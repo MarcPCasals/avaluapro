@@ -1,121 +1,73 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect } from 'react'
+import { Loader2 } from 'lucide-react'
+import { MainNavigation } from './components/MainNavigation'
+import { SemesterUtTabs } from './components/SemesterUtTabs'
+import { TopBar } from './components/TopBar'
+import { AnalyticsView } from './features/analytics/AnalyticsView'
+import { EvaluationView } from './features/evaluation/EvaluationView'
+import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
+import { TrackingView } from './features/tracking/TrackingView'
+import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const initialize = useAvaluaproStore((state) => state.initialize)
+  const status = useAvaluaproStore((state) => state.status)
+  const error = useAvaluaproStore((state) => state.error)
+  const cloud = useAvaluaproStore((state) => state.cloud)
+  const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
+  const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
+
+  useEffect(() => {
+    initialize()
+  }, [initialize])
+
+  if (status === 'loading' || status === 'idle') {
+    return (
+      <main className="loading-screen">
+        <Loader2 size={42} />
+        <p>Carregant Avaluapro V2...</p>
+      </main>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <main className="loading-screen error">
+        <h1>No s’han pogut carregar les dades locals.</h1>
+        <p>{error}</p>
+      </main>
+    )
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app-shell">
+      <TopBar />
+      {error && (
+        <div className="storage-alert">
+          <strong>{error}</strong>
+          <span>
+            Recomanació: descarrega una còpia de seguretat, elimina o arxiva dades antigues de
+            tasques i seguiment, i torna-ho a provar. Si el problema continua, contacta amb{' '}
+            <a href="mailto:mperezc@educand.ad">mperezc@educand.ad</a>.
+          </span>
         </div>
-        <div>
-          <h1>Hola Marc, soc Avaluapro</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+      )}
+      {cloud.error && (
+        <div className="storage-alert cloud-error">
+          <strong>No s’ha pogut sincronitzar amb Firebase.</strong>
+          <span>{cloud.error}</span>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      )}
+      <MainNavigation />
+      <SemesterUtTabs />
+      <main className="content-area">
+        {activeMode === 'evaluation' && <EvaluationView />}
+        {activeMode === 'tracking' && <TrackingView />}
+        {activeMode === 'analytics' && <AnalyticsView />}
+      </main>
+      {!defaultSubject && <TeacherProfileModal forceSetup onClose={() => {}} />}
+    </div>
   )
 }
 

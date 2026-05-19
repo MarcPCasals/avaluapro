@@ -1,0 +1,272 @@
+import {
+  BarChart3,
+  Cloud,
+  Download,
+  FileSpreadsheet,
+  GraduationCap,
+  HelpCircle,
+  LogIn,
+  LogOut,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  Settings,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { useRef, useState } from 'react'
+import { useAvaluaproStore } from '../store/useAvaluaproStore'
+import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
+import { NewClassModal } from '../features/classes/NewClassModal'
+import { DataSafetyModal } from '../features/data/DataSafetyModal'
+import { HelpCenterModal } from '../features/help/HelpCenterModal'
+import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
+import { buildBackupStatusMessage } from '../lib/backupDiagnostics'
+import { downloadBlob, downloadJson, getTodaySlug } from '../lib/downloads'
+import { calculateGrade } from '../lib/grades'
+
+const colorClass = {
+  blue: 'class-dot blue',
+  green: 'class-dot green',
+  yellow: 'class-dot yellow',
+  red: 'class-dot red',
+  purple: 'class-dot purple',
+  orange: 'class-dot orange',
+}
+
+function getCriterionMark(marks, studentId, criterionId) {
+  return marks.find((mark) => mark.studentId === studentId && mark.criterionId === criterionId)?.value || ''
+}
+
+function escapeCell(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+export function TopBar() {
+  const [showSettings, setShowSettings] = useState(false)
+  const [showNewClass, setShowNewClass] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
+  const [showDataSafety, setShowDataSafety] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const fileInputRef = useRef(null)
+  const classes = useAvaluaproStore((state) => state.classes)
+  const state = useAvaluaproStore()
+  const activeClassId = state.ui.activeClassId
+  const activeUtId = state.ui.activeUtId
+  const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
+  const createBackup = useAvaluaproStore((state) => state.createBackup)
+  const restoreBackup = useAvaluaproStore((state) => state.restoreBackup)
+  const cloud = useAvaluaproStore((state) => state.cloud)
+  const signInWithGoogle = useAvaluaproStore((state) => state.signInWithGoogle)
+  const signOutFromGoogle = useAvaluaproStore((state) => state.signOutFromGoogle)
+  const pushAllToCloud = useAvaluaproStore((state) => state.pushAllToCloud)
+  const pullFromCloud = useAvaluaproStore((state) => state.pullFromCloud)
+
+  function handleDownloadBackup() {
+    const backup = createBackup()
+    downloadJson(backup, `avaluapro-backup-complet-${getTodaySlug()}.json`)
+  }
+
+  function handleExportActiveUtExcel() {
+    const activeClass = state.classes.find((classItem) => classItem.id === activeClassId)
+    const activeUt = state.uts.find((ut) => ut.id === activeUtId)
+    const students = state.students
+      .filter((student) => student.classId === activeClassId)
+      .sort((a, b) => a.name.localeCompare(b.name))
+    const competencies = state.competencies
+      .filter((competency) => competency.utId === activeUtId)
+      .sort((a, b) => a.order - b.order)
+      .map((competency) => ({
+        ...competency,
+        criteria: state.criteria
+          .filter((criterion) => criterion.competencyId === competency.id)
+          .sort((a, b) => a.order - b.order),
+      }))
+
+    if (!activeClass || !activeUt || competencies.length === 0) {
+      window.alert('Aquesta UT encara no té competències actives per exportar.')
+      return
+    }
+
+    const headerCells = [
+      '<th>Alumne</th>',
+      '<th>Mig grup</th>',
+      ...competencies.flatMap((competency) => [
+        ...competency.criteria.map((criterion) => `<th>${escapeCell(competency.name)} · ${escapeCell(criterion.name)}</th>`),
+        `<th>${escapeCell(competency.name)} · Nota competència</th>`,
+      ]),
+    ].join('')
+
+    const bodyRows = students
+      .map((student) => {
+        const cells = [
+          `<td>${escapeCell(student.name)}</td>`,
+          `<td>${escapeCell(student.halfGroup || '')}</td>`,
+          ...competencies.flatMap((competency) => {
+            const criterionGrades = competency.criteria.map((criterion) =>
+              getCriterionMark(state.marks, student.id, criterion.id),
+            )
+            return [
+              ...criterionGrades.map((grade) => `<td>${escapeCell(grade || '-')}</td>`),
+              `<td><strong>${escapeCell(calculateGrade(criterionGrades) || '-')}</strong></td>`,
+            ]
+          }),
+        ].join('')
+        return `<tr>${cells}</tr>`
+      })
+      .join('')
+
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Arial, sans-serif; }
+            th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: center; }
+            th { background: #f3f4f6; font-weight: 700; }
+            td:first-child, th:first-child { text-align: left; min-width: 240px; }
+          </style>
+        </head>
+        <body>
+          <h2>${escapeCell(activeClass.name)} · ${escapeCell(activeUt.name)}</h2>
+          <table>
+            <thead><tr>${headerCells}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </body>
+      </html>`
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
+    downloadBlob(blob, `avaluapro-${activeClass.name}-${activeUt.name}-${getTodaySlug()}.xls`)
+  }
+
+  async function handleBackupFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const shouldRestore = window.confirm(
+      'Aquesta acció substituirà les dades locals actuals per les del backup seleccionat. Vols continuar?',
+    )
+    if (!shouldRestore) return
+
+    try {
+      const text = await file.text()
+      const backup = JSON.parse(text)
+      await restoreBackup(backup, { filename: file.name })
+      window.alert(`Backup restaurat correctament.\n\n${buildBackupStatusMessage(backup, file.name)}`)
+    } catch (error) {
+      window.alert(error.message || 'No s’ha pogut restaurar aquest backup.')
+    }
+  }
+
+  async function handlePullFromCloud() {
+    const shouldPull = window.confirm(
+      'Aquesta acció substituirà les dades locals actuals per les dades guardades a Firebase. Abans de continuar, és recomanable descarregar un backup local. Vols continuar?',
+    )
+    if (!shouldPull) return
+    await pullFromCloud()
+  }
+
+  return (
+    <header className="top-bar">
+      <div className="brand-card">
+        <GraduationCap size={28} />
+        <strong>
+          Avalua<span>Pro</span>
+        </strong>
+      </div>
+      <div className="brand-separator" />
+      <p className="author">Creat per Marc Pérez Casals</p>
+      <nav className="class-tabs" aria-label="Classes">
+        {classes.map((item) => (
+          <button
+            className={`class-tab ${item.id === activeClassId ? 'active' : ''}`}
+            key={item.id}
+            onClick={() => setActiveClass(item.id)}
+            type="button"
+          >
+            <span className={colorClass[item.color] || colorClass.blue} />
+            {item.name}
+          </button>
+        ))}
+        <button className="icon-button class-add" onClick={() => setShowNewClass(true)} title="Nova classe" type="button">
+          <Plus size={22} />
+        </button>
+      </nav>
+      <div className="top-actions">
+        <button className="icon-button" onClick={() => setShowSettings(true)} title="Configuració del grup" type="button">
+          <Settings size={22} />
+        </button>
+        <button className="icon-button" onClick={() => setShowHelp(true)} title="Ajuda i primera configuració" type="button">
+          <HelpCircle size={22} />
+        </button>
+        <span className="top-divider" />
+        {cloud.user ? (
+          <div className={`cloud-session ${cloud.status === 'syncing' ? 'syncing' : ''}`}>
+            <span title={cloud.user.email}>{cloud.user.email}</span>
+            <button className="icon-button blue-action" onClick={pushAllToCloud} title="Pujar dades locals a Firebase" type="button">
+              <Upload size={21} />
+            </button>
+            <button className="icon-button blue-action" onClick={handlePullFromCloud} title="Baixar dades de Firebase" type="button">
+              <Download size={21} />
+            </button>
+            <button className="icon-button" onClick={signOutFromGoogle} title="Tancar sessió" type="button">
+              <LogOut size={21} />
+            </button>
+          </div>
+        ) : (
+          <button className="google-login-button" onClick={signInWithGoogle} type="button">
+            <LogIn size={18} />
+            Inicia sessió
+          </button>
+        )}
+        <span className="top-divider" />
+        <button className="icon-button blue-action" onClick={() => setShowDataSafety(true)} title="Backups i seguretat de dades" type="button">
+          <Cloud size={23} />
+        </button>
+        <button className="icon-button" onClick={handleDownloadBackup} title="Descarregar backup" type="button">
+          <Download size={22} />
+        </button>
+        <button className="icon-button" onClick={() => fileInputRef.current?.click()} title="Importar backup" type="button">
+          <Upload size={22} />
+        </button>
+        <input
+          ref={fileInputRef}
+          accept="application/json,.json"
+          className="sr-only"
+          onChange={handleBackupFile}
+          type="file"
+        />
+        <button className="icon-button green-action" onClick={handleExportActiveUtExcel} title="Exportar notes de la UT activa a Excel" type="button">
+          <FileSpreadsheet size={22} />
+        </button>
+        <span className="top-divider" />
+        <button className="icon-button disabled" title="Desfer, propera iteració" type="button">
+          <RotateCcw size={22} />
+        </button>
+        <button className="icon-button disabled" title="Refer, propera iteració" type="button">
+          <RotateCw size={22} />
+        </button>
+        <span className="top-divider" />
+        <button className="icon-button red-action" onClick={resetToSeed} title="Reiniciar dades demo" type="button">
+          <Trash2 size={22} />
+        </button>
+        <button className="avatar-button" onClick={() => setShowProfile(true)} title="Perfil docent" type="button">
+          <BarChart3 size={18} />
+        </button>
+      </div>
+      {showSettings && (
+        <ClassSettingsModal classId={activeClassId} onClose={() => setShowSettings(false)} />
+      )}
+      {showNewClass && <NewClassModal onClose={() => setShowNewClass(false)} />}
+      {showDataSafety && <DataSafetyModal onClose={() => setShowDataSafety(false)} />}
+      {showHelp && <HelpCenterModal onClose={() => setShowHelp(false)} />}
+      {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
+    </header>
+  )
+}
