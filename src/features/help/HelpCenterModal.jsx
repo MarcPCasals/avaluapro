@@ -115,14 +115,6 @@ export function HelpCenterModal({ onClose }) {
             })}
           </div>
         </section>
-
-        <section className="help-reminder">
-          <strong>Recomanació pràctica</strong>
-          <p>
-            Abans d’ensenyar l’eina a altres professors, prepara una classe de prova, importa alumnes ficticis
-            i fes un backup. Això permet ensenyar el flux complet sense tocar dades reals.
-          </p>
-        </section>
       </div>
     </Modal>
   )

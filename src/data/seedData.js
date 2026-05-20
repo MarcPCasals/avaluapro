@@ -21,18 +21,18 @@ export const EMPTY_DATASET = COLLECTIONS.reduce(
 
 export const seedDataset = {
   classes: [
-    { id: 'class_2b', name: '2n B', color: 'green', order: 1 },
-    { id: 'class_2c', name: '2n C', color: 'blue', order: 2 },
-    { id: 'class_4e', name: '4t E', color: 'red', order: 3 },
+    { id: 'class_2b', name: '2n Demo', color: 'green', order: 1 },
+    { id: 'class_2c', name: '3r Demo', color: 'blue', order: 2 },
+    { id: 'class_4e', name: '4t Demo', color: 'red', order: 3 },
   ],
   students: [
-    { id: 'student_1', classId: 'class_2b', name: 'ALEIX MARSÀ, Íngrid', halfGroup: 'Grup A' },
-    { id: 'student_2', classId: 'class_2b', name: 'ALMEIDA RODRIGUEZ, Aitana', halfGroup: 'Grup B' },
-    { id: 'student_3', classId: 'class_2b', name: 'ALVARENGA PEREIRA, Noa', halfGroup: 'Grup B' },
-    { id: 'student_4', classId: 'class_2b', name: 'ARA FERNANDEZ, Lluc', halfGroup: 'Grup B' },
-    { id: 'student_5', classId: 'class_2b', name: 'ASENCIO NIETO, Clara', halfGroup: 'Grup B' },
-    { id: 'student_6', classId: 'class_2c', name: 'BENET RIBA, Nil', halfGroup: 'Grup A' },
-    { id: 'student_7', classId: 'class_4e', name: 'CODINA PONS, Júlia', halfGroup: 'Grup A' },
+    { id: 'student_1', classId: 'class_2b', name: 'PUJOL FONT, Marta', halfGroup: 'Grup A' },
+    { id: 'student_2', classId: 'class_2b', name: 'RIBA SALA, Marc', halfGroup: 'Grup B' },
+    { id: 'student_3', classId: 'class_2b', name: 'VIDAL TORRES, Laia', halfGroup: 'Grup B' },
+    { id: 'student_4', classId: 'class_2b', name: 'FERRER COSTA, Nil', halfGroup: 'Grup B' },
+    { id: 'student_5', classId: 'class_2b', name: 'ROCA SERRA, Júlia', halfGroup: 'Grup B' },
+    { id: 'student_6', classId: 'class_2c', name: 'MARTÍ VILA, Arnau', halfGroup: 'Grup A' },
+    { id: 'student_7', classId: 'class_4e', name: 'SOLER PRAT, Ona', halfGroup: 'Grup A' },
   ],
   semesters: [
     { id: 'sem_1', classId: 'class_2b', name: '1r Semestre', order: 1 },
@@ -99,8 +99,8 @@ export const seedDataset = {
     { id: 'rec_7', studentId: 'student_4', taskId: 'task_2', status: 'DONE' },
   ],
   behaviorEvents: [
-    { id: 'beh_1', classId: 'class_2b', studentId: 'student_2', type: 'incident', text: 'Interromp la sessió de treball.', date: '2026-09-19' },
-    { id: 'beh_2', classId: 'class_2b', studentId: 'student_4', type: 'positive', text: 'Ajuda el grup a organitzar-se.', date: '2026-09-21' },
+    { id: 'beh_1', classId: 'class_2b', studentId: 'student_2', type: 'incident', text: 'Necessita recordatori d’organització i material.', date: '2026-09-19' },
+    { id: 'beh_2', classId: 'class_2b', studentId: 'student_4', type: 'positive', text: 'Ajuda el grup a repartir rols i tancar la tasca.', date: '2026-09-21' },
   ],
   agendaNotes: [],
   seatingCharts: [],
