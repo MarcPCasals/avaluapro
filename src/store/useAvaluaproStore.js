@@ -14,6 +14,15 @@ import {
 const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
 const BACKUP_VERSION = 2
+const CLOUD_SYNC_DELAY_MS = 2500
+
+let cloudSyncTimer = null
+let cloudSyncInFlight = false
+const queuedCloudCollections = new Set()
+
+function getQueuedCloudCollections() {
+  return Array.from(queuedCloudCollections)
+}
 
 function readPreferences() {
   try {
@@ -142,21 +151,7 @@ async function persistCollections(set, get, collections) {
   try {
     await saveCollections(dataset, collections)
     if (state.cloud.user) {
-      set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
-      await saveCloudCollections(state.cloud.user.uid, dataset, collections, {
-        profile: state.profile,
-        preferences: readPreferences(),
-        user: state.cloud.user,
-      })
-      set((current) => ({
-        error: '',
-        cloud: {
-          ...current.cloud,
-          status: 'synced',
-          error: '',
-          lastSyncedAt: new Date().toISOString(),
-        },
-      }))
+      scheduleCloudSync(set, get, collections)
     } else {
       set({ error: '' })
     }
@@ -173,6 +168,97 @@ async function persistCollections(set, get, collections) {
     } else {
       set({ error: error.message || 'No s’han pogut guardar les dades locals.' })
     }
+  }
+}
+
+function scheduleCloudSync(set, get, collections) {
+  collections.forEach((collection) => queuedCloudCollections.add(collection))
+  if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+
+  set((current) => ({
+    error: '',
+    cloud: {
+      ...current.cloud,
+      status: cloudSyncInFlight ? 'syncing' : 'pending',
+      error: '',
+      pendingCollections: getQueuedCloudCollections(),
+    },
+  }))
+
+  cloudSyncTimer = setTimeout(() => {
+    flushQueuedCloudSync(set, get)
+  }, CLOUD_SYNC_DELAY_MS)
+}
+
+async function flushQueuedCloudSync(set, get) {
+  if (cloudSyncInFlight || queuedCloudCollections.size === 0) return
+
+  const state = get()
+  if (!state.cloud.user) return
+
+  const collectionsToSync = getQueuedCloudCollections()
+  queuedCloudCollections.clear()
+  cloudSyncInFlight = true
+
+  const dataset = collectionsToSync.reduce(
+    (nextDataset, collection) => ({ ...nextDataset, [collection]: get()[collection] }),
+    {},
+  )
+
+  set((current) => ({
+    cloud: {
+      ...current.cloud,
+      status: 'syncing',
+      error: '',
+      pendingCollections: collectionsToSync,
+    },
+  }))
+
+  try {
+    await saveCloudCollections(state.cloud.user.uid, dataset, collectionsToSync, {
+      profile: get().profile,
+      preferences: readPreferences(),
+      user: state.cloud.user,
+    })
+    cloudSyncInFlight = false
+
+    if (queuedCloudCollections.size > 0) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          status: 'pending',
+          error: '',
+          pendingCollections: getQueuedCloudCollections(),
+        },
+      }))
+      cloudSyncTimer = setTimeout(() => {
+        flushQueuedCloudSync(set, get)
+      }, CLOUD_SYNC_DELAY_MS)
+      return
+    }
+
+    set((current) => ({
+      error: '',
+      cloud: {
+        ...current.cloud,
+        status: 'synced',
+        error: '',
+        lastSyncedAt: new Date().toISOString(),
+        pendingCollections: [],
+      },
+    }))
+  } catch (error) {
+    collectionsToSync.forEach((collection) => queuedCloudCollections.add(collection))
+    cloudSyncInFlight = false
+    set((current) => ({
+      error: error.message || 'No s’han pogut guardar o sincronitzar les dades.',
+      cloud: {
+        ...current.cloud,
+        status: 'error',
+        error: error.message || 'No s’han pogut sincronitzar les dades amb Firebase.',
+        pendingCollections: getQueuedCloudCollections(),
+      },
+    }))
   }
 }
 
@@ -350,6 +436,7 @@ export const useAvaluaproStore = create((set, get) => ({
     status: 'signed-out',
     error: '',
     lastSyncedAt: '',
+    pendingCollections: [],
   },
   status: 'idle',
   error: '',
@@ -387,7 +474,9 @@ export const useAvaluaproStore = create((set, get) => ({
     set((state) => ({ cloud: { ...state.cloud, status: 'signing-in', error: '' } }))
     try {
       const user = await signInWithGoogle()
-      set((state) => ({ cloud: { ...state.cloud, user, status: 'signed-in', error: '' } }))
+      set((state) => ({
+        cloud: { ...state.cloud, user: user || state.cloud.user, status: user ? 'signed-in' : 'signing-in', error: '' },
+      }))
     } catch (error) {
       set((state) => ({
         cloud: {
@@ -419,6 +508,8 @@ export const useAvaluaproStore = create((set, get) => ({
   pushAllToCloud: async () => {
     const state = get()
     if (!state.cloud.user) return
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+    queuedCloudCollections.clear()
 
     set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
     try {
@@ -433,6 +524,7 @@ export const useAvaluaproStore = create((set, get) => ({
           status: 'synced',
           error: '',
           lastSyncedAt: new Date().toISOString(),
+          pendingCollections: [],
         },
       }))
     } catch (error) {
@@ -449,6 +541,8 @@ export const useAvaluaproStore = create((set, get) => ({
   pullFromCloud: async () => {
     const state = get()
     if (!state.cloud.user) return
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+    queuedCloudCollections.clear()
 
     set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
     try {
@@ -468,6 +562,7 @@ export const useAvaluaproStore = create((set, get) => ({
           status: 'synced',
           error: '',
           lastSyncedAt: new Date().toISOString(),
+          pendingCollections: [],
         },
       }))
     } catch (error) {

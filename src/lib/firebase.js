@@ -2,8 +2,9 @@ import { initializeApp } from 'firebase/app'
 import {
   GoogleAuthProvider,
   getAuth,
+  getRedirectResult,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from 'firebase/auth'
 import {
@@ -116,12 +117,15 @@ export function toCloudUser(user) {
 }
 
 export function observeFirebaseUser(callback) {
+  getRedirectResult(auth).catch((error) => {
+    console.warn('No s’ha pogut completar el retorn del login de Google.', error)
+  })
   return onAuthStateChanged(auth, (user) => callback(toCloudUser(user)))
 }
 
 export async function signInWithGoogle() {
-  const result = await signInWithPopup(auth, googleProvider)
-  return toCloudUser(result.user)
+  await signInWithRedirect(auth, googleProvider)
+  return null
 }
 
 export async function signOutFromGoogle() {

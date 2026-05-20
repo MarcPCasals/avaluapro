@@ -1,5 +1,7 @@
 import {
+  AlertCircle,
   BarChart3,
+  CheckCircle2,
   Cloud,
   Download,
   FileSpreadsheet,
@@ -7,6 +9,7 @@ import {
   HelpCircle,
   LogIn,
   LogOut,
+  Loader2,
   Plus,
   RotateCcw,
   RotateCw,
@@ -21,7 +24,7 @@ import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
-import { buildBackupStatusMessage } from '../lib/backupDiagnostics'
+import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
 import { downloadBlob, downloadJson, getTodaySlug } from '../lib/downloads'
 import { calculateGrade } from '../lib/grades'
 
@@ -46,6 +49,59 @@ function escapeCell(value) {
     .replaceAll('"', '&quot;')
 }
 
+function slugify(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function getBackupFilename(state) {
+  const userLabel = state.cloud.user?.email?.split('@')[0] || 'local'
+  return `avaluapro-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
+}
+
+function formatSyncTime(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' })
+}
+
+function getSyncIndicator(cloud) {
+  if (cloud.status === 'error') {
+    return { className: 'error', icon: AlertCircle, label: 'Error', detail: 'Revisa l’avís' }
+  }
+  if (cloud.status === 'syncing') {
+    return { className: 'syncing', icon: Loader2, label: 'Sincronitzant', detail: 'Pujant canvis' }
+  }
+  if (cloud.status === 'pending') {
+    return {
+      className: 'pending',
+      icon: Cloud,
+      label: 'Pendent',
+      detail: `${cloud.pendingCollections?.length || 1} bloc pendent`,
+    }
+  }
+  if (cloud.lastSyncedAt) {
+    return { className: 'synced', icon: CheckCircle2, label: 'Sincronitzat', detail: formatSyncTime(cloud.lastSyncedAt) }
+  }
+  return { className: 'signed-in', icon: Cloud, label: 'Connectat', detail: 'Sense sync encara' }
+}
+
+function buildRestoreMessage({ currentSummary, incomingSummary, source }) {
+  return [
+    `Estàs a punt de substituir les dades actuals per ${source}.`,
+    '',
+    `Ara tens: ${currentSummary.counts.classes} classes, ${currentSummary.counts.students} alumnes, ${currentSummary.counts.marks} notes i ${currentSummary.counts.tasks} tasques.`,
+    `Entraran: ${incomingSummary.counts.classes} classes, ${incomingSummary.counts.students} alumnes, ${incomingSummary.counts.marks} notes i ${incomingSummary.counts.tasks} tasques.`,
+    '',
+    'Recomanació: descarrega abans un backup de l’estat actual.',
+    '',
+    'Vols continuar?',
+  ].join('\n')
+}
+
 export function TopBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [showNewClass, setShowNewClass] = useState(false)
@@ -66,10 +122,12 @@ export function TopBar() {
   const signOutFromGoogle = useAvaluaproStore((state) => state.signOutFromGoogle)
   const pushAllToCloud = useAvaluaproStore((state) => state.pushAllToCloud)
   const pullFromCloud = useAvaluaproStore((state) => state.pullFromCloud)
+  const syncIndicator = getSyncIndicator(cloud)
+  const SyncIcon = syncIndicator.icon
 
   function handleDownloadBackup() {
     const backup = createBackup()
-    downloadJson(backup, `avaluapro-backup-complet-${getTodaySlug()}.json`)
+    downloadJson(backup, getBackupFilename(state))
   }
 
   function handleExportActiveUtExcel() {
@@ -149,14 +207,17 @@ export function TopBar() {
     event.target.value = ''
     if (!file) return
 
-    const shouldRestore = window.confirm(
-      'Aquesta acció substituirà les dades locals actuals per les del backup seleccionat. Vols continuar?',
-    )
-    if (!shouldRestore) return
-
     try {
       const text = await file.text()
       const backup = JSON.parse(text)
+      const shouldRestore = window.confirm(
+        buildRestoreMessage({
+          currentSummary: summarizeBackup(createBackup()),
+          incomingSummary: summarizeBackup(backup),
+          source: `el backup "${file.name}"`,
+        }),
+      )
+      if (!shouldRestore) return
       await restoreBackup(backup, { filename: file.name })
       window.alert(`Backup restaurat correctament.\n\n${buildBackupStatusMessage(backup, file.name)}`)
     } catch (error) {
@@ -166,10 +227,30 @@ export function TopBar() {
 
   async function handlePullFromCloud() {
     const shouldPull = window.confirm(
-      'Aquesta acció substituirà les dades locals actuals per les dades guardades a Firebase. Abans de continuar, és recomanable descarregar un backup local. Vols continuar?',
+      [
+        'Aquesta acció substituirà les dades locals actuals per les dades guardades a Firebase.',
+        '',
+        'Abans de continuar, és recomanable descarregar un backup local de l’estat actual.',
+        '',
+        'Vols continuar?',
+      ].join('\n'),
     )
     if (!shouldPull) return
     await pullFromCloud()
+  }
+
+  async function handleResetToSeed() {
+    const answer = window.prompt(
+      [
+        'Això esborrarà les dades actuals del dispositiu i tornarà a carregar les dades demo inicials.',
+        '',
+        'Descarrega un backup abans si vols conservar el que tens ara.',
+        '',
+        'Per confirmar, escriu ESBORRA.',
+      ].join('\n'),
+    )
+    if (answer !== 'ESBORRA') return
+    await resetToSeed()
   }
 
   return (
@@ -207,8 +288,15 @@ export function TopBar() {
         </button>
         <span className="top-divider" />
         {cloud.user ? (
-          <div className={`cloud-session ${cloud.status === 'syncing' ? 'syncing' : ''}`}>
+          <div className={`cloud-session ${syncIndicator.className}`}>
             <span title={cloud.user.email}>{cloud.user.email}</span>
+            <strong className="sync-pill" title={cloud.error || syncIndicator.label}>
+              <SyncIcon size={15} />
+              <span>
+                {syncIndicator.label}
+                <small>{syncIndicator.detail}</small>
+              </span>
+            </strong>
             <button className="icon-button blue-action" onClick={pushAllToCloud} title="Pujar dades locals a Firebase" type="button">
               <Upload size={21} />
             </button>
@@ -253,7 +341,7 @@ export function TopBar() {
           <RotateCw size={22} />
         </button>
         <span className="top-divider" />
-        <button className="icon-button red-action" onClick={resetToSeed} title="Reiniciar dades demo" type="button">
+        <button className="icon-button red-action" onClick={handleResetToSeed} title="Reiniciar dades demo" type="button">
           <Trash2 size={22} />
         </button>
         <button className="avatar-button" onClick={() => setShowProfile(true)} title="Perfil docent" type="button">

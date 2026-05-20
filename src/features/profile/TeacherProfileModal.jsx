@@ -26,6 +26,12 @@ export function TeacherProfileModal({ forceSetup = false, onClose }) {
             Això permet que les classes noves surtin preparades amb l’estructura de competències de la matèria.
             Si una classe és Projecte Integrador, Tutoria o un cas especial, la podràs canviar després.
           </p>
+          {forceSetup && (
+            <p>
+              Comences amb dades demo inicials perquè puguis veure com quedaran les taules, el seguiment i les estadístiques.
+              Quan vulguis començar de zero, fes servir el botó de la brossa de la barra superior per esborrar-les.
+            </p>
+          )}
         </section>
 
         <section className="setup-benefits">

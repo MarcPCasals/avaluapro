@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Database, Download, FileArchive, HardDrive, Info, Upload } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  Clock3,
+  Database,
+  Download,
+  FileArchive,
+  HardDrive,
+  Info,
+  Loader2,
+  Upload,
+} from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { COLLECTIONS } from '../../data/seedData'
 import { buildBackupStatusMessage, summarizeBackup } from '../../lib/backupDiagnostics'
@@ -13,6 +25,55 @@ function formatBytes(bytes = 0) {
   const units = ['B', 'KB', 'MB', 'GB']
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
+}
+
+function slugify(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function getBackupFilename(state) {
+  const userLabel = state.cloud.user?.email?.split('@')[0] || 'local'
+  return `avaluapro-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Encara no sincronitzat'
+  return new Date(value).toLocaleString('ca-ES')
+}
+
+function getCloudStatusText(cloud) {
+  if (!cloud.user) return 'No has iniciat sessió amb Google.'
+  if (cloud.status === 'pending') return 'Hi ha canvis locals pendents de pujar.'
+  if (cloud.status === 'syncing') return 'Sincronitzant dades amb Firebase.'
+  if (cloud.status === 'error') return cloud.error || 'Hi ha hagut un error de sincronització.'
+  if (cloud.lastSyncedAt) return `Última sincronització: ${formatDateTime(cloud.lastSyncedAt)}.`
+  return 'Sessió iniciada. Encara no hi ha cap sincronització registrada.'
+}
+
+function CloudStatusIcon({ status }) {
+  if (status === 'synced') return <CheckCircle2 size={20} />
+  if (status === 'pending') return <Clock3 size={20} />
+  if (status === 'syncing') return <Loader2 size={20} className="spin-icon" />
+  if (status === 'error') return <AlertTriangle size={20} />
+  return <Cloud size={20} />
+}
+
+function buildRestoreMessage({ currentSummary, incomingSummary, filename }) {
+  return [
+    `Aquesta acció substituirà totes les dades locals actuals pel backup "${filename}".`,
+    '',
+    `Ara tens: ${currentSummary.counts.classes} classes, ${currentSummary.counts.students} alumnes, ${currentSummary.counts.marks} notes i ${currentSummary.counts.tasks} tasques.`,
+    `El backup conté: ${incomingSummary.counts.classes} classes, ${incomingSummary.counts.students} alumnes, ${incomingSummary.counts.marks} notes i ${incomingSummary.counts.tasks} tasques.`,
+    '',
+    'Abans de continuar, assegura’t que tens una còpia recent si vols conservar l’estat actual.',
+    '',
+    'Vols continuar?',
+  ].join('\n')
 }
 
 function estimateDataUrlBytes(value = '') {
@@ -68,7 +129,7 @@ export function DataSafetyModal({ onClose }) {
   }, [])
 
   const handleDownloadBackup = () => {
-    downloadJson(createBackup(), `avaluapro-backup-complet-${getTodaySlug()}.json`)
+    downloadJson(createBackup(), getBackupFilename(state))
   }
 
   const handleRestoreFile = async (event) => {
@@ -76,16 +137,19 @@ export function DataSafetyModal({ onClose }) {
     event.target.value = ''
     if (!file) return
 
-    const shouldRestore = window.confirm(
-      'Aquesta acció substituirà totes les dades locals actuals per les del backup seleccionat. Abans de continuar, assegura’t que tens una còpia recent si vols conservar l’estat actual.',
-    )
-    if (!shouldRestore) return
-
     try {
       const text = await file.text()
       const backup = JSON.parse(text)
-      await restoreBackup(backup, { filename: file.name })
       const summary = summarizeBackup(backup)
+      const shouldRestore = window.confirm(
+        buildRestoreMessage({
+          currentSummary,
+          incomingSummary: summary,
+          filename: file.name,
+        }),
+      )
+      if (!shouldRestore) return
+      await restoreBackup(backup, { filename: file.name })
       setLastImportSummary({ filename: file.name, summary })
       setRestoreStatus(buildBackupStatusMessage(backup, file.name))
     } catch (error) {
@@ -106,13 +170,24 @@ export function DataSafetyModal({ onClose }) {
             <strong>Avaluapro desa les dades reals al dispositiu.</strong>
             <p>
               Classes, alumnes, fotos, llocs fixos, notes, tasques, comentaris, diagnòstics i rúbriques entren al backup complet.
-              El núvol queda preparat com a següent fase, però ara la còpia important és aquest fitxer.
+              Si inicies sessió amb Google, els canvis també es sincronitzen a Firebase de manera compartimentada.
             </p>
           </div>
           <button className="primary-action" onClick={handleDownloadBackup} type="button">
             <Download size={18} />
             Descarregar backup complet
           </button>
+        </section>
+
+        <section className={`backup-loaded-card cloud-${state.cloud.status}`}>
+          <CloudStatusIcon status={state.cloud.status} />
+          <div>
+            <strong>Estat de sincronització</strong>
+            <span>{getCloudStatusText(state.cloud)}</span>
+            {state.cloud.pendingCollections?.length > 0 && (
+              <small>{state.cloud.pendingCollections.length} col·leccions pendents</small>
+            )}
+          </div>
         </section>
 
         <section className="data-safety-grid">

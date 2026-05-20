@@ -179,7 +179,7 @@
   background: #1e293b;
 }
 
-.cloud-session span {
+.cloud-session > span {
   max-width: 170px;
   overflow: hidden;
   color: #bfdbfe;
@@ -188,9 +188,72 @@
   white-space: nowrap;
 }
 
+.cloud-session.syncing,
+.cloud-session.pending,
+.cloud-session.synced,
+.cloud-session.error {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+}
+
 .cloud-session.syncing {
   border-color: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+}
+
+.cloud-session.pending {
+  border-color: #facc15;
+}
+
+.cloud-session.synced {
+  border-color: #4ade80;
+}
+
+.cloud-session.error {
+  border-color: #f87171;
+}
+
+.sync-pill {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: #e5e7eb;
+  background: rgba(15, 23, 42, 0.42);
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.sync-pill > span {
+  display: grid;
+  gap: 1px;
+}
+
+.sync-pill small {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.cloud-session.synced .sync-pill svg,
+.cloud-session.synced .sync-pill {
+  color: #86efac;
+}
+
+.cloud-session.pending .sync-pill svg,
+.cloud-session.pending .sync-pill {
+  color: #fde68a;
+}
+
+.cloud-session.error .sync-pill svg,
+.cloud-session.error .sync-pill {
+  color: #fecaca;
+}
+
+.cloud-session.syncing .sync-pill svg,
+.spin-icon {
+  animation: spin 1s linear infinite;
 }
 
 .main-navigation {
