@@ -122,7 +122,7 @@ export function EvaluationView() {
 
   return (
     <section className="work-surface">
-      <div className="toolbar">
+      <div className="toolbar" data-tour="evaluation-toolbar">
         <button className="tool-button" onClick={() => setShowStructureModal(true)} type="button">
           <Pencil size={18} />
           Editar Taula
@@ -228,7 +228,7 @@ export function EvaluationView() {
           </div>
         </section>
       ) : (
-      <div className="grid-scroll">
+      <div className="grid-scroll" data-tour="evaluation-table">
         <table className="evaluation-table">
           <thead>
             <tr>
@@ -283,6 +283,7 @@ export function EvaluationView() {
                   <span className="student-index">{index + 1}.</span>
                   <button
                     className={`student-note-button ${noteState}`}
+                    data-tour={index === 0 ? 'student-comments' : undefined}
                     onClick={() => setAnnotationsStudentId(student.id)}
                     title="Anotacions personals"
                     type="button"

@@ -590,7 +590,7 @@ export function TrackingView() {
 
   return (
     <section className="work-surface">
-      <div className="toolbar">
+      <div className="toolbar" data-tour="tracking-toolbar">
         <button className="tool-button strong" onClick={() => setShowTaskModal(true)} type="button">
           Nova Tasca
         </button>
@@ -777,7 +777,7 @@ export function TrackingView() {
           {filteredStudents.length} de {students.length} alumnes visibles
         </span>
       </div>
-      <div className="grid-scroll">
+      <div className="grid-scroll" data-tour="tracking-table">
         <table className="tracking-table">
           <thead>
             <tr>
@@ -825,7 +825,7 @@ export function TrackingView() {
             </tr>
           </thead>
           <tbody>
-            {filteredStudents.map((student) => {
+            {filteredStudents.map((student, studentIndex) => {
               const stats = getStudentTrackingStats(student.id, taskRecords, tasks)
               const interventionInsight = insightByStudentId.get(student.id)
               const incidents = behaviorEvents.filter(
@@ -863,7 +863,7 @@ export function TrackingView() {
                         <small>{student.halfGroup}</small>
                       </button>
                     </div>
-                    <div className="student-flags">
+                    <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
                       <span
                         className={`red-point-stack ${redPointCount >= 3 ? 'warning' : ''}`}
                         title="Punts vermells per tasques no fetes"

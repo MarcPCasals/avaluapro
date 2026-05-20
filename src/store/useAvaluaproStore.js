@@ -15,6 +15,7 @@ const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
 const BACKUP_VERSION = 2
 const CLOUD_SYNC_DELAY_MS = 2500
+const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
@@ -62,6 +63,22 @@ function getInitialProfile() {
 
   return {
     defaultSubject: preferences.defaultSubject || '',
+  }
+}
+
+function getInitialOnboarding(hasStoredData) {
+  const preferences = readPreferences()
+  const demoMode =
+    Object.prototype.hasOwnProperty.call(preferences, 'demoMode')
+      ? Boolean(preferences.demoMode)
+      : !hasStoredData
+
+  return {
+    demoMode,
+    guideOpen:
+      Object.prototype.hasOwnProperty.call(preferences, 'guideOpen')
+        ? Boolean(preferences.guideOpen)
+        : demoMode,
   }
 }
 
@@ -430,6 +447,10 @@ export const useAvaluaproStore = create((set, get) => ({
   profile: {
     defaultSubject: '',
   },
+  onboarding: {
+    demoMode: false,
+    guideOpen: false,
+  },
   backupMeta: null,
   cloud: {
     user: null,
@@ -446,6 +467,14 @@ export const useAvaluaproStore = create((set, get) => ({
     try {
       const storedDataset = await loadDataset()
       const hasData = storedDataset.classes.length > 0
+      if (!hasData) {
+        writePreferences({
+          ...readPreferences(),
+          defaultSubject: DEMO_SUBJECT,
+          demoMode: true,
+          guideOpen: true,
+        })
+      }
       const dataset = normalizeDataset(hasData ? storedDataset : seedDataset)
       await saveDataset(dataset)
       observeFirebaseUser((user) => {
@@ -462,6 +491,7 @@ export const useAvaluaproStore = create((set, get) => ({
         ...dataset,
         ui: getInitialUi(dataset),
         profile: getInitialProfile(),
+        onboarding: getInitialOnboarding(hasData),
         backupMeta: getInitialBackupMeta(),
         status: 'ready',
       })
@@ -595,6 +625,47 @@ export const useAvaluaproStore = create((set, get) => ({
   setActiveMode: (activeMode) => setUiWithPreferences(set, { activeMode }),
   setActiveInsight: (activeInsight) => setUiWithPreferences(set, { activeInsight }),
   setDefaultSubject: (defaultSubject) => setProfileWithPreferences(set, { defaultSubject }),
+  setGuideOpen: (guideOpen) => {
+    set((state) => ({ onboarding: { ...state.onboarding, guideOpen } }))
+    writePreferences({ ...readPreferences(), guideOpen })
+  },
+  startOwnData: async () => {
+    const shouldStart = window.confirm(
+      [
+        'Això esborrarà les dades demo del dispositiu i començaràs amb una base buida.',
+        '',
+        'Després podràs triar la teva matèria, crear classes i afegir alumnes.',
+        '',
+        'Vols començar amb les teves pròpies dades?',
+      ].join('\n'),
+    )
+    if (!shouldStart) return false
+
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+    queuedCloudCollections.clear()
+    await resetDatabase()
+    await saveDataset(EMPTY_DATASET)
+    const ui = {
+      activeClassId: '',
+      activeSemesterId: '',
+      activeUtId: '',
+      activeMode: 'evaluation',
+      activeInsight: 'dashboard',
+    }
+    const profile = { defaultSubject: '' }
+    const onboarding = { demoMode: false, guideOpen: false }
+    writePreferences({ ...ui, ...profile, demoMode: false, guideOpen: false, backupMeta: null })
+    set({
+      ...EMPTY_DATASET,
+      ui,
+      profile,
+      onboarding,
+      backupMeta: null,
+      status: 'ready',
+      error: '',
+    })
+    return true
+  },
 
   addUt: async (semesterId) => {
     const semester = get().semesters.find((item) => item.id === semesterId)
@@ -1235,8 +1306,9 @@ export const useAvaluaproStore = create((set, get) => ({
     await resetDatabase()
     await saveDataset(dataset)
     const ui = getInitialUi(dataset)
-    const profile = getInitialProfile()
-    writePreferences({ ...readPreferences(), ...ui, backupMeta: null })
-    set({ ...dataset, ui, profile, backupMeta: null, status: 'ready', error: '' })
+    const profile = { defaultSubject: DEMO_SUBJECT }
+    const onboarding = { demoMode: true, guideOpen: true }
+    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: true, guideOpen: true, backupMeta: null })
+    set({ ...dataset, ui, profile, onboarding, backupMeta: null, status: 'ready', error: '' })
   },
 }))

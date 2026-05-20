@@ -18,7 +18,7 @@ export function MainNavigation() {
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
 
   return (
-    <div className="main-navigation">
+    <div className="main-navigation" data-tour="main-navigation">
       <div className="mode-tabs">
         {modes.map((mode) => {
           const Icon = mode.icon

@@ -1,14 +1,48 @@
 import { useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Info, Loader2, PlayCircle, Trash2 } from 'lucide-react'
 import { MainNavigation } from './components/MainNavigation'
 import { SemesterUtTabs } from './components/SemesterUtTabs'
 import { TopBar } from './components/TopBar'
 import { AnalyticsView } from './features/analytics/AnalyticsView'
 import { EvaluationView } from './features/evaluation/EvaluationView'
+import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
 import { TrackingView } from './features/tracking/TrackingView'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
+
+function DemoBanner() {
+  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+  const startOwnData = useAvaluaproStore((state) => state.startOwnData)
+
+  return (
+    <section className="demo-banner" data-tour="demo-banner">
+      <div className="demo-banner-copy">
+        <span className="demo-pill">
+          <Info size={16} />
+          Dades demo
+        </span>
+        <div>
+          <strong>Comences amb una aula inventada perquè vegis com funcionarà Avaluapro amb dades completes.</strong>
+          <p>
+            Les notes, tasques, comentaris i estadístiques són fictícies. Fes la guia interactiva i, quan estiguis a punt,
+            esborra la demo per començar amb la teva matèria, classes i alumnes.
+          </p>
+        </div>
+      </div>
+      <div className="demo-banner-actions">
+        <button className="secondary-action compact" onClick={() => setGuideOpen(true)} type="button">
+          <PlayCircle size={16} />
+          Veure guia
+        </button>
+        <button className="primary-action compact" data-tour="start-own-data" onClick={startOwnData} type="button">
+          <Trash2 size={16} />
+          Començar amb les meves dades
+        </button>
+      </div>
+    </section>
+  )
+}
 
 function App() {
   const initialize = useAvaluaproStore((state) => state.initialize)
@@ -17,6 +51,7 @@ function App() {
   const cloud = useAvaluaproStore((state) => state.cloud)
   const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
   const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
+  const onboarding = useAvaluaproStore((state) => state.onboarding)
 
   useEffect(() => {
     initialize()
@@ -43,6 +78,7 @@ function App() {
   return (
     <div className="app-shell">
       <TopBar />
+      {onboarding.demoMode && <DemoBanner />}
       {error && (
         <div className="storage-alert">
           <strong>{error}</strong>
@@ -66,7 +102,8 @@ function App() {
         {activeMode === 'tracking' && <TrackingView />}
         {activeMode === 'analytics' && <AnalyticsView />}
       </main>
-      {!defaultSubject && <TeacherProfileModal forceSetup onClose={() => {}} />}
+      {!defaultSubject && !onboarding.demoMode && <TeacherProfileModal forceSetup onClose={() => {}} />}
+      <GuidedTour />
     </div>
   )
 }

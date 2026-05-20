@@ -6,10 +6,12 @@ import {
   Database,
   GraduationCap,
   HelpCircle,
+  PlayCircle,
   ShieldCheck,
   Users,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const quickStart = [
   {
@@ -68,6 +70,13 @@ const helpSections = [
 ]
 
 export function HelpCenterModal({ onClose }) {
+  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+
+  const openGuidedTour = () => {
+    onClose()
+    window.requestAnimationFrame(() => setGuideOpen(true))
+  }
+
   return (
     <Modal onClose={onClose} size="xl" title="Ajuda i primera configuració">
       <div className="help-center">
@@ -82,6 +91,10 @@ export function HelpCenterModal({ onClose }) {
               Avaluapro és una eina de treball diari: primer ha de ser còmoda per passar classe,
               i després prou clara perquè qualsevol docent entengui què està mirant.
             </p>
+            <button className="primary-action compact" onClick={openGuidedTour} type="button">
+              <PlayCircle size={16} />
+              Obrir guia interactiva
+            </button>
           </div>
         </section>
 

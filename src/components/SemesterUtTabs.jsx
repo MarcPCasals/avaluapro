@@ -29,7 +29,7 @@ export function SemesterUtTabs() {
   const activeSemester = semesters.find((semester) => semester.id === activeSemesterId)
 
   return (
-    <div className="time-tabs">
+    <div className="time-tabs" data-tour="time-tabs">
       <div className="semester-tabs">
         {semesters.map((semester) => (
           <button

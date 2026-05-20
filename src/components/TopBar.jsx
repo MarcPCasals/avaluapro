@@ -266,7 +266,7 @@ export function TopBar() {
       </div>
       <div className="brand-separator" />
       <p className="author">Creat per Marc Pérez Casals</p>
-      <nav className="class-tabs" aria-label="Classes">
+      <nav className="class-tabs" aria-label="Classes" data-tour="class-tabs">
         {classes.map((item) => (
           <button
             className={`class-tab ${item.id === activeClassId ? 'active' : ''}`}
@@ -317,7 +317,7 @@ export function TopBar() {
           </button>
         )}
         <span className="top-divider" />
-        <div className="top-menu-wrapper">
+        <div className="top-menu-wrapper" data-tour="data-menu">
           <button
             className={`top-menu-trigger ${showDataMenu ? 'open' : ''}`}
             onClick={() => setShowDataMenu((value) => !value)}

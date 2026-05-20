@@ -19,89 +19,329 @@ export const EMPTY_DATASET = COLLECTIONS.reduce(
   {},
 )
 
+const DEMO_CLASS_ID = 'class_2b'
+const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
+
+const demoStudents = [
+  {
+    id: 'student_1',
+    classId: DEMO_CLASS_ID,
+    name: 'PUJOL FONT, Marta',
+    halfGroup: 'Grup A',
+    diagnoses: ['progress'],
+    personalNotes: 'Perfil molt autònom. Pot fer de referent quan el grup treballa per rols.',
+  },
+  {
+    id: 'student_2',
+    classId: DEMO_CLASS_ID,
+    name: 'RIBA SALA, Marc',
+    halfGroup: 'Grup B',
+    diagnoses: ['tdah'],
+    personalNotes: 'Li ajuda tenir passos curts i comprovacions visibles abans de tancar la tasca.',
+  },
+  {
+    id: 'student_3',
+    classId: DEMO_CLASS_ID,
+    name: 'VIDAL TORRES, Laia',
+    halfGroup: 'Grup A',
+    diagnoses: ['dyslexia'],
+    personalNotes: 'Treballa amb constància, però necessita suport per transformar idees en explicacions precises.',
+  },
+  {
+    id: 'student_4',
+    classId: DEMO_CLASS_ID,
+    name: 'FERRER COSTA, Nil',
+    halfGroup: 'Grup B',
+    diagnoses: ['qi-tdl'],
+    legacyTrackingPenaltyCount: 1,
+  },
+  { id: 'student_5', classId: DEMO_CLASS_ID, name: 'ROCA SERRA, Júlia', halfGroup: 'Grup A' },
+  { id: 'student_6', classId: DEMO_CLASS_ID, name: 'MARTÍ VILA, Arnau', halfGroup: 'Grup B' },
+  { id: 'student_7', classId: DEMO_CLASS_ID, name: 'SOLA PRAT, Ona', halfGroup: 'Grup A', diagnoses: ['tea'] },
+  { id: 'student_8', classId: DEMO_CLASS_ID, name: 'COSTA BATLLE, Biel', halfGroup: 'Grup B' },
+  { id: 'student_9', classId: DEMO_CLASS_ID, name: 'MIRALLES PONS, Clara', halfGroup: 'Grup A' },
+  { id: 'student_10', classId: DEMO_CLASS_ID, name: 'FARRÉ NOGUÉ, Pol', halfGroup: 'Grup B' },
+  { id: 'student_11', classId: DEMO_CLASS_ID, name: 'TORRES LLUCH, Aina', halfGroup: 'Grup A' },
+  { id: 'student_12', classId: DEMO_CLASS_ID, name: 'CASALS ORRI, Joel', halfGroup: 'Grup B', diagnoses: ['tdah', 'progress'] },
+  { id: 'student_13', classId: DEMO_CLASS_ID, name: 'BONELL RIERA, Emma', halfGroup: 'Grup A' },
+  { id: 'student_14', classId: DEMO_CLASS_ID, name: 'FONT GRAU, Iker', halfGroup: 'Grup B' },
+  { id: 'student_15', classId: DEMO_CLASS_ID, name: 'VILA CLAVEROL, Noa', halfGroup: 'Grup A' },
+  { id: 'student_16', classId: DEMO_CLASS_ID, name: 'PONS MATEU, Leo', halfGroup: 'Grup B' },
+  { id: 'student_17', classId: 'class_3d', name: 'MORER SERRA, Arlet', halfGroup: 'Grup A' },
+  { id: 'student_18', classId: 'class_3d', name: 'REIG COLL, Pau', halfGroup: 'Grup B' },
+  { id: 'student_19', classId: 'class_4e', name: 'DURAN PI, Jana', halfGroup: 'Grup A' },
+  { id: 'student_20', classId: 'class_4e', name: 'ESTEVE SOLÉ, Jan', halfGroup: 'Grup B' },
+]
+
+const semesters = [
+  { id: 'sem_1', classId: DEMO_CLASS_ID, name: '1r Semestre', order: 1 },
+  { id: 'sem_2', classId: DEMO_CLASS_ID, name: '2n Semestre', order: 2 },
+  { id: 'sem_3', classId: 'class_3d', name: '1r Semestre', order: 1 },
+  { id: 'sem_4', classId: 'class_3d', name: '2n Semestre', order: 2 },
+  { id: 'sem_5', classId: 'class_4e', name: '1r Semestre', order: 1 },
+  { id: 'sem_6', classId: 'class_4e', name: '2n Semestre', order: 2 },
+]
+
+const uts = [
+  { id: 'ut_1', classId: DEMO_CLASS_ID, semesterId: 'sem_1', name: 'UT1', order: 1 },
+  { id: 'ut_2', classId: DEMO_CLASS_ID, semesterId: 'sem_1', name: 'UT2', order: 2 },
+  { id: 'ut_3', classId: DEMO_CLASS_ID, semesterId: 'sem_2', name: 'UT3', order: 1 },
+  { id: 'ut_4', classId: DEMO_CLASS_ID, semesterId: 'sem_2', name: 'UT4', order: 2 },
+  { id: 'ut_3d_1', classId: 'class_3d', semesterId: 'sem_3', name: 'UT1', order: 1 },
+  { id: 'ut_3d_2', classId: 'class_3d', semesterId: 'sem_3', name: 'UT2', order: 2 },
+  { id: 'ut_3d_3', classId: 'class_3d', semesterId: 'sem_4', name: 'UT3', order: 1 },
+  { id: 'ut_3d_4', classId: 'class_3d', semesterId: 'sem_4', name: 'UT4', order: 2 },
+  { id: 'ut_4e_1', classId: 'class_4e', semesterId: 'sem_5', name: 'UT1', order: 1 },
+  { id: 'ut_4e_2', classId: 'class_4e', semesterId: 'sem_5', name: 'UT2', order: 2 },
+  { id: 'ut_4e_3', classId: 'class_4e', semesterId: 'sem_6', name: 'UT3', order: 1 },
+  { id: 'ut_4e_4', classId: 'class_4e', semesterId: 'sem_6', name: 'UT4', order: 2 },
+]
+
+const cfnCompetencies = [
+  {
+    code: 'c1',
+    name: 'C1: Modelització',
+    color: 'orange',
+    criteria: ['CA1: Rigor', 'CA2: Precisió'],
+  },
+  {
+    code: 'c2',
+    name: 'C2: Indagació',
+    color: 'green',
+    criteria: ['CA1: Pertinència', 'CA2: Rigor'],
+  },
+  {
+    code: 'c3',
+    name: 'C3: Argumentació',
+    color: 'purple',
+    criteria: ['CA1: Sentit crític', 'CA2: Coherència'],
+  },
+]
+
+function competencyId(utId, code) {
+  return `${utId}_${code}`
+}
+
+function criterionId(utId, code, index) {
+  return `${utId}_${code}_ca${index + 1}`
+}
+
+function buildCompetencies() {
+  return uts.flatMap((ut) => {
+    if (ut.classId !== DEMO_CLASS_ID) return []
+
+    return cfnCompetencies.map((competency, index) => ({
+      id: competencyId(ut.id, competency.code),
+      classId: ut.classId,
+      utId: ut.id,
+      name: competency.name,
+      color: competency.color,
+      order: index + 1,
+      source: 'demo-cfn',
+    }))
+  })
+}
+
+function buildCriteria() {
+  return uts.flatMap((ut) => {
+    if (ut.classId !== DEMO_CLASS_ID) return []
+
+    return cfnCompetencies.flatMap((competency) =>
+      competency.criteria.map((criterionName, index) => ({
+        id: criterionId(ut.id, competency.code, index),
+        competencyId: competencyId(ut.id, competency.code),
+        name: criterionName,
+        order: index + 1,
+        rubric: {
+          A: 'Descripció demo del nivell A: domini autònom i transferible.',
+          B: 'Descripció demo del nivell B: assoliment correcte amb algun ajust.',
+          C: 'Descripció demo del nivell C: assoliment fràgil que necessita reforç.',
+          D: 'Descripció demo del nivell D: no assolit encara.',
+        },
+      })),
+    )
+  })
+}
+
+const gradeProfiles = {
+  student_1: { ut_1: ['A', 'A', 'A'], ut_2: ['A', 'A', 'A'], ut_3: ['A', 'A', 'B'], ut_4: ['A', 'A', 'A'] },
+  student_2: { ut_1: ['A', 'B', 'B'], ut_2: ['B', 'B', 'B'], ut_3: ['A', 'B', 'B'], ut_4: ['B', 'B', 'B'] },
+  student_3: { ut_1: ['C', 'C', 'B'], ut_2: ['C', 'B', 'C'], ut_3: ['B', 'C', 'B'], ut_4: ['B', 'C', 'B'] },
+  student_4: { ut_1: ['D', 'D', 'C'], ut_2: ['D', 'C', 'D'], ut_3: ['C', 'D', 'D'], ut_4: ['D', 'D', 'C'] },
+  student_5: { ut_1: ['B', 'B', 'C'], ut_2: ['B', 'B', 'B'], ut_3: ['B', 'A', 'B'], ut_4: ['A', 'B', 'B'] },
+  student_6: { ut_1: ['C', 'B', 'C'], ut_2: ['C', 'C', 'B'], ut_3: ['C', 'B', 'C'], ut_4: ['B', 'C', 'C'] },
+  student_7: { ut_1: ['B', 'C', 'B'], ut_2: ['C', 'C', 'C'], ut_3: ['B', 'B', 'C'], ut_4: ['B', 'C', 'B'] },
+  student_8: { ut_1: ['D', 'C', 'D'], ut_2: ['C', 'D', 'C'], ut_3: ['D', 'C', 'D'], ut_4: ['C', 'C', 'D'] },
+  student_9: { ut_1: ['A', 'B', 'A'], ut_2: ['A', 'B', 'A'], ut_3: ['B', 'B', 'A'], ut_4: ['A', 'A', 'B'] },
+  student_10: { ut_1: ['C', 'D', 'C'], ut_2: ['B', 'C', 'C'], ut_3: ['B', 'B', 'C'], ut_4: ['B', 'B', 'B'] },
+  student_11: { ut_1: ['B', 'B', 'B'], ut_2: ['B', 'A', 'B'], ut_3: ['A', 'B', 'A'], ut_4: ['A', 'B', 'A'] },
+  student_12: { ut_1: ['A', 'A', 'B'], ut_2: ['B', 'A', 'B'], ut_3: ['B', 'B', 'B'], ut_4: ['C', 'B', 'B'] },
+  student_13: { ut_1: ['C', 'C', 'D'], ut_2: ['C', 'C', 'C'], ut_3: ['C', 'B', 'C'], ut_4: ['B', 'B', 'C'] },
+  student_14: { ut_1: ['D', 'D', 'D'], ut_2: ['D', 'C', 'D'], ut_3: ['D', 'D', 'C'], ut_4: ['D', 'C', 'C'] },
+  student_15: { ut_1: ['B', 'C', 'B'], ut_2: ['B', 'B', 'B'], ut_3: ['A', 'B', 'B'], ut_4: ['A', 'A', 'B'] },
+  student_16: { ut_1: ['C', 'D', 'C'], ut_2: ['C', 'C', 'D'], ut_3: ['B', 'C', 'C'], ut_4: ['B', 'C', 'B'] },
+}
+
+const criterionPairsByGrade = {
+  A: ['A', 'A'],
+  B: ['B', 'B'],
+  C: ['C', 'C'],
+  D: ['D', 'D'],
+}
+
+function buildMarks() {
+  return Object.entries(gradeProfiles).flatMap(([studentId, utGrades]) =>
+    Object.entries(utGrades).flatMap(([utId, grades]) =>
+      cfnCompetencies.flatMap((competency, competencyIndex) =>
+        criterionPairsByGrade[grades[competencyIndex]].map((value, criterionIndex) => ({
+          id: `mark_${studentId}_${utId}_${competency.code}_${criterionIndex + 1}`,
+          studentId,
+          criterionId: criterionId(utId, competency.code, criterionIndex),
+          value,
+        })),
+      ),
+    ),
+  )
+}
+
+const tasks = [
+  { id: 'task_1', classId: DEMO_CLASS_ID, utId: 'ut_1', title: 'Recerca inicial', date: '2026-09-18', order: 1 },
+  { id: 'task_2', classId: DEMO_CLASS_ID, utId: 'ut_1', title: 'Fonts i evidències', date: '2026-09-25', order: 2 },
+  { id: 'task_3', classId: DEMO_CLASS_ID, utId: 'ut_1', title: 'Hipòtesi i variables', date: '2026-10-02', order: 3 },
+  { id: 'task_4', classId: DEMO_CLASS_ID, utId: 'ut_1', title: 'Síntesi oral', date: '2026-10-09', order: 4 },
+  { id: 'task_5', classId: DEMO_CLASS_ID, utId: 'ut_2', title: 'Model de partícules', date: '2026-11-06', order: 1 },
+  { id: 'task_6', classId: DEMO_CLASS_ID, utId: 'ut_2', title: 'Problemes guiats', date: '2026-11-13', order: 2 },
+  { id: 'task_7', classId: DEMO_CLASS_ID, utId: 'ut_3', title: 'Disseny experimental', date: '2027-02-05', order: 1 },
+]
+
+const taskStatusProfiles = {
+  student_1: ['DONE', 'DONE', 'DONE', 'DONE'],
+  student_2: ['DONE', 'LATE', 'MISSING', 'DONE'],
+  student_3: ['DONE', 'DONE', 'DONE', 'DONE'],
+  student_4: ['MISSING', 'MISSING', 'LATE', 'MISSING'],
+  student_5: ['DONE', 'LATE', 'DONE', 'DONE'],
+  student_6: ['DONE', 'MISSING', 'DONE', 'LATE'],
+  student_7: ['DONE', 'DONE', 'EXEMPT', 'DONE'],
+  student_8: ['MISSING', 'DONE', 'MISSING', 'LATE'],
+  student_9: ['DONE', 'DONE', 'DONE', 'DONE'],
+  student_10: ['LATE', 'DONE', 'DONE', 'DONE'],
+  student_11: ['DONE', 'DONE', 'DONE', 'LATE'],
+  student_12: ['MISSING', 'LATE', 'MISSING', 'DONE'],
+  student_13: ['DONE', 'MISSING', 'LATE', 'DONE'],
+  student_14: ['MISSING', 'MISSING', 'MISSING', 'LATE'],
+  student_15: ['DONE', 'DONE', 'DONE', 'DONE'],
+  student_16: ['LATE', 'MISSING', 'DONE', 'EXEMPT'],
+}
+
+function buildTaskRecords() {
+  return Object.entries(taskStatusProfiles).flatMap(([studentId, statuses]) =>
+    statuses.map((status, index) => ({
+      id: `rec_${studentId}_${index + 1}`,
+      classId: DEMO_CLASS_ID,
+      utId: 'ut_1',
+      studentId,
+      taskId: tasks[index].id,
+      status,
+      note:
+        status === 'LATE'
+          ? 'Demo: tasca començada però incompleta el dia de revisió.'
+          : status === 'MISSING'
+            ? 'Demo: no constava entrega en el moment de classe.'
+            : '',
+    })),
+  )
+}
+
 export const seedDataset = {
   classes: [
-    { id: 'class_2b', name: '2n Demo', color: 'green', order: 1 },
-    { id: 'class_2c', name: '3r Demo', color: 'blue', order: 2 },
-    { id: 'class_4e', name: '4t Demo', color: 'red', order: 3 },
+    { id: DEMO_CLASS_ID, name: '2n Demo', subject: DEMO_SUBJECT, color: 'green', order: 1, utModelReady: true },
+    { id: 'class_3d', name: '3r Demo', subject: DEMO_SUBJECT, color: 'blue', order: 2, utModelReady: true },
+    { id: 'class_4e', name: '4t Demo', subject: DEMO_SUBJECT, color: 'red', order: 3, utModelReady: true },
   ],
-  students: [
-    { id: 'student_1', classId: 'class_2b', name: 'PUJOL FONT, Marta', halfGroup: 'Grup A' },
-    { id: 'student_2', classId: 'class_2b', name: 'RIBA SALA, Marc', halfGroup: 'Grup B' },
-    { id: 'student_3', classId: 'class_2b', name: 'VIDAL TORRES, Laia', halfGroup: 'Grup B' },
-    { id: 'student_4', classId: 'class_2b', name: 'FERRER COSTA, Nil', halfGroup: 'Grup B' },
-    { id: 'student_5', classId: 'class_2b', name: 'ROCA SERRA, Júlia', halfGroup: 'Grup B' },
-    { id: 'student_6', classId: 'class_2c', name: 'MARTÍ VILA, Arnau', halfGroup: 'Grup A' },
-    { id: 'student_7', classId: 'class_4e', name: 'SOLER PRAT, Ona', halfGroup: 'Grup A' },
-  ],
-  semesters: [
-    { id: 'sem_1', classId: 'class_2b', name: '1r Semestre', order: 1 },
-    { id: 'sem_2', classId: 'class_2b', name: '2n Semestre', order: 2 },
-    { id: 'sem_3', classId: 'class_2c', name: '1r Semestre', order: 1 },
-    { id: 'sem_4', classId: 'class_4e', name: '1r Semestre', order: 1 },
-  ],
-  uts: [
-    { id: 'ut_1', classId: 'class_2b', semesterId: 'sem_1', name: 'UT1', order: 1 },
-    { id: 'ut_2', classId: 'class_2b', semesterId: 'sem_1', name: 'UT2', order: 2 },
-    { id: 'ut_trans_1', classId: 'class_2b', semesterId: 'sem_1', name: 'Transversals', order: 3 },
-    { id: 'ut_3', classId: 'class_2b', semesterId: 'sem_2', name: 'UT3', order: 1 },
-    { id: 'ut_2c_1', classId: 'class_2c', semesterId: 'sem_3', name: 'UT1', order: 1 },
-    { id: 'ut_4e_1', classId: 'class_4e', semesterId: 'sem_4', name: 'UT1', order: 1 },
-  ],
-  competencies: [
-    { id: 'comp_invest', classId: 'class_2b', utId: 'ut_1', name: 'C2: Investigació', color: 'green', order: 1 },
-    { id: 'comp_com', classId: 'class_2b', utId: 'ut_1', name: 'C4: Comunicació', color: 'blue', order: 2 },
-    { id: 'comp_2c', classId: 'class_2c', utId: 'ut_2c_1', name: 'C1: Emprenedoria', color: 'orange', order: 1 },
-    { id: 'comp_4e', classId: 'class_4e', utId: 'ut_4e_1', name: 'C3: Relacions positives', color: 'purple', order: 1 },
-  ],
-  criteria: [
-    { id: 'crit_pert', competencyId: 'comp_invest', name: 'CA2.1: Pertinència', order: 1 },
-    { id: 'crit_rigor', competencyId: 'comp_invest', name: 'CA2.2: Rigor', order: 2 },
-    { id: 'crit_claredat', competencyId: 'comp_com', name: 'CA4.1: Claredat', order: 1 },
-    { id: 'crit_2c', competencyId: 'comp_2c', name: 'CA1.1: Iniciativa', order: 1 },
-    { id: 'crit_4e', competencyId: 'comp_4e', name: 'CA3.1: Cooperació', order: 1 },
-  ],
-  indicators: [
-    { id: 'ind_112', criterionId: 'crit_pert', name: 'I1.1.2', description: 'Formula preguntes pertinents.', order: 1 },
-    { id: 'ind_212', criterionId: 'crit_pert', name: 'I2.1.2', description: 'Selecciona informació útil.', order: 2 },
-    { id: 'ind_312', criterionId: 'crit_pert', name: 'I3.1.2', description: 'Relaciona fonts diverses.', order: 3 },
-    { id: 'ind_122', criterionId: 'crit_rigor', name: 'I1.2.2', description: 'Contrasta evidències.', order: 1 },
-    { id: 'ind_222', criterionId: 'crit_rigor', name: 'I2.2.2', description: 'Justifica conclusions.', order: 2 },
-    { id: 'ind_412', criterionId: 'crit_claredat', name: 'I4.1.2', description: 'Comunica amb precisió.', order: 1 },
-    { id: 'ind_2c', criterionId: 'crit_2c', name: 'I1.1.1', description: 'Proposa millores.', order: 1 },
-    { id: 'ind_4e', criterionId: 'crit_4e', name: 'I3.1.1', description: 'Treballa en equip.', order: 1 },
-  ],
-  marks: [
-    { id: 'mark_1', studentId: 'student_1', criterionId: 'crit_pert', value: 'B' },
-    { id: 'mark_2', studentId: 'student_1', criterionId: 'crit_rigor', value: 'D' },
-    { id: 'mark_3', studentId: 'student_1', criterionId: 'crit_claredat', value: 'C' },
-    { id: 'mark_4', studentId: 'student_2', criterionId: 'crit_pert', value: 'A' },
-    { id: 'mark_5', studentId: 'student_2', criterionId: 'crit_rigor', value: 'B' },
-    { id: 'mark_6', studentId: 'student_2', criterionId: 'crit_claredat', value: 'D' },
-    { id: 'mark_7', studentId: 'student_3', criterionId: 'crit_pert', value: 'A' },
-    { id: 'mark_8', studentId: 'student_3', criterionId: 'crit_rigor', value: 'B' },
-    { id: 'mark_9', studentId: 'student_4', criterionId: 'crit_pert', value: 'A' },
-    { id: 'mark_10', studentId: 'student_4', criterionId: 'crit_rigor', value: 'A' },
-  ],
-  tasks: [
-    { id: 'task_1', classId: 'class_2b', utId: 'ut_1', title: 'Recerca inicial', date: '2026-09-18', order: 1 },
-    { id: 'task_2', classId: 'class_2b', utId: 'ut_1', title: 'Fonts i evidències', date: '2026-09-25', order: 2 },
-    { id: 'task_3', classId: 'class_2b', utId: 'ut_1', title: 'Síntesi oral', date: '2026-10-02', order: 3 },
-    { id: 'task_4', classId: 'class_2c', utId: 'ut_2c_1', title: 'Proposta de projecte', date: '2026-09-20', order: 1 },
-  ],
-  taskRecords: [
-    { id: 'rec_1', studentId: 'student_1', taskId: 'task_1', status: 'DONE' },
-    { id: 'rec_2', studentId: 'student_1', taskId: 'task_2', status: 'LATE' },
-    { id: 'rec_3', studentId: 'student_2', taskId: 'task_1', status: 'DONE' },
-    { id: 'rec_4', studentId: 'student_2', taskId: 'task_2', status: 'MISSING' },
-    { id: 'rec_5', studentId: 'student_3', taskId: 'task_1', status: 'DONE' },
-    { id: 'rec_6', studentId: 'student_4', taskId: 'task_1', status: 'DONE' },
-    { id: 'rec_7', studentId: 'student_4', taskId: 'task_2', status: 'DONE' },
-  ],
+  students: demoStudents,
+  semesters,
+  uts,
+  competencies: buildCompetencies(),
+  criteria: buildCriteria(),
+  indicators: [],
+  marks: buildMarks(),
+  tasks,
+  taskRecords: buildTaskRecords(),
   behaviorEvents: [
-    { id: 'beh_1', classId: 'class_2b', studentId: 'student_2', type: 'incident', text: 'Necessita recordatori d’organització i material.', date: '2026-09-19' },
-    { id: 'beh_2', classId: 'class_2b', studentId: 'student_4', type: 'positive', text: 'Ajuda el grup a repartir rols i tancar la tasca.', date: '2026-09-21' },
+    {
+      id: 'beh_1',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_2',
+      type: 'incident',
+      text: 'Demo: necessita recordatori per mantenir material i ritme de treball.',
+      date: '2026-09-19',
+    },
+    {
+      id: 'beh_2',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_4',
+      type: 'incident',
+      text: 'Demo: interromp la sessió quan el grup treballa de manera autònoma.',
+      date: '2026-09-22',
+    },
+    {
+      id: 'beh_3',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_4',
+      type: 'incident',
+      text: 'Demo: cal reconduir-lo diverses vegades durant la posada en comú.',
+      date: '2026-09-29',
+    },
+    {
+      id: 'beh_4',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_8',
+      type: 'incident',
+      text: 'Demo: evita començar la tasca fins que rep una indicació individual.',
+      date: '2026-10-01',
+    },
+    {
+      id: 'beh_5',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_1',
+      type: 'positive',
+      text: 'Demo: ajuda el grup a repartir rols i comprovar evidències.',
+      date: '2026-09-21',
+    },
+    {
+      id: 'beh_6',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_11',
+      type: 'positive',
+      text: 'Demo: millora la qualitat de les justificacions respecte la UT anterior.',
+      date: '2026-10-03',
+    },
   ],
-  agendaNotes: [],
+  agendaNotes: [
+    {
+      id: 'note_1',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_3',
+      type: 'team',
+      text: 'Demo: a l’equip educatiu es recomana reforçar vocabulari científic abans de les exposicions.',
+      date: '2026-09-28',
+    },
+    {
+      id: 'note_2',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_12',
+      type: 'tutoring',
+      text: 'Demo: la família comenta que treballa millor si sap exactament què s’espera de cada criteri.',
+      date: '2026-10-04',
+    },
+    {
+      id: 'note_3',
+      classId: DEMO_CLASS_ID,
+      studentId: 'student_4',
+      type: 'tracking',
+      text: 'Demo: cal avisar agenda si acumula una altra tasca no feta.',
+      date: '2026-10-06',
+    },
+  ],
   seatingCharts: [],
 }

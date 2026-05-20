@@ -2243,7 +2243,7 @@ export function AnalyticsView() {
 
       <GradeUtMatrix matrix={gradeMatrix} setInfo={setSelectedInfo} />
 
-      <section className="global-diagnosis">
+      <section className="global-diagnosis" data-tour="stats-global">
         <div className="global-diagnosis-title">
           <Brain size={24} />
           <div>
