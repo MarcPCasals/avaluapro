@@ -1,11 +1,11 @@
 import {
   AlertCircle,
   BarChart3,
+  ChevronDown,
   CheckCircle2,
   Cloud,
   Download,
   FileSpreadsheet,
-  GraduationCap,
   HelpCircle,
   LogIn,
   LogOut,
@@ -36,6 +36,8 @@ const colorClass = {
   purple: 'class-dot purple',
   orange: 'class-dot orange',
 }
+
+const APP_ICON_URL = `${import.meta.env.BASE_URL}avaluapro-icon.png`
 
 function getCriterionMark(marks, studentId, criterionId) {
   return marks.find((mark) => mark.studentId === studentId && mark.criterionId === criterionId)?.value || ''
@@ -107,6 +109,7 @@ export function TopBar() {
   const [showNewClass, setShowNewClass] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showDataSafety, setShowDataSafety] = useState(false)
+  const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const fileInputRef = useRef(null)
   const classes = useAvaluaproStore((state) => state.classes)
@@ -256,7 +259,7 @@ export function TopBar() {
   return (
     <header className="top-bar">
       <div className="brand-card">
-        <GraduationCap size={28} />
+        <img alt="" src={APP_ICON_URL} />
         <strong>
           Avalua<span>Pro</span>
         </strong>
@@ -314,15 +317,86 @@ export function TopBar() {
           </button>
         )}
         <span className="top-divider" />
-        <button className="icon-button blue-action" onClick={() => setShowDataSafety(true)} title="Backups i seguretat de dades" type="button">
-          <Cloud size={23} />
-        </button>
-        <button className="icon-button" onClick={handleDownloadBackup} title="Descarregar backup" type="button">
-          <Download size={22} />
-        </button>
-        <button className="icon-button" onClick={() => fileInputRef.current?.click()} title="Importar backup" type="button">
-          <Upload size={22} />
-        </button>
+        <div className="top-menu-wrapper">
+          <button
+            className={`top-menu-trigger ${showDataMenu ? 'open' : ''}`}
+            onClick={() => setShowDataMenu((value) => !value)}
+            type="button"
+          >
+            <Cloud size={20} />
+            <span>Dades</span>
+            <ChevronDown size={17} />
+          </button>
+          {showDataMenu && (
+            <div className="top-menu-panel">
+              <button
+                onClick={() => {
+                  setShowDataSafety(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Cloud size={18} />
+                Backups i estat
+              </button>
+              <button
+                onClick={() => {
+                  handleDownloadBackup()
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Download size={18} />
+                Descarregar backup
+              </button>
+              <button
+                onClick={() => {
+                  fileInputRef.current?.click()
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Upload size={18} />
+                Importar backup
+              </button>
+              <button
+                onClick={() => {
+                  handleExportActiveUtExcel()
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <FileSpreadsheet size={18} />
+                Exportar notes UT
+              </button>
+              {cloud.user && (
+                <>
+                  <span className="top-menu-separator" />
+                  <button
+                    onClick={() => {
+                      pushAllToCloud()
+                      setShowDataMenu(false)
+                    }}
+                    type="button"
+                  >
+                    <Upload size={18} />
+                    Pujar a Firebase
+                  </button>
+                  <button
+                    onClick={() => {
+                      handlePullFromCloud()
+                      setShowDataMenu(false)
+                    }}
+                    type="button"
+                  >
+                    <Download size={18} />
+                    Baixar de Firebase
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           accept="application/json,.json"
@@ -330,9 +404,6 @@ export function TopBar() {
           onChange={handleBackupFile}
           type="file"
         />
-        <button className="icon-button green-action" onClick={handleExportActiveUtExcel} title="Exportar notes de la UT activa a Excel" type="button">
-          <FileSpreadsheet size={22} />
-        </button>
         <span className="top-divider" />
         <button className="icon-button disabled" title="Desfer, propera iteració" type="button">
           <RotateCcw size={22} />
