@@ -1832,6 +1832,77 @@
   margin-bottom: 16px;
 }
 
+.dashboard-scope-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.dashboard-scope-tabs button {
+  min-height: 58px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #475569;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-scope-tabs button:hover,
+.dashboard-scope-tabs button.active {
+  border-color: #f97316;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.dashboard-scope-tabs strong {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.dashboard-scope-tabs span {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-data-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 13px 15px;
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.empty-data-notice strong {
+  color: #78350f;
+  font-weight: 950;
+}
+
+.empty-data-notice p {
+  margin: 2px 0 0;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .grade-ut-matrix,
 .global-diagnosis,
 .visual-card,
@@ -1842,6 +1913,10 @@
   border-radius: 8px;
   background: white;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.action-list-grid.single-column {
+  grid-template-columns: 1fr;
 }
 
 .grade-ut-matrix {
@@ -2474,6 +2549,32 @@
     linear-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px),
     linear-gradient(135deg, #fff7ed 0 50%, #f0fdf4 50% 100%);
   background-size: auto, auto, 20% 20%, 20% 20%, 100% 100%;
+}
+
+.scatter-empty-state {
+  position: absolute;
+  inset: 64px 52px;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.78);
+  text-align: center;
+}
+
+.scatter-empty-state strong {
+  color: #1f2937;
+  font-size: 15px;
+}
+
+.scatter-empty-state span {
+  max-width: 320px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .scatter-dot {

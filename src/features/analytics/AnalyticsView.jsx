@@ -40,6 +40,29 @@ const insightCopy = {
   },
 }
 
+const dashboardScopes = [
+  {
+    id: 'executive',
+    label: 'Resum',
+    description: 'Decisions ràpides i diagnòstic principal.',
+  },
+  {
+    id: 'evaluation',
+    label: 'Avaluació',
+    description: 'Notes, UTs, competències i evolució.',
+  },
+  {
+    id: 'tracking',
+    label: 'Seguiment',
+    description: 'Constància, hàbits i avisos.',
+  },
+  {
+    id: 'cross',
+    label: 'Anàlisi creuada',
+    description: 'Rendiment, constància i comportament junts.',
+  },
+]
+
 const gradeOrder = ['A', 'B', 'C', 'D']
 const gradeLabels = {
   A: 'Alt assoliment',
@@ -141,6 +164,18 @@ function InfoModal({ info, onClose }) {
   )
 }
 
+function EmptyDataNotice({ text, title }) {
+  return (
+    <div className="empty-data-notice">
+      <AlertTriangle size={18} />
+      <div>
+        <strong>{title}</strong>
+        <p>{text}</p>
+      </div>
+    </div>
+  )
+}
+
 function MetricCard({ className = '', help, label, onClick, setInfo, value, helper }) {
   const content = (
     <>
@@ -173,6 +208,24 @@ function MetricCard({ className = '', help, label, onClick, setInfo, value, help
   }
 
   return <article className={`metric-card ${className}`}>{content}</article>
+}
+
+function DashboardScopeTabs({ activeScope, onChange }) {
+  return (
+    <section className="dashboard-scope-tabs" aria-label="Filtrar estadístiques globals">
+      {dashboardScopes.map((scope) => (
+        <button
+          className={activeScope === scope.id ? 'active' : ''}
+          key={scope.id}
+          onClick={() => onChange(scope.id)}
+          type="button"
+        >
+          <strong>{scope.label}</strong>
+          <span>{scope.description}</span>
+        </button>
+      ))}
+    </section>
+  )
 }
 
 function getConsistencyLabel(tracking) {
@@ -817,6 +870,7 @@ function PriorityCard({ balance, setInfo }) {
 }
 
 function ScatterCard({ onSelectProfile, profiles, setInfo }) {
+  const visibleProfiles = profiles.filter((profile) => profile.evaluation.score > 0 && profile.tracking.hasTrackingData)
   const getScatterPosition = (profile, index) => {
     const baseX = profile.tracking.hasTrackingData ? 8 + Math.min(100, Math.max(0, profile.tracking.consistency)) * 0.84 : 50
     const score = profile.evaluation.score > 0 ? profile.evaluation.score : 1
@@ -842,7 +896,13 @@ function ScatterCard({ onSelectProfile, profiles, setInfo }) {
       <div className="scatter-plot" aria-label="Relació entre constància i rendiment">
         <span className="axis x">Constància</span>
         <span className="axis y">Rendiment</span>
-        {profiles.map((profile, index) => {
+        {visibleProfiles.length === 0 && (
+          <div className="scatter-empty-state">
+            <strong>Sense dades suficients</strong>
+            <span>Cal tenir notes i tasques avaluables per situar els alumnes en aquest gràfic.</span>
+          </div>
+        )}
+        {visibleProfiles.map((profile, index) => {
           const { x, y } = getScatterPosition(profile, index)
           return (
             <button
@@ -1230,6 +1290,31 @@ function ActionList({ title, icon: Icon, profiles, emptyText, helpKey, setInfo }
             <span>{profile.student.name}</span>
             <small>
               {profile.evaluation.grade || '-'} · {getConsistencyLabel(profile.tracking)} · {profile.incidents} incid.
+            </small>
+          </div>
+        ))
+      )}
+    </article>
+  )
+}
+
+function TrackingActionList({ emptyText, icon: Icon, profiles, setInfo, title }) {
+  return (
+    <article className="action-list-card tracking-only">
+      <InfoButton label={title} onOpen={() => setInfo({ title, text: chartHelp.trackingSummary })} />
+      <header>
+        <Icon size={18} />
+        <strong>{title}</strong>
+      </header>
+      {profiles.length === 0 ? (
+        <p>{emptyText}</p>
+      ) : (
+        profiles.slice(0, 6).map((profile) => (
+          <div className="action-student-row" key={profile.student.id}>
+            <span>{profile.student.name}</span>
+            <small>
+              {getConsistencyLabel(profile.tracking)} const. · {profile.tracking.late} incompletes ·{' '}
+              {profile.redPointCount} vermells · {profile.incidents} incid.
             </small>
           </div>
         ))
@@ -2101,6 +2186,7 @@ export function AnalyticsView() {
   const [selectedEvolutionStudent, setSelectedEvolutionStudent] = useState(null)
   const [selectedTrackingEvidence, setSelectedTrackingEvidence] = useState(null)
   const [profileSortMode, setProfileSortMode] = useState('intervention')
+  const [dashboardScope, setDashboardScope] = useState('executive')
   const { activeClassId, activeUtId, activeInsight } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
   const students = state.students
@@ -2129,6 +2215,7 @@ export function AnalyticsView() {
     (profile) => hasLowConsistency(profile) && profile.evaluation.score >= 3,
   )
   const averageConsistency = getAverageConsistency(profiles)
+  const hasTrackingDataset = currentTasks.length > 0 && profiles.some((profile) => profile.tracking.hasTrackingData)
   const activeUtTracking = students.map((student) =>
     getStudentTrackingStats(student.id, state.taskRecords, currentTasks),
   )
@@ -2137,6 +2224,15 @@ export function AnalyticsView() {
   const agendaCandidates = profiles.filter(
     (profile) => profile.redPointCount >= 3 || profile.redPointCount + profile.incidents >= 3,
   )
+  const lowTrackingProfiles = profiles
+    .filter(hasLowConsistency)
+    .sort((a, b) => a.tracking.consistency - b.tracking.consistency)
+  const redPointProfiles = profiles
+    .filter((profile) => profile.redPointCount > 0)
+    .sort((a, b) => b.redPointCount - a.redPointCount || a.student.name.localeCompare(b.student.name))
+  const incidentProfiles = profiles
+    .filter((profile) => profile.incidents > 0)
+    .sort((a, b) => b.incidents - a.incidents || a.student.name.localeCompare(b.student.name))
   const priorityProfiles = sortProfilesByTeachingPriority(profiles)
   const alphabeticalProfiles = [...profiles].sort((a, b) => a.student.name.localeCompare(b.student.name))
   const visibleProfiles = profileSortMode === 'alphabetical' ? alphabeticalProfiles : priorityProfiles
@@ -2151,42 +2247,6 @@ export function AnalyticsView() {
     hardworkingLowAchievement,
     lowConsistencyGoodAchievement,
   })
-  const insightCards = [
-    {
-      kind: 'risk',
-      title: 'Alumnes en risc',
-      description: 'Alumnes amb senyals combinades de baix rendiment, baixa constància o incidències.',
-      icon: AlertTriangle,
-      profiles: atRisk,
-      className: 'danger',
-      label: 'Alumnes en risc',
-      helper: 'Baix rendiment, baixa constància o incidències acumulades.',
-      helpKey: 'riskStudents',
-    },
-    {
-      kind: 'concept',
-      title: 'Treballen però no assoleixen',
-      description: 'Alumnes constants que necessiten una ajuda més conceptual, no només recordatoris de feina.',
-      icon: Brain,
-      profiles: hardworkingLowAchievement,
-      className: 'concept',
-      label: 'Treballen però no assoleixen',
-      helper: 'Bon hàbit de tasques amb rendiment baix: ajuda conceptual.',
-      helpKey: 'conceptStudents',
-    },
-    {
-      kind: 'habit',
-      title: 'Assoleixen però són poc constants',
-      description: 'Alumnes amb bon rendiment però hàbits fràgils que poden generar problemes més endavant.',
-      icon: TrendingUp,
-      profiles: lowConsistencyGoodAchievement,
-      className: 'habit',
-      label: 'Assoleixen però són poc constants',
-      helper: 'Bon resultat amb hàbits fràgils: seguiment preventiu.',
-      helpKey: 'habitStudents',
-    },
-  ]
-
   if (activeInsight === 'utStats') {
     return (
       <UtStatsView
@@ -2255,9 +2315,11 @@ export function AnalyticsView() {
         />
       </div>
 
-      <GradeUtMatrix matrix={gradeMatrix} setInfo={setSelectedInfo} />
+      <DashboardScopeTabs activeScope={dashboardScope} onChange={setDashboardScope} />
 
-      <section className="global-diagnosis" data-tour="stats-global">
+      {dashboardScope === 'executive' && (
+        <>
+          <section className="global-diagnosis" data-tour="stats-global">
         <div className="global-diagnosis-title">
           <Brain size={24} />
           <div>
@@ -2277,22 +2339,7 @@ export function AnalyticsView() {
         </div>
       </section>
 
-      <div className="analytics-grid">
-        {insightCards.map((card) => (
-          <MetricCard
-            className={card.className}
-            help={chartHelp[card.helpKey]}
-            key={card.kind}
-            onClick={() => setSelectedInsight(card)}
-            setInfo={setSelectedInfo}
-            label={card.label}
-            value={card.profiles.length}
-            helper={card.helper}
-          />
-        ))}
-      </div>
-
-      <section className="global-action-strip" aria-label="Decisions ràpides de Stats Globals">
+          <section className="global-action-strip" aria-label="Decisions ràpides de Stats Globals">
         <button
           className={`global-action-card ${topPriorityDecision?.tone || 'stable'}`}
           onClick={() =>
@@ -2367,7 +2414,171 @@ export function AnalyticsView() {
         </button>
       </section>
 
-      <div className="profile-table-wrap full-width-analysis">
+          <div className="pedagogical-panel full-width-analysis">
+          <HelpSectionHeading
+            description="Conclusions i recomanacions accionables."
+            helpKey="pedagogicalAnalysis"
+            icon={Brain}
+            setInfo={setSelectedInfo}
+            title="Anàlisi pedagògica"
+          />
+          <div className="pedagogy-cards">
+            <article className="pedagogy-card best">
+              <CheckCircle2 size={18} />
+              <span>Millor competència</span>
+              <strong>{balance.best?.name || '-'}</strong>
+            </article>
+            <article className="pedagogy-card hard">
+              <AlertTriangle size={18} />
+              <span>Més dificultat</span>
+              <strong>{balance.weakest?.name || '-'}</strong>
+            </article>
+          </div>
+          <button
+            className="recommendation-text clickable"
+            onClick={() =>
+              setSelectedInsight({
+                kind: 'risk',
+                title: 'Risc combinat',
+                description: pedagogicalSummary.recommendation,
+                icon: AlertTriangle,
+                profiles: atRisk,
+              })
+            }
+            type="button"
+          >
+            {pedagogicalSummary.recommendation}
+          </button>
+          <button
+            className="recommendation-text soft clickable"
+            onClick={() =>
+              setSelectedInsight({
+                kind: 'concept',
+                title: 'Suport conceptual',
+                description: pedagogicalSummary.hiddenNeed,
+                icon: Brain,
+                profiles: hardworkingLowAchievement,
+              })
+            }
+            type="button"
+          >
+            {pedagogicalSummary.hiddenNeed}
+          </button>
+          <button
+            className="recommendation-text soft clickable"
+            onClick={() =>
+              setSelectedInsight({
+                kind: 'habit',
+                title: 'Hàbits fràgils',
+                description: pedagogicalSummary.habitWarning,
+                icon: TrendingUp,
+                profiles: lowConsistencyGoodAchievement,
+              })
+            }
+            type="button"
+          >
+            {pedagogicalSummary.habitWarning}
+          </button>
+      </div>
+        </>
+      )}
+
+      {dashboardScope === 'evaluation' && (
+        <>
+          <GradeUtMatrix matrix={gradeMatrix} setInfo={setSelectedInfo} />
+
+          <div className="analytics-two-column lower">
+            <ProgressChangePanel
+              declinedRows={declinedRows}
+              improvedRows={improvedRows}
+              onSelectStudent={setSelectedEvolutionStudent}
+              setInfo={setSelectedInfo}
+            />
+            <div className="action-list-grid single-column">
+              <ActionList
+                emptyText="Cap cas clar de constància alta amb rendiment baix."
+                helpKey="actionLists"
+                icon={Brain}
+                profiles={hardworkingLowAchievement}
+                setInfo={setSelectedInfo}
+                title="Qui treballa però no assoleix?"
+              />
+            </div>
+          </div>
+
+          <CriterionDistribution distributions={criterionDistributions} setInfo={setSelectedInfo} students={students} />
+        </>
+      )}
+
+      {dashboardScope === 'tracking' && (
+        <>
+          {!hasTrackingDataset && (
+            <EmptyDataNotice
+              title="Encara no hi ha prou dades de seguiment"
+              text="Avaluapro no calcularà constància com a 0% fins que hi hagi tasques avaluables. Quan afegeixis tasques, aquí apareixeran hàbits, punts vermells i avisos."
+            />
+          )}
+          <div className="analytics-grid">
+            <MetricCard
+              className="habit"
+              help={chartHelp.trackingSummary}
+              label="Constància mitjana"
+              setInfo={setSelectedInfo}
+              value={getConsistencyMetric(averageConsistency)}
+              helper={getConsistencyHelper(currentTasks, `${currentTasks.length} tasques avaluables a la UT activa.`)}
+            />
+            <MetricCard
+              className="warning"
+              help={chartHelp.trackingIncomplete}
+              label="Tasques incompletes"
+              setInfo={setSelectedInfo}
+              value={hasTrackingDataset ? lateTotal : 'Sense dades'}
+              helper={
+                hasTrackingDataset
+                  ? 'Marques grogues visibles dins la UT activa.'
+                  : 'Cal afegir tasques abans d’interpretar incompletes.'
+              }
+            />
+            <MetricCard
+              className="danger"
+              help={chartHelp.trackingStudents}
+              label="Punts vermells"
+              setInfo={setSelectedInfo}
+              value={redPointTotal}
+              helper="No fetes i acumulacions importades o registrades."
+            />
+          </div>
+          <div className="analytics-two-column lower">
+            <div className="action-list-grid">
+              <TrackingActionList
+                emptyText="Cap alumne amb constància baixa dins la UT activa."
+                icon={AlertTriangle}
+                profiles={lowTrackingProfiles}
+                setInfo={setSelectedInfo}
+                title="Baixa constància"
+              />
+              <TrackingActionList
+                emptyText="Cap alumne amb punts vermells visibles."
+                icon={MessageSquareText}
+                profiles={redPointProfiles}
+                setInfo={setSelectedInfo}
+                title="Punts vermells"
+              />
+              <TrackingActionList
+                emptyText="Cap incidència de comportament registrada."
+                icon={MessageSquareText}
+                profiles={incidentProfiles}
+                setInfo={setSelectedInfo}
+                title="Punts negres"
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {dashboardScope === 'cross' && (
+        <>
+          <div className="profile-table-wrap full-width-analysis">
           <div className="section-heading">
             <LineChart size={20} />
             <div>
@@ -2481,117 +2692,25 @@ export function AnalyticsView() {
           </table>
       </div>
 
-      <div className="pedagogical-panel full-width-analysis">
-          <HelpSectionHeading
-            description="Conclusions i recomanacions accionables."
-            helpKey="pedagogicalAnalysis"
-            icon={Brain}
-            setInfo={setSelectedInfo}
-            title="Anàlisi pedagògica"
-          />
-          <div className="pedagogy-cards">
-            <article className="pedagogy-card best">
-              <CheckCircle2 size={18} />
-              <span>Millor competència</span>
-              <strong>{balance.best?.name || '-'}</strong>
-            </article>
-            <article className="pedagogy-card hard">
-              <AlertTriangle size={18} />
-              <span>Més dificultat</span>
-              <strong>{balance.weakest?.name || '-'}</strong>
-            </article>
-          </div>
-          <button
-            className="recommendation-text clickable"
-            onClick={() =>
-              setSelectedInsight({
-                kind: 'risk',
-                title: 'Risc combinat',
-                description: pedagogicalSummary.recommendation,
-                icon: AlertTriangle,
-                profiles: atRisk,
-              })
-            }
-            type="button"
-          >
-            {pedagogicalSummary.recommendation}
-          </button>
-          <button
-            className="recommendation-text soft clickable"
-            onClick={() =>
-              setSelectedInsight({
-                kind: 'concept',
-                title: 'Suport conceptual',
-                description: pedagogicalSummary.hiddenNeed,
-                icon: Brain,
-                profiles: hardworkingLowAchievement,
-              })
-            }
-            type="button"
-          >
-            {pedagogicalSummary.hiddenNeed}
-          </button>
-          <button
-            className="recommendation-text soft clickable"
-            onClick={() =>
-              setSelectedInsight({
-                kind: 'habit',
-                title: 'Hàbits fràgils',
-                description: pedagogicalSummary.habitWarning,
-                icon: TrendingUp,
-                profiles: lowConsistencyGoodAchievement,
-              })
-            }
-            type="button"
-          >
-            {pedagogicalSummary.habitWarning}
-          </button>
-      </div>
-
-      <div className="analytics-two-column lower">
+          <div className="analytics-two-column lower">
         <ScatterCard
           onSelectProfile={setSelectedScatterProfile}
           profiles={profiles}
           setInfo={setSelectedInfo}
         />
-        <ProgressChangePanel
-          declinedRows={declinedRows}
-          improvedRows={improvedRows}
-          onSelectStudent={setSelectedEvolutionStudent}
-          setInfo={setSelectedInfo}
-        />
+            <div className="action-list-grid single-column">
+              <ActionList
+                emptyText="Cap alumne combina prou senyals de risc."
+                helpKey="actionLists"
+                icon={AlertTriangle}
+                profiles={atRisk}
+                setInfo={setSelectedInfo}
+                title="Qui necessita ajuda?"
+              />
+            </div>
       </div>
-
-      <div className="analytics-two-column lower">
-        <div className="action-list-grid">
-          <ActionList
-            emptyText="Cap alumne combina prou senyals de risc."
-            helpKey="actionLists"
-            icon={AlertTriangle}
-            profiles={atRisk}
-            setInfo={setSelectedInfo}
-            title="Qui necessita ajuda?"
-          />
-          <ActionList
-            emptyText="Cap cas clar de constància alta amb rendiment baix."
-            helpKey="actionLists"
-            icon={Brain}
-            profiles={hardworkingLowAchievement}
-            setInfo={setSelectedInfo}
-            title="Qui treballa però no assoleix?"
-          />
-          <ActionList
-            emptyText="Cap cas clar de bon rendiment amb baixa constància."
-            helpKey="actionLists"
-            icon={TrendingUp}
-            profiles={lowConsistencyGoodAchievement}
-            setInfo={setSelectedInfo}
-            title="Qui assoleix però és poc constant?"
-          />
-        </div>
-      </div>
-
-      <CriterionDistribution distributions={criterionDistributions} setInfo={setSelectedInfo} students={students} />
+        </>
+      )}
     </section>
   )
 }
