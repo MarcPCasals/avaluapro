@@ -817,6 +817,19 @@ function PriorityCard({ balance, setInfo }) {
 }
 
 function ScatterCard({ onSelectProfile, profiles, setInfo }) {
+  const getScatterPosition = (profile, index) => {
+    const baseX = profile.tracking.hasTrackingData ? 8 + Math.min(100, Math.max(0, profile.tracking.consistency)) * 0.84 : 50
+    const score = profile.evaluation.score > 0 ? profile.evaluation.score : 1
+    const baseY = 90 - ((Math.min(4, Math.max(1, score)) - 1) / 3) * 78
+    const jitterX = ((index % 5) - 2) * 1.7
+    const jitterY = ((Math.floor(index / 5) % 5) - 2) * 1.7
+
+    return {
+      x: Math.min(94, Math.max(6, baseX + jitterX)),
+      y: Math.min(94, Math.max(6, baseY + jitterY)),
+    }
+  }
+
   return (
     <article className="visual-card scatter-card">
       <HelpSectionHeading
@@ -829,9 +842,8 @@ function ScatterCard({ onSelectProfile, profiles, setInfo }) {
       <div className="scatter-plot" aria-label="Relació entre constància i rendiment">
         <span className="axis x">Constància</span>
         <span className="axis y">Rendiment</span>
-        {profiles.map((profile) => {
-          const x = profile.tracking.hasTrackingData ? Math.min(96, Math.max(4, profile.tracking.consistency)) : 50
-          const y = 96 - Math.min(92, Math.max(8, profile.evaluation.score * 23))
+        {profiles.map((profile, index) => {
+          const { x, y } = getScatterPosition(profile, index)
           return (
             <button
               className={`scatter-dot ${profile.riskScore >= 2 ? 'risk' : ''}`}
@@ -2091,7 +2103,9 @@ export function AnalyticsView() {
   const [profileSortMode, setProfileSortMode] = useState('intervention')
   const { activeClassId, activeUtId, activeInsight } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
-  const students = state.students.filter((student) => student.classId === activeClassId)
+  const students = state.students
+    .filter((student) => student.classId === activeClassId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
   const classUts = getClassUts(state, activeClassId)
   const currentTasks = getCurrentTasks(state, activeClassId, activeUtId)
   const currentInsight = insightCopy[activeInsight] || insightCopy.dashboard

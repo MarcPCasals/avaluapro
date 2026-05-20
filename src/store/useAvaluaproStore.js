@@ -16,6 +16,7 @@ const BACKUP_APP_ID = 'avaluapro-v2'
 const BACKUP_VERSION = 2
 const CLOUD_SYNC_DELAY_MS = 2500
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
+const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
@@ -357,6 +358,10 @@ function createSubjectStructureForUts({ classId, subjectName, uts, existingCompe
   return { competencies, criteria }
 }
 
+function getNextClassOrder(classes) {
+  return classes.reduce((maxOrder, classItem) => Math.max(maxOrder, classItem.order || 0), 0) + 1
+}
+
 function ensureFixedCourseForClass(state, classId) {
   const existingSemesters = state.semesters
     .filter((semester) => semester.classId === classId)
@@ -606,14 +611,130 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  setActiveClass: (classId) => {
-    const semester = get().semesters.find((item) => item.classId === classId)
-    const ut = get().uts.find((item) => item.semesterId === semester?.id)
-    setUiWithPreferences(set, {
+  setActiveClass: async (classId) => {
+    const state = get()
+    const activeClass = state.classes.find((classItem) => classItem.id === classId)
+    const timeline = activeClass?.subject ? ensureFixedCourseForClass(state, classId) : null
+    const workingSemesters = timeline?.semesters || state.semesters
+    const workingUts = timeline?.uts || state.uts
+    const classUts = timeline?.classUts || workingUts.filter((ut) => ut.classId === classId)
+    const subjectStructure = activeClass?.subject
+      ? ensureSubjectStructureForClass(
+          { ...state, semesters: workingSemesters, uts: workingUts },
+          classId,
+          activeClass.subject,
+          classUts,
+        )
+      : null
+    const semester = workingSemesters
+      .filter((item) => item.classId === classId)
+      .sort((a, b) => a.order - b.order)[0]
+    const ut = workingUts
+      .filter((item) => item.semesterId === semester?.id)
+      .sort((a, b) => a.order - b.order)[0]
+    const ui = {
       activeClassId: classId,
       activeSemesterId: semester?.id || '',
       activeUtId: ut?.id || '',
+    }
+
+    set((current) => ({
+      semesters: workingSemesters,
+      uts: workingUts,
+      competencies: subjectStructure?.competencies || current.competencies,
+      criteria: subjectStructure?.criteria || current.criteria,
+      ui: { ...current.ui, ...ui },
+    }))
+    writePreferences({ ...readPreferences(), ...get().ui })
+    if (activeClass?.subject) {
+      await persistCollections(set, get, ['semesters', 'uts', 'competencies', 'criteria'])
+    }
+  },
+
+  setupInitialWorkspace: async ({ subject, classes = [] }) => {
+    const cleanSubject = subject?.trim()
+    const cleanClasses = classes
+      .map((classItem, index) => ({
+        name: classItem.name?.trim() || `Classe ${index + 1}`,
+        color: classItem.color || DEFAULT_CLASS_COLORS[index % DEFAULT_CLASS_COLORS.length],
+      }))
+      .filter((classItem) => classItem.name)
+    if (!cleanSubject || cleanClasses.length === 0) return false
+
+    const newClasses = []
+    const newSemesters = []
+    const newUts = []
+    const newCompetencies = []
+    const newCriteria = []
+    const baseOrder = getNextClassOrder(get().classes) - 1
+
+    cleanClasses.forEach((classItem, index) => {
+      const id = createId('class')
+      const timeline = createCourseTimeline(id)
+      const subjectStructure = createSubjectStructureForUts({
+        classId: id,
+        subjectName: cleanSubject,
+        uts: timeline.uts,
+      })
+
+      newClasses.push({
+        id,
+        name: classItem.name,
+        subject: cleanSubject,
+        color: classItem.color,
+        order: baseOrder + index + 1,
+        utModelReady: true,
+      })
+      newSemesters.push(...timeline.semesters)
+      newUts.push(...timeline.uts)
+      newCompetencies.push(...subjectStructure.competencies)
+      newCriteria.push(...subjectStructure.criteria)
     })
+
+    const firstClass = newClasses[0]
+    const firstSemester = newSemesters.find((semester) => semester.classId === firstClass.id)
+    const firstUt = newUts.find((item) => item.semesterId === firstSemester?.id)
+    const ui = {
+      activeClassId: firstClass.id,
+      activeSemesterId: firstSemester?.id || '',
+      activeUtId: firstUt?.id || '',
+      activeMode: 'evaluation',
+      activeInsight: 'dashboard',
+    }
+    const profile = { defaultSubject: cleanSubject }
+
+    set((state) => ({
+      classes: [...state.classes, ...newClasses],
+      semesters: [...state.semesters, ...newSemesters],
+      uts: [...state.uts, ...newUts],
+      competencies: [...state.competencies, ...newCompetencies],
+      criteria: [...state.criteria, ...newCriteria],
+      ui,
+      profile,
+    }))
+    writePreferences({ ...readPreferences(), ...ui, ...profile })
+    await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
+    return true
+  },
+
+  reorderClass: async (classId, direction) => {
+    const orderedClasses = [...get().classes].sort((a, b) => (a.order || 0) - (b.order || 0))
+    const currentIndex = orderedClasses.findIndex((classItem) => classItem.id === classId)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedClasses.length) return
+
+    const nextOrdered = [...orderedClasses]
+    const [movedClass] = nextOrdered.splice(currentIndex, 1)
+    nextOrdered.splice(targetIndex, 0, movedClass)
+    const orderById = new Map(nextOrdered.map((classItem, index) => [classItem.id, index + 1]))
+
+    set((current) => ({
+      classes: current.classes.map((classItem) => ({
+        ...classItem,
+        order: orderById.get(classItem.id) || classItem.order,
+      })),
+    }))
+    await persistCollections(set, get, ['classes'])
   },
 
   setActiveSemester: (semesterId) => {
@@ -774,7 +895,7 @@ export const useAvaluaproStore = create((set, get) => ({
           name: name?.trim() || `Grup ${state.classes.length + 1}`,
           subject: classSubject,
           color,
-          order: state.classes.length + 1,
+          order: getNextClassOrder(state.classes),
           utModelReady: true,
         },
       ],

@@ -13,6 +13,7 @@ export function NewTaskModal({ onClose }) {
   const currentUt = state.uts.find((item) => item.id === state.ui.activeUtId)
   const targetClassOptions = state.classes
     .filter((classItem) => classItem.id !== state.ui.activeClassId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((classItem) => {
       const classUts = state.uts
         .filter((ut) => ut.classId === classItem.id)

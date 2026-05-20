@@ -30,6 +30,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
   const [targetUtId, setTargetUtId] = useState(
     state.uts.find((ut) => ut.classId === targetClassId)?.id || '',
   )
+  const orderedClasses = [...state.classes].sort((a, b) => (a.order || 0) - (b.order || 0))
 
   const activeUt = state.uts.find((ut) => ut.id === activeUtId)
   const activeClass = state.classes.find((classItem) => classItem.id === state.ui.activeClassId)
@@ -272,7 +273,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
           <label className="field-label">
             Classe destí
             <select onChange={(event) => handleTargetClassChange(event.target.value)} value={targetClassId}>
-              {state.classes.map((classItem) => (
+              {orderedClasses.map((classItem) => (
                 <option key={classItem.id} value={classItem.id}>
                   {classItem.name}
                 </option>

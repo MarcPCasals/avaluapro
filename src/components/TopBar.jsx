@@ -17,7 +17,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
@@ -113,6 +113,10 @@ export function TopBar() {
   const [showHelp, setShowHelp] = useState(false)
   const fileInputRef = useRef(null)
   const classes = useAvaluaproStore((state) => state.classes)
+  const orderedClasses = useMemo(
+    () => [...classes].sort((a, b) => (a.order || 0) - (b.order || 0)),
+    [classes],
+  )
   const state = useAvaluaproStore()
   const activeClassId = state.ui.activeClassId
   const activeUtId = state.ui.activeUtId
@@ -267,7 +271,7 @@ export function TopBar() {
       <div className="brand-separator" />
       <p className="author">Creat per Marc Pérez Casals</p>
       <nav className="class-tabs" aria-label="Classes" data-tour="class-tabs">
-        {classes.map((item) => (
+        {orderedClasses.map((item) => (
           <button
             className={`class-tab ${item.id === activeClassId ? 'active' : ''}`}
             key={item.id}

@@ -21,7 +21,9 @@ function useEvaluationModel() {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
 
   return useMemo(() => {
-    const students = allStudents.filter((student) => student.classId === activeClassId)
+    const students = allStudents
+      .filter((student) => student.classId === activeClassId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
     const competencies = allCompetencies
       .filter((competency) => competency.utId === activeUtId)
       .sort((a, b) => a.order - b.order)

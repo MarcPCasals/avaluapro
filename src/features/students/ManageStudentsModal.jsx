@@ -71,7 +71,10 @@ export function ManageStudentsModal({ classId, onClose }) {
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const deleteStudent = useAvaluaproStore((state) => state.deleteStudent)
   const classStudents = useMemo(
-    () => students.filter((student) => student.classId === classId),
+    () =>
+      students
+        .filter((student) => student.classId === classId)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true })),
     [classId, students],
   )
   const preview = useMemo(

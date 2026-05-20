@@ -45,7 +45,9 @@ function useTrackingModel() {
 
   return useMemo(
     () => ({
-      students: allStudents.filter((student) => student.classId === activeClassId),
+      students: allStudents
+        .filter((student) => student.classId === activeClassId)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true })),
       tasks: allTasks
         .filter((task) => task.classId === activeClassId && task.utId === activeUtId)
         .sort((a, b) => a.order - b.order),

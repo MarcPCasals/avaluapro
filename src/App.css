@@ -2390,21 +2390,23 @@
 }
 
 .scatter-plot {
-  height: 380px;
+  height: 440px;
   position: relative;
   overflow: hidden;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 0 1px, transparent 1px) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(rgba(15, 23, 42, 0.08) 0 1px, transparent 1px) 0 50% / 100% 1px no-repeat,
     linear-gradient(90deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
     linear-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px),
     linear-gradient(135deg, #fff7ed 0 50%, #f0fdf4 50% 100%);
-  background-size: 25% 25%, 25% 25%, 100% 100%;
+  background-size: auto, auto, 20% 20%, 20% 20%, 100% 100%;
 }
 
 .scatter-dot {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   position: absolute;
   transform: translate(-50%, -50%);
   display: grid;
@@ -2414,7 +2416,7 @@
   color: white;
   background: #2563eb;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 950;
   cursor: pointer;
 }
@@ -4623,6 +4625,10 @@
   gap: 12px;
 }
 
+.modal-body > .modal-section + .modal-section {
+  margin-top: 18px;
+}
+
 .modal-section h3 {
   display: flex;
   align-items: center;
@@ -6514,6 +6520,73 @@
   line-height: 1.35;
 }
 
+.initial-class-list,
+.class-order-list {
+  display: grid;
+  gap: 8px;
+}
+
+.initial-class-row,
+.class-order-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px;
+  background: #f8fafc;
+}
+
+.initial-class-row {
+  grid-template-columns: 34px minmax(180px, 1fr) minmax(130px, 170px) 38px;
+}
+
+.initial-class-row > span,
+.class-order-row > span {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #475569;
+  background: white;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.initial-class-row select {
+  min-height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: white;
+  font-weight: 800;
+}
+
+.class-order-row {
+  grid-template-columns: 34px minmax(90px, 0.7fr) minmax(140px, 1fr) auto;
+}
+
+.class-order-row.active {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.class-order-row strong {
+  color: #1f2937;
+}
+
+.class-order-row small {
+  color: #64748b;
+  font-weight: 750;
+}
+
+.class-order-row > div {
+  display: inline-flex;
+  gap: 6px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -6591,5 +6664,10 @@
   .tracking-filter-row span {
     width: 100%;
     margin-left: 0;
+  }
+
+  .initial-class-row,
+  .class-order-row {
+    grid-template-columns: 1fr;
   }
 }
