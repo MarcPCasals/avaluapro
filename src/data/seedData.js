@@ -254,9 +254,33 @@ function buildTaskRecords() {
 
 export const seedDataset = {
   classes: [
-    { id: DEMO_CLASS_ID, name: '2n Demo', subject: DEMO_SUBJECT, color: 'green', order: 1, utModelReady: true },
-    { id: 'class_3d', name: '3r Demo', subject: DEMO_SUBJECT, color: 'blue', order: 2, utModelReady: true },
-    { id: 'class_4e', name: '4t Demo', subject: DEMO_SUBJECT, color: 'red', order: 3, utModelReady: true },
+    {
+      id: DEMO_CLASS_ID,
+      name: '2n Demo',
+      subject: DEMO_SUBJECT,
+      color: 'green',
+      halfGroups: ['Grup A', 'Grup B'],
+      order: 1,
+      utModelReady: true,
+    },
+    {
+      id: 'class_3d',
+      name: '3r Demo',
+      subject: DEMO_SUBJECT,
+      color: 'blue',
+      halfGroups: ['Grup A', 'Grup B'],
+      order: 2,
+      utModelReady: true,
+    },
+    {
+      id: 'class_4e',
+      name: '4t Demo',
+      subject: DEMO_SUBJECT,
+      color: 'red',
+      halfGroups: ['Grup A', 'Grup B'],
+      order: 3,
+      utModelReady: true,
+    },
   ],
   students: demoStudents,
   semesters,

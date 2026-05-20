@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, ImagePlus, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, ImagePlus, Plus, Trash2, Users, X } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -65,9 +65,11 @@ export function ManageStudentsModal({ classId, onClose }) {
   const [bulkText, setBulkText] = useState('')
   const [selectedStudentIds, setSelectedStudentIds] = useState([])
   const [bulkHalfGroup, setBulkHalfGroup] = useState('')
+  const [newHalfGroupName, setNewHalfGroupName] = useState('')
   const students = useAvaluaproStore((state) => state.students)
   const currentClass = useAvaluaproStore((state) => state.classes.find((item) => item.id === classId))
   const addStudents = useAvaluaproStore((state) => state.addStudents)
+  const updateClass = useAvaluaproStore((state) => state.updateClass)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const deleteStudent = useAvaluaproStore((state) => state.deleteStudent)
   const classStudents = useMemo(
@@ -85,7 +87,14 @@ export function ManageStudentsModal({ classId, onClose }) {
   const duplicateRows = preview.rows.filter((row) => row.duplicateInClass || row.duplicateInPaste)
   const allSelected = classStudents.length > 0 && selectedStudentIds.length === classStudents.length
   const configuredCount = classStudents.filter((student) => student.photoUrl || student.personalNotes).length
-  const halfGroups = [...new Set(classStudents.map((student) => student.halfGroup).filter(Boolean))].sort()
+  const configuredHalfGroups =
+    Array.isArray(currentClass?.halfGroups) && currentClass.halfGroups.length > 0
+      ? currentClass.halfGroups
+      : ['Grup A', 'Grup B']
+  const halfGroups = [
+    ...configuredHalfGroups,
+    ...classStudents.map((student) => student.halfGroup).filter(Boolean),
+  ].reduce((groups, group) => (groups.includes(group) ? groups : [...groups, group]), [])
 
   const handleAdd = async () => {
     await addStudents(classId, importableRows)
@@ -106,6 +115,45 @@ export function ManageStudentsModal({ classId, onClose }) {
     await Promise.all(selectedStudentIds.map((studentId) => updateStudent(studentId, { halfGroup: bulkHalfGroup })))
     setSelectedStudentIds([])
     setBulkHalfGroup('')
+  }
+
+  const updateHalfGroupName = async (index, value) => {
+    const cleanValue = value.replace(/\s+/g, ' ').trim()
+    if (!cleanValue) return
+
+    const previousValue = configuredHalfGroups[index]
+    const nextHalfGroups = configuredHalfGroups.map((group, groupIndex) => (groupIndex === index ? cleanValue : group))
+    await updateClass(classId, { halfGroups: nextHalfGroups })
+    if (previousValue && previousValue !== cleanValue) {
+      await Promise.all(
+        classStudents
+          .filter((student) => student.halfGroup === previousValue)
+          .map((student) => updateStudent(student.id, { halfGroup: cleanValue })),
+      )
+    }
+  }
+
+  const addHalfGroup = async () => {
+    const cleanValue = newHalfGroupName.replace(/\s+/g, ' ').trim()
+    if (!cleanValue || configuredHalfGroups.includes(cleanValue)) return
+    await updateClass(classId, { halfGroups: [...configuredHalfGroups, cleanValue] })
+    setNewHalfGroupName('')
+  }
+
+  const removeHalfGroup = async (groupName) => {
+    const shouldRemove = window.confirm(
+      `Vols eliminar el mig grup "${groupName}"? Els alumnes que el tenen assignat quedaran sense mig grup.`,
+    )
+    if (!shouldRemove) return
+
+    await updateClass(classId, {
+      halfGroups: configuredHalfGroups.filter((group) => group !== groupName),
+    })
+    await Promise.all(
+      classStudents
+        .filter((student) => student.halfGroup === groupName)
+        .map((student) => updateStudent(student.id, { halfGroup: '' })),
+    )
   }
 
   const deleteSelection = async () => {
@@ -202,6 +250,46 @@ export function ManageStudentsModal({ classId, onClose }) {
           <button className="primary-action" disabled={importableRows.length === 0} onClick={handleAdd} type="button">
             Afegir {importableRows.length} alumne/s
           </button>
+          <div className="half-group-manager">
+            <div>
+              <strong>Mitjos grups</strong>
+              <small>Defineix els grups disponibles i assigna’ls amb desplegables.</small>
+            </div>
+            <div className="half-group-list">
+              {configuredHalfGroups.map((group, index) => (
+                <div className="half-group-row" key={`${group}-${index}`}>
+                  <input
+                    aria-label={`Nom del mig grup ${index + 1}`}
+                    defaultValue={group}
+                    onBlur={(event) => updateHalfGroupName(index, event.target.value)}
+                  />
+                  <button
+                    className="danger-soft mini"
+                    disabled={configuredHalfGroups.length <= 1}
+                    onClick={() => removeHalfGroup(group)}
+                    title="Eliminar mig grup"
+                    type="button"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="half-group-add">
+              <input
+                onChange={(event) => setNewHalfGroupName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') addHalfGroup()
+                }}
+                placeholder="Nou mig grup"
+                value={newHalfGroupName}
+              />
+              <button className="secondary-action compact" onClick={addHalfGroup} type="button">
+                <Plus size={15} />
+                Afegir
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="modal-section">
@@ -231,11 +319,18 @@ export function ManageStudentsModal({ classId, onClose }) {
               <input checked={allSelected} onChange={toggleAllStudents} type="checkbox" />
               Seleccionar tots
             </label>
-            <input
+            <select
+              aria-label="Mig grup per aplicar"
               onChange={(event) => setBulkHalfGroup(event.target.value)}
-              placeholder="Mig grup per aplicar"
               value={bulkHalfGroup}
-            />
+            >
+              <option value="">Sense mig grup</option>
+              {halfGroups.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
             <button
               className="secondary-action compact"
               disabled={selectedStudentIds.length === 0}
@@ -268,12 +363,18 @@ export function ManageStudentsModal({ classId, onClose }) {
                   onChange={(event) => updateStudent(student.id, { name: event.target.value })}
                   value={student.name}
                 />
-                <input
+                <select
                   aria-label={`Mig grup de ${student.name}`}
                   onChange={(event) => updateStudent(student.id, { halfGroup: event.target.value })}
-                  placeholder="Grup"
                   value={student.halfGroup || ''}
-                />
+                >
+                  <option value="">Sense grup</option>
+                  {halfGroups.map((group) => (
+                    <option key={group} value={group}>
+                      {group}
+                    </option>
+                  ))}
+                </select>
                 <input
                   accept="image/*"
                   aria-label={`Carregar foto de ${student.name}`}

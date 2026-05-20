@@ -37,6 +37,15 @@ const colorClass = {
   orange: 'class-dot orange',
 }
 
+const classAccent = {
+  blue: '#60a5fa',
+  green: '#4ade80',
+  yellow: '#facc15',
+  red: '#f87171',
+  purple: '#a78bfa',
+  orange: '#fb923c',
+}
+
 const APP_ICON_URL = `${import.meta.env.BASE_URL}avaluapro-icon.png`
 
 function getCriterionMark(marks, studentId, criterionId) {
@@ -111,6 +120,7 @@ export function TopBar() {
   const [showDataSafety, setShowDataSafety] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
   const classes = useAvaluaproStore((state) => state.classes)
   const orderedClasses = useMemo(
@@ -121,6 +131,7 @@ export function TopBar() {
   const activeClassId = state.ui.activeClassId
   const activeUtId = state.ui.activeUtId
   const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const reorderClassToIndex = useAvaluaproStore((state) => state.reorderClassToIndex)
   const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
   const createBackup = useAvaluaproStore((state) => state.createBackup)
   const restoreBackup = useAvaluaproStore((state) => state.restoreBackup)
@@ -271,11 +282,23 @@ export function TopBar() {
       <div className="brand-separator" />
       <p className="author">Creat per Marc Pérez Casals</p>
       <nav className="class-tabs" aria-label="Classes" data-tour="class-tabs">
-        {orderedClasses.map((item) => (
+        {orderedClasses.map((item, index) => (
           <button
-            className={`class-tab ${item.id === activeClassId ? 'active' : ''}`}
+            className={`class-tab ${item.id === activeClassId ? 'active' : ''} ${
+              draggedClassId === item.id ? 'dragging' : ''
+            }`}
+            draggable
             key={item.id}
+            onDragEnd={() => setDraggedClassId('')}
+            onDragOver={(event) => event.preventDefault()}
+            onDragStart={() => setDraggedClassId(item.id)}
+            onDrop={async () => {
+              if (!draggedClassId || draggedClassId === item.id) return
+              await reorderClassToIndex(draggedClassId, index)
+              setDraggedClassId('')
+            }}
             onClick={() => setActiveClass(item.id)}
+            style={{ '--class-accent': classAccent[item.color] || classAccent.blue }}
             type="button"
           >
             <span className={colorClass[item.color] || colorClass.blue} />
@@ -294,9 +317,8 @@ export function TopBar() {
           <HelpCircle size={22} />
         </button>
         <span className="top-divider" />
-        {cloud.user ? (
-          <div className={`cloud-session ${syncIndicator.className}`}>
-            <span title={cloud.user.email}>{cloud.user.email}</span>
+        {cloud.user && (
+          <div className={`top-sync-status ${syncIndicator.className}`}>
             <strong className="sync-pill" title={cloud.error || syncIndicator.label}>
               <SyncIcon size={15} />
               <span>
@@ -304,23 +326,8 @@ export function TopBar() {
                 <small>{syncIndicator.detail}</small>
               </span>
             </strong>
-            <button className="icon-button blue-action" onClick={pushAllToCloud} title="Pujar dades locals a Firebase" type="button">
-              <Upload size={21} />
-            </button>
-            <button className="icon-button blue-action" onClick={handlePullFromCloud} title="Baixar dades de Firebase" type="button">
-              <Download size={21} />
-            </button>
-            <button className="icon-button" onClick={signOutFromGoogle} title="Tancar sessió" type="button">
-              <LogOut size={21} />
-            </button>
           </div>
-        ) : (
-          <button className="google-login-button" onClick={signInWithGoogle} type="button">
-            <LogIn size={18} />
-            Inicia sessió
-          </button>
         )}
-        <span className="top-divider" />
         <div className="top-menu-wrapper" data-tour="data-menu">
           <button
             className={`top-menu-trigger ${showDataMenu ? 'open' : ''}`}
@@ -328,11 +335,39 @@ export function TopBar() {
             type="button"
           >
             <Cloud size={20} />
-            <span>Dades</span>
+            <span>Dades i Compte</span>
             <ChevronDown size={17} />
           </button>
           {showDataMenu && (
             <div className="top-menu-panel">
+              {cloud.user ? (
+                <div className="top-menu-account">
+                  <strong title={cloud.user.email}>{cloud.user.email}</strong>
+                  <small>Compte connectat</small>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    signInWithGoogle()
+                    setShowDataMenu(false)
+                  }}
+                  type="button"
+                >
+                  <LogIn size={18} />
+                  Inicia sessió amb Google
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowProfile(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <BarChart3 size={18} />
+                Perfil docent
+              </button>
+              <span className="top-menu-separator" />
               <button
                 onClick={() => {
                   setShowDataSafety(true)
@@ -396,6 +431,16 @@ export function TopBar() {
                     <Download size={18} />
                     Baixar de Firebase
                   </button>
+                  <button
+                    onClick={() => {
+                      signOutFromGoogle()
+                      setShowDataMenu(false)
+                    }}
+                    type="button"
+                  >
+                    <LogOut size={18} />
+                    Tancar sessió
+                  </button>
                 </>
               )}
             </div>
@@ -418,9 +463,6 @@ export function TopBar() {
         <span className="top-divider" />
         <button className="icon-button red-action" onClick={handleResetToSeed} title="Reiniciar dades demo" type="button">
           <Trash2 size={22} />
-        </button>
-        <button className="avatar-button" onClick={() => setShowProfile(true)} title="Perfil docent" type="button">
-          <BarChart3 size={18} />
         </button>
       </div>
       {showSettings && (

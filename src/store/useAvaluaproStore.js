@@ -17,6 +17,7 @@ const BACKUP_VERSION = 2
 const CLOUD_SYNC_DELAY_MS = 2500
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
+const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
@@ -97,6 +98,13 @@ function normalizeDataset(dataset) {
   ])
   normalizedDataset = {
     ...normalizedDataset,
+    classes: normalizedDataset.classes.map((classItem) => ({
+      ...classItem,
+      halfGroups:
+        Array.isArray(classItem.halfGroups) && classItem.halfGroups.length > 0
+          ? classItem.halfGroups
+          : DEFAULT_HALF_GROUPS,
+    })),
     uts: normalizedDataset.uts.filter((ut) => ut.name !== 'Transversals' || usedUtIds.has(ut.id)),
   }
 
@@ -682,6 +690,7 @@ export const useAvaluaproStore = create((set, get) => ({
         name: classItem.name,
         subject: cleanSubject,
         color: classItem.color,
+        halfGroups: DEFAULT_HALF_GROUPS,
         order: baseOrder + index + 1,
         utModelReady: true,
       })
@@ -722,6 +731,25 @@ export const useAvaluaproStore = create((set, get) => ({
     const currentIndex = orderedClasses.findIndex((classItem) => classItem.id === classId)
     const targetIndex = currentIndex + direction
     if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedClasses.length) return
+
+    const nextOrdered = [...orderedClasses]
+    const [movedClass] = nextOrdered.splice(currentIndex, 1)
+    nextOrdered.splice(targetIndex, 0, movedClass)
+    const orderById = new Map(nextOrdered.map((classItem, index) => [classItem.id, index + 1]))
+
+    set((current) => ({
+      classes: current.classes.map((classItem) => ({
+        ...classItem,
+        order: orderById.get(classItem.id) || classItem.order,
+      })),
+    }))
+    await persistCollections(set, get, ['classes'])
+  },
+
+  reorderClassToIndex: async (classId, targetIndex) => {
+    const orderedClasses = [...get().classes].sort((a, b) => (a.order || 0) - (b.order || 0))
+    const currentIndex = orderedClasses.findIndex((classItem) => classItem.id === classId)
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedClasses.length || currentIndex === targetIndex) return
 
     const nextOrdered = [...orderedClasses]
     const [movedClass] = nextOrdered.splice(currentIndex, 1)
@@ -895,6 +923,7 @@ export const useAvaluaproStore = create((set, get) => ({
           name: name?.trim() || `Grup ${state.classes.length + 1}`,
           subject: classSubject,
           color,
+          halfGroups: DEFAULT_HALF_GROUPS,
           order: getNextClassOrder(state.classes),
           utModelReady: true,
         },
