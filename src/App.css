@@ -671,6 +671,31 @@
   line-height: 1.45;
 }
 
+.guided-tour-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  background: #fff7ed;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.guided-tour-task svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.guided-tour-task.complete {
+  color: #166534;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
 .guided-tour-card small {
   color: #64748b;
   font-weight: 900;

@@ -69,12 +69,16 @@ const helpSections = [
   },
 ]
 
-export function HelpCenterModal({ onClose }) {
+export function HelpCenterModal({ onClose, onOpenGuide }) {
   const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
 
   const openGuidedTour = () => {
+    if (onOpenGuide) {
+      onOpenGuide()
+      return
+    }
     onClose()
-    window.requestAnimationFrame(() => setGuideOpen(true))
+    window.setTimeout(() => setGuideOpen(true), 120)
   }
 
   return (

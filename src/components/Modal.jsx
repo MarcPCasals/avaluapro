@@ -6,7 +6,7 @@ export function Modal({ children, onClose, title, size = 'md' }) {
       <section className={`modal-panel ${size}`} aria-modal="true" role="dialog">
         <header className="modal-header">
           <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose} title="Tancar" type="button">
+          <button className="modal-close" data-tour="modal-close" onClick={onClose} title="Tancar" type="button">
             <X size={22} />
           </button>
         </header>

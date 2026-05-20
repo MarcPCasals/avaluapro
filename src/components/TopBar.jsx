@@ -132,6 +132,7 @@ export function TopBar() {
   const activeClassId = state.ui.activeClassId
   const activeUtId = state.ui.activeUtId
   const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
   const reorderClassToIndex = useAvaluaproStore((state) => state.reorderClassToIndex)
   const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
   const createBackup = useAvaluaproStore((state) => state.createBackup)
@@ -498,7 +499,15 @@ export function TopBar() {
       )}
       {showNewClass && <NewClassModal onClose={() => setShowNewClass(false)} />}
       {showDataSafety && <DataSafetyModal onClose={() => setShowDataSafety(false)} />}
-      {showHelp && <HelpCenterModal onClose={() => setShowHelp(false)} />}
+      {showHelp && (
+        <HelpCenterModal
+          onClose={() => setShowHelp(false)}
+          onOpenGuide={() => {
+            setShowHelp(false)
+            window.setTimeout(() => setGuideOpen(true), 120)
+          }}
+        />
+      )}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
     </header>
   )

@@ -184,7 +184,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
 
   return (
     <Modal onClose={onClose} size="xl" title={`Anotacions personals: ${student.name}`}>
-      <div className="annotations-panel">
+      <div className="annotations-panel" data-tour="annotation-panel">
         <section className="annotation-hero">
           <div className="annotation-photo-card">
             {student.photoUrl ? (
@@ -251,7 +251,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <small>{reminder.meta}</small>
         </section>
 
-        <section className="annotation-section">
+        <section className="annotation-section" data-tour="annotation-diagnosis">
           <h3>
             <UserRound size={18} />
             1. Diagnòstics
@@ -284,7 +284,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           />
         </section>
 
-        <section className="annotation-section team">
+        <section className="annotation-section team" data-tour="annotation-team">
           <div className="annotation-section-title">
             <div>
               <button className="annotation-collapse" onClick={() => toggleSection('team')} type="button">
