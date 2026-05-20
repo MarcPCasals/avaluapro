@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CheckCircle2,
   CircleHelp,
+  Layers,
   ListFilter,
   LineChart,
   MessageSquareText,
@@ -87,7 +88,7 @@ const chartHelp = {
   globalTrend:
     'Mostra l’evolució de la mitjana del grup al llarg de les UTs. Permet veure si el grup progressa, queda estable o baixa.',
   achievementLevels:
-    'Resumeix quants alumnes estan en assoliment alt, risc o sense dades. És una lectura ràpida del nivell general del grup.',
+    'Resumeix quants alumnes estan en assoliment alt, en procés, en risc o sense dades. És una lectura ràpida del nivell general del grup.',
   priorityCompetency:
     'Identifica la competència amb mitjana més baixa. És una pista directa sobre on centrar reforç pedagògic.',
   riskStudents:
@@ -182,7 +183,7 @@ function EmptyDataNotice({ text, title }) {
   )
 }
 
-function MetricCard({ className = '', help, label, onClick, setInfo, value, helper }) {
+function MetricCard({ actionLabel = 'Consultar', className = '', help, label, onClick, setInfo, value, helper }) {
   const content = (
     <>
       {help && setInfo ? (
@@ -191,6 +192,7 @@ function MetricCard({ className = '', help, label, onClick, setInfo, value, help
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{helper}</small>
+      {onClick ? <em className="stat-card-hint">{actionLabel}</em> : null}
     </>
   )
 
@@ -822,15 +824,22 @@ function TrendCard({ trend, setInfo }) {
 }
 
 function DonutCard({ profiles, setInfo, onSelectGroup }) {
-  const highProfiles = profiles.filter((profile) => profile.evaluation.score >= 3)
-  const riskProfiles = profiles.filter((profile) => profile.evaluation.score > 0 && profile.evaluation.score <= 2)
+  const highProfiles = profiles.filter((profile) => profile.evaluation.score >= 2.5)
+  const processProfiles = profiles.filter(
+    (profile) => profile.evaluation.score > 1.5 && profile.evaluation.score < 2.5,
+  )
+  const riskProfiles = profiles.filter((profile) => profile.evaluation.score > 0 && profile.evaluation.score <= 1.5)
   const withoutDataProfiles = profiles.filter((profile) => profile.evaluation.score === 0)
   const high = highProfiles.length
+  const process = processProfiles.length
   const risk = riskProfiles.length
   const withoutData = withoutDataProfiles.length
   const total = Math.max(profiles.length, 1)
   const highPercent = Math.round((high / total) * 100)
+  const processPercent = Math.round((process / total) * 100)
   const riskPercent = Math.round((risk / total) * 100)
+  const processEnd = highPercent + processPercent
+  const riskEnd = processEnd + riskPercent
 
   return (
     <article className="diagnosis-card donut-card">
@@ -846,9 +855,7 @@ function DonutCard({ profiles, setInfo, onSelectGroup }) {
         <div
           className="donut"
           style={{
-            background: `conic-gradient(#22c55e 0 ${highPercent}%, #f43f5e ${highPercent}% ${
-              highPercent + riskPercent
-            }%, #e5e7eb ${highPercent + riskPercent}% 100%)`,
+            background: `conic-gradient(#22c55e 0 ${highPercent}%, #eab308 ${highPercent}% ${processEnd}%, #ef4444 ${processEnd}% ${riskEnd}%, #e5e7eb ${riskEnd}% 100%)`,
           }}
         >
           <strong>{profiles.length}</strong>
@@ -868,7 +875,22 @@ function DonutCard({ profiles, setInfo, onSelectGroup }) {
             }
             type="button"
           >
-            Alt: {high}
+            Alt: {highPercent}%
+          </button>
+          <button
+            className="process"
+            onClick={() =>
+              onSelectGroup({
+                kind: 'achievement-process',
+                title: 'Alumnes en procés',
+                description: 'Alumnes amb mitjana global C. No són risc greu, però necessiten consolidar criteris concrets.',
+                icon: Target,
+                profiles: processProfiles,
+              })
+            }
+            type="button"
+          >
+            Procés: {processPercent}%
           </button>
           <button
             className="risk"
@@ -876,14 +898,14 @@ function DonutCard({ profiles, setInfo, onSelectGroup }) {
               onSelectGroup({
                 kind: 'achievement-risk',
                 title: 'Alumnes en risc acadèmic',
-                description: 'Alumnes amb mitjana global C o D. Són bons candidats per revisar criteris concrets i reforç.',
+                description: 'Alumnes amb mitjana global D. Són candidats clars per revisar criteris concrets i reforç.',
                 icon: AlertTriangle,
                 profiles: riskProfiles,
               })
             }
             type="button"
           >
-            Risc: {risk}
+            Risc: {riskPercent}%
           </button>
           <span>Sense dades: {withoutData}</span>
         </div>
@@ -912,12 +934,25 @@ function PriorityCard({ balance, setInfo }) {
 
 function ScatterCard({ onSelectProfile, profiles, setInfo }) {
   const visibleProfiles = profiles.filter((profile) => profile.evaluation.score > 0 && profile.tracking.hasTrackingData)
-  const getScatterPosition = (profile, index) => {
+  const clusterIndexes = new Map()
+  visibleProfiles.forEach((profile) => {
+    const key = `${Math.round(profile.tracking.consistency / 5) * 5}-${Math.round(profile.evaluation.score * 2) / 2}`
+    const current = clusterIndexes.get(key) || []
+    current.push(profile.student.id)
+    clusterIndexes.set(key, current)
+  })
+
+  const getScatterPosition = (profile) => {
     const baseX = profile.tracking.hasTrackingData ? 8 + Math.min(100, Math.max(0, profile.tracking.consistency)) * 0.84 : 50
     const score = profile.evaluation.score > 0 ? profile.evaluation.score : 1
     const baseY = 90 - ((Math.min(4, Math.max(1, score)) - 1) / 3) * 78
-    const jitterX = ((index % 5) - 2) * 1.7
-    const jitterY = ((Math.floor(index / 5) % 5) - 2) * 1.7
+    const key = `${Math.round(profile.tracking.consistency / 5) * 5}-${Math.round(profile.evaluation.score * 2) / 2}`
+    const cluster = clusterIndexes.get(key) || []
+    const clusterIndex = Math.max(0, cluster.indexOf(profile.student.id))
+    const radius = cluster.length > 1 ? Math.min(6.5, 2 + cluster.length * 0.35) : 0
+    const angle = cluster.length > 1 ? (clusterIndex / cluster.length) * Math.PI * 2 : 0
+    const jitterX = Math.cos(angle) * radius
+    const jitterY = Math.sin(angle) * radius
 
     return {
       x: Math.min(94, Math.max(6, baseX + jitterX)),
@@ -943,8 +978,8 @@ function ScatterCard({ onSelectProfile, profiles, setInfo }) {
             <span>Cal tenir notes i tasques avaluables per situar els alumnes en aquest gràfic.</span>
           </div>
         )}
-        {visibleProfiles.map((profile, index) => {
-          const { x, y } = getScatterPosition(profile, index)
+        {visibleProfiles.map((profile) => {
+          const { x, y } = getScatterPosition(profile)
           return (
             <button
               className={`scatter-dot ${profile.riskScore >= 2 ? 'risk' : ''}`}
@@ -1278,7 +1313,7 @@ function CriterionDistribution({ distributions, students, setInfo }) {
       <HelpSectionHeading
         description="El que ja aportava la V1: veure on es concentren A/B/C/D per criteri i UT."
         helpKey="criterionDistribution"
-        icon={BarChart3}
+        icon={Layers}
         setInfo={setInfo}
         title="Distribució per criteris d’avaluació"
       />
@@ -1319,9 +1354,10 @@ function CriterionDistribution({ distributions, students, setInfo }) {
                                 />
                               ))}
                             </div>
-                            <small>
-                              Exc: {criterion.counts.A} · Risc: {criterion.counts.D}
-                            </small>
+                            <div className="criterion-bar-meta">
+                              <span className="excellent">Exc: {criterion.counts.A}</span>
+                              <span className="suspense">Susp: {criterion.counts.D}</span>
+                            </div>
                           </div>
                         )
                       })}
@@ -1359,6 +1395,7 @@ function ActionList({ title, icon: Icon, profiles, emptyText, helpKey, setInfo }
           </div>
         ))
       )}
+      {profiles.length > 0 ? <em className="stat-card-hint">Consultar detall a les targetes superiors</em> : null}
     </article>
   )
 }
@@ -1384,6 +1421,7 @@ function TrackingActionList({ emptyText, icon: Icon, profiles, setInfo, title })
           </div>
         ))
       )}
+      {profiles.length > 0 ? <em className="stat-card-hint">Consultar</em> : null}
     </article>
   )
 }
@@ -1730,6 +1768,7 @@ function UtStatsView({
   criterionRows,
   info,
   onCloseInfo,
+  onSelectGroup,
   profiles,
   setInfo,
   students,
@@ -1780,9 +1819,19 @@ function UtStatsView({
           helper={`${criterionRows.length} criteris actius en aquesta UT.`}
         />
         <MetricCard
+          actionLabel="Consultar alumnes"
           className="danger"
           help={chartHelp.utStudents}
           label="Alumnes a reforçar"
+          onClick={() =>
+            onSelectGroup?.({
+              kind: 'ut-reinforcement',
+              title: `Alumnes a reforçar · ${activeUt?.name || 'UT activa'}`,
+              description: 'Alumnes amb C/D global dins la UT activa. Revisa quin criteri o competència explica la dificultat.',
+              icon: AlertTriangle,
+              profiles: priorityStudents,
+            })
+          }
           setInfo={setInfo}
           value={priorityStudents.length}
           helper="Alumnes amb C/D global a la UT."
@@ -2253,6 +2302,7 @@ export function AnalyticsView() {
           <span>Mirar primer</span>
           <strong>{topPriority?.student.name || 'Cap prioritat crítica'}</strong>
           <small>{topPriorityDecision?.text || 'El grup no mostra cap senyal urgent combinat.'}</small>
+          <em className="stat-card-hint">Consultar</em>
         </button>
         <button
           className="global-action-card warning"
@@ -2274,6 +2324,7 @@ export function AnalyticsView() {
               ? 'Alumnes amb prou punts vermells o combinació de vermells i incidències.'
               : 'Sense alumnes que demanin agenda ara mateix.'}
           </small>
+          <em className="stat-card-hint">Consultar</em>
         </button>
         <button
           className="global-action-card concept"
@@ -2291,6 +2342,7 @@ export function AnalyticsView() {
           <span>Reforç més probable</span>
           <strong>{balance.weakest?.name || '-'}</strong>
           <small>{hardworkingLowAchievement.length} alumnes constants amb rendiment baix.</small>
+          <em className="stat-card-hint">Consultar</em>
         </button>
         <button
           className="global-action-card habit"
@@ -2308,6 +2360,7 @@ export function AnalyticsView() {
           <span>Prevenció d’hàbits</span>
           <strong>{lowConsistencyGoodAchievement.length}</strong>
           <small>Alumnes que assoleixen però no consoliden constància.</small>
+          <em className="stat-card-hint">Consultar</em>
         </button>
       </section>
 
@@ -2384,16 +2437,15 @@ export function AnalyticsView() {
         <>
           <GradeUtMatrix matrix={gradeMatrix} setInfo={setSelectedInfo} />
 
-          <div className="analytics-two-column lower">
+          <div className="analytics-two-column lower evaluation-detail-grid">
             <ProgressChangePanel
               declinedRows={declinedRows}
               improvedRows={improvedRows}
               onSelectStudent={setSelectedEvolutionStudent}
               setInfo={setSelectedInfo}
             />
+            <CriterionDistribution distributions={criterionDistributions} setInfo={setSelectedInfo} students={students} />
           </div>
-
-          <CriterionDistribution distributions={criterionDistributions} setInfo={setSelectedInfo} students={students} />
         </>
       )}
 
@@ -2406,6 +2458,7 @@ export function AnalyticsView() {
             criterionRows={activeUtCriterionRows}
             info={null}
             onCloseInfo={() => {}}
+            onSelectGroup={setSelectedInsight}
             profiles={profiles}
             setInfo={setSelectedInfo}
             students={students}
@@ -2453,8 +2506,7 @@ export function AnalyticsView() {
               helper="No fetes i acumulacions importades o registrades."
             />
           </div>
-          <div className="analytics-two-column lower">
-            <div className="action-list-grid">
+          <div className="action-list-grid tracking-action-grid">
               <ActionList
                 emptyText="Cap cas clar de constància alta amb rendiment baix."
                 helpKey="actionLists"
@@ -2484,7 +2536,6 @@ export function AnalyticsView() {
                 setInfo={setSelectedInfo}
                 title="Punts negres"
               />
-            </div>
           </div>
           <section className="global-diagnosis tracking-diagnosis">
             <div className="global-diagnosis-title">
@@ -2639,12 +2690,12 @@ export function AnalyticsView() {
           </table>
       </div>
 
-          <div className="analytics-two-column lower">
-        <ScatterCard
-          onSelectProfile={setSelectedScatterProfile}
-          profiles={profiles}
-          setInfo={setSelectedInfo}
-        />
+          <ScatterCard
+            onSelectProfile={setSelectedScatterProfile}
+            profiles={profiles}
+            setInfo={setSelectedInfo}
+          />
+          <div className="analytics-two-column lower cross-followup-grid">
             <div className="action-list-grid single-column">
               <ActionList
                 emptyText="Cap alumne combina prou senyals de risc."
@@ -2655,7 +2706,7 @@ export function AnalyticsView() {
                 title="Qui necessita ajuda?"
               />
             </div>
-      </div>
+          </div>
         </>
       )}
     </section>

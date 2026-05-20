@@ -290,6 +290,9 @@ export function GuidedTour() {
           <span style={{ width: `${((stepIndex + 1) / tourSteps.length) * 100}%` }} />
         </div>
         <footer>
+          <button className="ghost-action compact guided-tour-skip" onClick={closeTour} type="button">
+            Saltar guia
+          </button>
           <button
             className="secondary-action compact"
             disabled={stepIndex === 0}

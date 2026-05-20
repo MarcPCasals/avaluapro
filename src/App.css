@@ -104,10 +104,10 @@
 }
 
 .brand-card img {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 7px;
-  padding: 5px;
+  padding: 4px;
   border: 1px solid rgba(226, 232, 240, 0.72);
   background: white;
   object-fit: contain;
@@ -637,6 +637,10 @@
   gap: 10px;
 }
 
+.guided-tour-card footer .guided-tour-skip {
+  margin-right: auto;
+}
+
 .guided-tour-card header span {
   display: inline-flex;
   align-items: center;
@@ -713,6 +717,26 @@
   display: block;
   border-radius: inherit;
   background: #f97316;
+}
+
+.ghost-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #64748b;
+  background: transparent;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ghost-action:hover,
+.ghost-action:focus-visible {
+  color: #9a3412;
+  background: #fff7ed;
+  outline: none;
 }
 
 .toolbar {
@@ -2335,6 +2359,10 @@
   color: #15803d;
 }
 
+.donut-legend .process {
+  color: #b45309;
+}
+
 .donut-legend .risk {
   color: #be123c;
 }
@@ -2407,6 +2435,20 @@
   outline-offset: 2px;
 }
 
+.stat-card-hint {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
 .global-action-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2456,6 +2498,10 @@
   line-height: 1.35;
 }
 
+.global-action-card .stat-card-hint {
+  margin-top: auto;
+}
+
 .global-action-card.danger {
   border-color: #fecaca;
   background: linear-gradient(135deg, #fff7f7, #ffffff 72%);
@@ -2490,6 +2536,11 @@
 
 .analytics-two-column.lower {
   grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+}
+
+.analytics-two-column.evaluation-detail-grid {
+  grid-template-columns: minmax(360px, 0.92fr) minmax(520px, 1.08fr);
+  align-items: stretch;
 }
 
 .analytics-two-column.evolution-insights {
@@ -2572,11 +2623,12 @@
 .scatter-card {
   display: grid;
   gap: 14px;
+  margin-bottom: 18px;
   padding: 18px;
 }
 
 .scatter-plot {
-  height: 440px;
+  height: 520px;
   position: relative;
   overflow: hidden;
   border: 1px solid #e5e7eb;
@@ -2617,8 +2669,8 @@
 }
 
 .scatter-dot {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   position: absolute;
   transform: translate(-50%, -50%);
   display: grid;
@@ -2628,7 +2680,7 @@
   color: white;
   background: #2563eb;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 950;
   cursor: pointer;
 }
@@ -2669,10 +2721,27 @@
   gap: 12px;
 }
 
+.tracking-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
 .action-list-card {
   display: grid;
   gap: 8px;
   padding: 14px;
+}
+
+.tracking-action-grid .action-list-card,
+.tracking-task-heatmap,
+.tracking-student-ranking,
+.tracking-behavior-panel,
+.tracking-agenda-panel {
+  min-height: 360px;
+}
+
+.tracking-action-grid .action-list-card {
+  align-content: start;
 }
 
 .action-list-card header {
@@ -2974,12 +3043,26 @@
 .stacked-bar .segment.C { background: #eab308; }
 .stacked-bar .segment.D { background: #ef4444; }
 
-.criterion-bar-card small {
+.criterion-bar-meta {
   display: flex;
   justify-content: space-between;
-  color: #64748b;
   font-size: 12px;
   font-weight: 850;
+}
+
+.criterion-bar-meta span {
+  border-radius: 6px;
+  padding: 4px 7px;
+}
+
+.criterion-bar-meta .excellent {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.criterion-bar-meta .suspense {
+  color: #dc2626;
+  background: #fef2f2;
 }
 
 .ut-hero {
@@ -3235,6 +3318,7 @@
   align-content: start;
   gap: 14px;
   padding: 18px;
+  max-height: 560px;
 }
 
 .tracking-action-list,
@@ -3244,6 +3328,9 @@
 .tracking-agenda-list {
   display: grid;
   gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .tracking-action-row {
@@ -3435,6 +3522,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .tracking-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .ut-competency-overview {
     grid-template-columns: 1fr;
   }
@@ -3498,7 +3589,7 @@
   }
 
   .scatter-plot {
-    height: 260px;
+    height: 380px;
   }
 
   .ut-student-focus-row,
