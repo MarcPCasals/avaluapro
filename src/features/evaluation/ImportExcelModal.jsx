@@ -69,7 +69,6 @@ function countMatrixInvalids(matrix) {
 }
 
 export function ImportExcelModal({ criteria, onClose, onSave, students }) {
-  const [rawText, setRawText] = useState('')
   const [{ matrix, ignoredRows }, setImportState] = useState(() => ({
     matrix: createEmptyMatrix(students, criteria),
     ignoredRows: 0,
@@ -93,7 +92,6 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
   )
 
   const applyClipboardText = (text) => {
-    setRawText(text)
     setImportState(buildMatrixFromClipboard(text, students, criteria))
   }
 
@@ -135,19 +133,13 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
         <section className="excel-import-help">
           <Clipboard size={20} />
           <div>
-            <strong>Enganxa notes des d’Excel sense tocar la resta de la taula.</strong>
+            <strong>Com importar notes ràpidament?</strong>
             <p>
-              Copia només les cel·les de notes, o bé una taula amb la primera columna d’alumnes.
-              Només s’importen valors A, B, C, D o NA; les cel·les buides no modifiquen notes existents.
+              Selecciona les cel·les amb notes al teu Excel i copia-les. Fes clic a la primera cel·la blanca d’aquesta
+              taula i prem Ctrl + V.
             </p>
           </div>
         </section>
-
-        <textarea
-          onChange={(event) => applyClipboardText(event.target.value)}
-          placeholder="Enganxa aquí les notes copiades d’Excel..."
-          value={rawText}
-        />
 
         <div className="excel-import-status">
           <span className="ok">
@@ -188,6 +180,7 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
                       <td className={cell.invalid ? 'invalid-import-cell' : gradeTextClassName(cell.value)} key={criterion.id}>
                         <input
                           aria-label={`${student.name} ${criterion.name}`}
+                          autoFocus={rowIndex === 0 && columnIndex === 0}
                           className={cell.invalid ? 'invalid' : gradeTextClassName(cell.value)}
                           onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)}
                           onPaste={rowIndex === 0 && columnIndex === 0 ? handleCellPaste : undefined}

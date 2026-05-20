@@ -155,13 +155,55 @@ function MetricCard({ className = '', help, label, onClick, setInfo, value, help
 
   if (onClick) {
     return (
-      <button className={`metric-card ${className} clickable`} onClick={onClick} type="button">
+      <article
+        className={`metric-card ${className} clickable`}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onClick()
+          }
+        }}
+        role="button"
+        tabIndex={0}
+      >
         {content}
-      </button>
+      </article>
     )
   }
 
   return <article className={`metric-card ${className}`}>{content}</article>
+}
+
+function getConsistencyLabel(tracking) {
+  return tracking?.hasTrackingData ? `${tracking.consistency}%` : 'Sense dades'
+}
+
+function getAverageConsistency(profiles) {
+  const profilesWithTracking = profiles.filter((profile) => profile.tracking.hasTrackingData)
+  if (profilesWithTracking.length === 0) return null
+
+  return Math.round(
+    profilesWithTracking.reduce((total, profile) => total + profile.tracking.consistency, 0) /
+      profilesWithTracking.length,
+  )
+}
+
+function getConsistencyMetric(averageConsistency) {
+  return averageConsistency === null ? 'Sense dades' : `${averageConsistency}%`
+}
+
+function getConsistencyHelper(tasks, fallback) {
+  if (tasks.length === 0) return 'Encara no hi ha tasques avaluables.'
+  return fallback
+}
+
+function hasLowConsistency(profile) {
+  return profile.tracking.hasTrackingData && profile.tracking.consistency < 60
+}
+
+function hasHighConsistency(profile) {
+  return profile.tracking.hasTrackingData && profile.tracking.consistency >= 75
 }
 
 function HelpSectionHeading({ description, helpKey, icon: Icon, setInfo, title }) {
@@ -522,7 +564,7 @@ function getGlobalDecision(profile) {
     }
   }
 
-  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && profile.tracking.consistency >= 75) {
+  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasHighConsistency(profile)) {
     return {
       label: 'Reforç conceptual',
       text: 'Treballa de manera constant, però necessita ajuda sobre els criteris o competències.',
@@ -530,7 +572,7 @@ function getGlobalDecision(profile) {
     }
   }
 
-  if (profile.evaluation.score >= 3 && profile.tracking.consistency < 60) {
+  if (profile.evaluation.score >= 3 && hasLowConsistency(profile)) {
     return {
       label: 'Hàbit preventiu',
       text: 'El rendiment és bo, però la constància és fràgil i convé prevenir.',
@@ -555,9 +597,9 @@ function getGlobalDecision(profile) {
   }
 
   return {
-    label: profile.tracking.consistency >= 75 ? 'Hàbit estable' : 'Seguiment ordinari',
-    text: profile.tracking.consistency >= 75 ? 'Manté un patró de treball estable.' : 'Sense senyals combinades importants.',
-    tone: profile.tracking.consistency >= 75 ? 'stable' : 'neutral',
+    label: hasHighConsistency(profile) ? 'Hàbit estable' : 'Seguiment ordinari',
+    text: hasHighConsistency(profile) ? 'Manté un patró de treball estable.' : 'Sense senyals combinades importants.',
+    tone: hasHighConsistency(profile) ? 'stable' : 'neutral',
   }
 }
 
@@ -582,7 +624,7 @@ function sortProfilesByTeachingPriority(profiles) {
     if (a.riskScore !== b.riskScore) return b.riskScore - a.riskScore
     if (a.redPointCount !== b.redPointCount) return b.redPointCount - a.redPointCount
     if (a.incidents !== b.incidents) return b.incidents - a.incidents
-    return a.tracking.consistency - b.tracking.consistency
+    return (a.tracking.hasTrackingData ? a.tracking.consistency : 101) - (b.tracking.hasTrackingData ? b.tracking.consistency : 101)
   })
 }
 
@@ -644,6 +686,7 @@ function BalanceBar({ balance, setInfo }) {
       <header>
         <span>Equilibri competencial</span>
       </header>
+      <div className="balance-orb" />
       <strong>{level === 'stable' ? 'Equilibri correcte' : level === 'moderate' ? 'Desequilibri moderat' : 'Desequilibri important'}</strong>
       <div className="balance-meter">
         <span style={{ width: `${spreadPercent}%` }} />
@@ -660,12 +703,21 @@ function BalanceBar({ balance, setInfo }) {
 function TrendCard({ trend, setInfo }) {
   const plottedTrend = trend
     .map((item, index) => {
-      const x = trend.length <= 1 ? 50 : (index / (trend.length - 1)) * 100
-      const y = 90 - (item.average / 4) * 72
+      const x = trend.length <= 1 ? 160 : 24 + (index / (trend.length - 1)) * 272
+      const y = 96 - (item.average / 4) * 72
       return { ...item, x, y }
     })
     .filter((item) => item.count > 0)
   const points = plottedTrend.map((item) => `${item.x},${item.y}`)
+  const smoothPath =
+    plottedTrend.length < 2
+      ? ''
+      : plottedTrend.reduce((path, point, index, items) => {
+          if (index === 0) return `M ${point.x} ${point.y}`
+          const previous = items[index - 1]
+          const controlX = (previous.x + point.x) / 2
+          return `${path} C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`
+        }, '')
   const hasData = plottedTrend.length > 0
   const first = plottedTrend[0]?.average || 0
   const last = plottedTrend.at(-1)?.average || 0
@@ -684,16 +736,19 @@ function TrendCard({ trend, setInfo }) {
         <span>Tendència global</span>
         <TrendingUp size={16} />
       </header>
-      <svg viewBox="0 0 100 100" role="img" aria-label="Tendència global de notes">
-        <polyline className="trend-grid" points="0,82 100,82" />
-        {hasData && <polyline className="trend-line" points={points.join(' ')} />}
+      <svg viewBox="0 0 320 120" role="img" aria-label="Tendència global de notes">
+        {[24, 42, 60, 78, 96].map((y) => (
+          <line className="trend-grid" key={y} x1="16" x2="304" y1={y} y2={y} />
+        ))}
+        {hasData && plottedTrend.length === 1 && <polyline className="trend-line" points={points.join(' ')} />}
+        {hasData && plottedTrend.length > 1 && <path className="trend-line" d={smoothPath} />}
         {plottedTrend.map((item) => (
           <circle
             className={`trend-point grade-${getGradeFromAverage(item.average) || 'empty'}`}
             cx={item.x}
             cy={item.y}
             key={item.ut.id}
-            r="2.8"
+            r="4"
           />
         ))}
       </svg>
@@ -775,7 +830,7 @@ function ScatterCard({ onSelectProfile, profiles, setInfo }) {
         <span className="axis x">Constància</span>
         <span className="axis y">Rendiment</span>
         {profiles.map((profile) => {
-          const x = Math.min(96, Math.max(4, profile.tracking.consistency))
+          const x = profile.tracking.hasTrackingData ? Math.min(96, Math.max(4, profile.tracking.consistency)) : 50
           const y = 96 - Math.min(92, Math.max(8, profile.evaluation.score * 23))
           return (
             <button
@@ -783,7 +838,7 @@ function ScatterCard({ onSelectProfile, profiles, setInfo }) {
               key={profile.student.id}
               onClick={() => onSelectProfile(profile)}
               style={{ left: `${x}%`, top: `${y}%` }}
-              title={`${profile.student.name}: ${profile.evaluation.grade || '-'} · ${profile.tracking.consistency}%`}
+              title={`${profile.student.name}: ${profile.evaluation.grade || '-'} · ${getConsistencyLabel(profile.tracking)}`}
               type="button"
             >
               {getInitials(profile.student.name)}
@@ -1041,14 +1096,18 @@ function ScatterStudentModal({ onClose, profile, state, tasks }) {
           </article>
           <article className="scatter-detail-card tracking">
             <span>Constància</span>
-            <strong>{profile.tracking.consistency}%</strong>
-            <small>{profile.tracking.done}/{profile.tracking.total} tasques fetes</small>
+            <strong>{getConsistencyLabel(profile.tracking)}</strong>
+            <small>
+              {profile.tracking.hasTrackingData
+                ? `${profile.tracking.done}/${profile.tracking.total} tasques fetes`
+                : 'Encara no hi ha tasques avaluables'}
+            </small>
           </article>
         </div>
         <p className="scatter-detail-reading">
-          {profile.tracking.consistency >= 75 && profile.evaluation.score <= 2
+          {hasHighConsistency(profile) && profile.evaluation.score <= 2
             ? 'Lectura: treballa amb constància, però el rendiment indica que necessita suport conceptual.'
-            : profile.tracking.consistency < 60 && profile.evaluation.score >= 3
+            : hasLowConsistency(profile) && profile.evaluation.score >= 3
               ? 'Lectura: assoleix, però els hàbits són fràgils. Convé fer seguiment preventiu.'
               : profile.riskScore >= 2
                 ? 'Lectura: combina senyals de risc. Cal mirar evidències recents i marcar una acció curta.'
@@ -1158,7 +1217,7 @@ function ActionList({ title, icon: Icon, profiles, emptyText, helpKey, setInfo }
           <div className="action-student-row" key={profile.student.id}>
             <span>{profile.student.name}</span>
             <small>
-              {profile.evaluation.grade || '-'} · {profile.tracking.consistency}% · {profile.incidents} incid.
+              {profile.evaluation.grade || '-'} · {getConsistencyLabel(profile.tracking)} · {profile.incidents} incid.
             </small>
           </div>
         ))
@@ -1171,7 +1230,7 @@ function getStudentActionReason(profile, kind) {
   if (kind === 'risk') {
     const reasons = []
     if (profile.evaluation.score > 0 && profile.evaluation.score <= 2) reasons.push('rendiment baix')
-    if (profile.tracking.consistency < 60) reasons.push('constància baixa')
+    if (hasLowConsistency(profile)) reasons.push('constància baixa')
     if (profile.incidents >= 2) reasons.push('incidències repetides')
     return reasons.length > 0 ? reasons.join(' · ') : 'senyals combinades de risc'
   }
@@ -1235,13 +1294,13 @@ function StudentInsightModal({ insight, onClose }) {
                 </div>
                 <div className="insight-student-metrics">
                   <b>{profile.evaluation.grade || '-'}</b>
-                  <small>{profile.tracking.consistency}% const.</small>
+                  <small>{getConsistencyLabel(profile.tracking)} const.</small>
                   <small>{profile.redPointCount} punts vermells</small>
                   <small>{profile.incidents} incid.</small>
                 </div>
                 <p className="insight-evidence">
                   Dades: rendiment {profile.evaluation.grade || 'sense dades'} ({profile.evaluation.score || '-'}),
-                  constància {profile.tracking.consistency}%, {profile.tracking.missing} no fetes visibles,{' '}
+                  constància {getConsistencyLabel(profile.tracking)}, {profile.tracking.missing} no fetes visibles,{' '}
                   {profile.tracking.late} incompletes, {profile.redPointCount} punts vermells i {profile.incidents}{' '}
                   punts negres.
                 </p>
@@ -1427,7 +1486,7 @@ function UtCriterionFocus({ criterionRows, students, setInfo }) {
 function UtStudentFocus({ profiles, setInfo }) {
   const orderedProfiles = [...profiles].sort((a, b) => {
     if (a.evaluation.score !== b.evaluation.score) return a.evaluation.score - b.evaluation.score
-    return a.tracking.consistency - b.tracking.consistency
+    return (a.tracking.hasTrackingData ? a.tracking.consistency : 101) - (b.tracking.hasTrackingData ? b.tracking.consistency : 101)
   })
 
   return (
@@ -1448,7 +1507,7 @@ function UtStudentFocus({ profiles, setInfo }) {
             </div>
             <div className="ut-student-focus-metrics">
               <b>{profile.evaluation.grade || '-'}</b>
-              <small>{profile.tracking.consistency}% const.</small>
+              <small>{getConsistencyLabel(profile.tracking)} const.</small>
               <small>{profile.tracking.missing} no fetes</small>
               <small>{profile.incidents} incid.</small>
             </div>
@@ -1571,8 +1630,8 @@ function UtStatsView({
           help={chartHelp.trackingPulse}
           label="Constància mitjana"
           setInfo={setInfo}
-          value={`${averageConsistency}%`}
-          helper={`${tasks.length} tasques associades a la UT.`}
+          value={getConsistencyMetric(averageConsistency)}
+          helper={getConsistencyHelper(tasks, `${tasks.length} tasques associades a la UT.`)}
         />
       </div>
 
@@ -1882,8 +1941,11 @@ function TrackingAgendaPanel({ agendaNotes, rows, setInfo }) {
 }
 
 function TrackingStatsView({ agendaNotes, behaviorEvents, info, onCloseInfo, rows, setInfo, students, taskRecords, tasks }) {
+  const rowsWithTracking = rows.filter((row) => row.stats.hasTrackingData)
   const averageConsistency =
-    rows.length === 0 ? 0 : Math.round(rows.reduce((sum, row) => sum + row.stats.consistency, 0) / rows.length)
+    rowsWithTracking.length === 0
+      ? null
+      : Math.round(rowsWithTracking.reduce((sum, row) => sum + row.stats.consistency, 0) / rowsWithTracking.length)
   const redPointTotal = rows.reduce((sum, row) => sum + row.redPointCount, 0)
   const missingTotal = rows.reduce((sum, row) => sum + row.stats.missing, 0)
   const lateTotal = rows.reduce((sum, row) => sum + row.stats.late, 0)
@@ -1909,8 +1971,8 @@ function TrackingStatsView({ agendaNotes, behaviorEvents, info, onCloseInfo, row
           help={chartHelp.trackingSummary}
           label="Constància mitjana"
           setInfo={setInfo}
-          value={`${averageConsistency}%`}
-          helper={`${redPointTotal} punts vermells · ${lateTotal} incompletes`}
+          value={getConsistencyMetric(averageConsistency)}
+          helper={getConsistencyHelper(tasks, `${redPointTotal} punts vermells · ${lateTotal} incompletes`)}
         />
       </div>
 
@@ -2047,17 +2109,12 @@ export function AnalyticsView() {
   const trackingRows = buildTrackingRows(students, currentTasks, state.taskRecords, activeBehaviorEvents)
   const atRisk = profiles.filter((profile) => profile.riskScore >= 2)
   const hardworkingLowAchievement = profiles.filter(
-    (profile) => profile.tracking.consistency >= 75 && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
+    (profile) => hasHighConsistency(profile) && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
   )
   const lowConsistencyGoodAchievement = profiles.filter(
-    (profile) => profile.tracking.consistency < 60 && profile.evaluation.score >= 3,
+    (profile) => hasLowConsistency(profile) && profile.evaluation.score >= 3,
   )
-  const averageConsistency =
-    profiles.length === 0
-      ? 0
-      : Math.round(
-          profiles.reduce((total, profile) => total + profile.tracking.consistency, 0) / profiles.length,
-        )
+  const averageConsistency = getAverageConsistency(profiles)
   const activeUtTracking = students.map((student) =>
     getStudentTrackingStats(student.id, state.taskRecords, currentTasks),
   )
@@ -2179,8 +2236,8 @@ export function AnalyticsView() {
           help={chartHelp.globalSummary}
           label="Constància mitjana"
           setInfo={setSelectedInfo}
-          value={`${averageConsistency}%`}
-          helper={`${redPointTotal} punts vermells · ${lateTotal} incompletes a la UT activa`}
+          value={getConsistencyMetric(averageConsistency)}
+          helper={getConsistencyHelper(currentTasks, `${redPointTotal} punts vermells · ${lateTotal} incompletes a la UT activa`)}
         />
       </div>
 
@@ -2372,10 +2429,12 @@ export function AnalyticsView() {
                       </div>
                     </td>
                     <td>
-                      <div className={`progress-line compact ${profile.tracking.consistency < 60 ? 'low' : ''}`}>
-                        <span style={{ width: `${profile.tracking.consistency}%` }} />
+                      <div className={`progress-line compact ${hasLowConsistency(profile) ? 'low' : ''}`}>
+                        <span style={{ width: `${profile.tracking.hasTrackingData ? profile.tracking.consistency : 0}%` }} />
                       </div>
-                      <b className="consistency-badge">{profile.tracking.consistency}%</b>
+                      <b className={`consistency-badge ${profile.tracking.hasTrackingData ? '' : 'empty'}`}>
+                        {getConsistencyLabel(profile.tracking)}
+                      </b>
                     </td>
                     <td>
                       <button

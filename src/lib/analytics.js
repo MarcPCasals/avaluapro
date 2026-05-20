@@ -19,7 +19,7 @@ export function getStudentTrackingStats(studentId, taskRecords, tasks) {
   const points = done + late * 0.5
   const consistency = total === 0 ? 0 : Math.round((points / total) * 100)
 
-  return { done, late, missing, exempt, total, consistency }
+  return { done, late, missing, exempt, total, consistency, hasTrackingData: total > 0 }
 }
 
 export function getStudentRedPointCount(student, trackingStats) {
@@ -158,7 +158,7 @@ export function buildStudentProfiles(state, classId, utId) {
     ).length
     const riskScore =
       (evaluation.score > 0 && evaluation.score <= 2 ? 1 : 0) +
-      (tracking.consistency < 60 ? 1 : 0) +
+      (tracking.hasTrackingData && tracking.consistency < 60 ? 1 : 0) +
       (incidents >= 2 || redPointCount >= 3 ? 1 : 0)
 
     return { student, evaluation, tracking, redPointCount, incidents, riskScore }

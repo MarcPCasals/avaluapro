@@ -108,8 +108,17 @@ export function EvaluationView() {
   const filteredStudents = students.filter(
     (student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter,
   )
+  const studentOrder = new Map(filteredStudents.map((student, index) => [student.id, index]))
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
   const classSeatingCharts = seatingCharts.filter((chart) => chart.classId === activeClassId)
+  const getEvaluationTabIndex = (studentId, competencyIndex, criterionIndex) => {
+    const studentIndex = studentOrder.get(studentId) ?? 0
+    const previousCompetencySlots = competencies
+      .slice(0, competencyIndex)
+      .reduce((total, competency) => total + competency.criteria.length * filteredStudents.length, 0)
+
+    return previousCompetencySlots + studentIndex * competencies[competencyIndex].criteria.length + criterionIndex + 1
+  }
 
   return (
     <section className="work-surface">
@@ -289,14 +298,15 @@ export function EvaluationView() {
                     <small>{student.halfGroup}</small>
                   </button>
                 </td>
-                {competencies.flatMap((competency) => [
-                  ...competency.criteria.map((criterion) => {
+                {competencies.flatMap((competency, competencyIndex) => [
+                  ...competency.criteria.map((criterion, criterionIndex) => {
                     const value = getCriterionMark(marks, student.id, criterion.id)
                     return (
                       <td className="mark-cell criterion-mark-cell" key={`${student.id}_${criterion.id}`}>
                         <select
                           className={gradeTextClassName(value)}
                           onChange={(event) => updateMark(student.id, criterion.id, event.target.value)}
+                          tabIndex={getEvaluationTabIndex(student.id, competencyIndex, criterionIndex)}
                           value={value}
                         >
                           {GRADE_OPTIONS.map((option) => (
