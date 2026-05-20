@@ -41,7 +41,7 @@ const quickStart = [
   },
   {
     icon: ShieldCheck,
-    title: '6. Backup',
+    title: '6. Còpia de seguretat',
     text: 'Descarrega còpies de seguretat sovint, especialment abans de restaurar dades o fer proves importants.',
   },
 ]
@@ -54,8 +54,8 @@ const helpSections = [
   },
   {
     icon: Cloud,
-    title: 'Què entra al backup?',
-    text: 'El backup complet inclou classes, alumnes, fotos comprimides, notes, tasques, registres, comentaris, diagnòstics, rúbriques i preferències.',
+    title: 'Què entra a la còpia de seguretat?',
+    text: 'La còpia completa inclou classes, alumnes, fotos comprimides, notes, tasques, registres, comentaris, diagnòstics, rúbriques i preferències.',
   },
   {
     icon: BookOpenCheck,

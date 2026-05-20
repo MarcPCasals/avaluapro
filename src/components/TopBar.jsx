@@ -17,7 +17,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
@@ -107,7 +107,7 @@ function buildRestoreMessage({ currentSummary, incomingSummary, source }) {
     `Ara tens: ${currentSummary.counts.classes} classes, ${currentSummary.counts.students} alumnes, ${currentSummary.counts.marks} notes i ${currentSummary.counts.tasks} tasques.`,
     `Entraran: ${incomingSummary.counts.classes} classes, ${incomingSummary.counts.students} alumnes, ${incomingSummary.counts.marks} notes i ${incomingSummary.counts.tasks} tasques.`,
     '',
-    'Recomanació: descarrega abans un backup de l’estat actual.',
+    'Recomanació: descarrega abans una còpia de seguretat de l’estat actual.',
     '',
     'Vols continuar?',
   ].join('\n')
@@ -122,6 +122,7 @@ export function TopBar() {
   const [showHelp, setShowHelp] = useState(false)
   const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
+  const dataMenuRef = useRef(null)
   const classes = useAvaluaproStore((state) => state.classes)
   const orderedClasses = useMemo(
     () => [...classes].sort((a, b) => (a.order || 0) - (b.order || 0)),
@@ -140,8 +141,21 @@ export function TopBar() {
   const signOutFromGoogle = useAvaluaproStore((state) => state.signOutFromGoogle)
   const pushAllToCloud = useAvaluaproStore((state) => state.pushAllToCloud)
   const pullFromCloud = useAvaluaproStore((state) => state.pullFromCloud)
+  const createCloudBackup = useAvaluaproStore((state) => state.createCloudBackup)
   const syncIndicator = getSyncIndicator(cloud)
   const SyncIcon = syncIndicator.icon
+
+  useEffect(() => {
+    if (!showDataMenu) return undefined
+
+    function handleOutsidePointerDown(event) {
+      if (dataMenuRef.current?.contains(event.target)) return
+      setShowDataMenu(false)
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+  }, [showDataMenu])
 
   function handleDownloadBackup() {
     const backup = createBackup()
@@ -232,14 +246,14 @@ export function TopBar() {
         buildRestoreMessage({
           currentSummary: summarizeBackup(createBackup()),
           incomingSummary: summarizeBackup(backup),
-          source: `el backup "${file.name}"`,
+          source: `la còpia "${file.name}"`,
         }),
       )
       if (!shouldRestore) return
       await restoreBackup(backup, { filename: file.name })
-      window.alert(`Backup restaurat correctament.\n\n${buildBackupStatusMessage(backup, file.name)}`)
+      window.alert(`Còpia restaurada correctament.\n\n${buildBackupStatusMessage(backup, file.name)}`)
     } catch (error) {
-      window.alert(error.message || 'No s’ha pogut restaurar aquest backup.')
+      window.alert(error.message || 'No s’ha pogut restaurar aquesta còpia.')
     }
   }
 
@@ -248,7 +262,7 @@ export function TopBar() {
       [
         'Aquesta acció substituirà les dades locals actuals per les dades guardades a Firebase.',
         '',
-        'Abans de continuar, és recomanable descarregar un backup local de l’estat actual.',
+        'Abans de continuar, és recomanable descarregar una còpia local de l’estat actual.',
         '',
         'Vols continuar?',
       ].join('\n'),
@@ -262,7 +276,7 @@ export function TopBar() {
       [
         'Això esborrarà les dades actuals del dispositiu i tornarà a carregar les dades demo inicials.',
         '',
-        'Descarrega un backup abans si vols conservar el que tens ara.',
+        'Descarrega una còpia de seguretat abans si vols conservar el que tens ara.',
         '',
         'Per confirmar, escriu ESBORRA.',
       ].join('\n'),
@@ -328,7 +342,7 @@ export function TopBar() {
             </strong>
           </div>
         )}
-        <div className="top-menu-wrapper" data-tour="data-menu">
+        <div className="top-menu-wrapper" data-tour="data-menu" ref={dataMenuRef}>
           <button
             className={`top-menu-trigger ${showDataMenu ? 'open' : ''}`}
             onClick={() => setShowDataMenu((value) => !value)}
@@ -376,7 +390,7 @@ export function TopBar() {
                 type="button"
               >
                 <Cloud size={18} />
-                Backups i estat
+                Còpies i estat
               </button>
               <button
                 onClick={() => {
@@ -386,7 +400,7 @@ export function TopBar() {
                 type="button"
               >
                 <Download size={18} />
-                Descarregar backup
+                Còpia manual al dispositiu
               </button>
               <button
                 onClick={() => {
@@ -396,7 +410,7 @@ export function TopBar() {
                 type="button"
               >
                 <Upload size={18} />
-                Importar backup
+                Importar còpia manual
               </button>
               <button
                 onClick={() => {
@@ -412,6 +426,20 @@ export function TopBar() {
                 <>
                   <span className="top-menu-separator" />
                   <button
+                    onClick={async () => {
+                      try {
+                        await createCloudBackup('manual')
+                      } catch (error) {
+                        window.alert(error.message || 'No s’ha pogut crear la còpia al núvol.')
+                      }
+                      setShowDataMenu(false)
+                    }}
+                    type="button"
+                  >
+                    <Cloud size={18} />
+                    Crear còpia al núvol
+                  </button>
+                  <button
                     onClick={() => {
                       pushAllToCloud()
                       setShowDataMenu(false)
@@ -419,7 +447,7 @@ export function TopBar() {
                     type="button"
                   >
                     <Upload size={18} />
-                    Pujar a Firebase
+                    Sincronitzar ara
                   </button>
                   <button
                     onClick={() => {
@@ -429,7 +457,7 @@ export function TopBar() {
                     type="button"
                   >
                     <Download size={18} />
-                    Baixar de Firebase
+                    Recuperar estat del núvol
                   </button>
                   <button
                     onClick={() => {

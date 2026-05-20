@@ -47,8 +47,8 @@ export function summarizeBackup(backup) {
   )
 
   const warnings = [
-    counts.classes === 0 ? 'No hi ha cap classe al backup.' : '',
-    counts.students === 0 ? 'No hi ha alumnes al backup.' : '',
+    counts.classes === 0 ? 'No hi ha cap classe a la còpia.' : '',
+    counts.students === 0 ? 'No hi ha alumnes a la còpia.' : '',
     cfnUnexpectedCompetencies.length > 0
       ? `Hi ha ${cfnUnexpectedCompetencies.length} competències no CFN dins de classes de Ciències.`
       : '',

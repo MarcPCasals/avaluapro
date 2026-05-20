@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BarChart3,
   Brain,
+  ChevronDown,
   CheckCircle2,
   CircleHelp,
   ListFilter,
@@ -50,6 +51,11 @@ const dashboardScopes = [
     id: 'evaluation',
     label: 'Avaluació',
     description: 'Notes, UTs, competències i evolució.',
+  },
+  {
+    id: 'ut',
+    label: 'UT activa',
+    description: 'Criteris i tasques de la unitat seleccionada.',
   },
   {
     id: 'tracking',
@@ -563,7 +569,7 @@ function buildTrackingEvidence(profile, state, tasks, behaviorEvents) {
     redRows: [
       ...redRows,
       ...(missingDifference > 0
-        ? [{ title: `${missingDifference} punts vermells importats del Seguidor V1`, detail: 'Sense tasca concreta al backup' }]
+        ? [{ title: `${missingDifference} punts vermells importats del Seguidor V1`, detail: 'Sense tasca concreta a la còpia' }]
         : []),
     ],
     blackRows,
@@ -710,7 +716,11 @@ function GradeUtMatrix({ matrix, setInfo }) {
                     ut.competencyRows.map((competency) => (
                       <small className={!competency.hasCompetency ? 'muted' : ''} key={competency.id}>
                         <span>{competency.name}</span>
-                        <b className={`grade-count-badge grade-${competency.hasCompetency ? row.grade : 'empty'}`}>
+                        <b
+                          className={`grade-count-badge grade-${
+                            competency.hasCompetency && competency.count > 0 ? row.grade : 'empty'
+                          }`}
+                        >
                           {competency.hasCompetency ? competency.count : '-'}
                         </b>
                       </small>
@@ -811,10 +821,13 @@ function TrendCard({ trend, setInfo }) {
   )
 }
 
-function DonutCard({ profiles, setInfo }) {
-  const high = profiles.filter((profile) => profile.evaluation.score >= 3).length
-  const risk = profiles.filter((profile) => profile.evaluation.score > 0 && profile.evaluation.score <= 2).length
-  const withoutData = Math.max(profiles.length - high - risk, 0)
+function DonutCard({ profiles, setInfo, onSelectGroup }) {
+  const highProfiles = profiles.filter((profile) => profile.evaluation.score >= 3)
+  const riskProfiles = profiles.filter((profile) => profile.evaluation.score > 0 && profile.evaluation.score <= 2)
+  const withoutDataProfiles = profiles.filter((profile) => profile.evaluation.score === 0)
+  const high = highProfiles.length
+  const risk = riskProfiles.length
+  const withoutData = withoutDataProfiles.length
   const total = Math.max(profiles.length, 1)
   const highPercent = Math.round((high / total) * 100)
   const riskPercent = Math.round((risk / total) * 100)
@@ -842,8 +855,36 @@ function DonutCard({ profiles, setInfo }) {
           <span>Total</span>
         </div>
         <div className="donut-legend">
-          <span className="good">Alt: {high}</span>
-          <span className="risk">Risc: {risk}</span>
+          <button
+            className="good"
+            onClick={() =>
+              onSelectGroup({
+                kind: 'achievement-high',
+                title: 'Alumnes amb assoliment alt',
+                description: 'Alumnes amb mitjana global A o B. Serveix per veure qui consolida bé els aprenentatges.',
+                icon: CheckCircle2,
+                profiles: highProfiles,
+              })
+            }
+            type="button"
+          >
+            Alt: {high}
+          </button>
+          <button
+            className="risk"
+            onClick={() =>
+              onSelectGroup({
+                kind: 'achievement-risk',
+                title: 'Alumnes en risc acadèmic',
+                description: 'Alumnes amb mitjana global C o D. Són bons candidats per revisar criteris concrets i reforç.',
+                icon: AlertTriangle,
+                profiles: riskProfiles,
+              })
+            }
+            type="button"
+          >
+            Risc: {risk}
+          </button>
           <span>Sense dades: {withoutData}</span>
         </div>
       </div>
@@ -1222,6 +1263,16 @@ function ScatterStudentModal({ onClose, profile, state, tasks }) {
 }
 
 function CriterionDistribution({ distributions, students, setInfo }) {
+  const [openCompetencies, setOpenCompetencies] = useState([])
+
+  function toggleCompetency(competencyId) {
+    setOpenCompetencies((current) =>
+      current.includes(competencyId)
+        ? current.filter((id) => id !== competencyId)
+        : [...current, competencyId],
+    )
+  }
+
   return (
     <section className="visual-card criterion-distribution">
       <HelpSectionHeading
@@ -1232,41 +1283,55 @@ function CriterionDistribution({ distributions, students, setInfo }) {
         title="Distribució per criteris d’avaluació"
       />
       <div className="criterion-accordion-list">
-        {distributions.map((competency) => (
-          <article className="criterion-accordion" key={competency.id}>
-            <header>
-              <span className={`competency-dot ${competency.color}`} />
-              <strong>{competency.name}</strong>
-            </header>
-            <div className="criterion-distribution-grid">
-              {competency.uts.map((utRow) => (
-                <div className="criterion-ut-row" key={utRow.ut.id}>
-                  <strong>{utRow.ut.name}</strong>
-                  {utRow.criteria.map((criterion) => {
-                    const total = Math.max(students.length, 1)
-                    return (
-                      <div className="criterion-bar-card" key={criterion.criterion.id}>
-                        <span>{criterion.criterion.name}</span>
-                        <div className="stacked-bar">
-                          {gradeOrder.map((grade) => (
-                            <i
-                              className={`segment ${grade}`}
-                              key={grade}
-                              style={{ width: `${(criterion.counts[grade] / total) * 100}%` }}
-                            />
-                          ))}
-                        </div>
-                        <small>
-                          Exc: {criterion.counts.A} · Risc: {criterion.counts.D}
-                        </small>
-                      </div>
-                    )
-                  })}
+        {distributions.map((competency) => {
+          const isOpen = openCompetencies.includes(competency.id)
+          const criterionCount = competency.uts.reduce((total, utRow) => total + utRow.criteria.length, 0)
+          return (
+            <article className={`criterion-accordion ${isOpen ? 'open' : ''}`} key={competency.id}>
+              <button
+                className="criterion-accordion-toggle"
+                onClick={() => toggleCompetency(competency.id)}
+                type="button"
+              >
+                <span className={`competency-dot ${competency.color}`} />
+                <strong>{competency.name}</strong>
+                <small>
+                  {competency.uts.length} UT · {criterionCount} criteris
+                </small>
+                <ChevronDown size={18} />
+              </button>
+              {isOpen && (
+                <div className="criterion-distribution-grid">
+                  {competency.uts.map((utRow) => (
+                    <div className="criterion-ut-row" key={utRow.ut.id}>
+                      <strong>{utRow.ut.name}</strong>
+                      {utRow.criteria.map((criterion) => {
+                        const total = Math.max(students.length, 1)
+                        return (
+                          <div className="criterion-bar-card" key={criterion.criterion.id}>
+                            <span>{criterion.criterion.name}</span>
+                            <div className="stacked-bar">
+                              {gradeOrder.map((grade) => (
+                                <i
+                                  className={`segment ${grade}`}
+                                  key={grade}
+                                  style={{ width: `${(criterion.counts[grade] / total) * 100}%` }}
+                                />
+                              ))}
+                            </div>
+                            <small>
+                              Exc: {criterion.counts.A} · Risc: {criterion.counts.D}
+                            </small>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </article>
-        ))}
+              )}
+            </article>
+          )
+        })}
       </div>
     </section>
   )
@@ -2037,147 +2102,6 @@ function TrackingAgendaPanel({ agendaNotes, rows, setInfo }) {
   )
 }
 
-function TrackingStatsView({ agendaNotes, behaviorEvents, info, onCloseInfo, rows, setInfo, students, taskRecords, tasks }) {
-  const rowsWithTracking = rows.filter((row) => row.stats.hasTrackingData)
-  const averageConsistency =
-    rowsWithTracking.length === 0
-      ? null
-      : Math.round(rowsWithTracking.reduce((sum, row) => sum + row.stats.consistency, 0) / rowsWithTracking.length)
-  const redPointTotal = rows.reduce((sum, row) => sum + row.redPointCount, 0)
-  const missingTotal = rows.reduce((sum, row) => sum + row.stats.missing, 0)
-  const lateTotal = rows.reduce((sum, row) => sum + row.stats.late, 0)
-  const incidentsTotal = rows.reduce((sum, row) => sum + row.incidents.length, 0)
-  const remindersTotal =
-    tasks.filter((task) => task.reminder).length + taskRecords.filter((record) => record.reminder).length
-  const interventions = buildTrackingInterventions(students, taskRecords, tasks, behaviorEvents)
-  const priority = interventions.filter((intervention) => intervention.level === 'priority').length
-  const agendaNotesTotal = agendaNotes.filter((note) => note.type === 'tracking').length
-  const agendaCandidates = rows.filter((row) => row.redPointCount >= 3 || row.redPointCount + row.incidents.length >= 3).length
-
-  return (
-    <section className="analytics-view">
-      <InfoModal info={info} onClose={onCloseInfo} />
-      <div className="analytics-hero executive tracking-hero">
-        <div>
-          <Radar size={30} />
-          <h2>Stats Seguiment</h2>
-          <p>Lectura de constància, tasques, punts vermells, punts negres i intervencions de seguiment.</p>
-        </div>
-        <MetricCard
-          className="highlight"
-          help={chartHelp.trackingSummary}
-          label="Constància mitjana"
-          setInfo={setInfo}
-          value={getConsistencyMetric(averageConsistency)}
-          helper={getConsistencyHelper(tasks, `${redPointTotal} punts vermells · ${lateTotal} incompletes`)}
-        />
-      </div>
-
-      <div className="analytics-grid">
-        <MetricCard
-          className="danger"
-          help={chartHelp.trackingTaskMap}
-          label="Punts vermells"
-          setInfo={setInfo}
-          value={redPointTotal}
-          helper={`${missingTotal} venen de tasques no fetes visibles.`}
-        />
-        <MetricCard
-          className="habit"
-          help={chartHelp.trackingBehavior}
-          label="Punts negres"
-          setInfo={setInfo}
-          value={incidentsTotal}
-          helper="Incidències de comportament registrades."
-        />
-        <MetricCard
-          className="concept"
-          help={chartHelp.trackingIntervention}
-          label="Intervenció prioritària"
-          setInfo={setInfo}
-          value={priority}
-          helper="Alumnes amb patró recent preocupant."
-        />
-        <MetricCard
-          className="warning"
-          help={chartHelp.trackingAgenda}
-          label="Agenda"
-          setInfo={setInfo}
-          value={agendaCandidates}
-          helper={`${agendaNotesTotal} avisos ja registrats.`}
-        />
-      </div>
-
-      <section className="global-diagnosis tracking-diagnosis">
-        <div className="global-diagnosis-title">
-          <Radar size={24} />
-          <div>
-            <h3>Diagnòstic de seguiment</h3>
-            <p>Quins hàbits necessiten intervenció abans que afectin l’aprenentatge?</p>
-          </div>
-          <InfoButton
-            label="Diagnòstic de seguiment"
-            onOpen={() => setInfo({ title: 'Diagnòstic de seguiment', text: chartHelp.trackingSummary })}
-          />
-        </div>
-        <div className="diagnosis-grid">
-          <TrackingPulseCard rows={rows} setInfo={setInfo} />
-          <article className="diagnosis-card priority">
-            <InfoButton
-              label="Recordatoris actius"
-              onOpen={() => setInfo({ title: 'Recordatoris actius', text: chartHelp.trackingReminders })}
-            />
-            <AlertTriangle size={28} />
-            <span>Recordatoris actius</span>
-            <strong>{remindersTotal}</strong>
-            <small>De classe o individuals</small>
-          </article>
-          <article className="diagnosis-card balance stable">
-            <InfoButton
-              label="Tasques incompletes"
-              onOpen={() => setInfo({ title: 'Tasques incompletes', text: chartHelp.trackingIncomplete })}
-            />
-            <header>
-              <span>Tasques incompletes</span>
-            </header>
-            <strong>{lateTotal}</strong>
-            <div className="balance-meter">
-              <span style={{ width: `${Math.min(100, lateTotal * 12)}%` }} />
-            </div>
-            <p>Si s’acumulen, poden convertir-se en negatius vermells.</p>
-          </article>
-          <article className="diagnosis-card trend">
-            <InfoButton
-              label="Volum de tasques"
-              onOpen={() => setInfo({ title: 'Volum de tasques', text: chartHelp.trackingVolume })}
-            />
-            <header>
-              <span>Volum de tasques</span>
-              <CheckCircle2 size={16} />
-            </header>
-            <strong>{tasks.length}</strong>
-            <p>Tasques creades a la UT activa.</p>
-          </article>
-        </div>
-      </section>
-
-      <div className="analytics-two-column">
-        <TrackingInterventionPanel interventions={interventions} setInfo={setInfo} />
-        <TrackingAgendaPanel agendaNotes={agendaNotes} rows={rows} setInfo={setInfo} />
-      </div>
-
-      <div className="analytics-two-column">
-        <TrackingTaskHeatmap setInfo={setInfo} taskRecords={taskRecords} tasks={tasks} students={students} />
-        <TrackingStudentList rows={rows} setInfo={setInfo} />
-      </div>
-
-      <div className="analytics-two-column lower">
-        <TrackingBehaviorPanel rows={rows} setInfo={setInfo} />
-      </div>
-    </section>
-  )
-}
-
 export function AnalyticsView() {
   const state = useAvaluaproStore()
   const [selectedInsight, setSelectedInsight] = useState(null)
@@ -2186,15 +2110,21 @@ export function AnalyticsView() {
   const [selectedEvolutionStudent, setSelectedEvolutionStudent] = useState(null)
   const [selectedTrackingEvidence, setSelectedTrackingEvidence] = useState(null)
   const [profileSortMode, setProfileSortMode] = useState('intervention')
-  const [dashboardScope, setDashboardScope] = useState('executive')
-  const { activeClassId, activeUtId, activeInsight } = state.ui
+  const [dashboardScope, setDashboardScope] = useState(() =>
+    state.ui.activeInsight === 'utStats'
+      ? 'ut'
+      : state.ui.activeInsight === 'trackingStats'
+        ? 'tracking'
+        : 'executive',
+  )
+  const { activeClassId, activeUtId } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
   const students = state.students
     .filter((student) => student.classId === activeClassId)
     .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
   const classUts = getClassUts(state, activeClassId)
   const currentTasks = getCurrentTasks(state, activeClassId, activeUtId)
-  const currentInsight = insightCopy[activeInsight] || insightCopy.dashboard
+  const currentInsight = insightCopy.dashboard
   const Icon = currentInsight.icon
   const canonicalCompetencies = buildCanonicalCompetencies(state, classUts)
   const gradeMatrix = buildGradeUtMatrix(state, students, classUts, canonicalCompetencies)
@@ -2207,6 +2137,7 @@ export function AnalyticsView() {
   const activeUtCriterionRows = buildUtCriterionRows(state, students, activeUtCompetencies)
   const activeBehaviorEvents = state.behaviorEvents.filter((event) => event.classId === activeClassId)
   const trackingRows = buildTrackingRows(students, currentTasks, state.taskRecords, activeBehaviorEvents)
+  const trackingInterventions = buildTrackingInterventions(students, state.taskRecords, currentTasks, activeBehaviorEvents)
   const atRisk = profiles.filter((profile) => profile.riskScore >= 2)
   const hardworkingLowAchievement = profiles.filter(
     (profile) => hasHighConsistency(profile) && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
@@ -2247,40 +2178,6 @@ export function AnalyticsView() {
     hardworkingLowAchievement,
     lowConsistencyGoodAchievement,
   })
-  if (activeInsight === 'utStats') {
-    return (
-      <UtStatsView
-        activeUt={activeUt}
-        averageConsistency={averageConsistency}
-        competencies={activeUtCompetencyRows}
-        criterionRows={activeUtCriterionRows}
-        info={selectedInfo}
-        onCloseInfo={() => setSelectedInfo(null)}
-        profiles={profiles}
-        setInfo={setSelectedInfo}
-        students={students}
-        taskRecords={state.taskRecords}
-        tasks={currentTasks}
-      />
-    )
-  }
-
-  if (activeInsight === 'trackingStats') {
-    return (
-      <TrackingStatsView
-        agendaNotes={state.agendaNotes.filter((note) => note.classId === activeClassId)}
-        behaviorEvents={activeBehaviorEvents}
-        info={selectedInfo}
-        onCloseInfo={() => setSelectedInfo(null)}
-        rows={trackingRows}
-        setInfo={setSelectedInfo}
-        students={students}
-        taskRecords={state.taskRecords}
-        tasks={currentTasks}
-      />
-    )
-  }
-
   return (
     <section className="analytics-view">
       <StudentInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} />
@@ -2334,7 +2231,7 @@ export function AnalyticsView() {
         <div className="diagnosis-grid">
           <BalanceBar balance={balance} setInfo={setSelectedInfo} />
           <TrendCard setInfo={setSelectedInfo} trend={trend} />
-          <DonutCard profiles={profiles} setInfo={setSelectedInfo} />
+          <DonutCard profiles={profiles} setInfo={setSelectedInfo} onSelectGroup={setSelectedInsight} />
           <PriorityCard balance={balance} setInfo={setSelectedInfo} />
         </div>
       </section>
@@ -2494,20 +2391,28 @@ export function AnalyticsView() {
               onSelectStudent={setSelectedEvolutionStudent}
               setInfo={setSelectedInfo}
             />
-            <div className="action-list-grid single-column">
-              <ActionList
-                emptyText="Cap cas clar de constància alta amb rendiment baix."
-                helpKey="actionLists"
-                icon={Brain}
-                profiles={hardworkingLowAchievement}
-                setInfo={setSelectedInfo}
-                title="Qui treballa però no assoleix?"
-              />
-            </div>
           </div>
 
           <CriterionDistribution distributions={criterionDistributions} setInfo={setSelectedInfo} students={students} />
         </>
+      )}
+
+      {dashboardScope === 'ut' && (
+        <div className="embedded-stats-panel">
+          <UtStatsView
+            activeUt={activeUt}
+            averageConsistency={averageConsistency}
+            competencies={activeUtCompetencyRows}
+            criterionRows={activeUtCriterionRows}
+            info={null}
+            onCloseInfo={() => {}}
+            profiles={profiles}
+            setInfo={setSelectedInfo}
+            students={students}
+            taskRecords={state.taskRecords}
+            tasks={currentTasks}
+          />
+        </div>
       )}
 
       {dashboardScope === 'tracking' && (
@@ -2550,6 +2455,14 @@ export function AnalyticsView() {
           </div>
           <div className="analytics-two-column lower">
             <div className="action-list-grid">
+              <ActionList
+                emptyText="Cap cas clar de constància alta amb rendiment baix."
+                helpKey="actionLists"
+                icon={Brain}
+                profiles={hardworkingLowAchievement}
+                setInfo={setSelectedInfo}
+                title="Qui treballa però no assoleix?"
+              />
               <TrackingActionList
                 emptyText="Cap alumne amb constància baixa dins la UT activa."
                 icon={AlertTriangle}
@@ -2572,6 +2485,40 @@ export function AnalyticsView() {
                 title="Punts negres"
               />
             </div>
+          </div>
+          <section className="global-diagnosis tracking-diagnosis">
+            <div className="global-diagnosis-title">
+              <Radar size={24} />
+              <div>
+                <h3>Diagnòstic de seguiment</h3>
+                <p>Quins hàbits necessiten intervenció abans que afectin l’aprenentatge?</p>
+              </div>
+              <InfoButton
+                label="Diagnòstic de seguiment"
+                onOpen={() => setSelectedInfo({ title: 'Diagnòstic de seguiment', text: chartHelp.trackingSummary })}
+              />
+            </div>
+            <div className="diagnosis-grid">
+              <TrackingPulseCard rows={trackingRows} setInfo={setSelectedInfo} />
+              <TrackingInterventionPanel interventions={trackingInterventions} setInfo={setSelectedInfo} />
+            </div>
+          </section>
+          <div className="analytics-two-column lower">
+            <TrackingTaskHeatmap
+              setInfo={setSelectedInfo}
+              students={students}
+              taskRecords={state.taskRecords}
+              tasks={currentTasks}
+            />
+            <TrackingStudentList rows={trackingRows} setInfo={setSelectedInfo} />
+          </div>
+          <div className="analytics-two-column lower">
+            <TrackingBehaviorPanel rows={trackingRows} setInfo={setSelectedInfo} />
+            <TrackingAgendaPanel
+              agendaNotes={state.agendaNotes.filter((note) => note.classId === activeClassId)}
+              rows={trackingRows}
+              setInfo={setSelectedInfo}
+            />
           </div>
         </>
       )}

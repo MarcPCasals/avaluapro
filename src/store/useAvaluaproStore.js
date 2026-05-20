@@ -4,8 +4,11 @@ import { loadDataset, resetDatabase, saveCollections, saveDataset } from '../db/
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { getSubjectOption, getSubjectStructure } from '../data/subjects'
 import {
+  listCloudBackups,
+  loadCloudBackup,
   loadCloudDataset,
   observeFirebaseUser,
+  saveCloudBackup,
   saveCloudCollections,
   signInWithGoogle,
   signOutFromGoogle,
@@ -15,6 +18,7 @@ const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
 const BACKUP_VERSION = 2
 const CLOUD_SYNC_DELAY_MS = 2500
+const DAILY_CLOUD_BACKUP_KEY = 'lastCloudBackupDate'
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
@@ -88,6 +92,10 @@ function getInitialBackupMeta() {
   const preferences = readPreferences()
 
   return preferences.backupMeta || null
+}
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10)
 }
 
 function normalizeDataset(dataset) {
@@ -470,6 +478,10 @@ export const useAvaluaproStore = create((set, get) => ({
     status: 'signed-out',
     error: '',
     lastSyncedAt: '',
+    lastCloudBackupAt: '',
+    backupStatus: 'idle',
+    backupError: '',
+    recentBackups: [],
     pendingCollections: [],
   },
   status: 'idle',
@@ -499,6 +511,12 @@ export const useAvaluaproStore = create((set, get) => ({
             error: '',
           },
         }))
+        if (user) {
+          setTimeout(() => {
+            get().maybeCreateDailyCloudBackup()
+            get().loadCloudBackups()
+          }, 0)
+        }
       })
       set({
         ...dataset,
@@ -508,6 +526,10 @@ export const useAvaluaproStore = create((set, get) => ({
         backupMeta: getInitialBackupMeta(),
         status: 'ready',
       })
+      if (get().cloud.user) {
+        await get().maybeCreateDailyCloudBackup()
+        await get().loadCloudBackups()
+      }
     } catch (error) {
       set({ error: error.message || 'No s’han pogut carregar les dades locals.', status: 'error' })
     }
@@ -581,6 +603,115 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
+  createCloudBackup: async (reason = 'manual') => {
+    const state = get()
+    if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, backupStatus: 'saving', backupError: '' },
+    }))
+    try {
+      const backup = get().createBackup()
+      const savedBackup = await saveCloudBackup(state.cloud.user.uid, backup, {
+        reason,
+        label: reason === 'auto-daily' ? 'Còpia automàtica diària' : 'Còpia manual al núvol',
+      })
+      const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
+      const today = getTodayKey()
+      if (reason === 'auto-daily') {
+        writePreferences({ ...readPreferences(), [DAILY_CLOUD_BACKUP_KEY]: today })
+      }
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'saved',
+          backupError: '',
+          lastCloudBackupAt: savedBackup.createdAt,
+          recentBackups,
+        },
+      }))
+      return savedBackup
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'error',
+          backupError: error.message || 'No s’ha pogut crear la còpia al núvol.',
+        },
+      }))
+      throw error
+    }
+  },
+
+  maybeCreateDailyCloudBackup: async () => {
+    const state = get()
+    if (!state.cloud.user || state.status !== 'ready') return
+    const preferences = readPreferences()
+    const today = getTodayKey()
+    if (preferences[DAILY_CLOUD_BACKUP_KEY] === today) return
+    await get().createCloudBackup('auto-daily')
+  },
+
+  loadCloudBackups: async () => {
+    const state = get()
+    if (!state.cloud.user) return []
+    try {
+      const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupError: '',
+          recentBackups,
+          lastCloudBackupAt: recentBackups[0]?.createdAt || current.cloud.lastCloudBackupAt,
+        },
+      }))
+      return recentBackups
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'error',
+          backupError: error.message || 'No s’han pogut carregar les còpies del núvol.',
+        },
+      }))
+      return []
+    }
+  },
+
+  restoreCloudBackup: async (backupId) => {
+    const state = get()
+    if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de restaurar una còpia del núvol.')
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+    queuedCloudCollections.clear()
+
+    set((current) => ({
+      cloud: { ...current.cloud, backupStatus: 'restoring', backupError: '' },
+    }))
+    try {
+      const backup = await loadCloudBackup(state.cloud.user.uid, backupId)
+      await get().restoreBackup(backup, { filename: `copia-nuvol-${backupId}.json` })
+      const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'restored',
+          backupError: '',
+          recentBackups,
+          lastCloudBackupAt: recentBackups[0]?.createdAt || current.cloud.lastCloudBackupAt,
+        },
+      }))
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'error',
+          backupError: error.message || 'No s’ha pogut restaurar la còpia del núvol.',
+        },
+      }))
+      throw error
+    }
+  },
+
   pullFromCloud: async () => {
     const state = get()
     if (!state.cloud.user) return
@@ -625,15 +756,6 @@ export const useAvaluaproStore = create((set, get) => ({
     const timeline = activeClass?.subject ? ensureFixedCourseForClass(state, classId) : null
     const workingSemesters = timeline?.semesters || state.semesters
     const workingUts = timeline?.uts || state.uts
-    const classUts = timeline?.classUts || workingUts.filter((ut) => ut.classId === classId)
-    const subjectStructure = activeClass?.subject
-      ? ensureSubjectStructureForClass(
-          { ...state, semesters: workingSemesters, uts: workingUts },
-          classId,
-          activeClass.subject,
-          classUts,
-        )
-      : null
     const semester = workingSemesters
       .filter((item) => item.classId === classId)
       .sort((a, b) => a.order - b.order)[0]
@@ -649,13 +771,11 @@ export const useAvaluaproStore = create((set, get) => ({
     set((current) => ({
       semesters: workingSemesters,
       uts: workingUts,
-      competencies: subjectStructure?.competencies || current.competencies,
-      criteria: subjectStructure?.criteria || current.criteria,
       ui: { ...current.ui, ...ui },
     }))
     writePreferences({ ...readPreferences(), ...get().ui })
     if (activeClass?.subject) {
-      await persistCollections(set, get, ['semesters', 'uts', 'competencies', 'criteria'])
+      await persistCollections(set, get, ['semesters', 'uts'])
     }
   },
 

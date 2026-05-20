@@ -72,8 +72,8 @@ const tourSteps = [
   },
   {
     target: 'data-menu',
-    title: '12. Dades, backups i Firebase',
-    text: 'El menú Dades concentra backups, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
+    title: '12. Dades, còpies i Firebase',
+    text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
     mode: 'analytics',
     insight: 'dashboard',
   },

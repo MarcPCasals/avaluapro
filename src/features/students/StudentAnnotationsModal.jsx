@@ -227,7 +227,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
 
         <section className="annotation-tools-row">
           <div>
-            <span>L’historial de comentaris es desa localment i entra al backup.</span>
+            <span>L’historial de comentaris es desa localment i entra a la còpia de seguretat.</span>
             {copyState && <small>{copyState}</small>}
           </div>
           <button className="secondary-action" onClick={handleCopyText} type="button">

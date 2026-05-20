@@ -8,8 +8,6 @@ const modes = [
 
 const insights = [
   { id: 'dashboard', label: 'Stats Globals', icon: BarChart3 },
-  { id: 'utStats', label: 'Stats UT', icon: BarChart3 },
-  { id: 'trackingStats', label: 'Stats Seguiment', icon: ClipboardCheck },
 ]
 
 export function MainNavigation() {

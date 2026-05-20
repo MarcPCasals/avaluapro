@@ -65,10 +65,10 @@ function CloudStatusIcon({ status }) {
 
 function buildRestoreMessage({ currentSummary, incomingSummary, filename }) {
   return [
-    `Aquesta acció substituirà totes les dades locals actuals pel backup "${filename}".`,
+    `Aquesta acció substituirà totes les dades locals actuals per la còpia "${filename}".`,
     '',
     `Ara tens: ${currentSummary.counts.classes} classes, ${currentSummary.counts.students} alumnes, ${currentSummary.counts.marks} notes i ${currentSummary.counts.tasks} tasques.`,
-    `El backup conté: ${incomingSummary.counts.classes} classes, ${incomingSummary.counts.students} alumnes, ${incomingSummary.counts.marks} notes i ${incomingSummary.counts.tasks} tasques.`,
+    `La còpia conté: ${incomingSummary.counts.classes || 0} classes, ${incomingSummary.counts.students || 0} alumnes, ${incomingSummary.counts.marks || 0} notes i ${incomingSummary.counts.tasks || 0} tasques.`,
     '',
     'Abans de continuar, assegura’t que tens una còpia recent si vols conservar l’estat actual.',
     '',
@@ -93,6 +93,9 @@ export function DataSafetyModal({ onClose }) {
   const state = useAvaluaproStore()
   const createBackup = useAvaluaproStore((store) => store.createBackup)
   const restoreBackup = useAvaluaproStore((store) => store.restoreBackup)
+  const createCloudBackup = useAvaluaproStore((store) => store.createCloudBackup)
+  const loadCloudBackups = useAvaluaproStore((store) => store.loadCloudBackups)
+  const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
   const [storageEstimate, setStorageEstimate] = useState(null)
   const [restoreStatus, setRestoreStatus] = useState('')
   const [lastImportSummary, setLastImportSummary] = useState(null)
@@ -122,14 +125,41 @@ export function DataSafetyModal({ onClose }) {
     }
 
     loadStorageEstimate()
+    if (state.cloud.user) loadCloudBackups()
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadCloudBackups, state.cloud.user])
 
   const handleDownloadBackup = () => {
     downloadJson(createBackup(), getBackupFilename(state))
+  }
+
+  const handleCreateCloudBackup = async () => {
+    try {
+      await createCloudBackup('manual')
+      setRestoreStatus('Còpia de seguretat creada al núvol correctament.')
+    } catch (error) {
+      setRestoreStatus(error.message || 'No s’ha pogut crear la còpia al núvol.')
+    }
+  }
+
+  const handleRestoreCloudBackup = async (backup) => {
+    const shouldRestore = window.confirm(
+      buildRestoreMessage({
+        currentSummary,
+        incomingSummary: { counts: backup.counts || {} },
+        filename: backup.label || backup.id,
+      }).replace('per la còpia', 'per la còpia de seguretat al núvol'),
+    )
+    if (!shouldRestore) return
+    try {
+      await restoreCloudBackup(backup.id)
+      setRestoreStatus(`Còpia del núvol restaurada: ${backup.label || backup.id}.`)
+    } catch (error) {
+      setRestoreStatus(error.message || 'No s’ha pogut restaurar la còpia del núvol.')
+    }
   }
 
   const handleRestoreFile = async (event) => {
@@ -153,13 +183,13 @@ export function DataSafetyModal({ onClose }) {
       setLastImportSummary({ filename: file.name, summary })
       setRestoreStatus(buildBackupStatusMessage(backup, file.name))
     } catch (error) {
-      setRestoreStatus(error.message || 'No s’ha pogut restaurar aquest backup.')
+      setRestoreStatus(error.message || 'No s’ha pogut restaurar aquesta còpia.')
       setLastImportSummary(null)
     }
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title="Backups i seguretat de dades">
+    <Modal onClose={onClose} size="xl" title="Còpies de seguretat i estat de dades">
       <div className="data-safety-panel">
         <section className="data-safety-hero">
           <div>
@@ -169,13 +199,14 @@ export function DataSafetyModal({ onClose }) {
             </span>
             <strong>Avaluapro desa les dades reals al dispositiu.</strong>
             <p>
-              Classes, alumnes, fotos, llocs fixos, notes, tasques, comentaris, diagnòstics i rúbriques entren al backup complet.
-              Si inicies sessió amb Google, els canvis també es sincronitzen a Firebase de manera compartimentada.
+              Classes, alumnes, fotos, llocs fixos, notes, tasques, comentaris, diagnòstics i rúbriques entren a la còpia
+              completa. Si inicies sessió amb Google, els canvis se sincronitzen amb Firebase i també pots guardar còpies
+              de seguretat històriques al núvol.
             </p>
           </div>
           <button className="primary-action" onClick={handleDownloadBackup} type="button">
             <Download size={18} />
-            Descarregar backup complet
+            Còpia manual al dispositiu
           </button>
         </section>
 
@@ -190,11 +221,72 @@ export function DataSafetyModal({ onClose }) {
           </div>
         </section>
 
+        <section className="cloud-backup-panel">
+          <div className="cloud-backup-heading">
+            <Cloud size={20} />
+            <div>
+              <h3>Còpies de seguretat al núvol</h3>
+              <p>
+                Ruta protegida: <code>users/&lt;uid&gt;/cloudBackups</code>. Només l’usuari autenticat pot llegir o restaurar
+                les seves còpies.
+              </p>
+            </div>
+            <button
+              className="primary-action compact"
+              disabled={!state.cloud.user || state.cloud.backupStatus === 'saving'}
+              onClick={handleCreateCloudBackup}
+              type="button"
+            >
+              {state.cloud.backupStatus === 'saving' ? <Loader2 size={17} className="spin-icon" /> : <Cloud size={17} />}
+              Crear còpia al núvol
+            </button>
+          </div>
+          <div className="cloud-backup-meta">
+            <span>
+              Última còpia al núvol
+              <strong>{state.cloud.lastCloudBackupAt ? formatDateTime(state.cloud.lastCloudBackupAt) : 'Encara cap'}</strong>
+            </span>
+            <span>
+              Estat
+              <strong>{state.cloud.backupError || (state.cloud.user ? 'Preparat' : 'Cal iniciar sessió')}</strong>
+            </span>
+          </div>
+          {state.cloud.recentBackups?.length > 0 ? (
+            <div className="cloud-backup-list">
+              {state.cloud.recentBackups.slice(0, 5).map((backup) => (
+                <article key={backup.id}>
+                  <div>
+                    <strong>{backup.label || 'Còpia de seguretat'}</strong>
+                    <span>{formatDateTime(backup.createdAt)}</span>
+                    <small>
+                      {backup.counts?.classes || 0} classes · {backup.counts?.students || 0} alumnes ·{' '}
+                      {backup.counts?.marks || 0} notes · {backup.counts?.tasks || 0} tasques
+                    </small>
+                  </div>
+                  <button
+                    className="secondary-action compact"
+                    disabled={state.cloud.backupStatus === 'restoring'}
+                    onClick={() => handleRestoreCloudBackup(backup)}
+                    type="button"
+                  >
+                    Restaurar
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-cloud-backups">
+              Encara no hi ha còpies al núvol. Avaluapro en farà una automàtica el primer cop que obris el programa cada dia
+              amb Google iniciat.
+            </p>
+          )}
+        </section>
+
         <section className="data-safety-grid">
           <article className="data-card important">
             <FileArchive size={20} />
             <strong>{formatBytes(backupBytes)}</strong>
-            <span>Mida aproximada del backup complet</span>
+            <span>Mida aproximada de la còpia completa</span>
           </article>
           <article className="data-card">
             <HardDrive size={20} />
@@ -217,8 +309,8 @@ export function DataSafetyModal({ onClose }) {
           <section className="backup-loaded-card">
             <CheckCircle2 size={20} />
             <div>
-              <strong>Últim backup carregat</strong>
-              <span>{state.backupMeta.filename || 'Backup importat'}</span>
+              <strong>Última còpia importada</strong>
+              <span>{state.backupMeta.filename || 'Còpia importada'}</span>
               <small>
                 {state.backupMeta.importedAt
                   ? new Date(state.backupMeta.importedAt).toLocaleString('ca-ES')
@@ -246,14 +338,14 @@ export function DataSafetyModal({ onClose }) {
           <div>
             <h3>Restaurar una còpia</h3>
             <p>
-              Fes-ho només quan vulguis substituir l’estat actual per un backup anterior. Abans de restaurar,
+              Fes-ho només quan vulguis substituir l’estat actual per una còpia anterior. Abans de restaurar,
               és recomanable descarregar una còpia de l’estat actual.
             </p>
             {restoreStatus && <strong>{restoreStatus}</strong>}
           </div>
           <button className="secondary-action" onClick={() => fileInputRef.current?.click()} type="button">
             <Upload size={18} />
-            Importar backup
+            Importar còpia manual
           </button>
           <input
             ref={fileInputRef}
@@ -267,7 +359,7 @@ export function DataSafetyModal({ onClose }) {
         {lastImportSummary && (
           <section className="backup-diagnosis-card">
             <div>
-              <h3>Diagnosi del backup importat</h3>
+              <h3>Diagnosi de la còpia importada</h3>
               <p>{lastImportSummary.filename}</p>
             </div>
             <div className="backup-diagnosis-grid">
@@ -290,14 +382,14 @@ export function DataSafetyModal({ onClose }) {
             ) : (
               <p className="backup-ok">
                 <CheckCircle2 size={15} />
-                No s’han detectat avisos importants en l’estructura del backup.
+                No s’han detectat avisos importants en l’estructura de la còpia.
               </p>
             )}
           </section>
         )}
 
         <section className="collection-summary">
-          <h3>Què entra al backup?</h3>
+          <h3>Què entra a la còpia de seguretat?</h3>
           <div>
             {currentSummary.rows.map((item) => (
               <span key={item.collection}>
@@ -313,7 +405,7 @@ export function DataSafetyModal({ onClose }) {
           <div>
             <strong>Si algun dia se supera el límit de dades</strong>
             <p>
-              Descarrega un backup complet, elimina o arxiva tasques antigues i revisa si hi ha moltes fotos o imatges de llocs fixos.
+              Descarrega una còpia completa, elimina o arxiva tasques antigues i revisa si hi ha moltes fotos o imatges de llocs fixos.
               Si el problema continua, escriu a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
           </div>

@@ -86,7 +86,7 @@ export function TeacherProfileModal({ forceSetup = false, onClose }) {
           <article>
             <Database size={18} />
             <strong>Dades</strong>
-            <span>Tot es desa localment i entra al backup complet.</span>
+            <span>Tot es desa localment i entra a la còpia de seguretat completa.</span>
           </article>
         </section>
 
