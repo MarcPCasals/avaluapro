@@ -9,7 +9,9 @@ import {
   FileArchive,
   HardDrive,
   Info,
+  KeyRound,
   Loader2,
+  ShieldCheck,
   Upload,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -49,7 +51,7 @@ function formatDateTime(value) {
 function getCloudStatusText(cloud) {
   if (!cloud.user) return 'No has iniciat sessió amb Google.'
   if (cloud.status === 'pending') return 'Hi ha canvis locals pendents de pujar.'
-  if (cloud.status === 'syncing') return 'Sincronitzant dades amb Firebase.'
+  if (cloud.status === 'syncing') return 'Sincronitzant dades amb el núvol.'
   if (cloud.status === 'error') return cloud.error || 'Hi ha hagut un error de sincronització.'
   if (cloud.lastSyncedAt) return `Última sincronització: ${formatDateTime(cloud.lastSyncedAt)}.`
   return 'Sessió iniciada. Encara no hi ha cap sincronització registrada.'
@@ -221,6 +223,47 @@ export function DataSafetyModal({ onClose }) {
           </div>
         </section>
 
+        <section className="data-security-checklist">
+          <div className="data-security-heading">
+            <ShieldCheck size={21} />
+            <div>
+              <h3>Revisió de seguretat</h3>
+              <p>
+                La clau web de Firebase no és una contrasenya: el navegador la necessita per connectar-se. La protecció
+                real és que les regles de Firestore només deixin entrar cada usuari a les seves dades.
+              </p>
+            </div>
+          </div>
+          <div className="security-status-grid">
+            <article className="security-status-card ok">
+              <CheckCircle2 size={18} />
+              <div>
+                <strong>Regles de Firestore</strong>
+                <span>Les dades i còpies estan separades per usuari autenticat.</span>
+                <code>users/&lt;uid&gt;/...</code>
+              </div>
+            </article>
+            <article className="security-status-card ok">
+              <CheckCircle2 size={18} />
+              <div>
+                <strong>Còpies al núvol</strong>
+                <span>Les còpies històriques tenen una ruta pròpia i protegida.</span>
+                <code>users/&lt;uid&gt;/cloudBackups</code>
+              </div>
+            </article>
+            <article className="security-status-card warning">
+              <KeyRound size={18} />
+              <div>
+                <strong>Alerta de GitHub</strong>
+                <span>
+                  Pendent d’acció externa: restringeix la clau a Google Cloud i després marca l’avís com a resolt a GitHub.
+                </span>
+                <small>Dominis recomanats: marcpcasals.github.io, localhost i 127.0.0.1.</small>
+              </div>
+            </article>
+          </div>
+        </section>
+
         <section className="cloud-backup-panel">
           <div className="cloud-backup-heading">
             <Cloud size={20} />
@@ -257,7 +300,10 @@ export function DataSafetyModal({ onClose }) {
                 <article key={backup.id}>
                   <div>
                     <strong>{backup.label || 'Còpia de seguretat'}</strong>
-                    <span>{formatDateTime(backup.createdAt)}</span>
+                    <span>
+                      {formatDateTime(backup.createdAt)}
+                      <em>{backup.reason === 'auto-daily' ? 'Automàtica diària' : 'Manual'}</em>
+                    </span>
                     <small>
                       {backup.counts?.classes || 0} classes · {backup.counts?.students || 0} alumnes ·{' '}
                       {backup.counts?.marks || 0} notes · {backup.counts?.tasks || 0} tasques

@@ -6533,6 +6533,112 @@
   background: #f8fbff;
 }
 
+.data-security-checklist {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f0fdf4;
+}
+
+.data-security-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.data-security-heading > svg {
+  flex: 0 0 auto;
+  color: #16a34a;
+}
+
+.data-security-heading h3,
+.data-security-heading p {
+  margin: 0;
+}
+
+.data-security-heading h3 {
+  color: #14532d;
+}
+
+.data-security-heading p {
+  color: #166534;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.security-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.security-status-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  padding: 11px;
+  background: white;
+}
+
+.security-status-card > svg {
+  flex: 0 0 auto;
+}
+
+.security-status-card.ok > svg {
+  color: #16a34a;
+}
+
+.security-status-card.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.security-status-card.warning > svg {
+  color: #f97316;
+}
+
+.security-status-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.security-status-card strong {
+  color: #1f2937;
+}
+
+.security-status-card span,
+.security-status-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.security-status-card code {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.security-status-card.warning code {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
 .cloud-backup-heading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -6627,6 +6733,18 @@
   color: #64748b;
   font-size: 12px;
   font-weight: 800;
+}
+
+.cloud-backup-list em {
+  display: inline-flex;
+  margin-left: 8px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .empty-cloud-backups {
@@ -7138,6 +7256,7 @@
   .global-action-strip,
   .help-grid,
   .help-reference > div,
+  .security-status-grid,
   .setup-benefits {
     grid-template-columns: 1fr;
   }
