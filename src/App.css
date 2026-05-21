@@ -137,12 +137,11 @@
 .author {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 190px;
+  max-width: 150px;
   overflow: hidden;
   margin: 0;
   color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.02em;
   font-size: 10px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -543,6 +542,122 @@
   background: #eff6ff;
 }
 
+.urgent-tab {
+  position: relative;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  padding: 10px 22px 10px 18px;
+  color: #991b1b;
+  background: #fff7f7;
+  font-weight: 950;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
+}
+
+.urgent-tab.has-items {
+  border-color: #fb7185;
+  background: #fff1f2;
+}
+
+.urgent-tab > span {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: #dc2626;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.urgent-tab:not(.has-items) > span {
+  color: #64748b;
+  background: #e5e7eb;
+}
+
+.urgent-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.urgent-modal > p {
+  margin: 0;
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.urgent-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 22px;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.urgent-empty-state svg {
+  color: #16a34a;
+}
+
+.urgent-empty-state strong {
+  color: #1f2937;
+}
+
+.urgent-empty-state span {
+  color: #64748b;
+  font-weight: 750;
+}
+
+.urgent-student-list {
+  display: grid;
+  gap: 10px;
+}
+
+.urgent-student-list article {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 13px;
+  background: #fff7f7;
+}
+
+.urgent-student-list article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.urgent-student-list strong {
+  color: #991b1b;
+}
+
+.urgent-student-list span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.urgent-student-list ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+  font-weight: 750;
+}
+
 .time-tabs {
   background: #f3f4f6;
   border-bottom: 1px solid #d1d5db;
@@ -871,6 +986,39 @@
   background: white;
 }
 
+.tracking-empty-tasks {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px;
+  border: 1px dashed #fed7aa;
+  border-radius: 8px;
+  padding: 18px;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.tracking-empty-tasks > svg {
+  flex: 0 0 auto;
+  color: #f97316;
+}
+
+.tracking-empty-tasks > div {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.tracking-empty-tasks strong {
+  color: #1f2937;
+}
+
+.tracking-empty-tasks p {
+  margin: 0;
+  color: #64748b;
+  font-weight: 750;
+}
+
 .evaluation-table,
 .tracking-table,
 .profile-table {
@@ -1158,13 +1306,13 @@
 .grade-text-empty { color: #cbd5e1; }
 
 .tracking-student-cell {
-  min-width: 300px;
-  width: 300px;
-  padding: 12px 14px;
+  min-width: 335px;
+  width: 335px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .tracking-student-main {
@@ -1179,6 +1327,19 @@
   min-width: 0;
   flex-direction: column;
   font-weight: 900;
+}
+
+.tracking-student-name strong {
+  max-width: 145px;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+}
+
+.tracking-student-cell .student-note-button {
+  width: 30px;
+  height: 30px;
 }
 
 .tracking-intervention-popover {
@@ -1690,12 +1851,12 @@
 .student-flags {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .student-flags button {
-  min-width: 40px;
-  height: 32px;
+  min-width: 36px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1716,8 +1877,8 @@
 }
 
 .red-point-stack {
-  min-width: 42px;
-  height: 32px;
+  min-width: 38px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5694,6 +5855,10 @@
 
 .danger-action {
   min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
   border-radius: 8px;
   color: white;
@@ -5705,6 +5870,17 @@
 .danger-action.compact {
   min-height: 40px;
   padding: 9px 12px;
+}
+
+.danger-zone {
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff7f7;
+}
+
+.danger-zone h3 {
+  color: #991b1b;
 }
 
 .empty-list {
@@ -6573,6 +6749,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.security-status-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .security-status-card {

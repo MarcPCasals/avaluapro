@@ -481,6 +481,7 @@ export function TrackingView() {
   const halfGroups = Array.from(new Set(students.map((student) => student.halfGroup).filter(Boolean))).sort()
   const focusInsights = interventionInsights.filter((insight) => insight.level !== 'stable').slice(0, 4)
   const today = new Date().toISOString().slice(0, 10)
+  const pastTaskCount = tasks.filter((task) => task.date < today).length
   const visibleTasks = showPastTasks ? tasks : tasks.filter((task) => task.date >= today)
   const dueReminders = [
     ...tasks
@@ -597,7 +598,7 @@ export function TrackingView() {
           Nova Tasca
         </button>
         <button className={`tool-button ${showPastTasks ? 'active-soft' : ''}`} onClick={() => setShowPastTasks((value) => !value)} type="button">
-          {showPastTasks ? 'Amaga passades' : 'Mostra passades'}
+          {showPastTasks ? 'Amaga passades' : `Mostra passades: ${pastTaskCount}`}
         </button>
         {halfGroups.length > 0 && (
           <select
@@ -779,6 +780,28 @@ export function TrackingView() {
           {filteredStudents.length} de {students.length} alumnes visibles
         </span>
       </div>
+      {visibleTasks.length === 0 ? (
+        <section className="tracking-empty-tasks" data-tour="tracking-table">
+          <Clipboard size={26} />
+          <div>
+            <strong>No hi ha tasques visibles ara mateix.</strong>
+            <p>
+              {tasks.length === 0
+                ? 'Crea una primera tasca per començar el seguiment de la UT.'
+                : `Hi ha ${pastTaskCount} tasca/ques passades amagades. Mostra-les per revisar-les o continuar marcant estats.`}
+            </p>
+          </div>
+          {tasks.length === 0 ? (
+            <button className="primary-action compact" onClick={() => setShowTaskModal(true)} type="button">
+              Nova tasca
+            </button>
+          ) : (
+            <button className="secondary-action compact" onClick={() => setShowPastTasks(true)} type="button">
+              Mostra passades: {pastTaskCount}
+            </button>
+          )}
+        </section>
+      ) : (
       <div className="grid-scroll" data-tour="tracking-table">
         <table className="tracking-table">
           <thead>
@@ -955,6 +978,7 @@ export function TrackingView() {
           </tbody>
         </table>
       </div>
+      )}
     </section>
   )
 }

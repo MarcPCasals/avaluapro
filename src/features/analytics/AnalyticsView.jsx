@@ -122,7 +122,7 @@ const chartHelp = {
   trackingSummary:
     'Resumeix només el seguiment: constància, punts vermells, punts negres i intervencions. No inclou notes.',
   trackingPulse:
-    'Mostra el pols del grup segons hàbits de treball: estables, en seguiment o sense dades.',
+    'Mostra l’estat del grup segons hàbits de treball: estables, en seguiment o sense dades.',
   trackingReminders:
     'Compta recordatoris actius, de classe o individuals, per evitar que quedin tasques pendents sense seguiment.',
   trackingIncomplete:
@@ -1919,11 +1919,11 @@ function TrackingPulseCard({ rows, setInfo }) {
   return (
     <article className="diagnosis-card donut-card tracking-pulse-card">
       <InfoButton
-        label="Pols del seguiment"
-        onOpen={() => setInfo({ title: 'Pols del seguiment', text: chartHelp.trackingPulse })}
+        label="Estat del seguiment"
+        onOpen={() => setInfo({ title: 'Estat del seguiment', text: chartHelp.trackingPulse })}
       />
       <header>
-        <span>Pols del seguiment</span>
+        <span>Estat del seguiment</span>
         <Radar size={16} />
       </header>
       <div className="donut-wrap">

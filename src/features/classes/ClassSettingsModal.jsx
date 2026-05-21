@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Settings } from 'lucide-react'
+import { ArrowDown, ArrowUp, Settings, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassFormFields } from './ClassFormFields'
@@ -7,6 +7,7 @@ export function ClassSettingsModal({ classId, onClose }) {
   const classes = useAvaluaproStore((state) => state.classes)
   const updateClass = useAvaluaproStore((state) => state.updateClass)
   const reorderClass = useAvaluaproStore((state) => state.reorderClass)
+  const deleteClass = useAvaluaproStore((state) => state.deleteClass)
   const currentClass = classes.find((item) => item.id === classId)
   const orderedClasses = [...classes].sort((a, b) => (a.order || 0) - (b.order || 0))
 
@@ -70,6 +71,37 @@ export function ClassSettingsModal({ classId, onClose }) {
             </div>
           ))}
         </div>
+      </div>
+      <div className="modal-section danger-zone">
+        <h3>
+          <Trash2 size={18} />
+          Eliminar classe
+        </h3>
+        <p>
+          Aquesta acció eliminarà la classe, alumnes, notes, tasques, comentaris i llocs fixos associats.
+          Abans de fer-ho, descarrega una còpia de seguretat si vols conservar l’estat actual.
+        </p>
+        <button
+          className="danger-action"
+          onClick={async () => {
+            const answer = window.prompt(
+              [
+                `Vols eliminar la classe "${currentClass.name}" i totes les seves dades?`,
+                '',
+                'Aquesta acció no es pot desfer des d’Avaluapro.',
+                '',
+                'Per confirmar, escriu ELIMINA.',
+              ].join('\n'),
+            )
+            if (answer !== 'ELIMINA') return
+            await deleteClass(classId)
+            onClose()
+          }}
+          type="button"
+        >
+          <Trash2 size={16} />
+          Eliminar aquesta classe
+        </button>
       </div>
     </Modal>
   )

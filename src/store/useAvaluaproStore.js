@@ -1092,6 +1092,71 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
   },
 
+  deleteClass: async (classId) => {
+    const state = get()
+    const classToDelete = state.classes.find((classItem) => classItem.id === classId)
+    if (!classToDelete) return
+
+    const studentIds = new Set(state.students.filter((student) => student.classId === classId).map((student) => student.id))
+    const utIds = new Set(state.uts.filter((ut) => ut.classId === classId).map((ut) => ut.id))
+    const competencyIds = new Set(
+      state.competencies
+        .filter((competency) => competency.classId === classId || utIds.has(competency.utId))
+        .map((competency) => competency.id),
+    )
+    const criterionIds = new Set(
+      state.criteria.filter((criterion) => competencyIds.has(criterion.competencyId)).map((criterion) => criterion.id),
+    )
+    const taskIds = new Set(state.tasks.filter((task) => task.classId === classId || utIds.has(task.utId)).map((task) => task.id))
+    const remainingClasses = state.classes
+      .filter((classItem) => classItem.id !== classId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map((classItem, index) => ({ ...classItem, order: index + 1 }))
+    const nextClass = remainingClasses[0]
+    const nextSemester = nextClass
+      ? state.semesters
+          .filter((semester) => semester.classId === nextClass.id)
+          .sort((a, b) => a.order - b.order)[0]
+      : null
+    const nextUt = nextSemester
+      ? state.uts
+          .filter((ut) => ut.semesterId === nextSemester.id)
+          .sort((a, b) => a.order - b.order)[0]
+      : null
+    const ui =
+      state.ui.activeClassId === classId
+        ? {
+            ...state.ui,
+            activeClassId: nextClass?.id || '',
+            activeSemesterId: nextSemester?.id || '',
+            activeUtId: nextUt?.id || '',
+          }
+        : state.ui
+
+    set({
+      classes: remainingClasses,
+      students: state.students.filter((student) => student.classId !== classId),
+      semesters: state.semesters.filter((semester) => semester.classId !== classId),
+      uts: state.uts.filter((ut) => ut.classId !== classId),
+      competencies: state.competencies.filter((competency) => !competencyIds.has(competency.id)),
+      criteria: state.criteria.filter((criterion) => !criterionIds.has(criterion.id)),
+      indicators: state.indicators.filter((indicator) => !criterionIds.has(indicator.criterionId)),
+      marks: state.marks.filter((mark) => !studentIds.has(mark.studentId) && !criterionIds.has(mark.criterionId)),
+      tasks: state.tasks.filter((task) => !taskIds.has(task.id)),
+      taskRecords: state.taskRecords.filter(
+        (record) => !studentIds.has(record.studentId) && !taskIds.has(record.taskId),
+      ),
+      behaviorEvents: state.behaviorEvents.filter(
+        (event) => event.classId !== classId && !studentIds.has(event.studentId),
+      ),
+      agendaNotes: state.agendaNotes.filter((note) => note.classId !== classId && !studentIds.has(note.studentId)),
+      seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
+      ui,
+    })
+    writePreferences({ ...readPreferences(), ...ui })
+    await persistCollections(set, get, COLLECTIONS)
+  },
+
   updateMark: async (studentId, criterionId, value) => {
     set((state) => {
       const existing = state.marks.find(

@@ -9,7 +9,6 @@ import {
   FileArchive,
   HardDrive,
   Info,
-  KeyRound,
   Loader2,
   ShieldCheck,
   Upload,
@@ -234,7 +233,7 @@ export function DataSafetyModal({ onClose }) {
               </p>
             </div>
           </div>
-          <div className="security-status-grid">
+          <div className="security-status-grid two">
             <article className="security-status-card ok">
               <CheckCircle2 size={18} />
               <div>
@@ -249,16 +248,6 @@ export function DataSafetyModal({ onClose }) {
                 <strong>Còpies al núvol</strong>
                 <span>Les còpies històriques tenen una ruta pròpia i protegida.</span>
                 <code>users/&lt;uid&gt;/cloudBackups</code>
-              </div>
-            </article>
-            <article className="security-status-card warning">
-              <KeyRound size={18} />
-              <div>
-                <strong>Alerta de GitHub</strong>
-                <span>
-                  Pendent d’acció externa: restringeix la clau a Google Cloud i després marca l’avís com a resolt a GitHub.
-                </span>
-                <small>Dominis recomanats: marcpcasals.github.io, localhost i 127.0.0.1.</small>
               </div>
             </article>
           </div>
