@@ -294,7 +294,7 @@ export function TopBar() {
           <strong>
             Avalua<span>Pro</span>
           </strong>
-          <small>Creat per Marc Pérez Casals</small>
+          <small>de Marc Pérez Casals</small>
         </div>
       </div>
       <nav
