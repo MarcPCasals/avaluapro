@@ -357,7 +357,7 @@ function createSubjectStructureForUts({ classId, subjectName, uts, existingCompe
         name: competencyTemplate.name,
         color: competencyTemplate.color,
         order: existingCompetencyCount + index + 1,
-        source: 'CFN',
+        source: subjectName,
       })
       competencyTemplate.criteria.forEach((criterionName, criterionIndex) => {
         criteria.push({
@@ -1349,7 +1349,7 @@ export const useAvaluaproStore = create((set, get) => ({
         name: competencyTemplate.name,
         color: competencyTemplate.color,
         order: existingCompetencies.length + index + 1,
-        source: 'CFN',
+        source: subject.name,
       })
       competencyTemplate.criteria.forEach((criterionName, criterionIndex) => {
         newCriteria.push({
