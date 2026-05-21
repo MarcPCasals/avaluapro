@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Bell,
@@ -161,6 +161,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
           </button>
         </header>
         <div className="modal-body agenda-warning-modal">
+          <span className="tour-anchor" data-tour="agenda-warning-modal" />
           <div className="agenda-warning-hero">
             <AlertTriangle size={26} />
             <div>
@@ -591,6 +592,26 @@ export function TrackingView() {
     setBehaviorDraft(null)
   }
 
+  useEffect(() => {
+    const handleDemoAgendaWarning = async () => {
+      const student = filteredStudents[0] || students[0]
+      const targetTasks = tasks.slice(0, 3)
+      if (!student || targetTasks.length < 3) {
+        window.alert('Calen com a mínim 3 tasques a la UT activa per simular l’avís d’agenda.')
+        return
+      }
+
+      for (const task of targetTasks) {
+        await updateTaskRecordMeta(student.id, task.id, { status: 'MISSING' })
+      }
+
+      window.setTimeout(() => setAgendaWarningStudentId(student.id), 120)
+    }
+
+    window.addEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
+    return () => window.removeEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
+  }, [filteredStudents, students, tasks, updateTaskRecordMeta])
+
   return (
     <section className="work-surface">
       <div className="toolbar" data-tour="tracking-toolbar">
@@ -865,6 +886,7 @@ export function TrackingView() {
               const studentNotes = agendaNotes.filter((note) => note.studentId === student.id)
               const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
               const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
+              const trackingAgendaNotes = studentNotes.filter((note) => note.type === 'tracking')
               const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
 
               return (
@@ -916,6 +938,17 @@ export function TrackingView() {
                         <BookOpen size={15} />
                         {positives.length}
                       </button>
+                      {trackingAgendaNotes.length > 0 && (
+                        <button
+                          className="agenda-note-chip"
+                          onClick={() => setProfileStudentId(student.id)}
+                          title="Avís d’agenda registrat"
+                          type="button"
+                        >
+                          <Bell size={13} />
+                          {trackingAgendaNotes.length}
+                        </button>
+                      )}
                     </div>
                   </td>
                   {visibleTasks.map((task) => {

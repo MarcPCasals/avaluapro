@@ -84,8 +84,28 @@ const tourSteps = [
     mode: 'tracking',
   },
   {
+    target: 'tracking-student-actions',
+    title: '13. Simula un tercer negatiu',
+    text: 'Aquesta simulació marca tres tasques no fetes al primer alumne visible i obre el mateix avís que veuràs en ús real.',
+    action: 'Prem “Simular 3r negatiu” i observa com apareix l’avís d’agenda amb les tasques pendents.',
+    completeWhen: 'agenda-warning-open',
+    helperAction: 'simulate-agenda-warning',
+    helperLabel: 'Simular 3r negatiu',
+    mode: 'tracking',
+    placement: 'right',
+  },
+  {
+    target: 'agenda-warning-modal',
+    title: '14. Registra l’avís d’agenda',
+    text: 'El programa recorda quines tasques han generat l’avís. Pots copiar el text, donar una darrera oportunitat o registrar que ja has posat la nota.',
+    action: 'Prem “Registrar avís” perquè quedi marcat a la fila de l’alumne.',
+    completeWhen: 'agenda-note-added',
+    mode: 'tracking',
+    placement: 'right',
+  },
+  {
     target: 'stats-global',
-    title: '13. Stats Globals',
+    title: '15. Stats Globals',
     text: 'Aquí és on es creuen rendiment, constància i comportament per trobar alumnes en risc, reforç conceptual i hàbits fràgils.',
     dashboardScope: 'executive',
     mode: 'analytics',
@@ -93,47 +113,51 @@ const tourSteps = [
   },
   {
     target: 'stats-scope-tabs',
-    title: '14. Filtra les estadístiques per tema',
+    title: '16. Filtra les estadístiques per tema',
     text: 'Les pestanyes eviten que tot aparegui barrejat. Primer mires el resum i després entres a Avaluació, UT activa, Seguiment o Creuada.',
     action: 'Clica la pestanya “Avaluació” per veure només notes, evolució i criteris.',
     completeWhen: 'stats-evaluation-open',
     dashboardScope: 'executive',
     mode: 'analytics',
     insight: 'dashboard',
+    placement: 'below',
   },
   {
-    target: 'stats-evaluation',
-    title: '15. Estadístiques d’avaluació',
+    target: 'stats-scope-tabs',
+    title: '17. Estadístiques d’avaluació',
     text: 'Aquí veus la comparativa de notes per UT, alumnes que pugen o baixen i la distribució per criteris sense barrejar-hi tasques.',
     action: 'Clica “UT activa” per passar al resum de la unitat que tens seleccionada.',
     completeWhen: 'stats-ut-open',
     dashboardScope: 'evaluation',
     mode: 'analytics',
     insight: 'dashboard',
+    placement: 'below',
   },
   {
-    target: 'stats-ut',
-    title: '16. Estadístiques de la UT activa',
+    target: 'stats-scope-tabs',
+    title: '18. Estadístiques de la UT activa',
     text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
     action: 'Clica “Seguiment” per veure només constància, punts i avisos.',
     completeWhen: 'stats-tracking-open',
     dashboardScope: 'ut',
     mode: 'analytics',
     insight: 'dashboard',
+    placement: 'below',
   },
   {
-    target: 'stats-tracking',
-    title: '17. Estadístiques de seguiment',
+    target: 'stats-scope-tabs',
+    title: '19. Estadístiques de seguiment',
     text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles avisos d’agenda.',
     action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
     completeWhen: 'stats-cross-open',
     dashboardScope: 'tracking',
     mode: 'analytics',
     insight: 'dashboard',
+    placement: 'below',
   },
   {
     target: 'stats-cross',
-    title: '18. Anàlisi creuada',
+    title: '20. Anàlisi creuada',
     text: 'Aquesta vista és la més potent per detectar patrons: alumnes constants amb dificultat, alumnes bons però poc constants o risc combinat.',
     dashboardScope: 'cross',
     mode: 'analytics',
@@ -141,7 +165,7 @@ const tourSteps = [
   },
   {
     target: 'data-menu',
-    title: '19. Dades, còpies i Firebase',
+    title: '21. Dades, còpies i Firebase',
     text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
     action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
     completeWhen: 'data-menu-open',
@@ -151,7 +175,7 @@ const tourSteps = [
   },
   {
     target: 'start-own-data',
-    title: '20. Comença amb les teves dades',
+    title: '22. Comença amb les teves dades',
     text: 'Quan ja hagis entès el funcionament, pots esborrar la demo i començar amb la teva matèria, classes i alumnes reals.',
     mode: 'analytics',
     insight: 'dashboard',
@@ -163,12 +187,27 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
-function getPosition(rect) {
+function getPosition(rect, placement = 'auto') {
   const cardWidth = Math.min(390, window.innerWidth - 32)
+  const cardHeight = 250
+
+  if (placement === 'right') {
+    const rightSide = rect.right + 14
+    const leftSide = rect.left - cardWidth - 14
+    const left = rightSide + cardWidth < window.innerWidth - 16 ? rightSide : Math.max(16, leftSide)
+    const top = clamp(rect.top + rect.height / 2 - cardHeight / 2, 16, window.innerHeight - cardHeight - 16)
+    return { left, top, width: cardWidth }
+  }
+
   const left = clamp(rect.left + rect.width / 2 - cardWidth / 2, 16, window.innerWidth - cardWidth - 16)
   const below = rect.bottom + 14
-  const above = rect.top - 230
-  const top = below + 220 < window.innerHeight ? below : Math.max(16, above)
+  const above = rect.top - cardHeight - 14
+  const top =
+    placement === 'below'
+      ? clamp(below, 16, window.innerHeight - cardHeight - 16)
+      : below + cardHeight < window.innerHeight
+        ? below
+        : Math.max(16, above)
 
   return { left, top, width: cardWidth }
 }
@@ -201,6 +240,10 @@ function getCompletionState(step, baseline, current) {
 
   if (step.completeWhen === 'agenda-note-added') {
     return current.agendaNotesCount > (baseline?.agendaNotesCount ?? current.agendaNotesCount)
+  }
+
+  if (step.completeWhen === 'agenda-warning-open') {
+    return Boolean(document.querySelector('.agenda-warning-modal'))
   }
 
   if (step.completeWhen === 'task-record-changed') {
@@ -275,7 +318,7 @@ export function GuidedTour() {
         setTargetRect(null)
         return
       }
-      target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      target.scrollIntoView({ block: 'center', inline: 'center' })
       const rect = target.getBoundingClientRect()
       setTargetRect({
         top: rect.top,
@@ -302,8 +345,8 @@ export function GuidedTour() {
 
   const cardStyle = useMemo(() => {
     if (!targetRect) return { left: 20, top: 120, width: Math.min(390, window.innerWidth - 32) }
-    return getPosition(targetRect)
-  }, [targetRect])
+    return getPosition(targetRect, step.placement)
+  }, [step, targetRect])
 
   if (!guideOpen || !step) return null
 
@@ -325,6 +368,12 @@ export function GuidedTour() {
   const handleStartOwnData = async () => {
     const started = await startOwnData()
     if (started) closeTour()
+  }
+
+  const handleHelperAction = () => {
+    if (step.helperAction === 'simulate-agenda-warning') {
+      window.dispatchEvent(new CustomEvent('avaluapro-demo-agenda-warning'))
+    }
   }
 
   return (
@@ -357,6 +406,12 @@ export function GuidedTour() {
             <CheckCircle2 size={16} />
             <span>{step.action}</span>
           </div>
+        )}
+        {step.helperAction && (
+          <button className="primary-action compact guided-tour-helper" onClick={handleHelperAction} type="button">
+            <PlayCircle size={15} />
+            {step.helperLabel || 'Fer simulació'}
+          </button>
         )}
         <div className="guided-tour-progress">
           <span style={{ width: `${((stepIndex + 1) / tourSteps.length) * 100}%` }} />

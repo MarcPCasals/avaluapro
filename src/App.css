@@ -815,6 +815,10 @@
   background: #f0fdf4;
 }
 
+.guided-tour-helper {
+  width: fit-content;
+}
+
 .guided-tour-card small {
   color: #64748b;
   font-weight: 900;
@@ -1874,6 +1878,12 @@
 
 .diary-button {
   color: #6366f1 !important;
+}
+
+.agenda-note-chip {
+  color: #b45309 !important;
+  border-color: #fed7aa !important;
+  background: #fff7ed !important;
 }
 
 .red-point-stack {
@@ -4924,6 +4934,14 @@
 .agenda-warning-modal {
   display: grid;
   gap: 14px;
+  position: relative;
+}
+
+.tour-anchor {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
 }
 
 .behavior-modal-body > strong {
