@@ -138,7 +138,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title={`Editar Taula · ${activeUt?.name || 'UT'}`}>
+    <Modal onClose={onClose} size="xl" title={`Competències de la UT · ${activeUt?.name || 'UT'}`}>
       <div className="structure-editor">
         <section className="modal-section">
           <div className="section-title-row">

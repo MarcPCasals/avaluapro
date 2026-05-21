@@ -90,13 +90,13 @@
 
 .brand-card {
   flex: 0 0 auto;
-  min-height: 50px;
-  max-width: 182px;
+  min-height: 48px;
+  max-width: 176px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
-  padding: 7px 11px 7px 8px;
+  padding: 6px 9px 6px 7px;
   border: 1px solid #475569;
   border-radius: 8px;
   background: #172033;
@@ -104,8 +104,8 @@
 }
 
 .brand-card img {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 7px;
   padding: 4px;
   border: 1px solid rgba(226, 232, 240, 0.72);
@@ -117,7 +117,7 @@
   min-width: 0;
   overflow: hidden;
   color: white;
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -130,7 +130,7 @@
 }
 
 .brand-card small {
-  max-width: 112px;
+  max-width: 108px;
   overflow: hidden;
   color: #cbd5e1;
   font-size: 8.5px;
@@ -166,17 +166,17 @@
 }
 
 .class-tabs {
-  flex: 0 1 min(620px, 42vw);
-  min-width: 235px;
+  flex: 1 1 430px;
+  min-width: 210px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px;
+  gap: 5px;
+  padding: 4px;
   border: 1px solid #334155;
   border-radius: 8px;
   background: #1f2937;
   overflow-x: auto;
-  max-width: 620px;
+  max-width: min(560px, 46vw);
   scrollbar-width: thin;
 }
 
@@ -190,21 +190,39 @@
 }
 
 .class-tab {
-  flex: 1 1 82px;
+  flex: 1 1 72px;
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
+  gap: 8px;
+  padding: 7px 10px;
   border: 1px solid transparent;
   color: #94a3b8;
   background: transparent;
   font-weight: 900;
   min-width: 58px;
-  max-width: 128px;
+  max-width: 104px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.class-tabs.many .class-tab {
+  flex-basis: 54px;
+  max-width: 76px;
+  gap: 5px;
+  padding-inline: 7px;
+  font-size: 13px;
+}
+
+.class-tabs.many .class-tab .class-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.class-tabs.many .class-add {
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .class-tab .class-dot {
@@ -249,7 +267,8 @@
 
 .top-actions {
   margin-left: auto;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -7544,15 +7563,24 @@
 
   .class-tabs {
     min-width: 0;
+    max-width: min(480px, 43vw);
     gap: 5px;
     padding: 4px;
   }
 
   .class-tab {
+    flex-basis: 58px;
+    max-width: 86px;
     min-height: 38px;
     gap: 7px;
     padding: 6px 10px;
     font-size: 14px;
+  }
+
+  .class-tabs.many .class-tab {
+    flex-basis: 46px;
+    max-width: 66px;
+    padding-inline: 6px;
   }
 
   .class-tab.active::after {

@@ -297,7 +297,11 @@ export function TopBar() {
           <small>Creat per Marc Pérez Casals</small>
         </div>
       </div>
-      <nav className="class-tabs" aria-label="Classes" data-tour="class-tabs">
+      <nav
+        className={`class-tabs ${orderedClasses.length > 6 ? 'many' : ''}`}
+        aria-label="Classes"
+        data-tour="class-tabs"
+      >
         {orderedClasses.map((item, index) => (
           <button
             className={`class-tab ${item.id === activeClassId ? 'active' : ''} ${
