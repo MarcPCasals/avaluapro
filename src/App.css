@@ -7402,6 +7402,34 @@
 }
 
 @media (max-width: 1180px) {
+  .top-bar {
+    min-height: 64px;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .brand-card {
+    min-height: 46px;
+    max-width: 156px;
+    gap: 7px;
+    padding: 5px 8px 5px 6px;
+  }
+
+  .brand-card img {
+    width: 36px;
+    height: 36px;
+    padding: 3px;
+  }
+
+  .brand-card strong {
+    font-size: 17px;
+  }
+
+  .brand-separator,
+  .top-divider {
+    height: 26px;
+  }
+
   .demo-banner {
     align-items: flex-start;
     flex-direction: column;
@@ -7412,7 +7440,92 @@
   }
 
   .class-tabs {
-    min-width: 220px;
+    min-width: 0;
+    gap: 5px;
+    padding: 4px;
+  }
+
+  .class-tab {
+    min-height: 38px;
+    gap: 7px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .class-tab.active::after {
+    right: 8px;
+    bottom: 3px;
+    left: 8px;
+  }
+
+  .class-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .top-actions {
+    gap: 5px;
+  }
+
+  .icon-button,
+  .avatar-button {
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .top-sync-status {
+    min-height: 38px;
+    padding: 3px;
+  }
+
+  .sync-pill {
+    min-height: 30px;
+    gap: 5px;
+    padding: 3px 6px;
+  }
+
+  .sync-pill small {
+    display: none;
+  }
+
+  .top-menu-trigger {
+    min-height: 38px;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .top-menu-trigger span {
+    font-size: 12px;
+  }
+
+  .main-navigation {
+    gap: 10px;
+    padding: 12px 14px 0;
+  }
+
+  .mode-tab,
+  .insight-tab,
+  .semester-tab,
+  .ut-tab,
+  .tool-button {
+    min-height: 40px;
+    gap: 7px;
+    padding: 8px 12px;
+  }
+
+  .mode-tab {
+    min-width: 132px;
+  }
+
+  .toolbar {
+    min-height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .tool-button.dark {
+    margin-left: 0;
   }
 
   .insight-tab {
