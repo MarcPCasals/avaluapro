@@ -81,6 +81,17 @@ function getStudentRowClass(dominantDiagnosis, noteState) {
     .join(' ')
 }
 
+function buildTrackingAgendaText({ blackPointCount, missingTasks, redPointCount, student }) {
+  return [
+    `Cal informar a l’agenda: ${student.name}`,
+    `${redPointCount} punts vermells i ${blackPointCount} punts negres.`,
+    missingTasks.length > 0 ? 'Tasques pendents:' : '',
+    ...missingTasks.slice(-4).map((task) => `- ${task.title} (${new Date(task.date).toLocaleDateString('ca-ES')})`),
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 function shouldShowAgendaWarning(student, redPointCount, blackPointCount) {
   const deferredAt = student.taskAgendaDeferredAt || 0
   if (redPointCount >= 3 && redPointCount > deferredAt) return true
@@ -134,14 +145,7 @@ function BehaviorEventModal({ student, type, onClose, onSave }) {
 
 function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCount, onClose, onLastChance, onRegisterAgenda }) {
   const [copyState, setCopyState] = useState('')
-  const agendaText = [
-    `Cal informar a l’agenda: ${student.name}`,
-    `${redPointCount} punts vermells i ${blackPointCount} punts negres.`,
-    missingTasks.length > 0 ? 'Tasques pendents:' : '',
-    ...missingTasks.slice(-4).map((task) => `- ${task.title} (${new Date(task.date).toLocaleDateString('ca-ES')})`),
-  ]
-    .filter(Boolean)
-    .join('\n')
+  const agendaText = buildTrackingAgendaText({ blackPointCount, missingTasks, redPointCount, student })
 
   const copyAgendaText = async () => {
     try {
@@ -340,7 +344,10 @@ function TaskReminderModal({ draft, onClose, onSave }) {
         </header>
         <div className="modal-body behavior-modal-body">
           <strong>{draft.task.title}</strong>
-          <p>El dia indicat es podrà mostrar aquest recordatori amb el text que escriguis.</p>
+          <p>
+            El dia i hora indicats apareixerà una targeta de recordatori. Pot ser de tota la classe o d’un alumne concret,
+            i el podràs ajornar 55 minuts si encara no toca revisar-ho.
+          </p>
           <label className="field-label">
             Dia del recordatori
             <input onChange={(event) => setReminderDate(event.target.value)} type="date" value={reminderDate} />
@@ -812,7 +819,7 @@ export function TrackingView() {
       </section>
       )}
       {dueReminders.length > 0 && (
-        <section className="due-reminders">
+        <section className="due-reminders" data-tour="due-reminders">
           <header>
             <Bell size={17} />
             <strong>Recordatoris d’avui</strong>
@@ -828,7 +835,7 @@ export function TrackingView() {
                 <p>{reminder.text}</p>
               </div>
               <button className="secondary-action compact" onClick={() => snoozeReminder(reminder)} type="button">
-                Ajornar 55 min
+                Ajornar 55 minuts
               </button>
               {reminder.student && (
                 <button className="secondary-action compact" onClick={() => setProfileStudentId(reminder.student.id)} type="button">
@@ -880,7 +887,9 @@ export function TrackingView() {
         <table className="tracking-table">
           <thead>
             <tr>
-              <th className="sticky-student tracking-student-header">Alumne</th>
+              <th className="sticky-student tracking-student-header">
+                <span>Alumne</span>
+              </th>
               {visibleTasks.map((task, taskIndex) => (
                 <th className="task-header" key={task.id}>
                   <EditableTaskTitle task={task} onChangeTitle={(taskId, title) => updateTask(taskId, { title })} />
@@ -948,63 +957,64 @@ export function TrackingView() {
               return (
                 <tr className={getStudentRowClass(dominantDiagnosis, noteState)} key={student.id}>
                   <td className="sticky-student tracking-student-cell">
-                    <div className="tracking-student-main">
-                      <button
-                        className={`student-note-button ${noteState}`}
-                        onClick={() => setProfileStudentId(student.id)}
-                        title="Resum i anotacions de seguiment"
-                        type="button"
-                      >
-                        <MessageCircle size={17} />
-                      </button>
-                      <button
-                        className="tracking-student-name"
-                        onClick={() => setAnnotationsStudentId(student.id)}
-                        type="button"
-                      >
-                        <strong>{student.name}</strong>
-                        <small>{student.halfGroup}</small>
-                      </button>
-                    </div>
-                    <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
-                      <span
-                        className={`red-point-stack ${redPointCount >= 3 ? 'warning' : ''}`}
-                        title="Punts vermells per tasques no fetes"
-                      >
-                        {Array.from({ length: Math.min(redPointCount, 4) }).map((_, pointIndex) => (
-                          <i key={pointIndex} />
-                        ))}
-                        {redPointCount > 4 && <b>+{redPointCount - 4}</b>}
-                      </span>
-                      <button
-                        className="black-point-button"
-                        onClick={() => setBehaviorDraft({ student, type: 'incident' })}
-                        title="Afegir negatiu de comportament"
-                        type="button"
-                      >
-                        <AlertTriangle size={15} />
-                        {incidents.length}
-                      </button>
-                      <button
-                        className="diary-button"
-                        onClick={() => setBehaviorDraft({ student, type: 'positive' })}
-                        title="Afegir entrada de diari"
-                        type="button"
-                      >
-                        <BookOpen size={15} />
-                        {positives.length}
-                      </button>
-                      {trackingAgendaNotes.length > 0 && (
+                    <div className="tracking-student-row">
+                      <div className="tracking-student-main">
                         <button
-                          className="agenda-note-chip"
+                          className={`student-note-button ${noteState}`}
                           onClick={() => setProfileStudentId(student.id)}
-                          title="Nota a l’agenda registrada"
+                          title="Resum i anotacions de seguiment"
+                          type="button"
+                        >
+                          <MessageCircle size={17} />
+                        </button>
+                        <button
+                          className="tracking-student-name"
+                          onClick={() => setAnnotationsStudentId(student.id)}
+                          type="button"
+                        >
+                          <strong>{student.name}</strong>
+                          <small>{student.halfGroup}</small>
+                        </button>
+                      </div>
+                      <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
+                        <span
+                          className={`red-point-stack ${redPointCount >= 3 ? 'warning' : ''}`}
+                          title="Punts vermells per tasques no fetes"
+                        >
+                          {Array.from({ length: Math.min(redPointCount, 4) }).map((_, pointIndex) => (
+                            <i key={pointIndex} />
+                          ))}
+                          {redPointCount > 4 && <b>+{redPointCount - 4}</b>}
+                        </span>
+                        <button
+                          className="black-point-button"
+                          onClick={() => setBehaviorDraft({ student, type: 'incident' })}
+                          title="Afegir negatiu de comportament"
+                          type="button"
+                        >
+                          <AlertTriangle size={15} />
+                          {incidents.length}
+                        </button>
+                        <button
+                          className="diary-button"
+                          onClick={() => setBehaviorDraft({ student, type: 'positive' })}
+                          title="Afegir entrada de diari"
+                          type="button"
+                        >
+                          <BookOpen size={15} />
+                          {positives.length}
+                        </button>
+                        <button
+                          className={`agenda-note-chip ${trackingAgendaNotes.length > 0 ? 'active' : ''}`}
+                          disabled={trackingAgendaNotes.length === 0}
+                          onClick={() => setProfileStudentId(student.id)}
+                          title={trackingAgendaNotes.length > 0 ? 'Nota a l’agenda registrada' : 'Sense nota a l’agenda registrada'}
                           type="button"
                         >
                           <Skull size={13} />
                           {trackingAgendaNotes.length}
                         </button>
-                      )}
+                      </div>
                     </div>
                   </td>
                   {visibleTasks.map((task, taskIndex) => {

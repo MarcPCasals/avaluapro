@@ -331,7 +331,7 @@ const ownDataTourSteps = [
   {
     target: 'task-reminder-all',
     title: '17. Recordatoris de tasca',
-    text: 'La campana programa un recordatori de tota la tasca. El dia i hora indicats apareixerà una targeta i podràs ajornar-la 55 minuts.',
+    text: 'La campana del títol programa un recordatori per a tota la tasca; la campana de cada cel·la és individual. El dia i hora indicats apareixerà una targeta i podràs ajornar-la 55 minuts.',
     mode: 'tracking',
     ensureTrackingTasks: true,
     placement: 'left',

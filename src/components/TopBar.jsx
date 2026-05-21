@@ -81,7 +81,7 @@ function formatSyncTime(value) {
 
 function getSyncIndicator(cloud) {
   if (cloud.status === 'error') {
-    return { className: 'error', icon: AlertCircle, label: 'Error', detail: 'Revisa l’avís' }
+    return { className: 'error', icon: AlertCircle, label: 'Error', detail: 'Revisa l’error' }
   }
   if (cloud.status === 'syncing') {
     return { className: 'syncing', icon: Loader2, label: 'Sincronitzant', detail: 'Pujant canvis' }

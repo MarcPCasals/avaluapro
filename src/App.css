@@ -1098,12 +1098,16 @@
 
 .header-student,
 .tracking-student-header {
-  min-width: 335px;
-  width: 335px;
+  min-width: 360px;
+  width: 360px;
   padding: 16px 18px;
   text-align: left;
   vertical-align: middle;
   background: white;
+}
+
+.tracking-student-header span {
+  display: block;
 }
 
 .header-student span {
@@ -1311,6 +1315,8 @@
 
 .task-cell {
   position: relative;
+  height: 96px;
+  vertical-align: middle;
 }
 
 .mark-cell select {
@@ -1356,13 +1362,19 @@
 .grade-text-empty { color: #cbd5e1; }
 
 .tracking-student-cell {
-  min-width: 335px;
-  width: 335px;
-  padding: 8px 10px;
+  min-width: 360px;
+  width: 360px;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.tracking-student-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
+  grid-template-columns: minmax(0, 1fr) 78px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  min-height: 96px;
+  padding: 8px 10px;
 }
 
 .tracking-student-main {
@@ -1380,9 +1392,9 @@
 }
 
 .tracking-student-name strong {
-  max-width: 168px;
+  max-width: 210px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.15;
   text-overflow: ellipsis;
 }
@@ -1836,7 +1848,7 @@
   display: flex;
   justify-content: center;
   gap: 5px;
-  padding-top: 8px;
+  padding-top: 0;
 }
 
 .status-button {
@@ -1900,14 +1912,14 @@
 
 .student-flags {
   display: grid;
-  grid-template-columns: repeat(2, 38px);
+  grid-template-columns: repeat(2, 36px);
   align-items: center;
   justify-content: end;
   gap: 5px;
 }
 
 .student-flags button {
-  min-width: 36px;
+  min-width: 34px;
   height: 30px;
   display: inline-flex;
   align-items: center;
@@ -1929,13 +1941,13 @@
 }
 
 .agenda-note-chip {
-  color: #b45309 !important;
-  border-color: #fed7aa !important;
-  background: #fff7ed !important;
+  color: #94a3b8 !important;
+  border-color: #e5e7eb !important;
+  background: white !important;
 }
 
 .red-point-stack {
-  min-width: 38px;
+  min-width: 34px;
   height: 30px;
   display: inline-flex;
   align-items: center;
@@ -1946,9 +1958,15 @@
   background: #fff7f7;
 }
 
-.agenda-note-chip {
-  grid-column: 1 / -1;
-  width: 100%;
+.agenda-note-chip.active {
+  color: #b45309 !important;
+  border-color: #fed7aa !important;
+  background: #fff7ed !important;
+}
+
+.agenda-note-chip:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .red-point-stack.warning {
@@ -2007,6 +2025,8 @@
 .tracking-summary {
   min-width: 160px;
   padding: 12px;
+  height: 96px;
+  vertical-align: middle;
 }
 
 .intervention-badge {
