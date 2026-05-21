@@ -108,6 +108,21 @@ function NoteEntryList({ label, notes, onDelete }) {
   )
 }
 
+function LatestAnnotationCard({ color, emptyText, expanded, notes, onToggle, title }) {
+  const latest = notes[0]
+
+  return (
+    <button className={`annotation-latest-card ${color} ${latest ? 'active' : ''}`} onClick={onToggle} type="button">
+      <div>
+        <strong>{title}</strong>
+        <span>{latest ? new Date(latest.date).toLocaleDateString('ca-ES') : 'Sense entrades'}</span>
+      </div>
+      <p>{latest?.text || emptyText}</p>
+      <small>{latest ? (expanded ? 'Amagar historial' : `Veure ${notes.length} entrada/es`) : 'Afegeix una entrada quan calgui'}</small>
+    </button>
+  )
+}
+
 export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const students = useAvaluaproStore((state) => state.students)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
@@ -118,7 +133,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const [teamText, setTeamText] = useState('')
   const [tutoringText, setTutoringText] = useState('')
   const [copyState, setCopyState] = useState('')
-  const [expandedSections, setExpandedSections] = useState({ team: true, tutoring: true })
+  const [expandedSections, setExpandedSections] = useState({ team: false, tutoring: false })
   const student = students.find((item) => item.id === studentId)
 
   const notes = useMemo(
@@ -265,6 +280,25 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <small>{reminder.meta}</small>
         </section>
 
+        <section className="annotation-latest-grid">
+          <LatestAnnotationCard
+            color="team"
+            emptyText="No hi ha cap comentari d’equip educatiu registrat."
+            expanded={expandedSections.team}
+            notes={teamNotes}
+            onToggle={() => toggleSection('team')}
+            title="Últim equip educatiu"
+          />
+          <LatestAnnotationCard
+            color="tutoring"
+            emptyText="No hi ha cap comentari de tutoria registrat."
+            expanded={expandedSections.tutoring}
+            notes={tutoringNotes}
+            onToggle={() => toggleSection('tutoring')}
+            title="Última tutoria"
+          />
+        </section>
+
         <section className="annotation-section" data-tour="annotation-diagnosis">
           <h3>
             <UserRound size={18} />
@@ -311,15 +345,13 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
               + Nova entrada
             </button>
           </div>
+          <textarea
+            onChange={(event) => setTeamText(event.target.value)}
+            placeholder="Escriu una nova entrada d’equip educatiu..."
+            value={teamText}
+          />
           {expandedSections.team && (
-            <>
-              <textarea
-                onChange={(event) => setTeamText(event.target.value)}
-                placeholder="Escriu una nova entrada d’equip educatiu..."
-                value={teamText}
-              />
-              <NoteEntryList label="Equip educatiu" notes={teamNotes} onDelete={deleteAgendaNote} />
-            </>
+            <NoteEntryList label="Equip educatiu" notes={teamNotes} onDelete={deleteAgendaNote} />
           )}
         </section>
 
@@ -339,15 +371,13 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
               + Nova entrada
             </button>
           </div>
+          <textarea
+            onChange={(event) => setTutoringText(event.target.value)}
+            placeholder="Escriu una nova entrada de tutoria..."
+            value={tutoringText}
+          />
           {expandedSections.tutoring && (
-            <>
-              <textarea
-                onChange={(event) => setTutoringText(event.target.value)}
-                placeholder="Escriu una nova entrada de tutoria..."
-                value={tutoringText}
-              />
-              <NoteEntryList label="Tutoria" notes={tutoringNotes} onDelete={deleteAgendaNote} />
-            </>
+            <NoteEntryList label="Tutoria" notes={tutoringNotes} onDelete={deleteAgendaNote} />
           )}
         </section>
       </div>

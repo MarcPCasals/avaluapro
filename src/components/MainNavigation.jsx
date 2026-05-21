@@ -129,7 +129,12 @@ export function MainNavigation() {
             </button>
           )
         })}
-        <button className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`} onClick={() => setShowUrgent(true)} type="button">
+        <button
+          className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
+          data-tour="urgent-button"
+          onClick={() => setShowUrgent(true)}
+          type="button"
+        >
           <AlertTriangle size={18} />
           Urgent
           <span>{urgentProfiles.length}</span>

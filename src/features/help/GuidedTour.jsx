@@ -40,10 +40,10 @@ const tourSteps = [
     mode: 'evaluation',
   },
   {
-    target: 'student-comments',
+    target: 'student-name-open',
     title: '7. Anotacions i diagnòstics',
-    text: 'La bombolla obre la fitxa d’anotacions: diagnòstics, informació personal, equips educatius i comentaris de tutoria.',
-    action: 'Clica la bombolla del primer alumne per obrir la fitxa d’anotacions.',
+    text: 'El nom de l’alumne obre la fitxa personal: foto, diagnòstics, informació personal, equips educatius i comentaris de tutoria.',
+    action: 'Clica el nom del primer alumne per obrir la fitxa personal.',
     completeWhen: 'annotations-open',
     helperAction: 'open-first-annotations',
     helperLabel: 'Obrir fitxa demo',
@@ -208,6 +208,171 @@ const tourSteps = [
   },
 ]
 
+const ownDataTourSteps = [
+  {
+    target: 'manage-students-button',
+    title: '1. Afegeix la teva classe',
+    text: 'El primer pas real és afegir alumnes. Enganxa una llista amb un alumne per línia en format “Cognom Cognom, Nom”.',
+    action: 'Obre Gestió d’Alumnes per veure on s’afegeixen i s’organitzen els alumnes.',
+    completeWhen: 'students-open',
+    helperAction: 'open-students',
+    helperLabel: 'Obrir Gestió d’Alumnes',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'student-manager-bulk',
+    title: '2. Mitjos grups ràpids',
+    text: 'Selecciona diversos alumnes i aplica Grup A, Grup B o qualsevol mig grup que hagis configurat. Això evita editar-los un per un.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'modal-close',
+    title: '3. Torna a la taula',
+    text: 'Quan ja hagis revisat la gestió d’alumnes, tanca la finestra per continuar veient la resta de botons del programa.',
+    action: 'Tanca Gestió d’Alumnes per continuar.',
+    completeWhen: 'students-closed',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'ut-competency-toggle',
+    title: '4. Competències de la UT',
+    text: 'Aquí actives o desactives quines competències es treballen a cada UT. Si una competència està inactiva, no embruta les estadístiques.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'half-group-filter',
+    title: '5. Filtra per mig grup',
+    text: 'Aquest filtre és útil quan només tens mig grup a l’aula. En avaluació i seguiment treballes amb els alumnes visibles.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'import-excel-button',
+    title: '6. Importa notes d’Excel',
+    text: 'Pots copiar notes d’un full de càlcul i enganxar-les directament a la graella d’importació, seguint l’ordre dels criteris actius.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'urgent-button',
+    title: '7. Botó Urgent',
+    text: 'Sempre el tens a mà. Reuneix alumnes amb risc important per notes, constància o combinació de dades.',
+    mode: 'evaluation',
+    placement: 'below',
+  },
+  {
+    target: 'class-settings',
+    title: '8. Configura la classe',
+    text: 'Des d’aquí pots modificar classe, matèria, color, competències i eliminar la classe si cal.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'seating-button',
+    title: '9. Llocs fixos',
+    text: 'Carrega imatges de la disposició d’aula del grup sencer o dels mitjos grups. És una consulta ràpida per al dia a dia.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'undo-button',
+    title: '10. Desfer i refer',
+    text: 'Aquests botons quedaran reservats per recuperar canvis recents. Són una capa de seguretat quan es treballa ràpid a classe.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'reset-button',
+    title: '11. Reiniciar el curs',
+    text: 'La brossa serveix per tornar a començar. És una acció delicada: abans de fer-la, convé tenir una còpia de seguretat.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'sync-status',
+    title: '12. Sync i estat de núvol',
+    text: 'Quan iniciïs sessió, veuràs si les dades estan sincronitzades, pendents o amb error. Això no substitueix les còpies manuals.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'data-menu',
+    title: '13. Dades i compte',
+    text: 'Aquest menú concentra còpies de seguretat, restauració, exportació, sessió de Google i estat de dades.',
+    action: 'Obre el menú Dades i Compte.',
+    completeWhen: 'data-menu-open',
+    helperAction: 'open-data-menu',
+    helperLabel: 'Obrir menú',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'tracking-toolbar',
+    title: '14. Seguiment de tasques',
+    text: 'A Seguiment treballes hàbits, tasques incompletes, no fetes, recordatoris i notes a l’agenda.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+  },
+  {
+    target: 'new-task-button',
+    title: '15. Crea una tasca',
+    text: 'Nova Tasca afegeix una activitat a la UT activa. També pots copiar-la a altres classes si treballen el mateix.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+  },
+  {
+    target: 'task-done-all',
+    title: '16. Accions de tota la classe',
+    text: 'El tic general marca com a feta la tasca per a tots els alumnes visibles. Si filtres un mig grup, només afecta aquell mig grup.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+    placement: 'left',
+  },
+  {
+    target: 'task-reminder-all',
+    title: '17. Recordatoris de tasca',
+    text: 'La campana programa un recordatori de tota la tasca. El dia i hora indicats apareixerà una targeta i podràs ajornar-la 55 minuts.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+    placement: 'left',
+  },
+  {
+    target: 'task-info-all',
+    title: '18. Informació de la tasca',
+    text: 'El botó d’informació guarda anotacions generals de la tasca. També pots afegir informació individual dins de cada cel·la.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+    placement: 'left',
+  },
+  {
+    target: 'tracking-student-actions',
+    title: '19. Alumne, conducta i diari',
+    text: 'A la fila de l’alumne veuràs punts vermells, negatius de comportament, entrades de diari i notes a l’agenda registrades.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+  },
+  {
+    target: 'tracking-table',
+    title: '20. Estats de cada tasca',
+    text: 'Dins de cada cel·la pots marcar feta, incompleta, no feta o exempt. Aquestes dades alimenten les estadístiques de seguiment.',
+    mode: 'tracking',
+    ensureTrackingTasks: true,
+  },
+  {
+    target: 'evaluation-table',
+    title: '21. Perfil i anotacions',
+    text: 'Clicant el nom obres la fitxa personal amb diagnòstics i anotacions. Clicant la bombolla obres el resum de la UT i l’evolució de l’alumne.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'main-navigation',
+    title: '22. Ja pots començar',
+    text: 'Ara tens el mapa bàsic: alumnes, notes, seguiment, estadístiques, còpies i sync. Pots tancar aquesta guia i començar a treballar amb les teves dades.',
+    mode: 'evaluation',
+    final: true,
+  },
+]
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
@@ -272,6 +437,14 @@ function getCompletionState(step, baseline, current) {
     return !document.querySelector('.annotations-panel')
   }
 
+  if (step.completeWhen === 'students-open') {
+    return Boolean(document.querySelector('.student-manager'))
+  }
+
+  if (step.completeWhen === 'students-closed') {
+    return !document.querySelector('.student-manager')
+  }
+
   if (step.completeWhen === 'agenda-note-added') {
     return current.agendaNotesCount > (baseline?.agendaNotesCount ?? current.agendaNotesCount)
   }
@@ -308,7 +481,7 @@ function getCompletionState(step, baseline, current) {
 }
 
 export function GuidedTour() {
-  const { guideOpen } = useAvaluaproStore((state) => state.onboarding)
+  const { guideMode, guideOpen } = useAvaluaproStore((state) => state.onboarding)
   const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
   const startOwnData = useAvaluaproStore((state) => state.startOwnData)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
@@ -322,7 +495,8 @@ export function GuidedTour() {
   const [targetRect, setTargetRect] = useState(null)
   const [domPulse, setDomPulse] = useState(0)
   const { baseline, stepIndex } = tourState
-  const step = tourSteps[stepIndex]
+  const activeSteps = guideMode === 'own' ? ownDataTourSteps : tourSteps
+  const step = activeSteps[stepIndex]
 
   useEffect(() => {
     if (!guideOpen || !step) return
@@ -403,7 +577,7 @@ export function GuidedTour() {
   const goToStep = (nextStepIndex) => {
     setTourState({
       baseline: getGuideSnapshot(),
-      stepIndex: clamp(nextStepIndex, 0, tourSteps.length - 1),
+      stepIndex: clamp(nextStepIndex, 0, activeSteps.length - 1),
     })
   }
 
@@ -445,6 +619,12 @@ export function GuidedTour() {
 
     if (step.helperAction === 'open-data-menu') {
       document.querySelector('[data-tour="data-menu"] button')?.click()
+      return
+    }
+
+    if (step.helperAction === 'open-students') {
+      document.querySelector('[data-tour="manage-students-button"]')?.click()
+      document.querySelector('[data-tour="tracking-manage-students-button"]')?.click()
     }
   }
 
@@ -486,7 +666,7 @@ export function GuidedTour() {
           </button>
         )}
         <div className="guided-tour-progress">
-          <span style={{ width: `${((stepIndex + 1) / tourSteps.length) * 100}%` }} />
+          <span style={{ width: `${((stepIndex + 1) / activeSteps.length) * 100}%` }} />
         </div>
         <footer>
           <button className="ghost-action compact guided-tour-skip" onClick={closeTour} type="button">
@@ -502,12 +682,12 @@ export function GuidedTour() {
             Anterior
           </button>
           <small>
-            {stepIndex + 1}/{tourSteps.length}
+            {stepIndex + 1}/{activeSteps.length}
           </small>
           {step.final ? (
-            <button className="primary-action compact" onClick={handleStartOwnData} type="button">
+            <button className="primary-action compact" onClick={guideMode === 'demo' ? handleStartOwnData : closeTour} type="button">
               <CheckCircle2 size={15} />
-              Començar
+              {guideMode === 'demo' ? 'Començar' : 'Tancar guia'}
             </button>
           ) : (
             <button

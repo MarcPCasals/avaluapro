@@ -202,7 +202,7 @@ export function ManageStudentsModal({ classId, onClose }) {
 
   return (
     <Modal onClose={onClose} size="xl" title="Gestió d’Alumnes">
-      <div className="student-manager">
+      <div className="student-manager" data-tour="student-manager">
         <section className="modal-section">
           <h3>
             <Users size={18} />
@@ -254,7 +254,7 @@ export function ManageStudentsModal({ classId, onClose }) {
           <button className="primary-action" disabled={importableRows.length === 0} onClick={handleAdd} type="button">
             Afegir {importableRows.length} alumne/s
           </button>
-          <div className="half-group-manager">
+          <div className="half-group-manager" data-tour="student-manager-half-groups">
             <div>
               <strong>Mitjos grups</strong>
               <small>Defineix els grups disponibles i assigna’ls amb desplegables.</small>
@@ -314,7 +314,7 @@ export function ManageStudentsModal({ classId, onClose }) {
               <span>{halfGroups.length > 0 ? halfGroups.join(' · ') : 'Sense migs grups'}</span>
             </article>
           </div>
-          <div className="bulk-student-actions">
+          <div className="bulk-student-actions" data-tour="student-manager-bulk">
             <label className="copy-check">
               <input checked={allSelected} onChange={toggleAllStudents} type="checkbox" />
               Seleccionar tots

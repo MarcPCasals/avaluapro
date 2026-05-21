@@ -326,7 +326,13 @@ export function TopBar() {
         </button>
       </nav>
       <div className="top-actions">
-        <button className="icon-button" onClick={() => setShowSettings(true)} title="Configuració del grup" type="button">
+        <button
+          className="icon-button"
+          data-tour="class-settings"
+          onClick={() => setShowSettings(true)}
+          title="Configuració del grup"
+          type="button"
+        >
           <Settings size={22} />
         </button>
         <button className="icon-button" onClick={() => setShowHelp(true)} title="Ajuda i primera configuració" type="button">
@@ -334,7 +340,7 @@ export function TopBar() {
         </button>
         <span className="top-divider" />
         {cloud.user && (
-          <div className={`top-sync-status ${syncIndicator.className}`}>
+          <div className={`top-sync-status ${syncIndicator.className}`} data-tour="sync-status">
             <strong className="sync-pill" title={cloud.error || syncIndicator.label}>
               <SyncIcon size={15} />
               <span>
@@ -374,6 +380,7 @@ export function TopBar() {
                 </button>
               )}
               <button
+                data-tour="data-safety-button"
                 onClick={() => {
                   setShowProfile(true)
                   setShowDataMenu(false)
@@ -484,14 +491,14 @@ export function TopBar() {
           type="file"
         />
         <span className="top-divider" />
-        <button className="icon-button disabled" title="Desfer, propera iteració" type="button">
+        <button className="icon-button disabled" data-tour="undo-button" title="Desfer, propera iteració" type="button">
           <RotateCcw size={22} />
         </button>
-        <button className="icon-button disabled" title="Refer, propera iteració" type="button">
+        <button className="icon-button disabled" data-tour="redo-button" title="Refer, propera iteració" type="button">
           <RotateCw size={22} />
         </button>
         <span className="top-divider" />
-        <button className="icon-button red-action" onClick={handleResetToSeed} title="Reiniciar dades demo" type="button">
+        <button className="icon-button red-action" data-tour="reset-button" onClick={handleResetToSeed} title="Reiniciar dades demo" type="button">
           <Trash2 size={22} />
         </button>
       </div>

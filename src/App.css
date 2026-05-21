@@ -5743,6 +5743,69 @@
   font-weight: 850;
 }
 
+.annotation-latest-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.annotation-latest-card {
+  display: grid;
+  gap: 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annotation-latest-card.team {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.annotation-latest-card.tutoring {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.annotation-latest-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.annotation-latest-card strong {
+  color: #1f2937;
+  font-size: 15px;
+}
+
+.annotation-latest-card span,
+.annotation-latest-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.annotation-latest-card p {
+  min-height: 42px;
+  margin: 0;
+  color: #334155;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.annotation-latest-card.team.active small {
+  color: #b91c1c;
+}
+
+.annotation-latest-card.tutoring.active small {
+  color: #b45309;
+}
+
 .annotation-section {
   display: grid;
   gap: 12px;

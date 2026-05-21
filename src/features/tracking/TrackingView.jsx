@@ -662,7 +662,7 @@ export function TrackingView() {
   return (
     <section className="work-surface">
       <div className="toolbar" data-tour="tracking-toolbar">
-        <button className="tool-button strong" onClick={() => setShowTaskModal(true)} type="button">
+        <button className="tool-button strong" data-tour="new-task-button" onClick={() => setShowTaskModal(true)} type="button">
           Nova Tasca
         </button>
         <button className={`tool-button ${showPastTasks ? 'active-soft' : ''}`} onClick={() => setShowPastTasks((value) => !value)} type="button">
@@ -671,6 +671,7 @@ export function TrackingView() {
         {halfGroups.length > 0 && (
           <select
             className="half-group-select"
+            data-tour="tracking-half-group-filter"
             onChange={(event) => setHalfGroupFilter(event.target.value)}
             value={halfGroupFilter}
           >
@@ -684,13 +685,14 @@ export function TrackingView() {
         )}
         <button
           className={`intervention-toggle ${showInterventions ? 'active' : ''}`}
+          data-tour="weekly-intervention-button"
           onClick={() => setShowInterventions((isVisible) => !isVisible)}
           type="button"
         >
           <Target size={18} />
           Intervenció setmanal
         </button>
-        <button className="tool-button dark" onClick={() => setShowStudentsModal(true)} type="button">
+        <button className="tool-button dark" data-tour="tracking-manage-students-button" onClick={() => setShowStudentsModal(true)} type="button">
           <Users size={18} />
           Gestió d’Alumnes
         </button>
@@ -879,13 +881,14 @@ export function TrackingView() {
           <thead>
             <tr>
               <th className="sticky-student tracking-student-header">Alumne</th>
-              {visibleTasks.map((task) => (
+              {visibleTasks.map((task, taskIndex) => (
                 <th className="task-header" key={task.id}>
                   <EditableTaskTitle task={task} onChangeTitle={(taskId, title) => updateTask(taskId, { title })} />
                   <TaskCompletionSummary students={filteredStudents} task={task} taskRecords={taskRecords} />
                   <EditableTaskDate task={task} onChangeDate={(taskId, date) => updateTask(taskId, { date })} />
                   <button
                     className="task-header-action done-all"
+                    data-tour={taskIndex === 0 ? 'task-done-all' : undefined}
                     onClick={() => markVisibleStudentsDone(task.id)}
                     title="Marcar tots els alumnes visibles com a fets"
                     type="button"
@@ -894,6 +897,7 @@ export function TrackingView() {
                   </button>
                   <button
                     className="task-header-action reminder"
+                    data-tour={taskIndex === 0 ? 'task-reminder-all' : undefined}
                     onClick={() => setReminderDraft({ task })}
                     title="Programar recordatori de la tasca"
                     type="button"
@@ -902,6 +906,7 @@ export function TrackingView() {
                   </button>
                   <button
                     className={`task-header-action info ${task.note ? 'active' : ''}`}
+                    data-tour={taskIndex === 0 ? 'task-info-all' : undefined}
                     onClick={() => setTaskNoteDraft({ task })}
                     title="Afegir informació general de la tasca"
                     type="button"
@@ -1002,12 +1007,13 @@ export function TrackingView() {
                       )}
                     </div>
                   </td>
-                  {visibleTasks.map((task) => {
+                  {visibleTasks.map((task, taskIndex) => {
                     const record = getRecord(taskRecords, student.id, task.id)
                     return (
                       <td className="task-cell" key={`${student.id}_${task.id}`}>
                         <button
                           className={`task-cell-info ${record?.note ? 'active' : ''}`}
+                          data-tour={studentIndex === 0 && taskIndex === 0 ? 'task-info-individual' : undefined}
                           onClick={() => setTaskNoteDraft({ task, student, record })}
                           title="Afegir informació de la tasca"
                           type="button"

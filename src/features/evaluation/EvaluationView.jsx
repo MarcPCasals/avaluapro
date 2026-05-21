@@ -138,6 +138,7 @@ export function EvaluationView() {
         {totalSubjectCompetencies > 0 && (
           <button
             className={`ut-competency-summary ${competencySummaryIsComplete ? 'complete' : 'partial'}`}
+            data-tour="ut-competency-toggle"
             onClick={() => setShowStructureModal(true)}
             type="button"
           >
@@ -150,6 +151,7 @@ export function EvaluationView() {
         {halfGroups.length > 0 && (
           <select
             className="half-group-select"
+            data-tour="half-group-filter"
             onChange={(event) => setHalfGroupFilter(event.target.value)}
             value={halfGroupFilter}
           >
@@ -161,15 +163,15 @@ export function EvaluationView() {
             ))}
           </select>
         )}
-        <button className="tool-button" onClick={() => setShowSeatingModal(true)} type="button">
+        <button className="tool-button" data-tour="seating-button" onClick={() => setShowSeatingModal(true)} type="button">
           <MapPinned size={18} />
           Llocs Fixos
         </button>
-        <button className="tool-button" onClick={() => setShowImportModal(true)} type="button">
+        <button className="tool-button" data-tour="import-excel-button" onClick={() => setShowImportModal(true)} type="button">
           <FileSpreadsheet size={18} />
           Importar Excel
         </button>
-        <button className="tool-button dark" onClick={() => setShowStudentsModal(true)} type="button">
+        <button className="tool-button dark" data-tour="manage-students-button" onClick={() => setShowStudentsModal(true)} type="button">
           <Users size={18} />
           Gestió d’Alumnes
         </button>
@@ -300,6 +302,7 @@ export function EvaluationView() {
                   </button>
                   <button
                     className="student-name student-profile-trigger"
+                    data-tour={index === 0 ? 'student-name-open' : undefined}
                     onClick={() => setAnnotationsStudentId(student.id)}
                     type="button"
                   >

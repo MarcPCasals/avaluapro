@@ -85,6 +85,7 @@ function getInitialOnboarding(hasStoredData) {
       Object.prototype.hasOwnProperty.call(preferences, 'guideOpen')
         ? Boolean(preferences.guideOpen)
         : demoMode,
+    guideMode: preferences.guideMode || (demoMode ? 'demo' : 'own'),
   }
 }
 
@@ -484,6 +485,7 @@ export const useAvaluaproStore = create((set, get) => ({
   onboarding: {
     demoMode: false,
     guideOpen: false,
+    guideMode: 'demo',
   },
   backupMeta: null,
   cloud: {
@@ -853,8 +855,9 @@ export const useAvaluaproStore = create((set, get) => ({
       criteria: [...state.criteria, ...newCriteria],
       ui,
       profile,
+      onboarding: { demoMode: false, guideOpen: true, guideMode: 'own' },
     }))
-    writePreferences({ ...readPreferences(), ...ui, ...profile })
+    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: false, guideOpen: true, guideMode: 'own' })
     await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
     return true
   },
@@ -911,6 +914,10 @@ export const useAvaluaproStore = create((set, get) => ({
     set((state) => ({ onboarding: { ...state.onboarding, guideOpen } }))
     writePreferences({ ...readPreferences(), guideOpen })
   },
+  setGuideMode: (guideMode) => {
+    set((state) => ({ onboarding: { ...state.onboarding, guideMode } }))
+    writePreferences({ ...readPreferences(), guideMode })
+  },
   startOwnData: async () => {
     const shouldStart = window.confirm(
       [
@@ -935,8 +942,8 @@ export const useAvaluaproStore = create((set, get) => ({
       activeInsight: 'dashboard',
     }
     const profile = { defaultSubject: '' }
-    const onboarding = { demoMode: false, guideOpen: false }
-    writePreferences({ ...ui, ...profile, demoMode: false, guideOpen: false, backupMeta: null })
+    const onboarding = { demoMode: false, guideOpen: false, guideMode: 'own' }
+    writePreferences({ ...ui, ...profile, demoMode: false, guideOpen: false, guideMode: 'own', backupMeta: null })
     set({
       ...EMPTY_DATASET,
       ui,
@@ -1657,8 +1664,8 @@ export const useAvaluaproStore = create((set, get) => ({
     await saveDataset(dataset)
     const ui = getInitialUi(dataset)
     const profile = { defaultSubject: DEMO_SUBJECT }
-    const onboarding = { demoMode: true, guideOpen: true }
-    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: true, guideOpen: true, backupMeta: null })
+    const onboarding = { demoMode: true, guideOpen: true, guideMode: 'demo' }
+    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: true, guideOpen: true, guideMode: 'demo', backupMeta: null })
     set({ ...dataset, ui, profile, onboarding, backupMeta: null, status: 'ready', error: '' })
   },
 }))
