@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, FileSpreadsheet, MapPinned, MessageCircle, Pencil, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
@@ -121,6 +121,16 @@ export function EvaluationView() {
 
     return previousCompetencySlots + studentIndex * competencies[competencyIndex].criteria.length + criterionIndex + 1
   }
+
+  useEffect(() => {
+    const handleOpenFirstAnnotations = () => {
+      const student = filteredStudents[0] || students[0]
+      if (student) setAnnotationsStudentId(student.id)
+    }
+
+    window.addEventListener('avaluapro-open-first-annotations', handleOpenFirstAnnotations)
+    return () => window.removeEventListener('avaluapro-open-first-annotations', handleOpenFirstAnnotations)
+  }, [filteredStudents, students])
 
   return (
     <section className="work-surface">

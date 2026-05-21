@@ -45,6 +45,8 @@ const tourSteps = [
     text: 'La bombolla obre la fitxa d’anotacions: diagnòstics, informació personal, equips educatius i comentaris de tutoria.',
     action: 'Clica la bombolla del primer alumne per obrir la fitxa d’anotacions.',
     completeWhen: 'annotations-open',
+    helperAction: 'open-first-annotations',
+    helperLabel: 'Obrir fitxa demo',
     mode: 'evaluation',
   },
   {
@@ -53,6 +55,8 @@ const tourSteps = [
     text: 'Les entrades d’equip educatiu queden separades per data i marquen l’alumne en vermell perquè ho vegis durant la classe.',
     action: 'Escriu una entrada breu de prova i prem “+ Nova entrada”.',
     completeWhen: 'agenda-note-added',
+    helperAction: 'add-demo-team-note',
+    helperLabel: 'Afegir entrada demo',
     mode: 'evaluation',
   },
   {
@@ -68,6 +72,7 @@ const tourSteps = [
     title: '10. Seguiment de tasques',
     text: 'Crea tasques, filtra per mig grup, mostra tasques passades i obre la intervenció setmanal quan necessitis decidir prioritats.',
     mode: 'tracking',
+    ensureTrackingTasks: true,
   },
   {
     target: 'tracking-table',
@@ -75,13 +80,17 @@ const tourSteps = [
     text: 'Cada cel·la permet marcar feta, incompleta, no feta o exempt. També pots afegir notes i recordatoris.',
     action: 'Canvia l’estat d’una cel·la de tasca per veure com es desa el seguiment.',
     completeWhen: 'task-record-changed',
+    helperAction: 'simulate-task-record',
+    helperLabel: 'Simular canvi de tasca',
     mode: 'tracking',
+    ensureTrackingTasks: true,
   },
   {
     target: 'tracking-student-actions',
     title: '12. Punts vermells, negres i diari',
     text: 'Els punts vermells venen de tasques no fetes. El triangle registra incidències i el llibre guarda observacions sense negatiu.',
     mode: 'tracking',
+    ensureTrackingTasks: true,
   },
   {
     target: 'tracking-student-actions',
@@ -92,6 +101,7 @@ const tourSteps = [
     helperAction: 'simulate-agenda-warning',
     helperLabel: 'Simular 3r negatiu',
     mode: 'tracking',
+    ensureTrackingTasks: true,
     placement: 'right',
   },
   {
@@ -117,6 +127,9 @@ const tourSteps = [
     text: 'Les pestanyes eviten que tot aparegui barrejat. Primer mires el resum i després entres a Avaluació, UT activa, Seguiment o Creuada.',
     action: 'Clica la pestanya “Avaluació” per veure només notes, evolució i criteris.',
     completeWhen: 'stats-evaluation-open',
+    helperAction: 'set-dashboard-scope',
+    helperLabel: 'Obrir Avaluació',
+    helperScope: 'evaluation',
     dashboardScope: 'executive',
     mode: 'analytics',
     insight: 'dashboard',
@@ -128,6 +141,9 @@ const tourSteps = [
     text: 'Aquí veus la comparativa de notes per UT, alumnes que pugen o baixen i la distribució per criteris sense barrejar-hi tasques.',
     action: 'Clica “UT activa” per passar al resum de la unitat que tens seleccionada.',
     completeWhen: 'stats-ut-open',
+    helperAction: 'set-dashboard-scope',
+    helperLabel: 'Obrir UT activa',
+    helperScope: 'ut',
     dashboardScope: 'evaluation',
     mode: 'analytics',
     insight: 'dashboard',
@@ -139,6 +155,9 @@ const tourSteps = [
     text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
     action: 'Clica “Seguiment” per veure només constància, punts i avisos.',
     completeWhen: 'stats-tracking-open',
+    helperAction: 'set-dashboard-scope',
+    helperLabel: 'Obrir Seguiment',
+    helperScope: 'tracking',
     dashboardScope: 'ut',
     mode: 'analytics',
     insight: 'dashboard',
@@ -150,6 +169,9 @@ const tourSteps = [
     text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles avisos d’agenda.',
     action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
     completeWhen: 'stats-cross-open',
+    helperAction: 'set-dashboard-scope',
+    helperLabel: 'Obrir Creuada',
+    helperScope: 'cross',
     dashboardScope: 'tracking',
     mode: 'analytics',
     insight: 'dashboard',
@@ -169,6 +191,8 @@ const tourSteps = [
     text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
     action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
     completeWhen: 'data-menu-open',
+    helperAction: 'open-data-menu',
+    helperLabel: 'Obrir menú Dades',
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
@@ -300,6 +324,19 @@ export function GuidedTour() {
       window.requestAnimationFrame(applyDashboardScope)
       window.setTimeout(applyDashboardScope, 100)
     }
+
+    if (step.ensureTrackingTasks) {
+      const state = useAvaluaproStore.getState()
+      const classTasks = state.tasks.filter((task) => task.classId === state.ui.activeClassId)
+      const currentUtHasTasks = classTasks.some((task) => task.utId === state.ui.activeUtId)
+      const targetTask = currentUtHasTasks ? null : classTasks[0]
+      if (targetTask) {
+        const targetUt = state.uts.find((ut) => ut.id === targetTask.utId)
+        if (targetUt) state.setActiveSemester(targetUt.semesterId)
+        state.setActiveUt(targetTask.utId)
+      }
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent('avaluapro-show-demo-tasks')), 80)
+    }
   }, [guideOpen, setActiveInsight, setActiveMode, step])
 
   useEffect(() => {
@@ -371,8 +408,33 @@ export function GuidedTour() {
   }
 
   const handleHelperAction = () => {
+    if (step.helperAction === 'open-first-annotations') {
+      window.dispatchEvent(new CustomEvent('avaluapro-open-first-annotations'))
+      return
+    }
+
+    if (step.helperAction === 'add-demo-team-note') {
+      window.dispatchEvent(new CustomEvent('avaluapro-add-demo-team-note'))
+      return
+    }
+
+    if (step.helperAction === 'simulate-task-record') {
+      window.dispatchEvent(new CustomEvent('avaluapro-demo-task-record'))
+      return
+    }
+
     if (step.helperAction === 'simulate-agenda-warning') {
       window.dispatchEvent(new CustomEvent('avaluapro-demo-agenda-warning'))
+      return
+    }
+
+    if (step.helperAction === 'set-dashboard-scope' && step.helperScope) {
+      window.__avaluaproSetDashboardScope?.(step.helperScope)
+      return
+    }
+
+    if (step.helperAction === 'open-data-menu') {
+      document.querySelector('[data-tour="data-menu"] button')?.click()
     }
   }
 

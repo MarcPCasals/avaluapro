@@ -593,6 +593,22 @@ export function TrackingView() {
   }
 
   useEffect(() => {
+    const handleShowDemoTasks = () => {
+      setShowPastTasks(true)
+    }
+
+    const handleDemoTaskRecord = async () => {
+      const student = filteredStudents[0] || students[0]
+      const task = tasks[0]
+      if (!student || !task) {
+        window.alert('Cal una tasca visible per simular el canvi de seguiment.')
+        return
+      }
+
+      const currentRecord = getRecord(taskRecords, student.id, task.id)
+      await updateTaskRecord(student.id, task.id, currentRecord?.status === 'DONE' ? 'LATE' : 'DONE')
+    }
+
     const handleDemoAgendaWarning = async () => {
       const student = filteredStudents[0] || students[0]
       const targetTasks = tasks.slice(0, 3)
@@ -608,9 +624,15 @@ export function TrackingView() {
       window.setTimeout(() => setAgendaWarningStudentId(student.id), 120)
     }
 
+    window.addEventListener('avaluapro-show-demo-tasks', handleShowDemoTasks)
+    window.addEventListener('avaluapro-demo-task-record', handleDemoTaskRecord)
     window.addEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
-    return () => window.removeEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
-  }, [filteredStudents, students, tasks, updateTaskRecordMeta])
+    return () => {
+      window.removeEventListener('avaluapro-show-demo-tasks', handleShowDemoTasks)
+      window.removeEventListener('avaluapro-demo-task-record', handleDemoTaskRecord)
+      window.removeEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
+    }
+  }, [filteredStudents, students, taskRecords, tasks, updateTaskRecord, updateTaskRecordMeta])
 
   return (
     <section className="work-surface">

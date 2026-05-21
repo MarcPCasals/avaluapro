@@ -1,5 +1,5 @@
 import { BarChart3, Camera, ChevronDown, ChevronUp, Clipboard, MessageCircle, Trash2, UserRound, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
@@ -130,6 +130,20 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   )
   const teamNotes = notes.filter((note) => note.type === 'team')
   const tutoringNotes = notes.filter((note) => note.type === 'tutoring')
+
+  useEffect(() => {
+    const handleAddDemoTeamNote = async () => {
+      setExpandedSections((current) => ({ ...current, team: true }))
+      await addAgendaNote(
+        studentId,
+        'team',
+        'Entrada demo: acordem vigilar l’evolució de l’alumne i revisar si necessita suport puntual.',
+      )
+    }
+
+    window.addEventListener('avaluapro-add-demo-team-note', handleAddDemoTeamNote)
+    return () => window.removeEventListener('avaluapro-add-demo-team-note', handleAddDemoTeamNote)
+  }, [addAgendaNote, studentId])
 
   if (!student) return null
 
