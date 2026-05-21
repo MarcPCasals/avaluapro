@@ -18,7 +18,7 @@ const tourSteps = [
   {
     target: 'main-navigation',
     title: '3. Tria què vols fer',
-    text: 'Avaluació és per posar notes; Seguiment és per tasques i comportament; Stats et dona lectures i decisions docents.',
+    text: 'Avaluació és per posar notes; Seguiment és per tasques i comportament; Estadístiques et dona lectures i decisions docents.',
     mode: 'evaluation',
   },
   {
@@ -30,7 +30,7 @@ const tourSteps = [
   {
     target: 'evaluation-toolbar',
     title: '5. Eines de la taula',
-    text: 'Aquí pots editar quines competències treballes, filtrar migs grups, importar notes d’Excel, veure llocs fixos o gestionar alumnes.',
+    text: 'Aquí pots activar competències de la UT, filtrar migs grups, importar notes d’Excel, veure llocs fixos o gestionar alumnes.',
     mode: 'evaluation',
   },
   {
@@ -94,28 +94,28 @@ const tourSteps = [
   },
   {
     target: 'tracking-student-actions',
-    title: '13. Simula un tercer negatiu',
-    text: 'Aquesta simulació marca tres tasques no fetes al primer alumne visible i obre el mateix avís que veuràs en ús real.',
-    action: 'Prem “Simular 3r negatiu” i observa com apareix l’avís d’agenda amb les tasques pendents.',
+    title: '13. Simula una nota a l’agenda',
+    text: 'Aquesta simulació marca tres tasques no fetes al primer alumne visible i obre la mateixa nota a l’agenda que veuràs en ús real.',
+    action: 'Prem “Simular 3r negatiu” i observa com apareix la nota a l’agenda amb les tasques pendents.',
     completeWhen: 'agenda-warning-open',
     helperAction: 'simulate-agenda-warning',
     helperLabel: 'Simular 3r negatiu',
     mode: 'tracking',
     ensureTrackingTasks: true,
-    placement: 'right',
+    placement: 'above',
   },
   {
     target: 'agenda-warning-modal',
-    title: '14. Registra l’avís d’agenda',
-    text: 'El programa recorda quines tasques han generat l’avís. Pots copiar el text, donar una darrera oportunitat o registrar que ja has posat la nota.',
-    action: 'Prem “Registrar avís” perquè quedi marcat a la fila de l’alumne.',
+    title: '14. Registra la nota a l’agenda',
+    text: 'El programa recorda quines tasques han generat la nota. Pots copiar el text, donar una darrera oportunitat o registrar que ja has posat la nota.',
+    action: 'Prem “Registrar nota a l’agenda” perquè quedi marcat a la fila de l’alumne.',
     completeWhen: 'agenda-note-added',
     mode: 'tracking',
-    placement: 'right',
+    placement: 'left',
   },
   {
     target: 'stats-global',
-    title: '15. Stats Globals',
+    title: '15. Estadístiques globals',
     text: 'Aquí és on es creuen rendiment, constància i comportament per trobar alumnes en risc, reforç conceptual i hàbits fràgils.',
     dashboardScope: 'executive',
     mode: 'analytics',
@@ -153,7 +153,7 @@ const tourSteps = [
     target: 'stats-scope-tabs',
     title: '18. Estadístiques de la UT activa',
     text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
-    action: 'Clica “Seguiment” per veure només constància, punts i avisos.',
+    action: 'Clica “Seguiment” per veure només constància, punts i notes a l’agenda.',
     completeWhen: 'stats-tracking-open',
     helperAction: 'set-dashboard-scope',
     helperLabel: 'Obrir Seguiment',
@@ -166,7 +166,7 @@ const tourSteps = [
   {
     target: 'stats-scope-tabs',
     title: '19. Estadístiques de seguiment',
-    text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles avisos d’agenda.',
+    text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles notes a l’agenda.',
     action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
     completeWhen: 'stats-cross-open',
     helperAction: 'set-dashboard-scope',
@@ -196,11 +196,12 @@ const tourSteps = [
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
+    placement: 'left',
   },
   {
     target: 'start-own-data',
     title: '22. Comença amb les teves dades',
-    text: 'Quan ja hagis entès el funcionament, pots esborrar la demo i començar amb la teva matèria, classes i alumnes reals.',
+    text: 'Abans de començar, xafardeja una mica la demo i mira sobretot les estadístiques: amb dades reals trigaran uns dies o setmanes a mostrar aquests fruits. Quan estiguis llest, clica el botó per començar amb les teves dades.',
     mode: 'analytics',
     insight: 'dashboard',
     final: true,
@@ -213,12 +214,19 @@ function clamp(value, min, max) {
 
 function getPosition(rect, placement = 'auto') {
   const cardWidth = Math.min(390, window.innerWidth - 32)
-  const cardHeight = 250
+  const cardHeight = Math.min(330, window.innerHeight - 32)
 
-  if (placement === 'right') {
+  if (placement === 'right' || placement === 'left') {
     const rightSide = rect.right + 14
     const leftSide = rect.left - cardWidth - 14
-    const left = rightSide + cardWidth < window.innerWidth - 16 ? rightSide : Math.max(16, leftSide)
+    const preferLeft = placement === 'left'
+    const left = preferLeft
+      ? leftSide > 16
+        ? leftSide
+        : Math.min(window.innerWidth - cardWidth - 16, rightSide)
+      : rightSide + cardWidth < window.innerWidth - 16
+        ? rightSide
+        : Math.max(16, leftSide)
     const top = clamp(rect.top + rect.height / 2 - cardHeight / 2, 16, window.innerHeight - cardHeight - 16)
     return { left, top, width: cardWidth }
   }
@@ -229,6 +237,8 @@ function getPosition(rect, placement = 'auto') {
   const top =
     placement === 'below'
       ? clamp(below, 16, window.innerHeight - cardHeight - 16)
+      : placement === 'above'
+        ? clamp(above, 16, window.innerHeight - cardHeight - 16)
       : below + cardHeight < window.innerHeight
         ? below
         : Math.max(16, above)

@@ -91,7 +91,7 @@
 .brand-card {
   flex: 0 0 auto;
   min-height: 50px;
-  max-width: 190px;
+  max-width: 182px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -123,6 +123,23 @@
   white-space: nowrap;
 }
 
+.brand-card > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.brand-card small {
+  max-width: 112px;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 8.5px;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .brand-card span {
   color: #f97316;
 }
@@ -149,8 +166,8 @@
 }
 
 .class-tabs {
-  flex: 1 1 auto;
-  min-width: 280px;
+  flex: 0 1 min(620px, 42vw);
+  min-width: 235px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -159,7 +176,7 @@
   border-radius: 8px;
   background: #1f2937;
   overflow-x: auto;
-  max-width: none;
+  max-width: 620px;
   scrollbar-width: thin;
 }
 
@@ -173,7 +190,7 @@
 }
 
 .class-tab {
-  flex: 0 0 auto;
+  flex: 1 1 82px;
   position: relative;
   display: flex;
   align-items: center;
@@ -183,7 +200,15 @@
   color: #94a3b8;
   background: transparent;
   font-weight: 900;
+  min-width: 58px;
+  max-width: 128px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.class-tab .class-dot {
+  flex: 0 0 auto;
 }
 
 .class-tab.active {
@@ -742,6 +767,8 @@
   background: white;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
   pointer-events: auto;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
 }
 
 .guided-tour-card header,
@@ -1052,8 +1079,8 @@
 
 .header-student,
 .tracking-student-header {
-  min-width: 360px;
-  width: 360px;
+  min-width: 335px;
+  width: 335px;
   padding: 16px 18px;
   text-align: left;
   vertical-align: middle;
@@ -1312,11 +1339,11 @@
 .tracking-student-cell {
   min-width: 335px;
   width: 335px;
-  padding: 10px 12px;
-  display: flex;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
 }
 
 .tracking-student-main {
@@ -1334,9 +1361,9 @@
 }
 
 .tracking-student-name strong {
-  max-width: 145px;
+  max-width: 168px;
   overflow: hidden;
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.15;
   text-overflow: ellipsis;
 }
@@ -1853,8 +1880,10 @@
 }
 
 .student-flags {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 38px);
   align-items: center;
+  justify-content: end;
   gap: 5px;
 }
 
@@ -1896,6 +1925,11 @@
   border-radius: 8px;
   border: 1px solid #fecaca;
   background: #fff7f7;
+}
+
+.agenda-note-chip {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .red-point-stack.warning {
@@ -4206,7 +4240,7 @@
 
 .student-evolution-detail {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
 .student-evolution-summary,
@@ -4220,7 +4254,7 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px;
+  padding: 14px 16px;
 }
 
 .student-evolution-summary span,
@@ -4233,9 +4267,9 @@
 
 .student-evolution-summary strong {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   color: #1f2937;
-  font-size: 30px;
+  font-size: 25px;
 }
 
 .student-evolution-summary .evolution-rhythm.down {
@@ -4248,15 +4282,15 @@
 
 .student-evolution-summary small {
   color: #6b7280;
-  font-size: 20px;
+  font-size: 17px;
 }
 
 .student-evolution-card {
-  padding: 18px;
+  padding: 14px;
 }
 
 .student-evolution-card h3 {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   text-align: center;
 }
 
@@ -4268,7 +4302,7 @@
 .student-evolution-matrix th,
 .student-evolution-matrix td {
   border-top: 1px solid #e5e7eb;
-  padding: 10px;
+  padding: 7px 9px;
   text-align: center;
 }
 
@@ -4280,12 +4314,12 @@
 .student-evolution-charts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .student-line-chart {
   width: 100%;
-  min-height: 280px;
+  min-height: 230px;
 }
 
 .chart-grid-line {
@@ -4298,6 +4332,12 @@
   font-size: 3.8px;
   font-weight: 750;
   text-anchor: end;
+}
+
+.chart-axis-grade {
+  font-size: 3.5px;
+  font-weight: 950;
+  text-anchor: start;
 }
 
 .chart-axis-label.x {
@@ -4333,7 +4373,7 @@
 
 .student-radar-chart {
   width: 100%;
-  min-height: 280px;
+  min-height: 230px;
 }
 
 .radar-ring {
@@ -5130,7 +5170,7 @@
 
 .student-manager {
   display: grid;
-  grid-template-columns: minmax(280px, 0.72fr) minmax(620px, 1.28fr);
+  grid-template-columns: minmax(300px, 0.62fr) minmax(620px, 1.38fr);
   gap: 18px;
 }
 
@@ -5290,7 +5330,7 @@
 
 .student-manager-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -5390,7 +5430,7 @@
 
 .student-editor-row {
   display: grid;
-  grid-template-columns: 28px minmax(170px, 1.15fr) minmax(86px, 0.55fr) minmax(130px, 0.9fr) minmax(160px, 1fr) 44px;
+  grid-template-columns: 28px minmax(210px, 1fr) minmax(110px, 0.38fr) minmax(130px, 0.44fr) 44px;
   gap: 8px;
   align-items: center;
 }

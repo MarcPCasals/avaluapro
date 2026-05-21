@@ -101,7 +101,7 @@ export function getStudentInterventionInsight(student, taskRecords, tasks, behav
   } else if (redPointCount >= 3) {
     level = 'priority'
     label = 'Punts vermells acumulats'
-    reason = 'Ja acumula prou punts vermells per valorar un avís d’agenda.'
+    reason = 'Ja acumula prou punts vermells per valorar una nota a l’agenda.'
   } else if (hasEnoughPattern && recent.consistency < 55 && (redPointCount >= 2 || recentIncidents >= 1)) {
     level = 'priority'
     label = 'Intervenció prioritària'

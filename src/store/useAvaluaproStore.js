@@ -98,6 +98,19 @@ function getTodayKey() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function toTitleCase(value = '') {
+  return String(value)
+    .toLocaleLowerCase('ca')
+    .replace(/(^|[\s'’.-])(\p{L})/gu, (match, prefix, letter) => `${prefix}${letter.toLocaleUpperCase('ca')}`)
+}
+
+function formatStudentNameForDisplay(rawName = '') {
+  const cleanName = String(rawName).replace(/\s+/g, ' ').trim()
+  if (!cleanName.includes(',')) return toTitleCase(cleanName)
+  const [surnames, ...rest] = cleanName.split(',')
+  return `${toTitleCase(surnames)}, ${toTitleCase(rest.join(',').trim())}`.trim()
+}
+
 function normalizeDataset(dataset) {
   let normalizedDataset = { ...dataset }
   const usedUtIds = new Set([
@@ -1494,7 +1507,7 @@ export const useAvaluaproStore = create((set, get) => ({
         ...studentsToAdd.map((student) => ({
           id: createId('student'),
           classId,
-          name: student.name,
+          name: formatStudentNameForDisplay(student.name),
           halfGroup: student.halfGroup || '',
           photoUrl: student.photoUrl || '',
           personalNotes: student.personalNotes || '',
@@ -1510,7 +1523,7 @@ export const useAvaluaproStore = create((set, get) => ({
       .split('\n')
       .map((line) => line.replace(/\t+/g, ' ').trim())
       .filter(Boolean)
-      .map((name) => ({ name, halfGroup: '' }))
+      .map((name) => ({ name: formatStudentNameForDisplay(name), halfGroup: '' }))
 
     await get().addStudents(classId, studentsToAdd)
   },
@@ -1518,7 +1531,9 @@ export const useAvaluaproStore = create((set, get) => ({
   updateStudent: async (studentId, patch) => {
     set((state) => ({
       students: state.students.map((student) =>
-        student.id === studentId ? { ...student, ...patch } : student,
+        student.id === studentId
+          ? { ...student, ...patch, name: patch.name ? formatStudentNameForDisplay(patch.name) : student.name }
+          : student,
       ),
     }))
     await persistCollections(set, get, ['students'])

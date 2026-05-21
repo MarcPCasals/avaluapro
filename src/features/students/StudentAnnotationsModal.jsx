@@ -197,7 +197,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title={`Anotacions personals: ${student.name}`}>
+    <Modal onClose={onClose} size="xl" title={`Perfil de l’alumne: ${student.name}`}>
       <div className="annotations-panel" data-tour="annotation-panel">
         <section className="annotation-hero">
           <div className="annotation-photo-card">
@@ -251,7 +251,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           {onOpenProfile && (
             <button className="secondary-action" onClick={() => onOpenProfile(studentId)} type="button">
               <BarChart3 size={16} />
-              Obrir perfil
+              Obrir resum de la UT
             </button>
           )}
         </section>

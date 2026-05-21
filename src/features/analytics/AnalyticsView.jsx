@@ -26,17 +26,17 @@ import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const insightCopy = {
   dashboard: {
-    title: 'Stats Globals',
+    title: 'Estadístiques Globals',
     description: 'Lectura ràpida del grup amb rendiment, constància, comportament i anàlisi creuada.',
     icon: BarChart3,
   },
   utStats: {
-    title: 'Stats UT',
+    title: 'Estadístiques UT',
     description: 'Focus en la UT activa per veure com progressen criteris, competències i tasques associades.',
     icon: Target,
   },
   trackingStats: {
-    title: 'Stats Seguiment',
+    title: 'Estadístiques Seguiment',
     description: 'Constància, tasques no fetes i incidències per detectar hàbits de treball.',
     icon: Radar,
   },
@@ -61,7 +61,7 @@ const dashboardScopes = [
   {
     id: 'tracking',
     label: 'Seguiment',
-    description: 'Hàbits i avisos.',
+    description: 'Hàbits i notes a l’agenda.',
   },
   {
     id: 'cross',
@@ -138,7 +138,7 @@ const chartHelp = {
   trackingBehavior:
     'Resumeix punts negres i entrades de diari sense barrejar-ho amb rendiment acadèmic.',
   trackingAgenda:
-    'Mostra alumnes que ja tenen un avís d’agenda registrat o que acumulen prou punts vermells/negres per valorar-lo.',
+    'Mostra alumnes que ja tenen una nota a l’agenda registrada o que acumulen prou punts vermells/negres per valorar-la.',
 }
 
 function InfoButton({ label, onOpen }) {
@@ -644,7 +644,7 @@ function getGlobalDecision(profile) {
   if (profile.redPointCount >= 3) {
     return {
       label: 'Valorar agenda',
-      text: 'Acumula punts vermells suficients per revisar si cal avís d’agenda.',
+      text: 'Acumula punts vermells suficients per revisar si cal nota a l’agenda.',
       tone: 'warning',
     }
   }
@@ -1064,7 +1064,7 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
 
   const evolution = buildStudentEvolution(state, student.id, uts, canonicalCompetencies)
   const lineChart = {
-    left: 14,
+    left: 18,
     right: 96,
     top: 16,
     bottom: 88,
@@ -1149,6 +1149,8 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
             <h3>Trajectòria temporal</h3>
             <svg className="student-line-chart" viewBox="0 0 100 108" role="img" aria-label="Trajectòria temporal">
               {[0, 1, 2, 3, 4, 5, 6].map((index) => {
+                const value = 4 - index * 0.5
+                const gradeLabel = Number.isInteger(value) ? { 4: 'A', 3: 'B', 2: 'C', 1: 'D' }[value] : ''
                 const y =
                   lineChart.top +
                   (index / 6) *
@@ -1156,9 +1158,14 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
                 return (
                 <g key={y}>
                   <line className="chart-grid-line" x1={lineChart.left} x2={lineChart.right} y1={y} y2={y} />
-                  <text className="chart-axis-label" x="10" y={y + 1.5}>
-                    {(4 - index * 0.5).toFixed(1).replace('.', ',')}
+                  <text className="chart-axis-label" x="8.5" y={y + 1.5}>
+                    {value.toFixed(1).replace('.', ',')}
                   </text>
+                  {gradeLabel && (
+                    <text className={`chart-axis-grade grade-text-${gradeLabel}`} x="11.8" y={y + 1.5}>
+                      {gradeLabel}
+                    </text>
+                  )}
                 </g>
                 )
               })}
@@ -1444,7 +1451,7 @@ function getActionRecommendation(kind) {
     return 'Acció recomanada: començar per aquests alumnes perquè acumulen els senyals més urgents.'
   }
   if (kind === 'agenda') {
-    return 'Acció recomanada: revisar quines tasques o incidències expliquen l’avís i decidir si toca agenda, entrevista breu o darrera oportunitat.'
+    return 'Acció recomanada: revisar quines tasques o incidències expliquen la nota i decidir si toca agenda, entrevista breu o darrera oportunitat.'
   }
   if (kind === 'progress-up') {
     return 'Acció recomanada: felicitar explícitament el progrés i reforçar què ha fet bé perquè el mantingui.'
@@ -1796,7 +1803,7 @@ function UtStatsView({
       <div className="analytics-hero executive ut-hero">
         <div>
           <Target size={30} />
-          <h2>Stats UT · {activeUt?.name || 'UT activa'}</h2>
+          <h2>Estadístiques UT · {activeUt?.name || 'UT activa'}</h2>
           <p>Lectura operativa de la unitat: criteris, competències, tasques i alumnes que necessiten reforç.</p>
         </div>
         <MetricCard
@@ -2114,15 +2121,15 @@ function TrackingAgendaPanel({ agendaNotes, rows, setInfo }) {
   return (
     <section className="visual-card tracking-agenda-panel">
       <HelpSectionHeading
-        description="Qui ja té avís d’agenda o està a prop de necessitar-lo."
+        description="Qui ja té nota a l’agenda o està a prop de necessitar-la."
         helpKey="trackingAgenda"
         icon={MessageSquareText}
         setInfo={setInfo}
-        title="Agenda i avisos"
+        title="Agenda i notes"
       />
       <div className="tracking-agenda-list">
         {candidates.length === 0 ? (
-          <p className="empty-list">Cap alumne acumula prou senyals per valorar avís d’agenda.</p>
+          <p className="empty-list">Cap alumne acumula prou senyals per valorar nota a l’agenda.</p>
         ) : (
           candidates.map((row) => {
             const note = noteByStudentId.get(row.student.id)
@@ -2134,7 +2141,7 @@ function TrackingAgendaPanel({ agendaNotes, rows, setInfo }) {
               >
                 <div>
                   <strong>{row.student.name}</strong>
-                  <span>{note ? 'Avís registrat' : shouldWarn ? 'Valorar avís' : 'Seguiment preventiu'}</span>
+                  <span>{note ? 'Nota registrada' : shouldWarn ? 'Valorar nota' : 'Seguiment preventiu'}</span>
                   {note && <p>{note.text}</p>}
                 </div>
                 <div className="tracking-ranking-metrics">
@@ -2295,7 +2302,7 @@ export function AnalyticsView() {
         </div>
       </section>
 
-          <section className="global-action-strip" aria-label="Decisions ràpides de Stats Globals" data-tour="stats-decision-cards">
+          <section className="global-action-strip" aria-label="Decisions ràpides d’Estadístiques Globals" data-tour="stats-decision-cards">
         <button
           className={`global-action-card ${topPriorityDecision?.tone || 'stable'}`}
           onClick={() =>
@@ -2483,7 +2490,7 @@ export function AnalyticsView() {
           {!hasTrackingDataset && (
             <EmptyDataNotice
               title="Encara no hi ha prou dades de seguiment"
-              text="Avaluapro no calcularà constància com a 0% fins que hi hagi tasques avaluables. Quan afegeixis tasques, aquí apareixeran hàbits, punts vermells i avisos."
+              text="Avaluapro no calcularà constància com a 0% fins que hi hagi tasques avaluables. Quan afegeixis tasques, aquí apareixeran hàbits, punts vermells i notes a l’agenda."
             />
           )}
           <div className="analytics-grid">

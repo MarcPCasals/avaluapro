@@ -37,7 +37,7 @@ const quickStart = [
   {
     icon: BarChart3,
     title: '5. Estadístiques',
-    text: 'Consulta primer cada bloc per separat i després Stats Globals per veure relacions entre rendiment, constància i comportament.',
+    text: 'Consulta primer cada bloc per separat i després Estadístiques Globals per veure relacions entre rendiment, constància i comportament.',
   },
   {
     icon: ShieldCheck,
@@ -65,7 +65,7 @@ const helpSections = [
   {
     icon: ClipboardCheck,
     title: 'Seguiment separat',
-    text: 'La pantalla de seguiment només mostra dades de seguiment. La barreja amb l’avaluació es deixa per Stats Globals.',
+    text: 'La pantalla de seguiment només mostra dades de seguiment. La barreja amb l’avaluació es deixa per Estadístiques Globals.',
   },
 ]
 

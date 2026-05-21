@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, FileSpreadsheet, MapPinned, MessageCircle, Pencil, Users } from 'lucide-react'
+import { BookOpen, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
 import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
@@ -135,10 +135,6 @@ export function EvaluationView() {
   return (
     <section className="work-surface">
       <div className="toolbar" data-tour="evaluation-toolbar">
-        <button className="tool-button" onClick={() => setShowStructureModal(true)} type="button">
-          <Pencil size={18} />
-          Editar Taula
-        </button>
         {totalSubjectCompetencies > 0 && (
           <button
             className={`ut-competency-summary ${competencySummaryIsComplete ? 'complete' : 'partial'}`}
@@ -296,15 +292,15 @@ export function EvaluationView() {
                   <button
                     className={`student-note-button ${noteState}`}
                     data-tour={index === 0 ? 'student-comments' : undefined}
-                    onClick={() => setAnnotationsStudentId(student.id)}
-                    title="Anotacions personals"
+                    onClick={() => setProfileStudentId(student.id)}
+                    title="Resum i anotacions de la UT"
                     type="button"
                   >
                     <MessageCircle size={17} />
                   </button>
                   <button
                     className="student-name student-profile-trigger"
-                    onClick={() => setProfileStudentId(student.id)}
+                    onClick={() => setAnnotationsStudentId(student.id)}
                     type="button"
                   >
                     {student.name}

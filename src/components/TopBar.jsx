@@ -290,12 +290,13 @@ export function TopBar() {
     <header className="top-bar">
       <div className="brand-card">
         <img alt="" src={APP_ICON_URL} />
-        <strong>
-          Avalua<span>Pro</span>
-        </strong>
+        <div>
+          <strong>
+            Avalua<span>Pro</span>
+          </strong>
+          <small>Creat per Marc Pérez Casals</small>
+        </div>
       </div>
-      <div className="brand-separator" />
-      <p className="author">Creat per Marc Pérez Casals</p>
       <nav className="class-tabs" aria-label="Classes" data-tour="class-tabs">
         {orderedClasses.map((item, index) => (
           <button

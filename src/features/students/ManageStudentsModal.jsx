@@ -13,6 +13,19 @@ function normalizeName(name) {
     .toLowerCase()
 }
 
+function toTitleCase(value = '') {
+  return value
+    .toLocaleLowerCase('ca')
+    .replace(/(^|[\s'’.-])(\p{L})/gu, (match, prefix, letter) => `${prefix}${letter.toLocaleUpperCase('ca')}`)
+}
+
+function formatStudentNameForDisplay(rawName = '') {
+  const cleanName = rawName.replace(/\s+/g, ' ').trim()
+  if (!cleanName.includes(',')) return toTitleCase(cleanName)
+  const [surnames, ...rest] = cleanName.split(',')
+  return `${toTitleCase(surnames)}, ${toTitleCase(rest.join(',').trim())}`.trim()
+}
+
 function parseStudentRows(rawText, existingStudents) {
   const existingNames = new Set(existingStudents.map((student) => normalizeName(student.name)))
   const seenInPaste = new Set()
@@ -25,12 +38,7 @@ function parseStudentRows(rawText, existingStudents) {
       return null
     }
 
-    const columns = line.split('\t').map((column) => column.trim()).filter(Boolean)
-    const fallbackColumns = trimmedLine.split(/[;,]/).map((column) => column.trim()).filter(Boolean)
-    const parts = columns.length > 1 ? columns : fallbackColumns
-    const name = (parts[0] || trimmedLine).replace(/\s+/g, ' ').trim()
-    const halfGroup = (parts[1] || '').replace(/\s+/g, ' ').trim()
-    const personalNotes = (parts[2] || '').trim()
+    const name = formatStudentNameForDisplay(trimmedLine)
     const key = normalizeName(name)
     const duplicateInClass = existingNames.has(key)
     const duplicateInPaste = seenInPaste.has(key)
@@ -39,8 +47,8 @@ function parseStudentRows(rawText, existingStudents) {
     return {
       id: `${index}_${key}`,
       name,
-      halfGroup,
-      personalNotes,
+      halfGroup: '',
+      personalNotes: '',
       duplicateInClass,
       duplicateInPaste,
       canImport: Boolean(name) && !duplicateInClass && !duplicateInPaste,
@@ -86,7 +94,6 @@ export function ManageStudentsModal({ classId, onClose }) {
   const importableRows = preview.rows.filter((row) => row.canImport)
   const duplicateRows = preview.rows.filter((row) => row.duplicateInClass || row.duplicateInPaste)
   const allSelected = classStudents.length > 0 && selectedStudentIds.length === classStudents.length
-  const configuredCount = classStudents.filter((student) => student.photoUrl || student.personalNotes).length
   const configuredHalfGroups =
     Array.isArray(currentClass?.halfGroups) && currentClass.halfGroups.length > 0
       ? currentClass.halfGroups
@@ -165,12 +172,11 @@ export function ManageStudentsModal({ classId, onClose }) {
   }
 
   const exportStudents = () => {
-    const header = ['Nom', 'Mig grup', 'Foto carregada', 'Informació personal']
+    const header = ['Nom', 'Mig grup', 'Foto carregada']
     const rows = classStudents.map((student) => [
       student.name,
       student.halfGroup || '',
       student.photoUrl ? 'Sí' : 'No',
-      student.personalNotes || '',
     ])
     const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(';')).join('\n')
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })
@@ -203,13 +209,12 @@ export function ManageStudentsModal({ classId, onClose }) {
             Afegir alumnes
           </h3>
           <p>
-            Enganxa una llista amb un alumne per línia. Si copies dues columnes d’Excel o Clickedu,
-            la segona es guardarà com a mig grup. També pots enganxar 3 columnes: nom, mig grup i informació personal.
-            Les fotos es carreguen després des de l’iPad o l’ordinador.
+            Enganxa una llista amb un alumne per línia, amb el format <strong>COGNOM 1 COGNOM 2, Nom</strong>.
+            Si enganxes els cognoms en majúscules, Avaluapro els convertirà a un format més llegible automàticament.
           </p>
           <textarea
             onChange={(event) => setBulkText(event.target.value)}
-            placeholder={'ALUMNE 1\tGrup A\tObservació personal\nALUMNE 2\tGrup B\nALUMNE 3'}
+            placeholder={'ALMENDROS ANTUNES, Mireia\nAMAT RICO, Claudia\nATALAYA AZABAL, Vega'}
             value={bulkText}
           />
           {bulkText.trim() && (
@@ -234,8 +239,7 @@ export function ManageStudentsModal({ classId, onClose }) {
                   <div className={`preview-row ${row.canImport ? '' : 'blocked'}`} key={row.id}>
                     <strong>{row.name}</strong>
                     <small>
-                      {row.halfGroup || 'Sense grup'}
-                      {row.personalNotes && ' · info personal'}
+                      Format preparat
                       {row.duplicateInClass && ' · ja existeix'}
                       {row.duplicateInPaste && ' · repetit al text'}
                     </small>
@@ -309,10 +313,6 @@ export function ManageStudentsModal({ classId, onClose }) {
               <strong>{halfGroups.length || '-'}</strong>
               <span>{halfGroups.length > 0 ? halfGroups.join(' · ') : 'Sense migs grups'}</span>
             </article>
-            <article>
-              <strong>{configuredCount}</strong>
-              <span>Amb foto o informació personal</span>
-            </article>
           </div>
           <div className="bulk-student-actions">
             <label className="copy-check">
@@ -360,8 +360,8 @@ export function ManageStudentsModal({ classId, onClose }) {
                 </label>
                 <input
                   aria-label={`Nom de ${student.name}`}
-                  onChange={(event) => updateStudent(student.id, { name: event.target.value })}
-                  value={student.name}
+                  onBlur={(event) => updateStudent(student.id, { name: formatStudentNameForDisplay(event.target.value) })}
+                  defaultValue={student.name}
                 />
                 <select
                   aria-label={`Mig grup de ${student.name}`}
@@ -404,12 +404,6 @@ export function ManageStudentsModal({ classId, onClose }) {
                     </button>
                   )}
                 </div>
-                <input
-                  aria-label={`Informació personal de ${student.name}`}
-                  onChange={(event) => updateStudent(student.id, { personalNotes: event.target.value })}
-                  placeholder="Info personal"
-                  value={student.personalNotes || ''}
-                />
                 <button
                   className="danger-soft"
                   onClick={() => deleteStudent(student.id)}

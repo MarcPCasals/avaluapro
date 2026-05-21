@@ -7,6 +7,7 @@ import {
   Clock3,
   Clipboard,
   MessageCircle,
+  Skull,
   Target,
   Trash2,
   Triangle,
@@ -155,7 +156,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
     <div className="modal-backdrop">
       <div className="modal-panel lg">
         <header className="modal-header">
-          <h2>Avís d’agenda</h2>
+          <h2>Nota a l’agenda</h2>
           <button className="modal-close" onClick={onClose} type="button">
             ×
           </button>
@@ -163,7 +164,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
         <div className="modal-body agenda-warning-modal">
           <span className="tour-anchor" data-tour="agenda-warning-modal" />
           <div className="agenda-warning-hero">
-            <AlertTriangle size={26} />
+            <Skull size={26} />
             <div>
               <strong>{student.name}</strong>
               <span>
@@ -173,7 +174,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
           </div>
           <p>
             Aquest alumne ja té prou registres per valorar posar una nota a l’agenda. Revisa les tasques i decideix
-            si fas l’avís ara o li dones una darrera oportunitat.
+            si poses la nota ara o li dones una darrera oportunitat.
           </p>
           <div className="agenda-task-list">
             {missingTasks.slice(-4).map((task) => (
@@ -192,7 +193,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
               Darrera oportunitat
             </button>
             <button className="primary-action agenda-register-action" onClick={() => onRegisterAgenda(agendaText)} type="button">
-              Registrar avís
+              Registrar nota a l’agenda
             </button>
             <button className="primary-action" onClick={onClose} type="button">
               Entesos
@@ -326,6 +327,7 @@ function TaskNoteModal({ draft, onClose, onSave }) {
 function TaskReminderModal({ draft, onClose, onSave }) {
   const existingReminder = draft.record?.reminder || draft.task.reminder || {}
   const [reminderDate, setReminderDate] = useState(existingReminder.date || new Date().toISOString().slice(0, 10))
+  const [reminderTime, setReminderTime] = useState(existingReminder.time || '')
   const [reminderText, setReminderText] = useState(existingReminder.text || '')
   const title = draft.student ? `Recordatori: ${draft.student.name}` : 'Recordatori de tota la classe'
 
@@ -343,6 +345,10 @@ function TaskReminderModal({ draft, onClose, onSave }) {
             Dia del recordatori
             <input onChange={(event) => setReminderDate(event.target.value)} type="date" value={reminderDate} />
           </label>
+          <label className="field-label">
+            Hora opcional
+            <input onChange={(event) => setReminderTime(event.target.value)} type="time" value={reminderTime} />
+          </label>
           <textarea
             autoFocus
             onChange={(event) => setReminderText(event.target.value)}
@@ -355,7 +361,7 @@ function TaskReminderModal({ draft, onClose, onSave }) {
               className="primary-action"
               disabled={!reminderText.trim()}
               onClick={() =>
-                onSave({ taskId: draft.task.id, studentId: draft.student?.id, reminderDate, reminderText })
+                onSave({ taskId: draft.task.id, studentId: draft.student?.id, reminderDate, reminderTime, reminderText })
               }
               type="button"
             >
@@ -484,17 +490,27 @@ export function TrackingView() {
   const today = new Date().toISOString().slice(0, 10)
   const pastTaskCount = tasks.filter((task) => task.date < today).length
   const visibleTasks = showPastTasks ? tasks : tasks.filter((task) => task.date >= today)
+  const now = new Date()
+  const isReminderDue = (reminder = {}) => {
+    if (!reminder.date) return false
+    if (reminder.snoozeUntil && new Date(reminder.snoozeUntil) > now) return false
+    const dueAt = new Date(`${reminder.date}T${reminder.time || '00:00'}`)
+    return dueAt <= now
+  }
   const dueReminders = [
     ...tasks
-      .filter((task) => task.reminder?.date === today)
-      .map((task) => ({ id: `task_${task.id}`, task, text: task.reminder.text })),
+      .filter((task) => isReminderDue(task.reminder))
+      .map((task) => ({ id: `task_${task.id}`, kind: 'task', task, text: task.reminder.text, reminder: task.reminder })),
     ...taskRecords
-      .filter((record) => record.reminder?.date === today)
+      .filter((record) => isReminderDue(record.reminder))
       .map((record) => ({
         id: `record_${record.id}`,
+        kind: 'record',
+        record,
         task: tasks.find((task) => task.id === record.taskId),
         student: students.find((student) => student.id === record.studentId),
         text: record.reminder.text,
+        reminder: record.reminder,
       }))
       .filter((reminder) => reminder.task),
   ]
@@ -566,16 +582,25 @@ export function TrackingView() {
       await updateTaskRecord(student.id, taskId, 'DONE')
     }
   }
-  const saveTaskNote = async ({ taskId, studentId, text, reminderDate, reminderText }) => {
+  const saveTaskNote = async ({ taskId, studentId, text, reminderDate, reminderTime, reminderText }) => {
     const patch = {}
     if (text !== undefined) patch.note = text.trim()
     if (reminderDate !== undefined || reminderText !== undefined) {
-      patch.reminder = { date: reminderDate, text: reminderText.trim() }
+      patch.reminder = { date: reminderDate, time: reminderTime || '', text: reminderText.trim(), snoozeUntil: '' }
     }
     if (studentId) await updateTaskRecordMeta(studentId, taskId, patch)
     else await updateTask(taskId, patch)
     setTaskNoteDraft(null)
     setReminderDraft(null)
+  }
+  const snoozeReminder = async (reminder) => {
+    const snoozeUntil = new Date(new Date().getTime() + 55 * 60 * 1000).toISOString()
+    const nextReminder = { ...reminder.reminder, snoozeUntil }
+    if (reminder.kind === 'record' && reminder.student) {
+      await updateTaskRecordMeta(reminder.student.id, reminder.task.id, { reminder: nextReminder })
+      return
+    }
+    await updateTask(reminder.task.id, { reminder: nextReminder })
   }
   const handleBehaviorSave = async (text) => {
     if (!behaviorDraft) return
@@ -613,7 +638,7 @@ export function TrackingView() {
       const student = filteredStudents[0] || students[0]
       const targetTasks = tasks.slice(0, 3)
       if (!student || targetTasks.length < 3) {
-        window.alert('Calen com a mínim 3 tasques a la UT activa per simular l’avís d’agenda.')
+        window.alert('Calen com a mínim 3 tasques a la UT activa per simular la nota a l’agenda.')
         return
       }
 
@@ -797,8 +822,12 @@ export function TrackingView() {
               <div>
                 <strong>{reminder.task.title}</strong>
                 {reminder.student && <span>{reminder.student.name}</span>}
+                {reminder.reminder?.time && <span>{reminder.reminder.time}</span>}
                 <p>{reminder.text}</p>
               </div>
+              <button className="secondary-action compact" onClick={() => snoozeReminder(reminder)} type="button">
+                Ajornar 55 min
+              </button>
               {reminder.student && (
                 <button className="secondary-action compact" onClick={() => setProfileStudentId(reminder.student.id)} type="button">
                   Fitxa
@@ -917,15 +946,15 @@ export function TrackingView() {
                     <div className="tracking-student-main">
                       <button
                         className={`student-note-button ${noteState}`}
-                        onClick={() => setAnnotationsStudentId(student.id)}
-                        title="Anotacions personals"
+                        onClick={() => setProfileStudentId(student.id)}
+                        title="Resum i anotacions de seguiment"
                         type="button"
                       >
                         <MessageCircle size={17} />
                       </button>
                       <button
                         className="tracking-student-name"
-                        onClick={() => setProfileStudentId(student.id)}
+                        onClick={() => setAnnotationsStudentId(student.id)}
                         type="button"
                       >
                         <strong>{student.name}</strong>
@@ -964,10 +993,10 @@ export function TrackingView() {
                         <button
                           className="agenda-note-chip"
                           onClick={() => setProfileStudentId(student.id)}
-                          title="Avís d’agenda registrat"
+                          title="Nota a l’agenda registrada"
                           type="button"
                         >
-                          <Bell size={13} />
+                          <Skull size={13} />
                           {trackingAgendaNotes.length}
                         </button>
                       )}

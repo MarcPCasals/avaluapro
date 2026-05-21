@@ -10,7 +10,7 @@ const modes = [
 ]
 
 const insights = [
-  { id: 'dashboard', label: 'Stats Globals', icon: BarChart3 },
+  { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3 },
 ]
 
 function getUrgentProfiles(state) {
@@ -61,7 +61,7 @@ function UrgentModal({ profiles, onClose }) {
           <div className="urgent-empty-state">
             <CheckCircle2 size={22} />
             <strong>No hi ha alumnes urgents ara mateix.</strong>
-            <span>Quan apareguin notes molt baixes, baixa constància o acumulació d’avisos, sortiran aquí.</span>
+            <span>Quan apareguin notes molt baixes, baixa constància o acumulació de notes a l’agenda, sortiran aquí.</span>
           </div>
         ) : (
           <div className="urgent-student-list">
