@@ -87,21 +87,71 @@ const tourSteps = [
     target: 'stats-global',
     title: '13. Stats Globals',
     text: 'Aquí és on es creuen rendiment, constància i comportament per trobar alumnes en risc, reforç conceptual i hàbits fràgils.',
+    dashboardScope: 'executive',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'stats-scope-tabs',
+    title: '14. Filtra les estadístiques per tema',
+    text: 'Les pestanyes eviten que tot aparegui barrejat. Primer mires el resum i després entres a Avaluació, UT activa, Seguiment o Creuada.',
+    action: 'Clica la pestanya “Avaluació” per veure només notes, evolució i criteris.',
+    completeWhen: 'stats-evaluation-open',
+    dashboardScope: 'executive',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'stats-evaluation',
+    title: '15. Estadístiques d’avaluació',
+    text: 'Aquí veus la comparativa de notes per UT, alumnes que pugen o baixen i la distribució per criteris sense barrejar-hi tasques.',
+    action: 'Clica “UT activa” per passar al resum de la unitat que tens seleccionada.',
+    completeWhen: 'stats-ut-open',
+    dashboardScope: 'evaluation',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'stats-ut',
+    title: '16. Estadístiques de la UT activa',
+    text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
+    action: 'Clica “Seguiment” per veure només constància, punts i avisos.',
+    completeWhen: 'stats-tracking-open',
+    dashboardScope: 'ut',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'stats-tracking',
+    title: '17. Estadístiques de seguiment',
+    text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles avisos d’agenda.',
+    action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
+    completeWhen: 'stats-cross-open',
+    dashboardScope: 'tracking',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'stats-cross',
+    title: '18. Anàlisi creuada',
+    text: 'Aquesta vista és la més potent per detectar patrons: alumnes constants amb dificultat, alumnes bons però poc constants o risc combinat.',
+    dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
   },
   {
     target: 'data-menu',
-    title: '14. Dades, còpies i Firebase',
+    title: '19. Dades, còpies i Firebase',
     text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
     action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
     completeWhen: 'data-menu-open',
+    dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
   },
   {
     target: 'start-own-data',
-    title: '15. Comença amb les teves dades',
+    title: '20. Comença amb les teves dades',
     text: 'Quan ja hagis entès el funcionament, pots esborrar la demo i començar amb la teva matèria, classes i alumnes reals.',
     mode: 'analytics',
     insight: 'dashboard',
@@ -161,6 +211,22 @@ function getCompletionState(step, baseline, current) {
     return Boolean(document.querySelector('.top-menu-panel'))
   }
 
+  if (step.completeWhen === 'stats-evaluation-open') {
+    return document.querySelector('.dashboard-scope-tabs button.active')?.innerText.includes('Avaluació')
+  }
+
+  if (step.completeWhen === 'stats-ut-open') {
+    return document.querySelector('.dashboard-scope-tabs button.active')?.innerText.includes('UT activa')
+  }
+
+  if (step.completeWhen === 'stats-tracking-open') {
+    return document.querySelector('.dashboard-scope-tabs button.active')?.innerText.includes('Seguiment')
+  }
+
+  if (step.completeWhen === 'stats-cross-open') {
+    return document.querySelector('.dashboard-scope-tabs button.active')?.innerText.includes('Creuada')
+  }
+
   return true
 }
 
@@ -185,6 +251,12 @@ export function GuidedTour() {
     if (!guideOpen || !step) return
     if (step.mode) setActiveMode(step.mode)
     if (step.insight) setActiveInsight(step.insight)
+    if (step.dashboardScope) {
+      const applyDashboardScope = () => window.__avaluaproSetDashboardScope?.(step.dashboardScope)
+      applyDashboardScope()
+      window.requestAnimationFrame(applyDashboardScope)
+      window.setTimeout(applyDashboardScope, 100)
+    }
   }, [guideOpen, setActiveInsight, setActiveMode, step])
 
   useEffect(() => {

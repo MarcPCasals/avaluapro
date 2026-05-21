@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -46,27 +46,27 @@ const dashboardScopes = [
   {
     id: 'executive',
     label: 'Resum',
-    description: 'Decisions ràpides i diagnòstic principal.',
+    description: 'Decisions clau.',
   },
   {
     id: 'evaluation',
     label: 'Avaluació',
-    description: 'Notes, UTs, competències i evolució.',
+    description: 'Notes i evolució.',
   },
   {
     id: 'ut',
     label: 'UT activa',
-    description: 'Criteris i tasques de la unitat seleccionada.',
+    description: 'Unitat actual.',
   },
   {
     id: 'tracking',
     label: 'Seguiment',
-    description: 'Constància, hàbits i avisos.',
+    description: 'Hàbits i avisos.',
   },
   {
     id: 'cross',
-    label: 'Anàlisi creuada',
-    description: 'Rendiment, constància i comportament junts.',
+    label: 'Creuada',
+    description: 'Relacions clau.',
   },
 ]
 
@@ -220,7 +220,7 @@ function MetricCard({ actionLabel = 'Consultar', className = '', help, label, on
 
 function DashboardScopeTabs({ activeScope, onChange }) {
   return (
-    <section className="dashboard-scope-tabs" aria-label="Filtrar estadístiques globals">
+    <section className="dashboard-scope-tabs" aria-label="Filtrar estadístiques globals" data-tour="stats-scope-tabs">
       {dashboardScopes.map((scope) => (
         <button
           className={activeScope === scope.id ? 'active' : ''}
@@ -691,7 +691,7 @@ function sortProfilesByTeachingPriority(profiles) {
 
 function GradeUtMatrix({ matrix, setInfo }) {
   return (
-    <section className="grade-ut-matrix">
+    <section className="grade-ut-matrix" data-tour="stats-evaluation">
       <HelpSectionHeading
         description="Distribució A/B/C/D per veure ràpidament on s’acumula assoliment o risc."
         helpKey="gradeUtMatrix"
@@ -2166,6 +2166,16 @@ export function AnalyticsView() {
         ? 'tracking'
         : 'executive',
   )
+
+  useEffect(() => {
+    window.__avaluaproSetDashboardScope = (scope) => {
+      if (scope) setDashboardScope(scope)
+    }
+    return () => {
+      if (window.__avaluaproSetDashboardScope) delete window.__avaluaproSetDashboardScope
+    }
+  }, [])
+
   const { activeClassId, activeUtId } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
   const students = state.students
@@ -2285,7 +2295,7 @@ export function AnalyticsView() {
         </div>
       </section>
 
-          <section className="global-action-strip" aria-label="Decisions ràpides de Stats Globals">
+          <section className="global-action-strip" aria-label="Decisions ràpides de Stats Globals" data-tour="stats-decision-cards">
         <button
           className={`global-action-card ${topPriorityDecision?.tone || 'stable'}`}
           onClick={() =>
@@ -2364,7 +2374,7 @@ export function AnalyticsView() {
         </button>
       </section>
 
-          <div className="pedagogical-panel full-width-analysis">
+          <div className="pedagogical-panel full-width-analysis" data-tour="stats-pedagogical">
           <HelpSectionHeading
             description="Conclusions i recomanacions accionables."
             helpKey="pedagogicalAnalysis"
@@ -2450,7 +2460,7 @@ export function AnalyticsView() {
       )}
 
       {dashboardScope === 'ut' && (
-        <div className="embedded-stats-panel">
+        <div className="embedded-stats-panel" data-tour="stats-ut">
           <UtStatsView
             activeUt={activeUt}
             averageConsistency={averageConsistency}
@@ -2469,7 +2479,7 @@ export function AnalyticsView() {
       )}
 
       {dashboardScope === 'tracking' && (
-        <>
+        <div className="stats-scope-panel tracking-scope-panel" data-tour="stats-tracking">
           {!hasTrackingDataset && (
             <EmptyDataNotice
               title="Encara no hi ha prou dades de seguiment"
@@ -2571,12 +2581,12 @@ export function AnalyticsView() {
               setInfo={setSelectedInfo}
             />
           </div>
-        </>
+        </div>
       )}
 
       {dashboardScope === 'cross' && (
         <>
-          <div className="profile-table-wrap full-width-analysis">
+          <div className="profile-table-wrap full-width-analysis" data-tour="stats-cross">
           <div className="section-heading">
             <LineChart size={20} />
             <div>

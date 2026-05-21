@@ -92,8 +92,9 @@ export function HelpCenterModal({ onClose, onOpenGuide }) {
             </span>
             <strong>Configura poc, treballa ràpid i no perdis dades.</strong>
             <p>
-              Avaluapro és una eina de treball diari: primer ha de ser còmoda per passar classe,
-              i després prou clara perquè qualsevol docent entengui què està mirant.
+              Avaluapro s’obre amb una demo fictícia perquè puguis provar el flux complet. La guia
+              interactiva funciona com un manual: et fa passar per avaluació, seguiment, estadístiques
+              i còpies de seguretat abans de començar amb dades pròpies.
             </p>
             <button className="primary-action compact" onClick={openGuidedTour} type="button">
               <PlayCircle size={16} />
