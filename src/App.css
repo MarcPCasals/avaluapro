@@ -5209,14 +5209,14 @@
 
 .student-manager {
   display: grid;
-  grid-template-columns: minmax(300px, 0.62fr) minmax(620px, 1.38fr);
-  gap: 18px;
+  grid-template-columns: minmax(300px, 0.55fr) minmax(620px, 1.45fr);
+  gap: 16px;
 }
 
 .modal-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .modal-body > .modal-section + .modal-section {
@@ -5367,6 +5367,10 @@
   gap: 12px;
 }
 
+.student-list-header h3 {
+  min-width: 0;
+}
+
 .student-manager-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5374,7 +5378,7 @@
 }
 
 .student-manager-summary article {
-  min-height: 72px;
+  min-height: 58px;
   display: grid;
   align-content: center;
   gap: 3px;
@@ -5386,7 +5390,7 @@
 
 .student-manager-summary strong {
   color: #1f2937;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -5402,7 +5406,7 @@
 
 .bulk-student-actions {
   display: grid;
-  grid-template-columns: max-content minmax(140px, 1fr) max-content max-content;
+  grid-template-columns: max-content minmax(150px, 1fr) max-content max-content;
   gap: 8px;
   align-items: center;
   border: 1px solid #e5e7eb;
@@ -5463,15 +5467,19 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding-right: 4px;
 }
 
 .student-editor-row {
   display: grid;
-  grid-template-columns: 28px minmax(210px, 1fr) minmax(110px, 0.38fr) minmax(130px, 0.44fr) 44px;
+  grid-template-columns: 28px minmax(230px, 1fr) minmax(132px, 0.34fr) 38px;
   gap: 8px;
   align-items: center;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  padding: 7px;
+  background: #fbfdff;
 }
 
 .student-editor-row > input[type='file'] {
@@ -5480,32 +5488,6 @@
 
 .student-editor-row .copy-check {
   justify-content: center;
-}
-
-.student-photo-tools {
-  display: grid;
-  grid-template-columns: 34px minmax(62px, 1fr) 32px;
-  gap: 6px;
-  align-items: center;
-}
-
-.student-photo-tools img,
-.student-photo-tools span {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-}
-
-.student-photo-tools img {
-  object-fit: cover;
-  border: 1px solid #d1d5db;
-}
-
-.student-photo-tools span {
-  display: grid;
-  place-items: center;
-  color: #94a3b8;
-  background: #f1f5f9;
 }
 
 .danger-soft.mini {

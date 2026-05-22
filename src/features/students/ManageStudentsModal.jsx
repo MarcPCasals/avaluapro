@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, ImagePlus, Plus, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, Plus, Trash2, UserRoundPlus, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
-import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function normalizeName(name) {
@@ -38,7 +37,8 @@ function parseStudentRows(rawText, existingStudents) {
       return null
     }
 
-    const name = formatStudentNameForDisplay(trimmedLine)
+    const nameCell = trimmedLine.split(/\t|;/)[0].trim()
+    const name = formatStudentNameForDisplay(nameCell)
     const key = normalizeName(name)
     const duplicateInClass = existingNames.has(key)
     const duplicateInPaste = seenInPaste.has(key)
@@ -48,7 +48,6 @@ function parseStudentRows(rawText, existingStudents) {
       id: `${index}_${key}`,
       name,
       halfGroup: '',
-      personalNotes: '',
       duplicateInClass,
       duplicateInPaste,
       canImport: Boolean(name) && !duplicateInClass && !duplicateInPaste,
@@ -172,11 +171,10 @@ export function ManageStudentsModal({ classId, onClose }) {
   }
 
   const exportStudents = () => {
-    const header = ['Nom', 'Mig grup', 'Foto carregada']
+    const header = ['Nom', 'Mig grup']
     const rows = classStudents.map((student) => [
       student.name,
       student.halfGroup || '',
-      student.photoUrl ? 'Sí' : 'No',
     ])
     const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(';')).join('\n')
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })
@@ -189,28 +187,17 @@ export function ManageStudentsModal({ classId, onClose }) {
     URL.revokeObjectURL(url)
   }
 
-  const handlePhotoUpload = async (studentId, file) => {
-    if (!file) return
-
-    try {
-      const photoUrl = await imageFileToCompressedDataUrl(file)
-      await updateStudent(studentId, { photoUrl })
-    } catch (error) {
-      window.alert(error.message)
-    }
-  }
-
   return (
     <Modal onClose={onClose} size="xl" title="Gestió d’Alumnes">
       <div className="student-manager" data-tour="student-manager">
         <section className="modal-section">
           <h3>
-            <Users size={18} />
+            <UserRoundPlus size={18} />
             Afegir alumnes
           </h3>
           <p>
-            Enganxa una llista amb un alumne per línia, amb el format <strong>COGNOM 1 COGNOM 2, Nom</strong>.
-            Si enganxes els cognoms en majúscules, Avaluapro els convertirà a un format més llegible automàticament.
+            Enganxa un alumne per línia. Format esperat: <strong>COGNOM 1 COGNOM 2, Nom</strong>.
+            Avaluapro ho mostrarà com <strong>Cognom Cognom, Nom</strong>.
           </p>
           <textarea
             onChange={(event) => setBulkText(event.target.value)}
@@ -298,10 +285,13 @@ export function ManageStudentsModal({ classId, onClose }) {
 
         <section className="modal-section">
           <div className="student-list-header">
-            <h3>Alumnes de la classe ({classStudents.length})</h3>
+            <h3>
+              <Users size={18} />
+              Alumnes de la classe ({classStudents.length})
+            </h3>
             <button className="secondary-action compact" disabled={classStudents.length === 0} onClick={exportStudents} type="button">
               <Download size={16} />
-              Exportar CSV
+              Exportar
             </button>
           </div>
           <div className="student-manager-summary">
@@ -311,7 +301,7 @@ export function ManageStudentsModal({ classId, onClose }) {
             </article>
             <article>
               <strong>{halfGroups.length || '-'}</strong>
-              <span>{halfGroups.length > 0 ? halfGroups.join(' · ') : 'Sense migs grups'}</span>
+              <span>{halfGroups.length > 0 ? halfGroups.join(' · ') : 'Sense mitjos grups'}</span>
             </article>
           </div>
           <div className="bulk-student-actions" data-tour="student-manager-bulk">
@@ -375,35 +365,6 @@ export function ManageStudentsModal({ classId, onClose }) {
                     </option>
                   ))}
                 </select>
-                <input
-                  accept="image/*"
-                  aria-label={`Carregar foto de ${student.name}`}
-                  id={`photo-${student.id}`}
-                  onChange={(event) => handlePhotoUpload(student.id, event.target.files?.[0])}
-                  type="file"
-                />
-                <div className="student-photo-tools">
-                  {student.photoUrl ? (
-                    <img alt="" src={student.photoUrl} />
-                  ) : (
-                    <span>
-                      <ImagePlus size={16} />
-                    </span>
-                  )}
-                  <label className="secondary-action compact" htmlFor={`photo-${student.id}`}>
-                    Foto
-                  </label>
-                  {student.photoUrl && (
-                    <button
-                      className="danger-soft mini"
-                      onClick={() => updateStudent(student.id, { photoUrl: '' })}
-                      title="Treure foto"
-                      type="button"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
                 <button
                   className="danger-soft"
                   onClick={() => deleteStudent(student.id)}
