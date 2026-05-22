@@ -809,6 +809,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const newUts = []
     const newCompetencies = []
     const newCriteria = []
+    const newTasks = []
     const baseOrder = getNextClassOrder(get().classes) - 1
 
     cleanClasses.forEach((classItem, index) => {
@@ -833,6 +834,16 @@ export const useAvaluaproStore = create((set, get) => ({
       newUts.push(...timeline.uts)
       newCompetencies.push(...subjectStructure.competencies)
       newCriteria.push(...subjectStructure.criteria)
+      if (timeline.uts[0]) {
+        newTasks.push({
+          id: createId('task'),
+          classId: id,
+          utId: timeline.uts[0].id,
+          title: 'Coneixements previs',
+          date: new Date().toISOString().slice(0, 10),
+          order: 1,
+        })
+      }
     })
 
     const firstClass = newClasses[0]
@@ -853,12 +864,13 @@ export const useAvaluaproStore = create((set, get) => ({
       uts: [...state.uts, ...newUts],
       competencies: [...state.competencies, ...newCompetencies],
       criteria: [...state.criteria, ...newCriteria],
+      tasks: [...state.tasks, ...newTasks],
       ui,
       profile,
       onboarding: { demoMode: false, guideOpen: true, guideMode: 'own' },
     }))
     writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: false, guideOpen: true, guideMode: 'own' })
-    await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
+    await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria', 'tasks'])
     return true
   },
 
@@ -1054,6 +1066,18 @@ export const useAvaluaproStore = create((set, get) => ({
       subjectName: classSubject,
       uts: timeline.uts,
     })
+    const initialTask = timeline.uts[0]
+      ? [
+          {
+            id: createId('task'),
+            classId: id,
+            utId: timeline.uts[0].id,
+            title: 'Coneixements previs',
+            date: new Date().toISOString().slice(0, 10),
+            order: 1,
+          },
+        ]
+      : []
 
     set((state) => ({
       classes: [
@@ -1072,6 +1096,7 @@ export const useAvaluaproStore = create((set, get) => ({
       uts: [...state.uts, ...timeline.uts],
       competencies: [...state.competencies, ...subjectStructure.competencies],
       criteria: [...state.criteria, ...subjectStructure.criteria],
+      tasks: [...state.tasks, ...initialTask],
       ui: {
         ...state.ui,
         activeClassId: id,
@@ -1080,7 +1105,7 @@ export const useAvaluaproStore = create((set, get) => ({
       },
     }))
     writePreferences({ ...readPreferences(), ...get().ui })
-    await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
+    await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria', 'tasks'])
   },
 
   updateClass: async (classId, patch) => {

@@ -312,6 +312,7 @@ const ownDataTourSteps = [
     text: 'A Seguiment treballes hàbits, tasques incompletes, no fetes, recordatoris i notes a l’agenda.',
     mode: 'tracking',
     ensureTrackingTasks: true,
+    requiresClassStudents: true,
   },
   {
     target: 'new-task-button',
@@ -319,6 +320,7 @@ const ownDataTourSteps = [
     text: 'Nova Tasca afegeix una activitat a la UT activa. També pots copiar-la a altres classes si treballen el mateix.',
     mode: 'tracking',
     ensureTrackingTasks: true,
+    requiresClassStudents: true,
   },
   {
     target: 'task-done-all',
@@ -327,6 +329,7 @@ const ownDataTourSteps = [
     mode: 'tracking',
     ensureTrackingTasks: true,
     placement: 'left',
+    requiresClassStudents: true,
   },
   {
     target: 'task-reminder-all',
@@ -335,6 +338,7 @@ const ownDataTourSteps = [
     mode: 'tracking',
     ensureTrackingTasks: true,
     placement: 'left',
+    requiresClassStudents: true,
   },
   {
     target: 'task-info-all',
@@ -343,6 +347,7 @@ const ownDataTourSteps = [
     mode: 'tracking',
     ensureTrackingTasks: true,
     placement: 'left',
+    requiresClassStudents: true,
   },
   {
     target: 'tracking-student-actions',
@@ -350,6 +355,7 @@ const ownDataTourSteps = [
     text: 'A la fila de l’alumne veuràs punts vermells, negatius de comportament, entrades de diari i notes a l’agenda registrades.',
     mode: 'tracking',
     ensureTrackingTasks: true,
+    requiresClassStudents: true,
   },
   {
     target: 'tracking-table',
@@ -357,12 +363,14 @@ const ownDataTourSteps = [
     text: 'Dins de cada cel·la pots marcar feta, incompleta, no feta o exempt. Aquestes dades alimenten les estadístiques de seguiment.',
     mode: 'tracking',
     ensureTrackingTasks: true,
+    requiresClassStudents: true,
   },
   {
     target: 'evaluation-table',
     title: '21. Perfil i anotacions',
     text: 'Clicant el nom obres la fitxa personal amb diagnòstics i anotacions. Clicant la bombolla obres el resum de la UT i l’evolució de l’alumne.',
     mode: 'evaluation',
+    requiresClassStudents: true,
   },
   {
     target: 'main-navigation',
@@ -370,8 +378,22 @@ const ownDataTourSteps = [
     text: 'Ara tens el mapa bàsic: alumnes, notes, seguiment, estadístiques, còpies i sync. Pots tancar aquesta guia i començar a treballar amb les teves dades.',
     mode: 'evaluation',
     final: true,
+    requiresClassStudents: true,
   },
 ]
+
+const waitingForStudentsStep = {
+  target: 'manage-students-button',
+  title: '14. Carrega el grup classe',
+  text: 'La resta de la guia necessita alumnes per assenyalar la taula, els botons de seguiment i el perfil. Quan afegeixis alumnes, Avaluapro també tindrà una tasca inicial “Coneixements previs” perquè puguis veure el seguiment de seguida.',
+  action: 'Obre Gestió d’Alumnes i enganxa el grup classe per desbloquejar els passos de seguiment i perfil.',
+  completeWhen: 'class-students-loaded',
+  helperAction: 'open-students',
+  helperLabel: 'Obrir Gestió d’Alumnes',
+  mode: 'evaluation',
+  placement: 'left',
+  final: true,
+}
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
@@ -477,6 +499,11 @@ function getCompletionState(step, baseline, current) {
     return document.querySelector('.dashboard-scope-tabs button.active')?.innerText.includes('Creuada')
   }
 
+  if (step.completeWhen === 'class-students-loaded') {
+    const state = useAvaluaproStore.getState()
+    return state.students.some((student) => student.classId === state.ui.activeClassId)
+  }
+
   return true
 }
 
@@ -486,6 +513,15 @@ export function GuidedTour() {
   const startOwnData = useAvaluaproStore((state) => state.startOwnData)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
+  const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
+  const activeClassStudentCount = useAvaluaproStore(
+    (state) => state.students.filter((student) => student.classId === state.ui.activeClassId).length,
+  )
+  const activeUtTaskCount = useAvaluaproStore(
+    (state) =>
+      state.tasks.filter((task) => task.classId === state.ui.activeClassId && task.utId === state.ui.activeUtId).length,
+  )
   const agendaNotesCount = useAvaluaproStore((state) => state.agendaNotes.length)
   const taskSignature = useAvaluaproStore((state) => buildTaskSignature(state.taskRecords))
   const [tourState, setTourState] = useState(() => ({
@@ -495,8 +531,14 @@ export function GuidedTour() {
   const [targetRect, setTargetRect] = useState(null)
   const [domPulse, setDomPulse] = useState(0)
   const { baseline, stepIndex } = tourState
-  const activeSteps = guideMode === 'own' ? ownDataTourSteps : tourSteps
-  const step = activeSteps[stepIndex]
+  const activeSteps = useMemo(() => {
+    if (guideMode !== 'own') return tourSteps
+    const hasClassStudents = activeClassStudentCount > 0
+    const visibleSteps = ownDataTourSteps.filter((item) => !item.requiresClassStudents || hasClassStudents)
+    return hasClassStudents ? visibleSteps : [...visibleSteps, waitingForStudentsStep]
+  }, [activeClassStudentCount, guideMode])
+  const safeStepIndex = clamp(stepIndex, 0, Math.max(0, activeSteps.length - 1))
+  const step = activeSteps[safeStepIndex]
 
   useEffect(() => {
     if (!guideOpen || !step) return
@@ -513,6 +555,18 @@ export function GuidedTour() {
       const state = useAvaluaproStore.getState()
       const classTasks = state.tasks.filter((task) => task.classId === state.ui.activeClassId)
       const currentUtHasTasks = classTasks.some((task) => task.utId === state.ui.activeUtId)
+      if (
+        guideMode === 'own' &&
+        state.ui.activeClassId &&
+        state.ui.activeUtId &&
+        state.students.some((student) => student.classId === state.ui.activeClassId) &&
+        !currentUtHasTasks
+      ) {
+        state.addTask({
+          title: 'Coneixements previs',
+          date: new Date().toISOString().slice(0, 10),
+        })
+      }
       const targetTask = currentUtHasTasks ? null : classTasks[0]
       if (targetTask) {
         const targetUt = state.uts.find((ut) => ut.id === targetTask.utId)
@@ -521,7 +575,7 @@ export function GuidedTour() {
       }
       window.setTimeout(() => window.dispatchEvent(new CustomEvent('avaluapro-show-demo-tasks')), 80)
     }
-  }, [guideOpen, setActiveInsight, setActiveMode, step])
+  }, [activeClassId, activeUtId, activeUtTaskCount, guideMode, guideOpen, setActiveInsight, setActiveMode, step])
 
   useEffect(() => {
     if (!guideOpen || !step?.completeWhen) return undefined
@@ -666,7 +720,7 @@ export function GuidedTour() {
           </button>
         )}
         <div className="guided-tour-progress">
-          <span style={{ width: `${((stepIndex + 1) / activeSteps.length) * 100}%` }} />
+          <span style={{ width: `${((safeStepIndex + 1) / activeSteps.length) * 100}%` }} />
         </div>
         <footer>
           <button className="ghost-action compact guided-tour-skip" onClick={closeTour} type="button">
@@ -674,15 +728,15 @@ export function GuidedTour() {
           </button>
           <button
             className="secondary-action compact"
-            disabled={stepIndex === 0}
-            onClick={() => goToStep(stepIndex - 1)}
+            disabled={safeStepIndex === 0}
+            onClick={() => goToStep(safeStepIndex - 1)}
             type="button"
           >
             <ArrowLeft size={15} />
             Anterior
           </button>
           <small>
-            {stepIndex + 1}/{activeSteps.length}
+            {safeStepIndex + 1}/{activeSteps.length}
           </small>
           {step.final ? (
             <button className="primary-action compact" onClick={guideMode === 'demo' ? handleStartOwnData : closeTour} type="button">
@@ -693,7 +747,7 @@ export function GuidedTour() {
             <button
               className="primary-action compact"
               disabled={!stepComplete}
-              onClick={() => goToStep(stepIndex + 1)}
+              onClick={() => goToStep(safeStepIndex + 1)}
               type="button"
             >
               {step.action ? 'Acció feta' : 'Següent'}
