@@ -1,7 +1,20 @@
 import { useMemo, useState } from 'react'
-import { BookOpenCheck, ClipboardList, FileDown, Filter, GraduationCap, Layers3, UsersRound } from 'lucide-react'
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpenCheck,
+  ClipboardList,
+  Eye,
+  FileDown,
+  Filter,
+  GraduationCap,
+  Layers3,
+  TrendingDown,
+  UsersRound,
+} from 'lucide-react'
+import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
-import { GRADE_OPTIONS, calculateGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
+import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const TUTORING_RECORD_TYPES = [
@@ -35,6 +48,10 @@ function getSubjectOptionsForArea(areaFilter) {
     )
 }
 
+function getAllTutorialSubjectOptions() {
+  return getSubjectOptionsForArea('all')
+}
+
 function buildTutorialCompetencies(subject) {
   const structure = SUBJECT_STRUCTURES[subject] || []
   return structure.map((competency, competencyIndex) => ({
@@ -62,6 +79,143 @@ function getTutorialMark(tutorialMarks, classId, studentId, subject, criterionKe
   )
 }
 
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return '-'
+  return `${Math.round(value)}%`
+}
+
+function isNotDeveloped(grade) {
+  return grade === 'D' || grade === 'NA'
+}
+
+function average(values) {
+  const cleanValues = values.filter((value) => Number.isFinite(value) && value > 0)
+  if (cleanValues.length === 0) return 0
+  return cleanValues.reduce((total, value) => total + value, 0) / cleanValues.length
+}
+
+function summarizeTutorialData({ classId, students, tutorialMarks }) {
+  const subjectOptions = getAllTutorialSubjectOptions()
+  const areaBuckets = new Map()
+  const subjectBuckets = new Map()
+  const studentProfiles = students.map((student) => {
+    const evaluatedCompetencies = []
+
+    subjectOptions.forEach((subjectOption) => {
+      buildTutorialCompetencies(subjectOption.subject).forEach((competency) => {
+        const criterionValues = competency.criteria.map((criterion) =>
+          getTutorialMark(tutorialMarks, classId, student.id, subjectOption.subject, criterion.key),
+        )
+        const grade = calculateGrade(criterionValues)
+        if (!grade) return
+
+        const score = getNumericFromGrade(grade)
+        const row = {
+          areaId: subjectOption.areaId,
+          areaName: subjectOption.areaName,
+          subject: subjectOption.subject,
+          competencyName: competency.name,
+          grade,
+          score,
+          notDeveloped: isNotDeveloped(grade),
+        }
+        evaluatedCompetencies.push(row)
+
+        const areaBucket = areaBuckets.get(subjectOption.areaId) || {
+          id: subjectOption.areaId,
+          name: subjectOption.areaName,
+          scores: [],
+          notDeveloped: 0,
+          evaluated: 0,
+        }
+        areaBucket.scores.push(score)
+        areaBucket.notDeveloped += row.notDeveloped ? 1 : 0
+        areaBucket.evaluated += 1
+        areaBuckets.set(subjectOption.areaId, areaBucket)
+
+        const subjectBucket = subjectBuckets.get(subjectOption.subject) || {
+          subject: subjectOption.subject,
+          areaName: subjectOption.areaName,
+          scores: [],
+          notDeveloped: 0,
+          evaluated: 0,
+        }
+        subjectBucket.scores.push(score)
+        subjectBucket.notDeveloped += row.notDeveloped ? 1 : 0
+        subjectBucket.evaluated += 1
+        subjectBuckets.set(subjectOption.subject, subjectBucket)
+      })
+    })
+
+    const notDevelopedCount = evaluatedCompetencies.filter((item) => item.notDeveloped).length
+    const averageScore = average(evaluatedCompetencies.map((item) => item.score))
+    const notDevelopedPercent =
+      evaluatedCompetencies.length > 0 ? (notDevelopedCount / evaluatedCompetencies.length) * 100 : 0
+    const weakestAreas = Object.values(
+      evaluatedCompetencies.reduce((areas, item) => {
+        const current = areas[item.areaId] || { name: item.areaName, scores: [], notDeveloped: 0, evaluated: 0 }
+        current.scores.push(item.score)
+        current.notDeveloped += item.notDeveloped ? 1 : 0
+        current.evaluated += 1
+        return { ...areas, [item.areaId]: current }
+      }, {}),
+    )
+      .map((area) => ({ ...area, averageScore: average(area.scores) }))
+      .sort((a, b) => a.averageScore - b.averageScore || b.notDeveloped - a.notDeveloped)
+
+    return {
+      student,
+      evaluatedCompetencies,
+      evaluatedCount: evaluatedCompetencies.length,
+      notDevelopedCount,
+      notDevelopedPercent,
+      averageScore,
+      weakestArea: weakestAreas[0] || null,
+    }
+  })
+
+  const evaluatedCount = studentProfiles.reduce((total, profile) => total + profile.evaluatedCount, 0)
+  const notDevelopedCount = studentProfiles.reduce((total, profile) => total + profile.notDevelopedCount, 0)
+  const riskProfiles = studentProfiles
+    .filter(
+      (profile) =>
+        profile.evaluatedCount > 0 &&
+        (profile.notDevelopedPercent >= 30 || profile.notDevelopedCount >= 2 || profile.averageScore <= 2),
+    )
+    .sort(
+      (a, b) =>
+        b.notDevelopedPercent - a.notDevelopedPercent ||
+        b.notDevelopedCount - a.notDevelopedCount ||
+        a.student.name.localeCompare(b.student.name, 'ca'),
+    )
+  const areaSummaries = [...areaBuckets.values()]
+    .map((area) => ({
+      ...area,
+      averageScore: average(area.scores),
+      notDevelopedPercent: area.evaluated > 0 ? (area.notDeveloped / area.evaluated) * 100 : 0,
+    }))
+    .sort((a, b) => a.averageScore - b.averageScore || b.notDevelopedPercent - a.notDevelopedPercent)
+  const subjectSummaries = [...subjectBuckets.values()]
+    .map((subject) => ({
+      ...subject,
+      averageScore: average(subject.scores),
+      notDevelopedPercent: subject.evaluated > 0 ? (subject.notDeveloped / subject.evaluated) * 100 : 0,
+    }))
+    .sort((a, b) => a.averageScore - b.averageScore || b.notDevelopedPercent - a.notDevelopedPercent)
+
+  return {
+    evaluatedCount,
+    notDevelopedCount,
+    notDevelopedPercent: evaluatedCount > 0 ? (notDevelopedCount / evaluatedCount) * 100 : 0,
+    studentProfiles,
+    riskProfiles,
+    areaSummaries,
+    subjectSummaries,
+    weakestArea: areaSummaries[0] || null,
+    weakestSubject: subjectSummaries[0] || null,
+  }
+}
+
 function SubjectCatalogCard({ item, onSelect }) {
   return (
     <article className="tutorial-subject-card">
@@ -77,10 +231,82 @@ function SubjectCatalogCard({ item, onSelect }) {
   )
 }
 
+function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral', onClick }) {
+  const Component = onClick ? 'button' : 'article'
+  return (
+    <Component className={`tutorial-stat-card ${tone}`} onClick={onClick} type={onClick ? 'button' : undefined}>
+      <Icon size={20} />
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+      {onClick && <em>Consultar</em>}
+    </Component>
+  )
+}
+
+function TutorialStudentProfileModal({ profile, onClose }) {
+  if (!profile) return null
+
+  const groupedByArea = Object.values(
+    profile.evaluatedCompetencies.reduce((areas, item) => {
+      const area = areas[item.areaId] || { name: item.areaName, rows: [] }
+      area.rows.push(item)
+      return { ...areas, [item.areaId]: area }
+    }, {}),
+  )
+
+  return (
+    <Modal onClose={onClose} size="xl" title={`Perfil tutorial: ${profile.student.name}`}>
+      <div className="tutorial-profile-modal">
+        <section className="tutorial-profile-summary">
+          <article>
+            <span>Competències avaluades</span>
+            <strong>{profile.evaluatedCount}</strong>
+          </article>
+          <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
+            <span>No assolides</span>
+            <strong>{profile.notDevelopedCount}</strong>
+          </article>
+          <article>
+            <span>% no assolides</span>
+            <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
+          </article>
+          <article>
+            <span>Àrea més delicada</span>
+            <strong>{profile.weakestArea?.name || '-'}</strong>
+          </article>
+        </section>
+
+        {profile.evaluatedCount === 0 ? (
+          <div className="empty-state compact">Encara no hi ha notes tutorials per aquest alumne.</div>
+        ) : (
+          <div className="tutorial-profile-area-list">
+            {groupedByArea.map((area) => (
+              <section key={area.name}>
+                <h3>{area.name}</h3>
+                {area.rows.map((row) => (
+                  <div className={`tutorial-profile-row ${row.notDeveloped ? 'risk' : ''}`} key={`${row.subject}_${row.competencyName}`}>
+                    <div>
+                      <strong>{row.subject}</strong>
+                      <span>{row.competencyName}</span>
+                    </div>
+                    <span className={gradeClassName(row.grade)}>{row.grade}</span>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 export function TutoringView() {
   const [activePanel, setActivePanel] = useState('evaluation')
   const [areaFilter, setAreaFilter] = useState('all')
   const [subjectFilter, setSubjectFilter] = useState('auto')
+  const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -102,6 +328,13 @@ export function TutoringView() {
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
   const selectedCriteria = selectedCompetencies.flatMap((competency) =>
     competency.criteria.map((criterion) => ({ ...criterion, competency })),
+  )
+  const tutorialSummary = useMemo(
+    () => summarizeTutorialData({ classId: activeClassId, students: classStudents, tutorialMarks }),
+    [activeClassId, classStudents, tutorialMarks],
+  )
+  const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
+    (profile) => profile.student.id === selectedTutorialProfileId,
   )
 
   return (
@@ -154,6 +387,78 @@ export function TutoringView() {
 
       {activePanel === 'evaluation' && (
         <section className="tutorial-evaluation-panel">
+          <div className="tutorial-stats-grid">
+            <TutorialStatsCard
+              detail={`${tutorialSummary.notDevelopedCount} de ${tutorialSummary.evaluatedCount} competències avaluades`}
+              icon={TrendingDown}
+              label="Competències no assolides"
+              tone={tutorialSummary.notDevelopedPercent >= 30 ? 'risk' : 'neutral'}
+              value={tutorialSummary.evaluatedCount > 0 ? formatPercent(tutorialSummary.notDevelopedPercent) : '-'}
+            />
+            <TutorialStatsCard
+              detail={
+                tutorialSummary.weakestArea
+                  ? `${tutorialSummary.weakestArea.notDeveloped} no assolides · mitjana ${tutorialSummary.weakestArea.averageScore.toFixed(2)}`
+                  : 'Encara no hi ha prou dades'
+              }
+              icon={BarChart3}
+              label="Àrea amb més dificultat"
+              tone="amber"
+              value={tutorialSummary.weakestArea?.name || '-'}
+            />
+            <TutorialStatsCard
+              detail="Baix assoliment o acumulació de competències no assolides"
+              icon={AlertTriangle}
+              label="Alumnes a mirar"
+              onClick={() => setActivePanel('profile')}
+              tone={tutorialSummary.riskProfiles.length > 0 ? 'risk' : 'ok'}
+              value={tutorialSummary.riskProfiles.length}
+            />
+            <TutorialStatsCard
+              detail="Competències amb alguna nota tutorial registrada"
+              icon={Eye}
+              label="Cobertura de dades"
+              tone="blue"
+              value={tutorialSummary.evaluatedCount}
+            />
+          </div>
+
+          {tutorialSummary.evaluatedCount > 0 && (
+            <div className="tutorial-insight-grid">
+              <article className="tutoring-card compact">
+                <div>
+                  <Layers3 size={22} />
+                  <h2>Àrees de dificultat</h2>
+                </div>
+                <div className="tutorial-insight-list">
+                  {tutorialSummary.areaSummaries.slice(0, 4).map((area) => (
+                    <div className="tutorial-insight-row" key={area.id}>
+                      <strong>{area.name}</strong>
+                      <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
+                      <small>Mitjana {area.averageScore.toFixed(2)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="tutoring-card compact">
+                <div>
+                  <BookOpenCheck size={22} />
+                  <h2>Assignatures a revisar</h2>
+                </div>
+                <div className="tutorial-insight-list">
+                  {tutorialSummary.subjectSummaries.slice(0, 5).map((subject) => (
+                    <div className="tutorial-insight-row" key={subject.subject}>
+                      <strong>{subject.subject}</strong>
+                      <span>{formatPercent(subject.notDevelopedPercent)} no assolides</span>
+                      <small>{subject.areaName}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          )}
+
           <div className="tutorial-filter-bar">
             <label>
               Àrea
@@ -235,8 +540,14 @@ export function TutoringView() {
                       return (
                         <tr key={student.id}>
                           <th>
-                            {student.name}
-                            <small>{student.halfGroup || 'Sense mig grup'}</small>
+                            <button
+                              className="tutorial-student-link"
+                              onClick={() => setSelectedTutorialProfileId(student.id)}
+                              type="button"
+                            >
+                              <span>{student.name}</span>
+                              <small>{student.halfGroup || 'Sense mig grup'}</small>
+                            </button>
                           </th>
                           {selectedCriteria.map((criterion) => {
                             const value = getTutorialMark(
@@ -307,29 +618,58 @@ export function TutoringView() {
       )}
 
       {activePanel === 'profile' && (
-        <article className="tutoring-card">
-          <div>
-            <UsersRound size={24} />
-            <h2>Perfil d’alumne</h2>
-          </div>
-          <p>
-            Quan obrim un alumne des d’aquest mode, el perfil servirà per preparar el resum tutorial i el PDF descarregable.
-          </p>
-          <span>{classStudents.length > 0 ? 'Llista preparada per al perfil tutorial.' : 'Afegeix alumnes per començar.'}</span>
-        </article>
+        <section className="tutorial-profile-panel">
+          <article className="tutoring-card">
+            <div>
+              <UsersRound size={24} />
+              <h2>Perfils tutorials</h2>
+            </div>
+            <p>
+              Consulta el resum de cada alumne amb competències no assolides, àrees delicades i evidències
+              preparades per al futur PDF.
+            </p>
+            {tutorialSummary.studentProfiles.length === 0 ? (
+              <div className="empty-state compact">Afegeix alumnes per començar a preparar perfils tutorials.</div>
+            ) : (
+              <div className="tutorial-student-profile-list">
+                {tutorialSummary.studentProfiles.map((profile) => (
+                  <button
+                    className={`tutorial-student-profile-row ${profile.notDevelopedCount > 0 ? 'risk' : ''}`}
+                    key={profile.student.id}
+                    onClick={() => setSelectedTutorialProfileId(profile.student.id)}
+                    type="button"
+                  >
+                    <div>
+                      <strong>{profile.student.name}</strong>
+                      <small>{profile.weakestArea?.name || 'Sense àrea delicada detectada'}</small>
+                    </div>
+                    <span>{profile.evaluatedCount} comp.</span>
+                    <span>{profile.notDevelopedCount} no assolides</span>
+                    <em>{profile.evaluatedCount > 0 ? formatPercent(profile.notDevelopedPercent) : '-'}</em>
+                  </button>
+                ))}
+              </div>
+            )}
+          </article>
+
+          <article className="tutoring-card muted">
+            <div>
+              <FileDown size={24} />
+              <h2>PDF de tutoria</h2>
+            </div>
+            <p>
+              El PDF vindrà després, quan tinguem definit exactament quin resum necessita el tutor per alumne i per grup.
+            </p>
+            <span>Base preparada: notes tutorials, seguiment i perfil individual.</span>
+          </article>
+        </section>
       )}
 
-      {activePanel === 'profile' && (
-        <article className="tutoring-card muted">
-          <div>
-            <FileDown size={24} />
-            <h2>PDF de tutoria</h2>
-          </div>
-          <p>
-            El PDF vindrà després, quan tinguem definit exactament quin resum necessita el tutor per alumne i per grup.
-          </p>
-          <span>Encara sense generar documents, però el flux ja queda reservat.</span>
-        </article>
+      {selectedTutorialProfile && (
+        <TutorialStudentProfileModal
+          onClose={() => setSelectedTutorialProfileId('')}
+          profile={selectedTutorialProfile}
+        />
       )}
     </section>
   )

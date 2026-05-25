@@ -729,6 +729,153 @@
   gap: 14px;
 }
 
+.tutorial-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-stat-card {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-height: 126px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  color: #475569;
+  background: white;
+  text-align: left;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+button.tutorial-stat-card {
+  cursor: pointer;
+}
+
+.tutorial-stat-card svg {
+  color: #2563eb;
+}
+
+.tutorial-stat-card span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-stat-card strong {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.tutorial-stat-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tutorial-stat-card em {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-stat-card.risk {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-stat-card.risk svg,
+.tutorial-stat-card.risk strong {
+  color: #dc2626;
+}
+
+.tutorial-stat-card.ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-stat-card.ok svg,
+.tutorial-stat-card.ok strong {
+  color: #16a34a;
+}
+
+.tutorial-stat-card.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-stat-card.amber svg,
+.tutorial-stat-card.amber strong {
+  color: #ea580c;
+}
+
+.tutorial-stat-card.blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.tutorial-stat-card.blue svg,
+.tutorial-stat-card.blue strong {
+  color: #2563eb;
+}
+
+.tutorial-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tutoring-card.compact {
+  min-height: unset;
+  padding: 14px;
+}
+
+.tutorial-insight-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-insight-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.tutorial-insight-row strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-insight-row span {
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #b91c1c;
+  background: #fee2e2;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.tutorial-insight-row small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .tutorial-filter-bar {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -896,6 +1043,24 @@
   font-size: 12px;
 }
 
+.tutorial-student-link {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tutorial-student-link span {
+  color: #1f2937;
+  font-weight: 950;
+}
+
 .tutorial-mark-table select {
   min-width: 58px;
   border: 1px solid #e5e7eb;
@@ -999,6 +1164,170 @@
 .tutorial-record-pill.slate {
   border-color: #cbd5e1;
   background: #f8fafc;
+}
+
+.tutorial-profile-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.5fr);
+  gap: 14px;
+}
+
+.tutorial-student-profile-list {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tutorial-student-profile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 11px;
+  color: #334155;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.tutorial-student-profile-row.risk {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-student-profile-row strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-student-profile-row small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-student-profile-row > span,
+.tutorial-student-profile-row em {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #475569;
+  background: white;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.tutorial-student-profile-row em {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.tutorial-profile-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-profile-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-profile-summary article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.tutorial-profile-summary article.ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-profile-summary article.warning {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-profile-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-profile-summary strong {
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.tutorial-profile-area-list {
+  display: grid;
+  gap: 12px;
+}
+
+.tutorial-profile-area-list section {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.tutorial-profile-area-list h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.tutorial-profile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.tutorial-profile-row.risk {
+  background: #fff1f2;
+}
+
+.tutorial-profile-row strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-profile-row span:not([class]) {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+@media (max-width: 1100px) {
+  .tutorial-stats-grid,
+  .tutorial-profile-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tutorial-profile-panel,
+  .tutorial-insight-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .urgent-modal {
