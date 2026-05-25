@@ -26,13 +26,6 @@ function getCompetencyGrade(marks, studentId, competency) {
   return calculateGrade(grades)
 }
 
-const taskStatusLabel = {
-  DONE: 'Feta',
-  LATE: 'Tard',
-  MISSING: 'No feta',
-  EXEMPT: 'Exempt',
-}
-
 function formatNote(note) {
   return `- ${new Date(note.date).toLocaleDateString('ca-ES')}: ${note.text}`
 }
@@ -41,25 +34,28 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString('ca-ES')
 }
 
-function getRedPointCount(student, missingTasks) {
-  return Math.max(missingTasks.length, student.legacyTrackingPenaltyCount || 0)
+function getAgendaRedResetCount(trackingNotes) {
+  const latestTrackingNote = trackingNotes[0]
+  const match = latestTrackingNote?.text.match(/(\d+)\s+punts vermells/i)
+  return Number(match?.[1] || 0)
 }
 
-function buildStudentAnnotationSummary({ diagnoses, student, teamNotes, tutoringNotes }) {
-  const diagnosisLabels = DIAGNOSIS_OPTIONS
-    .filter((diagnosis) => diagnoses.includes(diagnosis.id))
-    .map((diagnosis) => diagnosis.label)
+function getActiveMissingTasks(missingTasks, trackingNotes) {
+  const latestTrackingNote = trackingNotes[0]
+  if (!latestTrackingNote) return missingTasks
+  return missingTasks.filter((task) => !latestTrackingNote.text.includes(task.title))
+}
 
+function getRedPointCount(student, missingTasks, trackingNotes = []) {
+  const activeMissingTasks = getActiveMissingTasks(missingTasks, trackingNotes)
+  const legacyCount = Math.max((student.legacyTrackingPenaltyCount || 0) - getAgendaRedResetCount(trackingNotes), 0)
+  return Math.max(activeMissingTasks.length, legacyCount)
+}
+
+function buildStudentAnnotationSummary({ student, teamNotes, tutoringNotes }) {
   return [
-    `ANOTACIONS PERSONALS: ${student.name}`,
+    `ANOTACIONS I RESUM: ${student.name}`,
     student.halfGroup ? `Grup: ${student.halfGroup}` : '',
-    '',
-    '1. DIAGNÒSTICS',
-    diagnosisLabels.length > 0 ? diagnosisLabels.map((label) => `- ${label}`).join('\n') : '- Sense diagnòstics marcats',
-    student.diagnosisNotes ? `\nAnotacions diagnòstiques:\n${student.diagnosisNotes}` : '',
-    '',
-    '2. INFORMACIÓ PERSONAL',
-    student.personalNotes || '- Sense informació personal registrada',
     '',
     '3. EQUIPS EDUCATIUS I AVALUACIONS',
     teamNotes.length > 0 ? teamNotes.map(formatNote).join('\n') : '- Sense entrades',
@@ -71,7 +67,7 @@ function buildStudentAnnotationSummary({ diagnoses, student, teamNotes, tutoring
     .join('\n')
 }
 
-function getReminderText({ activeDiagnoses, student, teamNotes, tutoringNotes }) {
+function getReminderText({ teamNotes, tutoringNotes }) {
   const latestTeamNote = teamNotes[0]
   const latestTutoringNote = tutoringNotes[0]
 
@@ -90,24 +86,6 @@ function getReminderText({ activeDiagnoses, student, teamNotes, tutoringNotes })
       title: 'Comentari de tutoria',
       body: latestTutoringNote.text,
       meta: new Date(latestTutoringNote.date).toLocaleDateString('ca-ES'),
-    }
-  }
-
-  if (student.personalNotes) {
-    return {
-      tone: 'personal',
-      title: 'Informació personal',
-      body: student.personalNotes,
-      meta: 'Dada de context docent',
-    }
-  }
-
-  if (activeDiagnoses.length > 0) {
-    return {
-      tone: 'diagnosis',
-      title: 'Diagnòstic marcat',
-      body: activeDiagnoses.map((diagnosis) => diagnosis.label).join(' · '),
-      meta: 'Tingues-ho present a classe',
     }
   }
 
@@ -159,6 +137,74 @@ function LatestAnnotationCard({ color, emptyText, expanded, notes, onToggle, tit
   )
 }
 
+function TrackingDetailPanel({ agendaNotes, diaryEntries, detail, missingTasks, blackPoints }) {
+  if (!detail) return null
+
+  const detailConfig = {
+    red: {
+      title: 'Tasques no fetes',
+      empty: 'No hi ha cap tasca no feta activa.',
+      rows: missingTasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        meta: formatDate(task.date),
+        body: task.note || '',
+      })),
+    },
+    black: {
+      title: 'Punts negres registrats',
+      empty: 'No hi ha cap incidència de comportament registrada.',
+      rows: blackPoints.map((event) => ({
+        id: event.id,
+        title: formatDate(event.date),
+        meta: 'Negatiu de comportament',
+        body: event.text,
+      })),
+    },
+    diary: {
+      title: 'Entrades de diari',
+      empty: 'No hi ha cap observació sense negatiu registrada.',
+      rows: diaryEntries.map((event) => ({
+        id: event.id,
+        title: formatDate(event.date),
+        meta: 'Entrada de diari',
+        body: event.text,
+      })),
+    },
+    agenda: {
+      title: 'Notes a l’agenda',
+      empty: 'No hi ha cap nota a l’agenda registrada.',
+      rows: agendaNotes.map((note) => ({
+        id: note.id,
+        title: formatDate(note.date),
+        meta: 'Nota a l’agenda',
+        body: note.text,
+      })),
+    },
+  }[detail]
+
+  return (
+    <section className={`profile-followup-detail ${detail}`}>
+      <h4>{detailConfig.title}</h4>
+      {detailConfig.rows.length === 0 ? (
+        <p className="empty-list">{detailConfig.empty}</p>
+      ) : (
+        <div className="profile-task-list">
+          {detailConfig.rows.map((row) => (
+            <article className={`profile-task-row ${detail}`} key={row.id}>
+              <div>
+                <strong>{row.title}</strong>
+                {row.body && <span>{row.body}</span>}
+              </div>
+              <small>{row.meta}</small>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const students = useAvaluaproStore((state) => state.students)
   const tasks = useAvaluaproStore((state) => state.tasks)
@@ -170,13 +216,13 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
-  const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
   const deleteAgendaNote = useAvaluaproStore((state) => state.deleteAgendaNote)
   const [teamText, setTeamText] = useState('')
   const [tutoringText, setTutoringText] = useState('')
   const [copyState, setCopyState] = useState('')
   const [expandedSections, setExpandedSections] = useState({ team: false, tutoring: false })
+  const [trackingDetail, setTrackingDetail] = useState('')
   const teamSectionRef = useRef(null)
   const teamTextRef = useRef(null)
   const tutoringSectionRef = useRef(null)
@@ -241,7 +287,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id))
   const hasTeamAlert = teamNotes.length > 0
   const hasTutoringAlert = tutoringNotes.length > 0
-  const reminder = getReminderText({ activeDiagnoses, student, teamNotes, tutoringNotes })
+  const reminder = getReminderText({ teamNotes, tutoringNotes })
   const tracking = getStudentTrackingStats(studentId, taskRecords, activeTasks)
   const criterionMarks = activeCompetencies.flatMap((competency) =>
     competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id)).filter(Boolean),
@@ -254,16 +300,10 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
       taskRecords.find((record) => record.studentId === studentId && record.taskId === task.id)
         ?.status === 'MISSING',
   )
-  const redPointCount = getRedPointCount(student || {}, missingTasks)
+  const redPointCount = getRedPointCount(student || {}, missingTasks, trackingNotes)
+  const activeMissingTasks = getActiveMissingTasks(missingTasks, trackingNotes)
   const blackPoints = studentBehaviorEvents.filter((event) => event.type === 'incident')
   const diaryEntries = studentBehaviorEvents.filter((event) => event.type === 'positive')
-
-  const toggleDiagnosis = (diagnosisId) => {
-    const nextDiagnoses = diagnoses.includes(diagnosisId)
-      ? diagnoses.filter((id) => id !== diagnosisId)
-      : [...diagnoses, diagnosisId]
-    updateStudent(studentId, { diagnoses: nextDiagnoses })
-  }
 
   const handleAddTeamNote = async () => {
     await addAgendaNote(studentId, 'team', teamText)
@@ -276,7 +316,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   }
 
   const handleCopyText = async () => {
-    const summary = buildStudentAnnotationSummary({ diagnoses, student, teamNotes, tutoringNotes })
+    const summary = buildStudentAnnotationSummary({ student, teamNotes, tutoringNotes })
 
     try {
       await navigator.clipboard.writeText(summary)
@@ -443,43 +483,50 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             Seguiment de tasques
           </h3>
           <div className="profile-followup-grid compact">
-            <article className="profile-followup-card red">
+            <button
+              className={`profile-followup-card red ${trackingDetail === 'red' ? 'active' : ''}`}
+              onClick={() => setTrackingDetail((current) => (current === 'red' ? '' : 'red'))}
+              type="button"
+            >
               <span>Punts vermells</span>
               <strong>{redPointCount}</strong>
-              <small>Tasques no fetes o comptadors importats</small>
-            </article>
-            <article className="profile-followup-card black">
+              <small>Veure tasques no fetes</small>
+            </button>
+            <button
+              className={`profile-followup-card black ${trackingDetail === 'black' ? 'active' : ''}`}
+              onClick={() => setTrackingDetail((current) => (current === 'black' ? '' : 'black'))}
+              type="button"
+            >
               <span>Punts negres</span>
               <strong>{blackPoints.length}</strong>
-              <small>Incidències de comportament</small>
-            </article>
-            <article className="profile-followup-card diary">
+              <small>Veure incidències</small>
+            </button>
+            <button
+              className={`profile-followup-card diary ${trackingDetail === 'diary' ? 'active' : ''}`}
+              onClick={() => setTrackingDetail((current) => (current === 'diary' ? '' : 'diary'))}
+              type="button"
+            >
               <span>Diari</span>
               <strong>{diaryEntries.length}</strong>
-              <small>Observacions sense negatiu</small>
-            </article>
-            <article className="profile-followup-card agenda">
+              <small>Veure observacions</small>
+            </button>
+            <button
+              className={`profile-followup-card agenda ${trackingDetail === 'agenda' ? 'active' : ''}`}
+              onClick={() => setTrackingDetail((current) => (current === 'agenda' ? '' : 'agenda'))}
+              type="button"
+            >
               <span>Agenda</span>
               <strong>{trackingNotes.length}</strong>
-              <small>Notes a l’agenda registrades</small>
-            </article>
+              <small>Veure notes registrades</small>
+            </button>
           </div>
-          <div className="profile-task-list">
-            {activeTasks.map((task) => {
-              const record = taskRecords.find((item) => item.studentId === studentId && item.taskId === task.id)
-              const status = record?.status || ''
-              return (
-                <div className={`profile-task-row ${status.toLowerCase() || 'empty'}`} key={task.id}>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <span>{formatDate(task.date)}</span>
-                  </div>
-                  <small>{taskStatusLabel[status] || 'Sense registre'}</small>
-                </div>
-              )
-            })}
-            {activeTasks.length === 0 && <p className="empty-list">Aquesta UT encara no té tasques.</p>}
-          </div>
+          <TrackingDetailPanel
+            agendaNotes={trackingNotes}
+            blackPoints={blackPoints}
+            detail={trackingDetail}
+            diaryEntries={diaryEntries}
+            missingTasks={activeMissingTasks}
+          />
         </section>
 
         <section className="annotation-latest-grid">
@@ -498,39 +545,6 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             notes={tutoringNotes}
             onToggle={() => toggleSection('tutoring')}
             title="Última tutoria"
-          />
-        </section>
-
-        <section className="annotation-section" data-tour="annotation-diagnosis">
-          <h3>
-            <UserRound size={18} />
-            1. Diagnòstics
-          </h3>
-          <div className="diagnosis-chip-list">
-            {DIAGNOSIS_OPTIONS.map((diagnosis) => (
-              <button
-                className={`diagnosis-chip ${diagnosis.color} ${diagnoses.includes(diagnosis.id) ? 'active' : ''}`}
-                key={diagnosis.id}
-                onClick={() => toggleDiagnosis(diagnosis.id)}
-                type="button"
-              >
-                {diagnosis.label}
-              </button>
-            ))}
-          </div>
-          <textarea
-            onChange={(event) => updateStudent(studentId, { diagnosisNotes: event.target.value })}
-            placeholder="Anotacions addicionals sobre diagnòstics..."
-            value={student.diagnosisNotes || ''}
-          />
-        </section>
-
-        <section className="annotation-section compact">
-          <h3>2. Informació personal</h3>
-          <textarea
-            onChange={(event) => updateStudent(studentId, { personalNotes: event.target.value })}
-            placeholder="Informació personal rellevant per al seguiment docent..."
-            value={student.personalNotes || ''}
           />
         </section>
 

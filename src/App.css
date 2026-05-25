@@ -4798,6 +4798,23 @@
   border-radius: 8px;
   padding: 14px;
   background: #f9fafb;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.profile-followup-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+button.profile-followup-card:hover,
+button.profile-followup-card.active,
+button.profile-followup-card:focus-visible {
+  border-color: #f97316;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .profile-followup-card span {
@@ -4858,6 +4875,43 @@
 
 .profile-followup-card.agenda svg {
   color: #f97316;
+}
+
+.profile-followup-detail {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.profile-followup-detail h4 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.profile-followup-detail.red {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.profile-followup-detail.black {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.profile-followup-detail.diary {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.profile-followup-detail.agenda {
+  border-color: #fed7aa;
+  background: #fff7ed;
 }
 
 .profile-meeting-summary {
@@ -4978,6 +5032,10 @@
 .profile-task-row.late { border-color: #fde68a; background: #fffbeb; }
 .profile-task-row.missing { border-color: #fecaca; background: #fef2f2; }
 .profile-task-row.exempt { border-color: #cbd5e1; background: #f8fafc; }
+.profile-task-row.red { border-color: #fecaca; background: #fff7f7; }
+.profile-task-row.black { border-color: #cbd5e1; background: white; }
+.profile-task-row.diary { border-color: #c7d2fe; background: white; }
+.profile-task-row.agenda { border-color: #fed7aa; background: white; }
 
 .profile-task-row small,
 .profile-event-row small {
@@ -5106,6 +5164,16 @@
   color: #64748b;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.agenda-note-history div {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.agenda-note-history span {
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
 
 .empty-state,

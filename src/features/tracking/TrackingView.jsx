@@ -68,8 +68,28 @@ function getMissingTasksForStudent(studentId, taskRecords, tasks) {
   return tasks.filter((task) => getRecord(taskRecords, studentId, task.id)?.status === 'MISSING')
 }
 
-function getRedPointCount(student, missingTasks) {
-  return Math.max(missingTasks.length, student.legacyTrackingPenaltyCount || 0)
+function getTrackingAgendaNotes(studentId, agendaNotes, classId) {
+  return agendaNotes
+    .filter((note) => note.studentId === studentId && note.classId === classId && note.type === 'tracking')
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+function getAgendaRedResetCount(trackingAgendaNotes) {
+  const latestTrackingNote = trackingAgendaNotes[0]
+  const match = latestTrackingNote?.text.match(/(\d+)\s+punts vermells/i)
+  return Number(match?.[1] || 0)
+}
+
+function getActiveMissingTasks(missingTasks, trackingAgendaNotes) {
+  const latestTrackingNote = trackingAgendaNotes[0]
+  if (!latestTrackingNote) return missingTasks
+  return missingTasks.filter((task) => !latestTrackingNote.text.includes(task.title))
+}
+
+function getRedPointCount(student, missingTasks, trackingAgendaNotes = []) {
+  const activeMissingTasks = getActiveMissingTasks(missingTasks, trackingAgendaNotes)
+  const legacyCount = Math.max((student.legacyTrackingPenaltyCount || 0) - getAgendaRedResetCount(trackingAgendaNotes), 0)
+  return Math.max(activeMissingTasks.length, legacyCount)
 }
 
 function getStudentRowClass(dominantDiagnosis, noteState) {
@@ -145,7 +165,8 @@ function BehaviorEventModal({ student, type, onClose, onSave }) {
 
 function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCount, onClose, onLastChance, onRegisterAgenda }) {
   const [copyState, setCopyState] = useState('')
-  const agendaText = buildTrackingAgendaText({ blackPointCount, missingTasks, redPointCount, student })
+  const activeMissingTasks = redPointCount > 0 ? missingTasks.slice(-redPointCount) : []
+  const agendaText = buildTrackingAgendaText({ blackPointCount, missingTasks: activeMissingTasks, redPointCount, student })
 
   const copyAgendaText = async () => {
     try {
@@ -181,7 +202,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
             si poses la nota ara o li dones una darrera oportunitat.
           </p>
           <div className="agenda-task-list">
-            {missingTasks.slice(-4).map((task) => (
+            {activeMissingTasks.slice(-4).map((task) => (
               <div key={task.id}>
                 <strong>{task.title}</strong>
                 <span>{new Date(task.date).toLocaleDateString('ca-ES')}</span>
@@ -204,6 +225,44 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
             </button>
           </div>
           {copyState && <small className="agenda-copy-state">{copyState}</small>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AgendaNotesModal({ notes, onClose, student }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-panel lg">
+        <header className="modal-header">
+          <h2>Notes a l’agenda: {student.name}</h2>
+          <button className="modal-close" onClick={onClose} type="button">
+            ×
+          </button>
+        </header>
+        <div className="modal-body agenda-warning-modal">
+          <div className="agenda-warning-hero">
+            <Skull size={26} />
+            <div>
+              <strong>{notes.length} nota/es registrades</strong>
+              <span>Historial de motius i tasques que van activar la nota.</span>
+            </div>
+          </div>
+          <div className="agenda-task-list agenda-note-history">
+            {notes.map((note) => (
+              <div key={note.id}>
+                <strong>{new Date(note.date).toLocaleDateString('ca-ES')}</strong>
+                <span>{note.text}</span>
+              </div>
+            ))}
+            {notes.length === 0 && <p className="empty-list">Aquest alumne encara no té notes a l’agenda.</p>}
+          </div>
+          <div className="modal-actions">
+            <button className="primary-action" onClick={onClose} type="button">
+              Tancar
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -471,6 +530,7 @@ export function TrackingView() {
   const [showPastTasks, setShowPastTasks] = useState(false)
   const [behaviorDraft, setBehaviorDraft] = useState(null)
   const [agendaWarningStudentId, setAgendaWarningStudentId] = useState(null)
+  const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const interventionInsights = useMemo(
     () => buildTrackingInterventions(students, taskRecords, tasks, behaviorEvents),
     [students, taskRecords, tasks, behaviorEvents],
@@ -522,11 +582,15 @@ export function TrackingView() {
       .filter((reminder) => reminder.task),
   ]
   const agendaWarningStudent = students.find((student) => student.id === agendaWarningStudentId)
-  const agendaWarningMissingTasks = agendaWarningStudent
+  const agendaWarningTrackingNotes = agendaWarningStudent
+    ? getTrackingAgendaNotes(agendaWarningStudent.id, agendaNotes, activeClassId)
+    : []
+  const agendaWarningRawMissingTasks = agendaWarningStudent
     ? getMissingTasksForStudent(agendaWarningStudent.id, taskRecords, tasks)
     : []
+  const agendaWarningMissingTasks = getActiveMissingTasks(agendaWarningRawMissingTasks, agendaWarningTrackingNotes)
   const agendaWarningRedPoints = agendaWarningStudent
-    ? getRedPointCount(agendaWarningStudent, agendaWarningMissingTasks)
+    ? getRedPointCount(agendaWarningStudent, agendaWarningMissingTasks, agendaWarningTrackingNotes)
     : 0
   const agendaWarningBlackPoints = agendaWarningStudent
     ? behaviorEvents.filter((event) => event.studentId === agendaWarningStudent.id && event.type === 'incident').length
@@ -575,8 +639,12 @@ export function TrackingView() {
         status,
       })
     }
-    const missingCount = getMissingTasksForStudent(student.id, nextTaskRecords, tasks).length
-    const redPointCount = getRedPointCount(student, { length: missingCount })
+    const previewMissingTasks = getMissingTasksForStudent(student.id, nextTaskRecords, tasks)
+    const redPointCount = getRedPointCount(
+      student,
+      previewMissingTasks,
+      getTrackingAgendaNotes(student.id, agendaNotes, activeClassId),
+    )
     const blackPointCount = behaviorEvents.filter(
       (event) => event.studentId === student.id && event.type === 'incident',
     ).length
@@ -612,8 +680,12 @@ export function TrackingView() {
   const handleBehaviorSave = async (text) => {
     if (!behaviorDraft) return
     await addBehaviorEvent(behaviorDraft.student.id, behaviorDraft.type, text)
-    const missingCount = getMissingTasksForStudent(behaviorDraft.student.id, taskRecords, tasks).length
-    const redPointCount = getRedPointCount(behaviorDraft.student, { length: missingCount })
+    const missingTasks = getMissingTasksForStudent(behaviorDraft.student.id, taskRecords, tasks)
+    const redPointCount = getRedPointCount(
+      behaviorDraft.student,
+      missingTasks,
+      getTrackingAgendaNotes(behaviorDraft.student.id, agendaNotes, activeClassId),
+    )
     const blackPointCount =
       behaviorEvents.filter(
         (event) => event.studentId === behaviorDraft.student.id && event.type === 'incident',
@@ -665,6 +737,11 @@ export function TrackingView() {
       window.removeEventListener('avaluapro-demo-agenda-warning', handleDemoAgendaWarning)
     }
   }, [filteredStudents, students, taskRecords, tasks, updateTaskRecord, updateTaskRecordMeta])
+
+  const agendaDetailStudent = students.find((student) => student.id === agendaDetailStudentId)
+  const agendaDetailNotes = agendaDetailStudent
+    ? getTrackingAgendaNotes(agendaDetailStudent.id, agendaNotes, activeClassId)
+    : []
 
   return (
     <section className="work-surface">
@@ -753,6 +830,13 @@ export function TrackingView() {
             await deferTaskAgendaWarning(agendaWarningStudent.id, agendaWarningRedPoints)
             setAgendaWarningStudentId(null)
           }}
+        />
+      )}
+      {agendaDetailStudent && (
+        <AgendaNotesModal
+          notes={agendaDetailNotes}
+          onClose={() => setAgendaDetailStudentId(null)}
+          student={agendaDetailStudent}
         />
       )}
       {taskNoteDraft && (
@@ -946,12 +1030,14 @@ export function TrackingView() {
                 (event) => event.studentId === student.id && event.type === 'positive',
               )
               const missingTasks = getMissingTasksForStudent(student.id, taskRecords, tasks)
-              const redPointCount = getRedPointCount(student, missingTasks)
+              const trackingAgendaNotes = getTrackingAgendaNotes(student.id, agendaNotes, activeClassId)
+              const redPointCount = getRedPointCount(student, missingTasks, trackingAgendaNotes)
               const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
-              const studentNotes = agendaNotes.filter((note) => note.studentId === student.id)
+              const studentNotes = agendaNotes.filter(
+                (note) => note.studentId === student.id && note.classId === activeClassId,
+              )
               const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
               const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
-              const trackingAgendaNotes = studentNotes.filter((note) => note.type === 'tracking')
               const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
 
               return (
@@ -1007,7 +1093,7 @@ export function TrackingView() {
                         <button
                           className={`agenda-note-chip ${trackingAgendaNotes.length > 0 ? 'active' : ''}`}
                           disabled={trackingAgendaNotes.length === 0}
-                          onClick={() => setProfileStudentId(student.id)}
+                          onClick={() => setAgendaDetailStudentId(student.id)}
                           title={trackingAgendaNotes.length > 0 ? 'Nota a l’agenda registrada' : 'Sense nota a l’agenda registrada'}
                           type="button"
                         >
