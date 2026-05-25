@@ -298,9 +298,11 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
   )
 }
 
-function TutorialStudentProfileModal({ profile, onClose }) {
+function TutorialStudentProfileModal({ onClose, onDeleteRecord, profile, recordRow }) {
   if (!profile) return null
 
+  const records = recordRow?.records || []
+  const hasTracking = records.length > 0
   const groupedByArea = Object.values(
     profile.evaluatedCompetencies.reduce((areas, item) => {
       const area = areas[item.areaId] || { name: item.areaName, rows: [] }
@@ -312,23 +314,49 @@ function TutorialStudentProfileModal({ profile, onClose }) {
   return (
     <Modal onClose={onClose} size="xl" title={`Perfil tutorial: ${profile.student.name}`}>
       <div className="tutorial-profile-modal">
-        <section className="tutorial-profile-summary">
-          <article>
-            <span>Competències avaluades</span>
-            <strong>{profile.evaluatedCount}</strong>
-          </article>
-          <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
-            <span>No assolides</span>
-            <strong>{profile.notDevelopedCount}</strong>
-          </article>
-          <article>
-            <span>% no assolides</span>
-            <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
-          </article>
-          <article>
-            <span>Àrea més delicada</span>
-            <strong>{profile.weakestArea?.name || '-'}</strong>
-          </article>
+        <div className="tutorial-profile-modal-toolbar">
+          <p>
+            Resum combinat de rendiment competencial i seguiment tutorial. Aquest és el punt de partida
+            per preparar una reunió o guardar el perfil com a PDF.
+          </p>
+          <button className="secondary-action compact" onClick={() => window.print()} type="button">
+            <FileDown size={16} />
+            Imprimir / desar PDF
+          </button>
+        </div>
+
+        <section>
+          <h3 className="tutorial-profile-section-title">Rendiment competencial</h3>
+          <div className="tutorial-profile-summary">
+            <article>
+              <span>Competències avaluades</span>
+              <strong>{profile.evaluatedCount}</strong>
+            </article>
+            <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
+              <span>No assolides</span>
+              <strong>{profile.notDevelopedCount}</strong>
+            </article>
+            <article>
+              <span>% no assolides</span>
+              <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
+            </article>
+            <article>
+              <span>Àrea més delicada</span>
+              <strong>{profile.weakestArea?.name || '-'}</strong>
+            </article>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="tutorial-profile-section-title">Seguiment tutorial</h3>
+          <div className="tutorial-profile-summary tracking">
+            {TUTORING_RECORD_TYPES.map((type) => (
+              <article className={type.tone} key={type.id}>
+                <span>{type.label}</span>
+                <strong>{countByType(records, type.id)}</strong>
+              </article>
+            ))}
+          </div>
         </section>
 
         {profile.evaluatedCount === 0 ? (
@@ -351,6 +379,43 @@ function TutorialStudentProfileModal({ profile, onClose }) {
             ))}
           </div>
         )}
+
+        <section className="tutorial-profile-record-section">
+          <h3 className="tutorial-profile-section-title">Evidències de seguiment</h3>
+          {!hasTracking ? (
+            <div className="empty-state compact">Encara no hi ha registres tutorials vinculats a aquest alumne.</div>
+          ) : (
+            <div className="tutorial-record-history compact">
+              {records
+                .slice()
+                .sort((a, b) => {
+                  const dateCompare = String(b.date || '').localeCompare(String(a.date || ''))
+                  if (dateCompare !== 0) return dateCompare
+                  return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+                })
+                .map((record) => {
+                  const typeMeta = getRecordTypeMeta(record.type)
+                  return (
+                    <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
+                      <div>
+                        <strong>{typeMeta.label}</strong>
+                        <span>{formatShortDate(record.date)}</span>
+                        <p>{record.note || 'Sense comentari afegit.'}</p>
+                      </div>
+                      <button
+                        className="icon-button danger subtle"
+                        onClick={() => onDeleteRecord(record.id)}
+                        title="Eliminar registre"
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </article>
+                  )
+                })}
+            </div>
+          )}
+        </section>
       </div>
     </Modal>
   )
@@ -428,10 +493,14 @@ export function TutoringView() {
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
-  const classStudents = students
-    .filter((student) => student.classId === linkedClassId)
-    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
-  const classTutorialRecords = tutorialRecords.filter((record) => record.classId === activeClassId)
+  const classStudents = useMemo(
+    () => students.filter((student) => student.classId === linkedClassId).sort((a, b) => a.name.localeCompare(b.name, 'ca')),
+    [linkedClassId, students],
+  )
+  const classTutorialRecords = useMemo(
+    () => tutorialRecords.filter((record) => record.classId === activeClassId),
+    [activeClassId, tutorialRecords],
+  )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const autoSubject =
     linkedClass?.subject && SUBJECT_STRUCTURES[linkedClass.subject] ? linkedClass.subject : subjectOptions[0]?.subject
@@ -448,6 +517,10 @@ export function TutoringView() {
   const tutorialRecordSummary = useMemo(
     () => summarizeTutorialRecords({ students: classStudents, records: classTutorialRecords }),
     [classStudents, classTutorialRecords],
+  )
+  const tutorialRecordRowsByStudent = useMemo(
+    () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
+    [tutorialRecordSummary.studentRows],
   )
   const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
     (profile) => profile.student.id === selectedTutorialProfileId,
@@ -896,35 +969,62 @@ export function TutoringView() {
               <div className="empty-state compact">Afegeix alumnes per començar a preparar perfils tutorials.</div>
             ) : (
               <div className="tutorial-student-profile-list">
-                {tutorialSummary.studentProfiles.map((profile) => (
-                  <button
-                    className={`tutorial-student-profile-row ${profile.notDevelopedCount > 0 ? 'risk' : ''}`}
-                    key={profile.student.id}
-                    onClick={() => setSelectedTutorialProfileId(profile.student.id)}
-                    type="button"
-                  >
-                    <div>
-                      <strong>{profile.student.name}</strong>
-                      <small>{profile.weakestArea?.name || 'Sense àrea delicada detectada'}</small>
-                    </div>
-                    <span>{profile.evaluatedCount} comp.</span>
-                    <span>{profile.notDevelopedCount} no assolides</span>
-                    <em>{profile.evaluatedCount > 0 ? formatPercent(profile.notDevelopedPercent) : '-'}</em>
-                  </button>
-                ))}
+                {tutorialSummary.studentProfiles.map((profile) => {
+                  const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
+                  const trackingCount = recordRow?.total || 0
+                  return (
+                    <button
+                      className={`tutorial-student-profile-row ${
+                        profile.notDevelopedCount > 0 || trackingCount > 0 ? 'risk' : ''
+                      }`}
+                      key={profile.student.id}
+                      onClick={() => setSelectedTutorialProfileId(profile.student.id)}
+                      type="button"
+                    >
+                      <div>
+                        <strong>{profile.student.name}</strong>
+                        <small>
+                          {profile.weakestArea?.name || 'Sense àrea delicada detectada'} · {trackingCount} registre/s
+                        </small>
+                      </div>
+                      <span>{profile.evaluatedCount} comp.</span>
+                      <span>{profile.notDevelopedCount} no assolides</span>
+                      <span>{recordRow?.agenda || 0} agenda</span>
+                      <em>{profile.evaluatedCount > 0 ? formatPercent(profile.notDevelopedPercent) : '-'}</em>
+                    </button>
+                  )
+                })}
               </div>
             )}
           </article>
 
-          <article className="tutoring-card muted">
+          <article className="tutoring-card muted tutorial-profile-pdf-card">
             <div>
               <FileDown size={24} />
               <h2>PDF de tutoria</h2>
             </div>
             <p>
-              El PDF vindrà després, quan tinguem definit exactament quin resum necessita el tutor per alumne i per grup.
+              Obre el perfil d’un alumne per revisar rendiment, registres tutorials i evidències. Des d’allà
+              pots imprimir-lo o desar-lo com a PDF.
             </p>
-            <span>Base preparada: notes tutorials, seguiment i perfil individual.</span>
+            <div className="tutorial-profile-pdf-stats">
+              <span>
+                <strong>{tutorialSummary.studentProfiles.length}</strong>
+                perfils
+              </span>
+              <span>
+                <strong>{tutorialRecordSummary.studentsWithRecords.length}</strong>
+                amb seguiment
+              </span>
+            </div>
+            <button
+              className="secondary-action"
+              disabled={tutorialSummary.studentProfiles.length === 0}
+              onClick={() => setSelectedTutorialProfileId(tutorialSummary.studentProfiles[0]?.student.id || '')}
+              type="button"
+            >
+              Obrir primer perfil
+            </button>
           </article>
         </section>
       )}
@@ -932,7 +1032,9 @@ export function TutoringView() {
       {selectedTutorialProfile && (
         <TutorialStudentProfileModal
           onClose={() => setSelectedTutorialProfileId('')}
+          onDeleteRecord={deleteTutorialRecord}
           profile={selectedTutorialProfile}
+          recordRow={tutorialRecordRowsByStudent.get(selectedTutorialProfile.student.id)}
         />
       )}
 

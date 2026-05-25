@@ -1423,7 +1423,7 @@ button.tutorial-record-pill {
 
 .tutorial-student-profile-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   gap: 10px;
   align-items: center;
   border: 1px solid #e5e7eb;
@@ -1474,6 +1474,32 @@ button.tutorial-record-pill {
   gap: 14px;
 }
 
+.tutorial-profile-modal-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border: 1px solid #e0e7ff;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eef2ff;
+}
+
+.tutorial-profile-modal-toolbar p {
+  max-width: 760px;
+  margin: 0;
+  color: #475569;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.tutorial-profile-section-title {
+  margin: 0 0 8px;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 950;
+}
+
 .tutorial-profile-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1497,6 +1523,26 @@ button.tutorial-record-pill {
 .tutorial-profile-summary article.warning {
   border-color: #fecaca;
   background: #fff1f2;
+}
+
+.tutorial-profile-summary article.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-profile-summary article.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-profile-summary article.violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.tutorial-profile-summary article.slate {
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
 .tutorial-profile-summary span {
@@ -1557,6 +1603,40 @@ button.tutorial-record-pill {
   color: #64748b;
   font-size: 12px;
   font-weight: 850;
+}
+
+.tutorial-profile-record-section {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-profile-pdf-card {
+  align-content: start;
+}
+
+.tutorial-profile-pdf-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-profile-pdf-stats span {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  color: #64748b;
+  background: white;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tutorial-profile-pdf-stats strong {
+  color: #0f172a;
+  font-size: 26px;
+  line-height: 1;
 }
 
 @media (max-width: 1100px) {
