@@ -201,7 +201,7 @@ export function ManageStudentsModal({ classId, onClose }) {
           </p>
           <textarea
             onChange={(event) => setBulkText(event.target.value)}
-            placeholder={'ALMENDROS ANTUNES, Mireia\nAMAT RICO, Claudia\nATALAYA AZABAL, Vega'}
+            placeholder={'PUJOL SERRA, Laia\nRIBA FONT, Nil\nVALLS ROCA, Jana'}
             value={bulkText}
           />
           {bulkText.trim() && (

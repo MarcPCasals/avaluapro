@@ -961,15 +961,15 @@ export function TrackingView() {
                       <div className="tracking-student-main">
                         <button
                           className={`student-note-button ${noteState}`}
-                          onClick={() => setProfileStudentId(student.id)}
-                          title="Resum i anotacions de seguiment"
+                          onClick={() => setAnnotationsStudentId(student.id)}
+                          title="Resum i anotacions per reunió"
                           type="button"
                         >
                           <MessageCircle size={17} />
                         </button>
                         <button
                           className="tracking-student-name"
-                          onClick={() => setAnnotationsStudentId(student.id)}
+                          onClick={() => setProfileStudentId(student.id)}
                           type="button"
                         >
                           <strong>{student.name}</strong>

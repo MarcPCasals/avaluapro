@@ -4279,7 +4279,7 @@
 
 .student-evolution-detail {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .student-evolution-summary,
@@ -4292,8 +4292,8 @@
 .student-evolution-summary {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 10px 14px;
 }
 
 .student-evolution-summary span,
@@ -4306,9 +4306,9 @@
 
 .student-evolution-summary strong {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   color: #1f2937;
-  font-size: 25px;
+  font-size: 21px;
 }
 
 .student-evolution-summary .evolution-rhythm.down {
@@ -4321,15 +4321,15 @@
 
 .student-evolution-summary small {
   color: #6b7280;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .student-evolution-card {
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .student-evolution-card h3 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   text-align: center;
 }
 
@@ -4341,7 +4341,7 @@
 .student-evolution-matrix th,
 .student-evolution-matrix td {
   border-top: 1px solid #e5e7eb;
-  padding: 7px 9px;
+  padding: 5px 8px;
   text-align: center;
 }
 
@@ -4353,12 +4353,12 @@
 .student-evolution-charts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .student-line-chart {
   width: 100%;
-  min-height: 230px;
+  min-height: 176px;
 }
 
 .chart-grid-line {
@@ -4412,7 +4412,7 @@
 
 .student-radar-chart {
   width: 100%;
-  min-height: 230px;
+  min-height: 176px;
 }
 
 .radar-ring {

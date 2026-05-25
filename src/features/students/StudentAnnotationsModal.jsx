@@ -1,12 +1,48 @@
-import { BarChart3, Camera, ChevronDown, ChevronUp, Clipboard, MessageCircle, Trash2, UserRound, X } from 'lucide-react'
+import {
+  BarChart3,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Clipboard,
+  ClipboardList,
+  MessageCircle,
+  Trash2,
+  TrendingUp,
+  UserRound,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
-import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
+import { getStudentTrackingStats } from '../../lib/analytics'
+import { calculateGrade, gradeClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+
+function getCriterionMark(marks, studentId, criterionId) {
+  return marks.find((mark) => mark.studentId === studentId && mark.criterionId === criterionId)?.value || ''
+}
+
+function getCompetencyGrade(marks, studentId, competency) {
+  const grades = competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id))
+  return calculateGrade(grades)
+}
+
+const taskStatusLabel = {
+  DONE: 'Feta',
+  LATE: 'Tard',
+  MISSING: 'No feta',
+  EXEMPT: 'Exempt',
+}
 
 function formatNote(note) {
   return `- ${new Date(note.date).toLocaleDateString('ca-ES')}: ${note.text}`
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleDateString('ca-ES')
+}
+
+function getRedPointCount(student, missingTasks) {
+  return Math.max(missingTasks.length, student.legacyTrackingPenaltyCount || 0)
 }
 
 function buildStudentAnnotationSummary({ diagnoses, student, teamNotes, tutoringNotes }) {
@@ -125,8 +161,15 @@ function LatestAnnotationCard({ color, emptyText, expanded, notes, onToggle, tit
 
 export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const students = useAvaluaproStore((state) => state.students)
+  const tasks = useAvaluaproStore((state) => state.tasks)
+  const taskRecords = useAvaluaproStore((state) => state.taskRecords)
+  const competencies = useAvaluaproStore((state) => state.competencies)
+  const criteria = useAvaluaproStore((state) => state.criteria)
+  const marks = useAvaluaproStore((state) => state.marks)
+  const behaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
   const deleteAgendaNote = useAvaluaproStore((state) => state.deleteAgendaNote)
@@ -145,6 +188,34 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   )
   const teamNotes = notes.filter((note) => note.type === 'team')
   const tutoringNotes = notes.filter((note) => note.type === 'tutoring')
+  const trackingNotes = notes.filter((note) => note.type === 'tracking')
+  const activeTasks = useMemo(
+    () =>
+      tasks
+        .filter((task) => task.classId === activeClassId && task.utId === activeUtId)
+        .sort((a, b) => a.order - b.order),
+    [activeClassId, activeUtId, tasks],
+  )
+  const activeCompetencies = useMemo(
+    () =>
+      competencies
+        .filter((competency) => competency.utId === activeUtId)
+        .sort((a, b) => a.order - b.order)
+        .map((competency) => ({
+          ...competency,
+          criteria: criteria
+            .filter((criterion) => criterion.competencyId === competency.id)
+            .sort((a, b) => a.order - b.order),
+        })),
+    [activeUtId, competencies, criteria],
+  )
+  const studentBehaviorEvents = useMemo(
+    () =>
+      behaviorEvents
+        .filter((event) => event.classId === activeClassId && event.studentId === studentId)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [activeClassId, behaviorEvents, studentId],
+  )
 
   useEffect(() => {
     const handleAddDemoTeamNote = async () => {
@@ -167,6 +238,21 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const hasTeamAlert = teamNotes.length > 0
   const hasTutoringAlert = tutoringNotes.length > 0
   const reminder = getReminderText({ activeDiagnoses, student, teamNotes, tutoringNotes })
+  const tracking = getStudentTrackingStats(studentId, taskRecords, activeTasks)
+  const criterionMarks = activeCompetencies.flatMap((competency) =>
+    competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id)).filter(Boolean),
+  )
+  const evaluationGrade = calculateGrade(criterionMarks)
+  const evaluatedCriteria = criterionMarks.length
+  const totalCriteria = activeCompetencies.reduce((total, competency) => total + competency.criteria.length, 0)
+  const missingTasks = activeTasks.filter(
+    (task) =>
+      taskRecords.find((record) => record.studentId === studentId && record.taskId === task.id)
+        ?.status === 'MISSING',
+  )
+  const redPointCount = getRedPointCount(student || {}, missingTasks)
+  const blackPoints = studentBehaviorEvents.filter((event) => event.type === 'incident')
+  const diaryEntries = studentBehaviorEvents.filter((event) => event.type === 'positive')
 
   const toggleDiagnosis = (diagnosisId) => {
     const nextDiagnoses = diagnoses.includes(diagnosisId)
@@ -200,19 +286,8 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
     setExpandedSections((current) => ({ ...current, [section]: !current[section] }))
   }
 
-  const handlePhotoUpload = async (file) => {
-    if (!file) return
-
-    try {
-      const photoUrl = await imageFileToCompressedDataUrl(file, { maxSize: 480 })
-      await updateStudent(studentId, { photoUrl })
-    } catch (error) {
-      window.alert(error.message)
-    }
-  }
-
   return (
-    <Modal onClose={onClose} size="xl" title={`Perfil de l’alumne: ${student.name}`}>
+    <Modal onClose={onClose} size="xl" title={`Anotacions i resum: ${student.name}`}>
       <div className="annotations-panel" data-tour="annotation-panel">
         <section className="annotation-hero">
           <div className="annotation-photo-card">
@@ -220,23 +295,11 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
               <img alt={student.name} src={student.photoUrl} />
             ) : (
               <div className="photo-placeholder">
-                <Camera size={34} />
+                <UserRound size={34} />
               </div>
             )}
-            <label>
-              Foto de l’alumne
-              <input
-                accept="image/*"
-                onChange={(event) => handlePhotoUpload(event.target.files?.[0])}
-                type="file"
-              />
-            </label>
-            {student.photoUrl && (
-              <button className="secondary-action compact" onClick={() => updateStudent(studentId, { photoUrl: '' })} type="button">
-                <X size={15} />
-                Treure foto
-              </button>
-            )}
+            <strong>{student.name}</strong>
+            <span>{student.halfGroup || 'Sense mig grup assignat'}</span>
           </div>
           <div className="annotation-quick-status">
             <article className={activeDiagnoses.length > 0 ? 'active' : ''}>
@@ -266,7 +329,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           {onOpenProfile && (
             <button className="secondary-action" onClick={() => onOpenProfile(studentId)} type="button">
               <BarChart3 size={16} />
-              Obrir resum de la UT
+              Obrir perfil personal
             </button>
           )}
         </section>
@@ -278,6 +341,120 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           </div>
           <p>{reminder.body}</p>
           <small>{reminder.meta}</small>
+        </section>
+
+        <section className="profile-section">
+          <div className="profile-section-title">
+            <h3>
+              <TrendingUp size={18} />
+              Resum de la UT activa
+            </h3>
+            <span className="profile-context-label">
+              Nota {evaluationGrade || '-'} · {evaluatedCriteria}/{totalCriteria} criteris · {tracking.total} tasques
+            </span>
+          </div>
+          <div className="profile-alert-grid">
+            <article className="profile-alert-card diagnoses">
+              <div>
+                <strong>Diagnòstics</strong>
+                <span>
+                  {activeDiagnoses.length > 0
+                    ? activeDiagnoses.map((diagnosis) => diagnosis.label).join(' · ')
+                    : 'Sense diagnòstics marcats'}
+                </span>
+              </div>
+            </article>
+            <article className={`profile-alert-card ${hasTeamAlert ? 'team' : ''}`}>
+              <div>
+                <strong>Equips educatius</strong>
+                <span>{teamNotes.length} entrada/es</span>
+                {teamNotes[0] && <small>{formatDate(teamNotes[0].date)}</small>}
+              </div>
+            </article>
+            <article className={`profile-alert-card ${hasTutoringAlert ? 'tutoring' : ''}`}>
+              <div>
+                <strong>Tutoria</strong>
+                <span>{tutoringNotes.length} comentari/s</span>
+                {tutoringNotes[0] && <small>{formatDate(tutoringNotes[0].date)}</small>}
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="profile-section">
+          <h3>
+            <BookOpen size={18} />
+            Avaluació de la UT
+          </h3>
+          <div className="profile-competency-grid">
+            {activeCompetencies.map((competency) => {
+              const grade = getCompetencyGrade(marks, studentId, competency)
+              return (
+                <article className="profile-competency" key={competency.id}>
+                  <div>
+                    <strong>{competency.name}</strong>
+                    <span className={gradeClassName(grade)}>{grade || '-'}</span>
+                  </div>
+                  <ul>
+                    {competency.criteria.map((criterion) => (
+                      <li key={criterion.id}>
+                        <span>{criterion.name}</span>
+                        <strong>{getCriterionMark(marks, studentId, criterion.id) || '-'}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              )
+            })}
+            {activeCompetencies.length === 0 && (
+              <p className="empty-list">Aquesta UT no té competències actives.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="profile-section">
+          <h3>
+            <ClipboardList size={18} />
+            Seguiment de tasques
+          </h3>
+          <div className="profile-followup-grid compact">
+            <article className="profile-followup-card red">
+              <span>Punts vermells</span>
+              <strong>{redPointCount}</strong>
+              <small>Tasques no fetes o comptadors importats</small>
+            </article>
+            <article className="profile-followup-card black">
+              <span>Punts negres</span>
+              <strong>{blackPoints.length}</strong>
+              <small>Incidències de comportament</small>
+            </article>
+            <article className="profile-followup-card diary">
+              <span>Diari</span>
+              <strong>{diaryEntries.length}</strong>
+              <small>Observacions sense negatiu</small>
+            </article>
+            <article className="profile-followup-card agenda">
+              <span>Agenda</span>
+              <strong>{trackingNotes.length}</strong>
+              <small>Notes a l’agenda registrades</small>
+            </article>
+          </div>
+          <div className="profile-task-list">
+            {activeTasks.map((task) => {
+              const record = taskRecords.find((item) => item.studentId === studentId && item.taskId === task.id)
+              const status = record?.status || ''
+              return (
+                <div className={`profile-task-row ${status.toLowerCase() || 'empty'}`} key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <span>{formatDate(task.date)}</span>
+                  </div>
+                  <small>{taskStatusLabel[status] || 'Sense registre'}</small>
+                </div>
+              )
+            })}
+            {activeTasks.length === 0 && <p className="empty-list">Aquesta UT encara no té tasques.</p>}
+          </div>
         </section>
 
         <section className="annotation-latest-grid">

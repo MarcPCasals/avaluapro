@@ -294,8 +294,8 @@ export function EvaluationView() {
                   <button
                     className={`student-note-button ${noteState}`}
                     data-tour={index === 0 ? 'student-comments' : undefined}
-                    onClick={() => setProfileStudentId(student.id)}
-                    title="Resum i anotacions de la UT"
+                    onClick={() => setAnnotationsStudentId(student.id)}
+                    title="Resum i anotacions per reunió"
                     type="button"
                   >
                     <MessageCircle size={17} />
@@ -303,7 +303,7 @@ export function EvaluationView() {
                   <button
                     className="student-name student-profile-trigger"
                     data-tour={index === 0 ? 'student-name-open' : undefined}
-                    onClick={() => setAnnotationsStudentId(student.id)}
+                    onClick={() => setProfileStudentId(student.id)}
                     type="button"
                   >
                     {student.name}
