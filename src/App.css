@@ -1124,7 +1124,7 @@ button.tutorial-stat-card {
 
 .tutorial-record-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1138,6 +1138,16 @@ button.tutorial-stat-card {
   background: #f8fafc;
   font-size: 12px;
   font-weight: 850;
+  text-align: left;
+}
+
+button.tutorial-record-pill {
+  cursor: pointer;
+}
+
+.tutorial-record-pill.active {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
 }
 
 .tutorial-record-pill strong {
@@ -1164,6 +1174,237 @@ button.tutorial-stat-card {
 .tutorial-record-pill.slate {
   border-color: #cbd5e1;
   background: #f8fafc;
+}
+
+.tutorial-tracking-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-tracking-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.tutorial-record-form-card {
+  min-height: unset;
+}
+
+.tutorial-record-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-record-form label {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-record-form label.full,
+.tutorial-record-form button {
+  grid-column: 1 / -1;
+}
+
+.tutorial-record-form input,
+.tutorial-record-form select,
+.tutorial-record-form textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: white;
+  font-size: 14px;
+  font-weight: 850;
+  text-transform: none;
+}
+
+.tutorial-record-form textarea {
+  min-height: 94px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.tutorial-record-type-select.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-record-type-select.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-record-type-select.violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.tutorial-record-type-select.slate {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tutorial-tracking-student-list {
+  display: grid;
+  gap: 8px;
+  max-height: 470px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tutorial-tracking-student-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  color: #334155;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.tutorial-tracking-student-row strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-tracking-student-row small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-tracking-student-row > span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #475569;
+  background: white;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.tutorial-record-history {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-record-history.compact {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.tutorial-record-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 11px;
+  background: #f8fafc;
+}
+
+.tutorial-record-entry.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-record-entry.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-record-entry.violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.tutorial-record-entry strong {
+  display: block;
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-record-entry span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tutorial-record-entry p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.tutorial-record-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-record-modal-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-record-modal-summary article {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.tutorial-record-modal-summary article.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-record-modal-summary article.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-record-modal-summary article.violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.tutorial-record-modal-summary article.slate {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tutorial-record-modal-summary span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-record-modal-summary strong {
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .tutorial-profile-panel {
@@ -1325,8 +1566,14 @@ button.tutorial-stat-card {
   }
 
   .tutorial-profile-panel,
-  .tutorial-insight-grid {
+  .tutorial-insight-grid,
+  .tutorial-tracking-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tutorial-record-summary,
+  .tutorial-record-modal-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

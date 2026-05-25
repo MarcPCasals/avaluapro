@@ -1310,6 +1310,38 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialMarks'])
   },
 
+  addTutorialRecord: async ({ classId, studentId, type, date, note }) => {
+    if (!classId || !studentId || !type) return
+
+    const cleanNote = String(note || '').trim()
+    const cleanDate = date || new Date().toISOString().slice(0, 10)
+
+    set((state) => ({
+      tutorialRecords: [
+        ...state.tutorialRecords,
+        {
+          id: createId('trecord'),
+          classId,
+          studentId,
+          type,
+          date: cleanDate,
+          note: cleanNote,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }))
+    await persistCollections(set, get, ['tutorialRecords'])
+  },
+
+  deleteTutorialRecord: async (recordId) => {
+    if (!recordId) return
+
+    set((state) => ({
+      tutorialRecords: state.tutorialRecords.filter((record) => record.id !== recordId),
+    }))
+    await persistCollections(set, get, ['tutorialRecords'])
+  },
+
   addCompetency: async (utId) => {
     const classId = get().ui.activeClassId
     const existingCompetencies = get().competencies.filter((competency) => competency.utId === utId)
