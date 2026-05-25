@@ -45,6 +45,21 @@ function formatShortDate(value) {
   return new Intl.DateTimeFormat('ca-AD', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
+function formatLongDate(value) {
+  if (!value) return 'Sense data'
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
+}
+
+function printTutorialProfile() {
+  document.body.classList.add('tutorial-profile-printing')
+  const clearPrintClass = () => document.body.classList.remove('tutorial-profile-printing')
+  window.addEventListener('afterprint', clearPrintClass, { once: true })
+  window.print()
+  window.setTimeout(clearPrintClass, 1200)
+}
+
 function getSubjectArea(subjectName) {
   return SUBJECT_AREAS.find((area) => area.subjects.includes(subjectName))
 }
@@ -298,11 +313,12 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
   )
 }
 
-function TutorialStudentProfileModal({ onClose, onDeleteRecord, profile, recordRow }) {
+function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow }) {
   if (!profile) return null
 
   const records = recordRow?.records || []
   const hasTracking = records.length > 0
+  const reportDate = getTodayDateInput()
   const groupedByArea = Object.values(
     profile.evaluatedCompetencies.reduce((areas, item) => {
       const area = areas[item.areaId] || { name: item.areaName, rows: [] }
@@ -312,14 +328,27 @@ function TutorialStudentProfileModal({ onClose, onDeleteRecord, profile, recordR
   )
 
   return (
-    <Modal onClose={onClose} size="xl" title={`Perfil tutorial: ${profile.student.name}`}>
+    <Modal
+      onClose={onClose}
+      panelClassName="tutorial-print-panel"
+      size="xl"
+      title={`Perfil tutorial: ${profile.student.name}`}
+    >
       <div className="tutorial-profile-modal">
+        <header className="tutorial-print-header">
+          <span>AvaluaPro · Informe tutorial</span>
+          <h2>{profile.student.name}</h2>
+          <p>
+            {classLabel || 'Classe sense nom'} · Generat el {formatLongDate(reportDate)}
+          </p>
+        </header>
+
         <div className="tutorial-profile-modal-toolbar">
           <p>
             Resum combinat de rendiment competencial i seguiment tutorial. Aquest és el punt de partida
             per preparar una reunió o guardar el perfil com a PDF.
           </p>
-          <button className="secondary-action compact" onClick={() => window.print()} type="button">
+          <button className="secondary-action compact" onClick={printTutorialProfile} type="button">
             <FileDown size={16} />
             Imprimir / desar PDF
           </button>
@@ -416,6 +445,10 @@ function TutorialStudentProfileModal({ onClose, onDeleteRecord, profile, recordR
             </div>
           )}
         </section>
+
+        <footer className="tutorial-print-footer">
+          Informe orientatiu generat amb AvaluaPro. Les dades s’han d’interpretar dins del context educatiu de l’alumne.
+        </footer>
       </div>
     </Modal>
   )
@@ -1031,6 +1064,7 @@ export function TutoringView() {
 
       {selectedTutorialProfile && (
         <TutorialStudentProfileModal
+          classLabel={activeClass?.name}
           onClose={() => setSelectedTutorialProfileId('')}
           onDeleteRecord={deleteTutorialRecord}
           profile={selectedTutorialProfile}
