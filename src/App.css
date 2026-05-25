@@ -698,6 +698,213 @@
   gap: 14px;
 }
 
+.tutoring-panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 10px;
+}
+
+.tutoring-panel-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #475569;
+  background: white;
+  font-weight: 950;
+}
+
+.tutoring-panel-tabs button.active {
+  color: #047857;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.tutorial-evaluation-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.tutorial-filter-bar label {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-filter-bar select {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: white;
+  font-size: 14px;
+  font-weight: 850;
+  text-transform: none;
+}
+
+.tutorial-subject-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.tutorial-subject-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.tutorial-subject-card > div {
+  display: grid;
+  gap: 3px;
+}
+
+.tutorial-subject-card strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-subject-card small,
+.tutorial-subject-card span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-subject-card button {
+  grid-column: 1 / -1;
+  width: fit-content;
+}
+
+.tutorial-mark-grid-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 16px;
+  background: white;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.tutorial-mark-grid-card > header {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-mark-grid-card h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.tutorial-mark-grid-card p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.tutorial-mark-table-wrap {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.tutorial-mark-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.tutorial-mark-table th,
+.tutorial-mark-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: center;
+}
+
+.tutorial-mark-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.tutorial-mark-table thead th:first-child,
+.tutorial-mark-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 230px;
+  max-width: 260px;
+  text-align: left;
+  background: #ffffff;
+}
+
+.tutorial-mark-table thead th:first-child {
+  z-index: 4;
+  background: #f8fafc;
+}
+
+.tutorial-mark-table thead span {
+  display: block;
+  max-width: 150px;
+  color: #64748b;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorial-mark-table thead strong {
+  display: block;
+  color: #1f2937;
+  font-size: 12px;
+}
+
+.tutorial-mark-table tbody th small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.tutorial-mark-table select {
+  min-width: 58px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 7px 8px;
+  text-align: center;
+  font-weight: 950;
+}
+
 .tutoring-card {
   display: grid;
   gap: 12px;

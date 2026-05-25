@@ -12,6 +12,7 @@ export const COLLECTIONS = [
   'behaviorEvents',
   'agendaNotes',
   'tutorialRecords',
+  'tutorialMarks',
   'seatingCharts',
 ]
 
@@ -474,5 +475,6 @@ export const seedDataset = {
     },
   ],
   tutorialRecords: [],
+  tutorialMarks: [],
   seatingCharts: [],
 }

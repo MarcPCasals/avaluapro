@@ -334,7 +334,10 @@ function parseBackupDataset(backup) {
 
   return COLLECTIONS.reduce((dataset, collection) => {
     if (!Array.isArray(source[collection])) {
-      if ((collection === 'seatingCharts' || collection === 'tutorialRecords') && source[collection] === undefined) {
+      if (
+        (collection === 'seatingCharts' || collection === 'tutorialRecords' || collection === 'tutorialMarks') &&
+        source[collection] === undefined
+      ) {
         return { ...dataset, [collection]: [] }
       }
 
@@ -1224,6 +1227,9 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialRecords: state.tutorialRecords.filter(
         (record) => record.classId !== classId && !studentIds.has(record.studentId),
       ),
+      tutorialMarks: state.tutorialMarks.filter(
+        (mark) => mark.classId !== classId && !studentIds.has(mark.studentId),
+      ),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })
@@ -1268,6 +1274,40 @@ export const useAvaluaproStore = create((set, get) => ({
       return { marks }
     })
     await persistCollections(set, get, ['marks'])
+  },
+
+  updateTutorialMark: async ({ classId, studentId, subject, criterionKey, value }) => {
+    if (!classId || !studentId || !subject || !criterionKey) return
+
+    set((state) => {
+      const existing = state.tutorialMarks.find(
+        (mark) =>
+          mark.classId === classId &&
+          mark.studentId === studentId &&
+          mark.subject === subject &&
+          mark.criterionKey === criterionKey,
+      )
+      const cleanValue = value || ''
+      const tutorialMarks = cleanValue
+        ? existing
+          ? state.tutorialMarks.map((mark) => (mark.id === existing.id ? { ...mark, value: cleanValue } : mark))
+          : [
+              ...state.tutorialMarks,
+              {
+                id: createId('tmark'),
+                classId,
+                studentId,
+                subject,
+                criterionKey,
+                value: cleanValue,
+                updatedAt: new Date().toISOString(),
+              },
+            ]
+        : state.tutorialMarks.filter((mark) => mark.id !== existing?.id)
+
+      return { tutorialMarks }
+    })
+    await persistCollections(set, get, ['tutorialMarks'])
   },
 
   addCompetency: async (utId) => {
