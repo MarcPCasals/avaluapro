@@ -10,7 +10,7 @@ import {
   TrendingUp,
   UserRound,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
 import { getStudentTrackingStats } from '../../lib/analytics'
@@ -177,6 +177,10 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const [tutoringText, setTutoringText] = useState('')
   const [copyState, setCopyState] = useState('')
   const [expandedSections, setExpandedSections] = useState({ team: false, tutoring: false })
+  const teamSectionRef = useRef(null)
+  const teamTextRef = useRef(null)
+  const tutoringSectionRef = useRef(null)
+  const tutoringTextRef = useRef(null)
   const student = students.find((item) => item.id === studentId)
 
   const notes = useMemo(
@@ -286,6 +290,17 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
     setExpandedSections((current) => ({ ...current, [section]: !current[section] }))
   }
 
+  const openAnnotationShortcut = (section) => {
+    const sectionRef = section === 'team' ? teamSectionRef : tutoringSectionRef
+    const textRef = section === 'team' ? teamTextRef : tutoringTextRef
+
+    setExpandedSections((current) => ({ ...current, [section]: true }))
+    window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      textRef.current?.focus()
+    })
+  }
+
   return (
     <Modal onClose={onClose} size="xl" title={`Anotacions i resum: ${student.name}`}>
       <div className="annotations-panel" data-tour="annotation-panel">
@@ -306,14 +321,24 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
               <strong>{activeDiagnoses.length}</strong>
               <span>diagnòstics marcats</span>
             </article>
-            <article className={hasTeamAlert ? 'team' : ''}>
+            <button
+              className={`annotation-quick-card ${hasTeamAlert ? 'team' : ''}`}
+              onClick={() => openAnnotationShortcut('team')}
+              title="Veure historial i afegir entrada d’equip educatiu"
+              type="button"
+            >
               <strong>{teamNotes.length}</strong>
               <span>equips educatius</span>
-            </article>
-            <article className={hasTutoringAlert && !hasTeamAlert ? 'tutoring' : ''}>
+            </button>
+            <button
+              className={`annotation-quick-card ${hasTutoringAlert && !hasTeamAlert ? 'tutoring' : ''}`}
+              onClick={() => openAnnotationShortcut('tutoring')}
+              title="Veure historial i afegir comentari de tutoria"
+              type="button"
+            >
               <strong>{tutoringNotes.length}</strong>
               <span>comentaris tutoria</span>
-            </article>
+            </button>
           </div>
         </section>
 
@@ -509,7 +534,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           />
         </section>
 
-        <section className="annotation-section team" data-tour="annotation-team">
+        <section className="annotation-section team" data-tour="annotation-team" ref={teamSectionRef}>
           <div className="annotation-section-title">
             <div>
               <button className="annotation-collapse" onClick={() => toggleSection('team')} type="button">
@@ -525,6 +550,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <textarea
             onChange={(event) => setTeamText(event.target.value)}
             placeholder="Escriu una nova entrada d’equip educatiu..."
+            ref={teamTextRef}
             value={teamText}
           />
           {expandedSections.team && (
@@ -532,7 +558,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           )}
         </section>
 
-        <section className="annotation-section tutoring">
+        <section className="annotation-section tutoring" ref={tutoringSectionRef}>
           <div className="annotation-section-title">
             <div>
               <button className="annotation-collapse" onClick={() => toggleSection('tutoring')} type="button">
@@ -551,6 +577,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <textarea
             onChange={(event) => setTutoringText(event.target.value)}
             placeholder="Escriu una nova entrada de tutoria..."
+            ref={tutoringTextRef}
             value={tutoringText}
           />
           {expandedSections.tutoring && (

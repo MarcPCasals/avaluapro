@@ -5641,7 +5641,8 @@
   gap: 10px;
 }
 
-.annotation-quick-status article {
+.annotation-quick-status article,
+.annotation-quick-card {
   display: grid;
   align-content: center;
   gap: 6px;
@@ -5649,6 +5650,18 @@
   border-radius: 8px;
   padding: 16px;
   background: #f8fafc;
+  text-align: left;
+}
+
+.annotation-quick-card {
+  cursor: pointer;
+}
+
+.annotation-quick-card:hover,
+.annotation-quick-card:focus-visible {
+  border-color: #fb923c;
+  box-shadow: 0 0 0 3px #ffedd5;
+  outline: none;
 }
 
 .annotation-quick-status article.active {
@@ -5656,23 +5669,27 @@
   background: #eff6ff;
 }
 
-.annotation-quick-status article.team {
+.annotation-quick-status article.team,
+.annotation-quick-card.team {
   border-color: #fecaca;
   background: #fff7f7;
 }
 
-.annotation-quick-status article.tutoring {
+.annotation-quick-status article.tutoring,
+.annotation-quick-card.tutoring {
   border-color: #fde68a;
   background: #fffbeb;
 }
 
-.annotation-quick-status strong {
+.annotation-quick-status strong,
+.annotation-quick-card strong {
   color: #111827;
   font-size: 34px;
   line-height: 1;
 }
 
-.annotation-quick-status span {
+.annotation-quick-status span,
+.annotation-quick-card span {
   color: #64748b;
   font-size: 13px;
   font-weight: 900;
