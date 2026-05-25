@@ -71,11 +71,8 @@ function getEmptyStateCopy(activeClass, subjectStructure) {
   }
 }
 
-function getStudentRowClass(dominantDiagnosis, noteState) {
-  return [
-    dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '',
-    noteState !== 'empty' ? `student-attention-${noteState}` : '',
-  ]
+function getStudentRowClass(dominantDiagnosis) {
+  return [dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '']
     .filter(Boolean)
     .join(' ')
 }
@@ -282,13 +279,15 @@ export function EvaluationView() {
           <tbody>
             {filteredStudents.map((student, index) => {
               const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
-              const studentNotes = agendaNotes.filter((note) => note.studentId === student.id)
+              const studentNotes = agendaNotes.filter(
+                (note) => note.studentId === student.id && note.classId === activeClassId,
+              )
               const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
               const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
               const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
 
               return (
-              <tr className={getStudentRowClass(dominantDiagnosis, noteState)} key={student.id}>
+              <tr className={getStudentRowClass(dominantDiagnosis)} key={student.id}>
                 <td className="sticky-student student-cell">
                   <span className="student-index">{index + 1}.</span>
                   <button

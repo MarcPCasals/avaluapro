@@ -92,11 +92,8 @@ function getRedPointCount(student, missingTasks, trackingAgendaNotes = []) {
   return Math.max(activeMissingTasks.length, legacyCount)
 }
 
-function getStudentRowClass(dominantDiagnosis, noteState) {
-  return [
-    dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '',
-    noteState !== 'empty' ? `student-attention-${noteState}` : '',
-  ]
+function getStudentRowClass(dominantDiagnosis) {
+  return [dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '']
     .filter(Boolean)
     .join(' ')
 }
@@ -1041,7 +1038,7 @@ export function TrackingView() {
               const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
 
               return (
-                <tr className={getStudentRowClass(dominantDiagnosis, noteState)} key={student.id}>
+                <tr className={getStudentRowClass(dominantDiagnosis)} key={student.id}>
                   <td className="sticky-student tracking-student-cell">
                     <div className="tracking-student-row">
                       <div className="tracking-student-main">
