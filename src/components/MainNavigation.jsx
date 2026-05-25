@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, TableProperties } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles } from '../lib/analytics'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
@@ -88,10 +88,12 @@ function UrgentModal({ profiles, onClose }) {
 export function MainNavigation() {
   const [showUrgent, setShowUrgent] = useState(false)
   const state = useAvaluaproStore()
-  const { activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)
+  const { activeClassId, activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
+  const activeClass = useAvaluaproStore((state) => state.classes.find((classItem) => classItem.id === activeClassId))
   const urgentProfiles = useMemo(() => getUrgentProfiles(state), [state])
+  const hasTutoringMode = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
 
   return (
     <div className="main-navigation" data-tour="main-navigation">
@@ -129,6 +131,16 @@ export function MainNavigation() {
             </button>
           )
         })}
+        {hasTutoringMode && (
+          <button
+            className={`insight-tab tutoring-tab ${activeMode === 'tutoring' ? 'active' : ''}`}
+            onClick={() => setActiveMode('tutoring')}
+            type="button"
+          >
+            <GraduationCap size={18} />
+            Mode tutoria
+          </button>
+        )}
         <button
           className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
           data-tour="urgent-button"

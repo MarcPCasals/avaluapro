@@ -114,6 +114,13 @@ function formatStudentNameForDisplay(rawName = '') {
 
 function normalizeDataset(dataset) {
   let normalizedDataset = { ...dataset }
+  normalizedDataset = COLLECTIONS.reduce(
+    (nextDataset, collection) => ({
+      ...nextDataset,
+      [collection]: Array.isArray(nextDataset[collection]) ? nextDataset[collection] : [],
+    }),
+    normalizedDataset,
+  )
   const usedUtIds = new Set([
     ...normalizedDataset.tasks.map((task) => task.utId),
     ...normalizedDataset.competencies.map((competency) => competency.utId),
@@ -122,6 +129,8 @@ function normalizeDataset(dataset) {
     ...normalizedDataset,
     classes: normalizedDataset.classes.map((classItem) => ({
       ...classItem,
+      isTutoringGroup: Boolean(classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
+      tutorialLinkedClassId: classItem.tutorialLinkedClassId || classItem.id,
       halfGroups:
         Array.isArray(classItem.halfGroups) && classItem.halfGroups.length > 0
           ? classItem.halfGroups
@@ -325,7 +334,7 @@ function parseBackupDataset(backup) {
 
   return COLLECTIONS.reduce((dataset, collection) => {
     if (!Array.isArray(source[collection])) {
-      if (collection === 'seatingCharts' && source[collection] === undefined) {
+      if ((collection === 'seatingCharts' || collection === 'tutorialRecords') && source[collection] === undefined) {
         return { ...dataset, [collection]: [] }
       }
 
@@ -781,6 +790,10 @@ export const useAvaluaproStore = create((set, get) => ({
       activeClassId: classId,
       activeSemesterId: semester?.id || '',
       activeUtId: ut?.id || '',
+      activeMode:
+        state.ui.activeMode === 'tutoring' && !(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
+          ? 'evaluation'
+          : state.ui.activeMode,
     }
 
     set((current) => ({
@@ -829,6 +842,8 @@ export const useAvaluaproStore = create((set, get) => ({
         halfGroups: DEFAULT_HALF_GROUPS,
         order: baseOrder + index + 1,
         utModelReady: true,
+        isTutoringGroup: false,
+        tutorialLinkedClassId: id,
       })
       newSemesters.push(...timeline.semesters)
       newUts.push(...timeline.uts)
@@ -1090,6 +1105,8 @@ export const useAvaluaproStore = create((set, get) => ({
           halfGroups: DEFAULT_HALF_GROUPS,
           order: getNextClassOrder(state.classes),
           utModelReady: true,
+          isTutoringGroup: false,
+          tutorialLinkedClassId: id,
         },
       ],
       semesters: [...state.semesters, ...timeline.semesters],
@@ -1123,6 +1140,13 @@ export const useAvaluaproStore = create((set, get) => ({
             timeline.classUts,
           )
         : null
+      const nextIsTutoringGroup =
+        patch.isTutoringGroup ?? Boolean(currentClass?.isTutoringGroup || nextSubject === 'Tutoria')
+      const shouldLeaveTutoringMode =
+        state.ui.activeClassId === classId &&
+        state.ui.activeMode === 'tutoring' &&
+        !nextIsTutoringGroup &&
+        nextSubject !== 'Tutoria'
 
       return {
         classes: state.classes.map((classItem) =>
@@ -1132,8 +1156,10 @@ export const useAvaluaproStore = create((set, get) => ({
         uts: timeline?.uts || state.uts,
         competencies: subjectStructure?.competencies || state.competencies,
         criteria: subjectStructure?.criteria || state.criteria,
+        ui: shouldLeaveTutoringMode ? { ...state.ui, activeMode: 'evaluation' } : state.ui,
       }
     })
+    writePreferences({ ...readPreferences(), ...get().ui })
     await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria'])
   },
 
@@ -1195,6 +1221,9 @@ export const useAvaluaproStore = create((set, get) => ({
         (event) => event.classId !== classId && !studentIds.has(event.studentId),
       ),
       agendaNotes: state.agendaNotes.filter((note) => note.classId !== classId && !studentIds.has(note.studentId)),
+      tutorialRecords: state.tutorialRecords.filter(
+        (record) => record.classId !== classId && !studentIds.has(record.studentId),
+      ),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })

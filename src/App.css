@@ -586,6 +586,12 @@
   background: #eff6ff;
 }
 
+.tutoring-tab.active {
+  color: #047857;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
 .urgent-tab {
   position: relative;
   min-height: 44px;
@@ -624,6 +630,168 @@
 .urgent-tab:not(.has-items) > span {
   color: #64748b;
   background: #e5e7eb;
+}
+
+.tutoring-view {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.tutoring-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 18px;
+  align-items: stretch;
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  padding: 22px;
+  background: linear-gradient(135deg, #ecfdf5, #ffffff 58%);
+}
+
+.tutoring-hero h1 {
+  margin: 8px 0 6px;
+  color: #0f172a;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.tutoring-hero p {
+  max-width: 780px;
+  margin: 0;
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.tutoring-hero aside {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  background: white;
+}
+
+.tutoring-hero aside strong {
+  color: #047857;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.tutoring-hero aside span {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutoring-hero aside small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.tutoring-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tutoring-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-height: 190px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+  background: white;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.tutoring-card.primary {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.tutoring-card.muted {
+  background: #f8fafc;
+}
+
+.tutoring-card > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #2563eb;
+}
+
+.tutoring-card h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 19px;
+}
+
+.tutoring-card p {
+  margin: 0;
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.tutoring-card > span {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.tutorial-record-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-record-pill {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-record-pill strong {
+  color: #111827;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.tutorial-record-pill.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-record-pill.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-record-pill.violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.tutorial-record-pill.slate {
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
 .urgent-modal {
@@ -5339,6 +5507,47 @@ button.profile-followup-card:focus-visible {
   font-size: 13px;
 }
 
+.tutorial-settings-panel {
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f0fdf4;
+}
+
+.tutorial-toggle-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.tutorial-toggle-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #16a34a;
+}
+
+.tutorial-toggle-row span {
+  display: grid;
+  gap: 3px;
+}
+
+.tutorial-toggle-row strong {
+  color: #14532d;
+  font-weight: 950;
+}
+
+.tutorial-toggle-row small {
+  color: #64748b;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .task-target-list {
   display: grid;
   gap: 8px;
@@ -7611,6 +7820,11 @@ button.profile-followup-card:focus-visible {
 }
 
 @media (max-width: 1180px) {
+  .tutoring-hero,
+  .tutoring-grid {
+    grid-template-columns: 1fr;
+  }
+
   .top-bar {
     min-height: 64px;
     gap: 6px;

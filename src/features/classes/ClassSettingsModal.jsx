@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Settings, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, GraduationCap, Settings, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassFormFields } from './ClassFormFields'
@@ -71,6 +71,47 @@ export function ClassSettingsModal({ classId, onClose }) {
             </div>
           ))}
         </div>
+      </div>
+      <div className="modal-section tutorial-settings-panel">
+        <h3>
+          <GraduationCap size={18} />
+          Tutoria
+        </h3>
+        <p>
+          Marca aquest grup si també és el teu grup de tutoria. Avaluapro reutilitzarà els mateixos
+          alumnes, mitjos grups, fotografies, diagnòstics i anotacions perquè no hagis de configurar-ho dues vegades.
+        </p>
+        <label className="tutorial-toggle-row">
+          <input
+            checked={Boolean(currentClass.isTutoringGroup || currentClass.subject === 'Tutoria')}
+            onChange={(event) =>
+              updateClass(classId, {
+                isTutoringGroup: event.target.checked,
+                tutorialLinkedClassId: currentClass.tutorialLinkedClassId || classId,
+              })
+            }
+            type="checkbox"
+          />
+          <span>
+            <strong>Aquest grup també és una tutoria</strong>
+            <small>Activarà el botó “Mode tutoria” quan aquesta classe estigui seleccionada.</small>
+          </span>
+        </label>
+        {(currentClass.isTutoringGroup || currentClass.subject === 'Tutoria') && (
+          <label className="field-label">
+            Classe d’origen per compartir alumnes
+            <select
+              onChange={(event) => updateClass(classId, { tutorialLinkedClassId: event.target.value })}
+              value={currentClass.tutorialLinkedClassId || classId}
+            >
+              {orderedClasses.map((classItem) => (
+                <option key={classItem.id} value={classItem.id}>
+                  {classItem.name} · {classItem.subject || 'Sense assignatura'}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <div className="modal-section danger-zone">
         <h3>

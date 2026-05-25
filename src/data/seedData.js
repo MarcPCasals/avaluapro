@@ -11,6 +11,7 @@ export const COLLECTIONS = [
   'taskRecords',
   'behaviorEvents',
   'agendaNotes',
+  'tutorialRecords',
   'seatingCharts',
 ]
 
@@ -301,6 +302,8 @@ export const seedDataset = {
       halfGroups: ['Grup A', 'Grup B'],
       order: 1,
       utModelReady: true,
+      isTutoringGroup: false,
+      tutorialLinkedClassId: DEMO_CLASS_ID,
     },
     {
       id: 'class_3d',
@@ -470,5 +473,6 @@ export const seedDataset = {
       date: '2027-02-14',
     },
   ],
+  tutorialRecords: [],
   seatingCharts: [],
 }

@@ -8,6 +8,7 @@ import { EvaluationView } from './features/evaluation/EvaluationView'
 import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
 import { TrackingView } from './features/tracking/TrackingView'
+import { TutoringView } from './features/tutoring/TutoringView'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
 
@@ -101,6 +102,7 @@ function App() {
         {activeMode === 'evaluation' && <EvaluationView />}
         {activeMode === 'tracking' && <TrackingView />}
         {activeMode === 'analytics' && <AnalyticsView />}
+        {activeMode === 'tutoring' && <TutoringView />}
       </main>
       {!defaultSubject && !onboarding.demoMode && <TeacherProfileModal forceSetup onClose={() => {}} />}
       <GuidedTour />
