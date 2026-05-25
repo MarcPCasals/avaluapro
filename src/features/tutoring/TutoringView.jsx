@@ -314,6 +314,12 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
 }
 
 function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow }) {
+  const [printSections, setPrintSections] = useState({
+    performanceSummary: true,
+    competencyDetail: true,
+    trackingSummary: true,
+    trackingEvidence: true,
+  })
   if (!profile) return null
 
   const records = recordRow?.records || []
@@ -326,6 +332,10 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
       return { ...areas, [item.areaId]: area }
     }, {}),
   )
+  const selectedPrintSections = Object.values(printSections).filter(Boolean).length
+  const togglePrintSection = (section) => {
+    setPrintSections((current) => ({ ...current, [section]: !current[section] }))
+  }
 
   return (
     <Modal
@@ -354,97 +364,155 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
           </button>
         </div>
 
-        <section>
-          <h3 className="tutorial-profile-section-title">Rendiment competencial</h3>
-          <div className="tutorial-profile-summary">
-            <article>
-              <span>Competències avaluades</span>
-              <strong>{profile.evaluatedCount}</strong>
-            </article>
-            <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
-              <span>No assolides</span>
-              <strong>{profile.notDevelopedCount}</strong>
-            </article>
-            <article>
-              <span>% no assolides</span>
-              <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
-            </article>
-            <article>
-              <span>Àrea més delicada</span>
-              <strong>{profile.weakestArea?.name || '-'}</strong>
-            </article>
+        <section className="tutorial-print-options">
+          <div>
+            <h3 className="tutorial-profile-section-title">Seccions de l’informe</h3>
+            <p>Activa només allò que vols incloure quan imprimeixis o desis el perfil com a PDF.</p>
           </div>
-        </section>
-
-        <section>
-          <h3 className="tutorial-profile-section-title">Seguiment tutorial</h3>
-          <div className="tutorial-profile-summary tracking">
-            {TUTORING_RECORD_TYPES.map((type) => (
-              <article className={type.tone} key={type.id}>
-                <span>{type.label}</span>
-                <strong>{countByType(records, type.id)}</strong>
-              </article>
-            ))}
+          <div className="tutorial-print-option-grid">
+            <label>
+              <input
+                checked={printSections.performanceSummary}
+                onChange={() => togglePrintSection('performanceSummary')}
+                type="checkbox"
+              />
+              Resum de rendiment
+            </label>
+            <label>
+              <input
+                checked={printSections.competencyDetail}
+                onChange={() => togglePrintSection('competencyDetail')}
+                type="checkbox"
+              />
+              Detall de competències
+            </label>
+            <label>
+              <input
+                checked={printSections.trackingSummary}
+                onChange={() => togglePrintSection('trackingSummary')}
+                type="checkbox"
+              />
+              Resum de seguiment
+            </label>
+            <label>
+              <input
+                checked={printSections.trackingEvidence}
+                onChange={() => togglePrintSection('trackingEvidence')}
+                type="checkbox"
+              />
+              Evidències de seguiment
+            </label>
           </div>
-        </section>
-
-        {profile.evaluatedCount === 0 ? (
-          <div className="empty-state compact">Encara no hi ha notes tutorials per aquest alumne.</div>
-        ) : (
-          <div className="tutorial-profile-area-list">
-            {groupedByArea.map((area) => (
-              <section key={area.name}>
-                <h3>{area.name}</h3>
-                {area.rows.map((row) => (
-                  <div className={`tutorial-profile-row ${row.notDeveloped ? 'risk' : ''}`} key={`${row.subject}_${row.competencyName}`}>
-                    <div>
-                      <strong>{row.subject}</strong>
-                      <span>{row.competencyName}</span>
-                    </div>
-                    <span className={gradeClassName(row.grade)}>{row.grade}</span>
-                  </div>
-                ))}
-              </section>
-            ))}
-          </div>
-        )}
-
-        <section className="tutorial-profile-record-section">
-          <h3 className="tutorial-profile-section-title">Evidències de seguiment</h3>
-          {!hasTracking ? (
-            <div className="empty-state compact">Encara no hi ha registres tutorials vinculats a aquest alumne.</div>
-          ) : (
-            <div className="tutorial-record-history compact">
-              {records
-                .slice()
-                .sort((a, b) => {
-                  const dateCompare = String(b.date || '').localeCompare(String(a.date || ''))
-                  if (dateCompare !== 0) return dateCompare
-                  return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-                })
-                .map((record) => {
-                  const typeMeta = getRecordTypeMeta(record.type)
-                  return (
-                    <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
-                      <div>
-                        <strong>{typeMeta.label}</strong>
-                        <span>{formatShortDate(record.date)}</span>
-                        <p>{record.note || 'Sense comentari afegit.'}</p>
-                      </div>
-                      <button
-                        className="icon-button danger subtle"
-                        onClick={() => onDeleteRecord(record.id)}
-                        title="Eliminar registre"
-                        type="button"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </article>
-                  )
-                })}
-            </div>
+          {selectedPrintSections === 0 && (
+            <strong className="tutorial-print-warning">Selecciona almenys una secció abans d’imprimir.</strong>
           )}
         </section>
+
+        {printSections.performanceSummary && (
+          <section>
+            <h3 className="tutorial-profile-section-title">Rendiment competencial</h3>
+            <div className="tutorial-profile-summary">
+              <article>
+                <span>Competències avaluades</span>
+                <strong>{profile.evaluatedCount}</strong>
+              </article>
+              <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
+                <span>No assolides</span>
+                <strong>{profile.notDevelopedCount}</strong>
+              </article>
+              <article>
+                <span>% no assolides</span>
+                <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
+              </article>
+              <article>
+                <span>Àrea més delicada</span>
+                <strong>{profile.weakestArea?.name || '-'}</strong>
+              </article>
+            </div>
+          </section>
+        )}
+
+        {printSections.trackingSummary && (
+          <section>
+            <h3 className="tutorial-profile-section-title">Seguiment tutorial</h3>
+            <div className="tutorial-profile-summary tracking">
+              {TUTORING_RECORD_TYPES.map((type) => (
+                <article className={type.tone} key={type.id}>
+                  <span>{type.label}</span>
+                  <strong>{countByType(records, type.id)}</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {printSections.competencyDetail && (
+          <section>
+            <h3 className="tutorial-profile-section-title">Detall de competències</h3>
+            {profile.evaluatedCount === 0 ? (
+              <div className="empty-state compact">Encara no hi ha notes tutorials per aquest alumne.</div>
+            ) : (
+              <div className="tutorial-profile-area-list">
+                {groupedByArea.map((area) => (
+                  <section key={area.name}>
+                    <h3>{area.name}</h3>
+                    {area.rows.map((row) => (
+                      <div
+                        className={`tutorial-profile-row ${row.notDeveloped ? 'risk' : ''}`}
+                        key={`${row.subject}_${row.competencyName}`}
+                      >
+                        <div>
+                          <strong>{row.subject}</strong>
+                          <span>{row.competencyName}</span>
+                        </div>
+                        <span className={gradeClassName(row.grade)}>{row.grade}</span>
+                      </div>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {printSections.trackingEvidence && (
+          <section className="tutorial-profile-record-section">
+          <h3 className="tutorial-profile-section-title">Evidències de seguiment</h3>
+            {!hasTracking ? (
+              <div className="empty-state compact">Encara no hi ha registres tutorials vinculats a aquest alumne.</div>
+            ) : (
+              <div className="tutorial-record-history compact">
+                {records
+                  .slice()
+                  .sort((a, b) => {
+                    const dateCompare = String(b.date || '').localeCompare(String(a.date || ''))
+                    if (dateCompare !== 0) return dateCompare
+                    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+                  })
+                  .map((record) => {
+                    const typeMeta = getRecordTypeMeta(record.type)
+                    return (
+                      <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
+                        <div>
+                          <strong>{typeMeta.label}</strong>
+                          <span>{formatShortDate(record.date)}</span>
+                          <p>{record.note || 'Sense comentari afegit.'}</p>
+                        </div>
+                        <button
+                          className="icon-button danger subtle"
+                          onClick={() => onDeleteRecord(record.id)}
+                          title="Eliminar registre"
+                          type="button"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </article>
+                    )
+                  })}
+              </div>
+            )}
+          </section>
+        )}
 
         <footer className="tutorial-print-footer">
           Informe orientatiu generat amb AvaluaPro. Les dades s’han d’interpretar dins del context educatiu de l’alumne.

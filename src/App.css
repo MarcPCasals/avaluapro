@@ -1505,6 +1505,57 @@ button.tutorial-record-pill {
   font-weight: 950;
 }
 
+.tutorial-print-options {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff7ed;
+}
+
+.tutorial-print-options p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.tutorial-print-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-print-option-grid label {
+  min-height: 40px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #9a3412;
+  background: white;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.tutorial-print-option-grid input {
+  width: 17px;
+  height: 17px;
+  accent-color: #ea580c;
+}
+
+.tutorial-print-warning {
+  grid-column: 1 / -1;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
 .tutorial-profile-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1677,6 +1728,7 @@ button.tutorial-record-pill {
 
   body.tutorial-profile-printing .modal-header,
   body.tutorial-profile-printing .tutorial-profile-modal-toolbar,
+  body.tutorial-profile-printing .tutorial-print-options,
   body.tutorial-profile-printing .tutorial-record-entry .icon-button {
     display: none !important;
   }
@@ -1768,13 +1820,15 @@ button.tutorial-record-pill {
 
 @media (max-width: 1100px) {
   .tutorial-stats-grid,
-  .tutorial-profile-summary {
+  .tutorial-profile-summary,
+  .tutorial-print-option-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tutorial-profile-panel,
   .tutorial-insight-grid,
-  .tutorial-tracking-grid {
+  .tutorial-tracking-grid,
+  .tutorial-print-options {
     grid-template-columns: 1fr;
   }
 
