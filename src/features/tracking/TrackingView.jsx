@@ -71,11 +71,12 @@ function getMissingTasksForStudent(studentId, taskRecords, tasks) {
 function getTrackingAgendaNotes(studentId, agendaNotes, classId) {
   return agendaNotes
     .filter((note) => note.studentId === studentId && note.classId === classId && note.type === 'tracking')
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))
 }
 
 function getAgendaRedResetCount(trackingAgendaNotes) {
   const latestTrackingNote = trackingAgendaNotes[0]
+  if (Number.isFinite(latestTrackingNote?.redPointCount)) return latestTrackingNote.redPointCount
   const match = latestTrackingNote?.text.match(/(\d+)\s+punts vermells/i)
   return Number(match?.[1] || 0)
 }
@@ -83,6 +84,10 @@ function getAgendaRedResetCount(trackingAgendaNotes) {
 function getActiveMissingTasks(missingTasks, trackingAgendaNotes) {
   const latestTrackingNote = trackingAgendaNotes[0]
   if (!latestTrackingNote) return missingTasks
+  const registeredTaskIds = new Set(latestTrackingNote.taskIds || [])
+  if (registeredTaskIds.size > 0) {
+    return missingTasks.filter((task) => !registeredTaskIds.has(task.id))
+  }
   return missingTasks.filter((task) => !latestTrackingNote.text.includes(task.title))
 }
 
@@ -115,7 +120,13 @@ function shouldShowAgendaWarning(student, redPointCount, blackPointCount) {
   return redPointCount + blackPointCount >= 3 && redPointCount > 0 && blackPointCount > 0
 }
 
-function BehaviorEventModal({ student, type, onClose, onSave }) {
+function formatReminderDateTime(reminder = {}) {
+  if (!reminder.date) return 'Sense data'
+  const date = new Date(`${reminder.date}T${reminder.time || '00:00'}`).toLocaleDateString('ca-ES')
+  return reminder.time ? `${date} · ${reminder.time}` : date
+}
+
+function BehaviorEventModal({ events = [], student, type, onClose, onSave }) {
   const [text, setText] = useState('')
   const isIncident = type === 'incident'
 
@@ -135,6 +146,22 @@ function BehaviorEventModal({ student, type, onClose, onSave }) {
               ? 'Explica breument què ha passat. Aquest registre comptarà com a punt negre.'
               : 'Afegeix una observació sense comptar-la com a negatiu.'}
           </p>
+          <section className="tracking-history-list">
+            <header>
+              <strong>Historial</strong>
+              <span>{events.length} entrada/es</span>
+            </header>
+            {events.length === 0 ? (
+              <p className="empty-list">Encara no hi ha cap entrada registrada.</p>
+            ) : (
+              events.map((event) => (
+                <article className={isIncident ? 'incident' : 'diary'} key={event.id}>
+                  <span>{new Date(event.date).toLocaleDateString('ca-ES')}</span>
+                  <p>{event.text}</p>
+                </article>
+              ))
+            )}
+          </section>
           <textarea
             autoFocus
             onChange={(event) => setText(event.target.value)}
@@ -164,6 +191,10 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
   const [copyState, setCopyState] = useState('')
   const activeMissingTasks = redPointCount > 0 ? missingTasks.slice(-redPointCount) : []
   const agendaText = buildTrackingAgendaText({ blackPointCount, missingTasks: activeMissingTasks, redPointCount, student })
+  const agendaReason =
+    redPointCount >= 3
+      ? 'S’ha activat perquè ja acumula 3 punts vermells de tasques no fetes.'
+      : 'S’ha activat per combinació de punts vermells i punts negres.'
 
   const copyAgendaText = async () => {
     try {
@@ -195,8 +226,7 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
             </div>
           </div>
           <p>
-            Aquest alumne ja té prou registres per valorar posar una nota a l’agenda. Revisa les tasques i decideix
-            si poses la nota ara o li dones una darrera oportunitat.
+            {agendaReason} Revisa les evidències i decideix si registres la nota ara o li dones una darrera oportunitat.
           </p>
           <div className="agenda-task-list">
             {activeMissingTasks.slice(-4).map((task) => (
@@ -214,8 +244,12 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
             <button className="secondary-action" onClick={onLastChance} type="button">
               Darrera oportunitat
             </button>
-            <button className="primary-action agenda-register-action" onClick={() => onRegisterAgenda(agendaText)} type="button">
-              Registrar nota a l’agenda
+            <button
+              className="primary-action agenda-register-action"
+              onClick={() => onRegisterAgenda(agendaText, activeMissingTasks)}
+              type="button"
+            >
+              Registrar nota i reiniciar punts vermells
             </button>
             <button className="primary-action" onClick={onClose} type="button">
               Entesos
@@ -250,10 +284,53 @@ function AgendaNotesModal({ notes, onClose, student }) {
             {notes.map((note) => (
               <div key={note.id}>
                 <strong>{new Date(note.date).toLocaleDateString('ca-ES')}</strong>
+                {Number.isFinite(note.redPointCount) && (
+                  <small>
+                    {note.redPointCount} punts vermells · {note.blackPointCount || 0} punts negres
+                  </small>
+                )}
                 <span>{note.text}</span>
               </div>
             ))}
             {notes.length === 0 && <p className="empty-list">Aquest alumne encara no té notes a l’agenda.</p>}
+          </div>
+          <div className="modal-actions">
+            <button className="primary-action" onClick={onClose} type="button">
+              Tancar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RedPointsModal({ missingTasks, onClose, student }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-panel lg">
+        <header className="modal-header">
+          <h2>Punts vermells: {student.name}</h2>
+          <button className="modal-close" onClick={onClose} type="button">
+            ×
+          </button>
+        </header>
+        <div className="modal-body agenda-warning-modal">
+          <div className="agenda-warning-hero red">
+            <XCircle size={26} />
+            <div>
+              <strong>{missingTasks.length} punt/s vermell/s actiu/s</strong>
+              <span>Quan s’arriba a 3, el programa proposa registrar una nota a l’agenda.</span>
+            </div>
+          </div>
+          <div className="agenda-task-list">
+            {missingTasks.map((task) => (
+              <div key={task.id}>
+                <strong>{task.title}</strong>
+                <span>{new Date(task.date).toLocaleDateString('ca-ES')}</span>
+              </div>
+            ))}
+            {missingTasks.length === 0 && <p className="empty-list">No hi ha tasques no fetes pendents de comptar.</p>}
           </div>
           <div className="modal-actions">
             <button className="primary-action" onClick={onClose} type="button">
@@ -528,6 +605,7 @@ export function TrackingView() {
   const [behaviorDraft, setBehaviorDraft] = useState(null)
   const [agendaWarningStudentId, setAgendaWarningStudentId] = useState(null)
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
+  const [redDetailStudentId, setRedDetailStudentId] = useState(null)
   const interventionInsights = useMemo(
     () => buildTrackingInterventions(students, taskRecords, tasks, behaviorEvents),
     [students, taskRecords, tasks, behaviorEvents],
@@ -577,7 +655,11 @@ export function TrackingView() {
         reminder: record.reminder,
       }))
       .filter((reminder) => reminder.task),
-  ]
+  ].sort((a, b) =>
+    `${a.reminder?.date || ''}T${a.reminder?.time || '00:00'}`.localeCompare(
+      `${b.reminder?.date || ''}T${b.reminder?.time || '00:00'}`,
+    ),
+  )
   const agendaWarningStudent = students.find((student) => student.id === agendaWarningStudentId)
   const agendaWarningTrackingNotes = agendaWarningStudent
     ? getTrackingAgendaNotes(agendaWarningStudent.id, agendaNotes, activeClassId)
@@ -739,6 +821,14 @@ export function TrackingView() {
   const agendaDetailNotes = agendaDetailStudent
     ? getTrackingAgendaNotes(agendaDetailStudent.id, agendaNotes, activeClassId)
     : []
+  const redDetailStudent = students.find((student) => student.id === redDetailStudentId)
+  const redDetailNotes = redDetailStudent ? getTrackingAgendaNotes(redDetailStudent.id, agendaNotes, activeClassId) : []
+  const redDetailMissingTasks = redDetailStudent
+    ? getActiveMissingTasks(
+        getMissingTasksForStudent(redDetailStudent.id, taskRecords, tasks),
+        redDetailNotes,
+      )
+    : []
 
   return (
     <section className="work-surface">
@@ -805,6 +895,9 @@ export function TrackingView() {
       )}
       {behaviorDraft && (
         <BehaviorEventModal
+          events={behaviorEvents
+            .filter((event) => event.studentId === behaviorDraft.student.id && event.type === behaviorDraft.type)
+            .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))}
           student={behaviorDraft.student}
           type={behaviorDraft.type}
           onClose={() => setBehaviorDraft(null)}
@@ -822,8 +915,13 @@ export function TrackingView() {
             await deferTaskAgendaWarning(agendaWarningStudent.id, agendaWarningRedPoints)
             setAgendaWarningStudentId(null)
           }}
-          onRegisterAgenda={async (agendaText) => {
-            await addAgendaNote(agendaWarningStudent.id, 'tracking', agendaText)
+          onRegisterAgenda={async (agendaText, tasksForAgenda) => {
+            await addAgendaNote(agendaWarningStudent.id, 'tracking', agendaText, {
+              blackPointCount: agendaWarningBlackPoints,
+              redPointCount: agendaWarningRedPoints,
+              resetRedPoints: true,
+              taskIds: tasksForAgenda.map((task) => task.id),
+            })
             await deferTaskAgendaWarning(agendaWarningStudent.id, agendaWarningRedPoints)
             setAgendaWarningStudentId(null)
           }}
@@ -834,6 +932,13 @@ export function TrackingView() {
           notes={agendaDetailNotes}
           onClose={() => setAgendaDetailStudentId(null)}
           student={agendaDetailStudent}
+        />
+      )}
+      {redDetailStudent && (
+        <RedPointsModal
+          missingTasks={redDetailMissingTasks}
+          onClose={() => setRedDetailStudentId(null)}
+          student={redDetailStudent}
         />
       )}
       {taskNoteDraft && (
@@ -912,7 +1017,7 @@ export function TrackingView() {
               <div>
                 <strong>{reminder.task.title}</strong>
                 {reminder.student && <span>{reminder.student.name}</span>}
-                {reminder.reminder?.time && <span>{reminder.reminder.time}</span>}
+                <span>Programat per {formatReminderDateTime(reminder.reminder)}</span>
                 <p>{reminder.text}</p>
               </div>
               <button className="secondary-action compact" onClick={() => snoozeReminder(reminder)} type="button">
@@ -1060,15 +1165,18 @@ export function TrackingView() {
                         </button>
                       </div>
                       <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
-                        <span
+                        <button
                           className={`red-point-stack ${redPointCount >= 3 ? 'warning' : ''}`}
+                          disabled={redPointCount === 0}
+                          onClick={() => setRedDetailStudentId(student.id)}
                           title="Punts vermells per tasques no fetes"
+                          type="button"
                         >
                           {Array.from({ length: Math.min(redPointCount, 4) }).map((_, pointIndex) => (
                             <i key={pointIndex} />
                           ))}
                           {redPointCount > 4 && <b>+{redPointCount - 4}</b>}
-                        </span>
+                        </button>
                         <button
                           className="black-point-button"
                           onClick={() => setBehaviorDraft({ student, type: 'incident' })}

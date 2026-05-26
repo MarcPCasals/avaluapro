@@ -3518,6 +3518,7 @@ button.tutorial-record-pill {
   border-radius: 8px;
   border: 1px solid #fecaca;
   background: #fff7f7;
+  cursor: pointer;
 }
 
 .agenda-note-chip.active {
@@ -3539,6 +3540,13 @@ button.tutorial-record-pill {
 .red-point-stack:empty {
   border-color: #e5e7eb;
   background: white;
+}
+
+.red-point-stack:disabled {
+  cursor: default;
+  border-color: #e5e7eb;
+  background: white;
+  opacity: 0.7;
 }
 
 .red-point-stack b,
@@ -6721,6 +6729,12 @@ button.profile-followup-card:focus-visible {
   background: #fef2f2;
 }
 
+.agenda-warning-hero.red {
+  color: #be123c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
 .agenda-warning-hero > div {
   display: grid;
   gap: 3px;
@@ -6761,9 +6775,64 @@ button.profile-followup-card:focus-visible {
   flex-direction: column;
 }
 
+.agenda-note-history small {
+  color: #b45309;
+  font-weight: 900;
+}
+
 .agenda-note-history span {
   white-space: pre-wrap;
   line-height: 1.45;
+}
+
+.tracking-history-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.tracking-history-list header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tracking-history-list article {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: white;
+}
+
+.tracking-history-list article.incident {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tracking-history-list article.diary {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.tracking-history-list article span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tracking-history-list article p {
+  color: #111827;
 }
 
 .empty-state,

@@ -36,6 +36,7 @@ function formatDate(date) {
 
 function getAgendaRedResetCount(trackingNotes) {
   const latestTrackingNote = trackingNotes[0]
+  if (Number.isFinite(latestTrackingNote?.redPointCount)) return latestTrackingNote.redPointCount
   const match = latestTrackingNote?.text.match(/(\d+)\s+punts vermells/i)
   return Number(match?.[1] || 0)
 }
@@ -43,6 +44,10 @@ function getAgendaRedResetCount(trackingNotes) {
 function getActiveMissingTasks(missingTasks, trackingNotes) {
   const latestTrackingNote = trackingNotes[0]
   if (!latestTrackingNote) return missingTasks
+  const registeredTaskIds = new Set(latestTrackingNote.taskIds || [])
+  if (registeredTaskIds.size > 0) {
+    return missingTasks.filter((task) => !registeredTaskIds.has(task.id))
+  }
   return missingTasks.filter((task) => !latestTrackingNote.text.includes(task.title))
 }
 
@@ -233,7 +238,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
     () =>
       agendaNotes
         .filter((note) => note.studentId === studentId && note.classId === activeClassId)
-        .sort((a, b) => b.date.localeCompare(a.date)),
+        .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
     [activeClassId, agendaNotes, studentId],
   )
   const teamNotes = notes.filter((note) => note.type === 'team')
@@ -263,7 +268,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
     () =>
       behaviorEvents
         .filter((event) => event.classId === activeClassId && event.studentId === studentId)
-        .sort((a, b) => b.date.localeCompare(a.date)),
+        .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
     [activeClassId, behaviorEvents, studentId],
   )
 

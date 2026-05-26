@@ -1633,6 +1633,7 @@ export const useAvaluaproStore = create((set, get) => ({
   addBehaviorEvent: async (studentId, type, text = '') => {
     const classId = get().ui.activeClassId
     const label = text.trim() || (type === 'incident' ? 'Incidència pendent de detallar' : 'Observació positiva')
+    const createdAt = new Date().toISOString()
     set((state) => ({
       behaviorEvents: [
         ...state.behaviorEvents,
@@ -1642,7 +1643,8 @@ export const useAvaluaproStore = create((set, get) => ({
           studentId,
           type,
           text: label,
-          date: new Date().toISOString().slice(0, 10),
+          date: createdAt.slice(0, 10),
+          createdAt,
         },
       ],
     }))
@@ -1658,21 +1660,24 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['students'])
   },
 
-  addAgendaNote: async (studentId, type, text) => {
+  addAgendaNote: async (studentId, type, text, meta = {}) => {
     const classId = get().ui.activeClassId
     const cleanText = text.trim()
     if (!cleanText) return
+    const createdAt = new Date().toISOString()
 
     set((state) => ({
       agendaNotes: [
         ...state.agendaNotes,
         {
+          ...meta,
           id: createId('note'),
           classId,
           studentId,
           type,
           text: cleanText,
-          date: new Date().toISOString().slice(0, 10),
+          date: createdAt.slice(0, 10),
+          createdAt,
         },
       ],
     }))
