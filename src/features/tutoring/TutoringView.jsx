@@ -70,6 +70,38 @@ function getSubjectArea(subjectName) {
   return SUBJECT_AREAS.find((area) => area.subjects.includes(subjectName))
 }
 
+function normalizeCompetencyLabel(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function getCompetencyCode(value) {
+  const match = String(value || '').match(/\b(?:trans\s*)?c\s*(\d+)\b/i)
+  return match ? `C${match[1]}` : ''
+}
+
+function isSameCompetencyName(a, b) {
+  const normalizedA = normalizeCompetencyLabel(a)
+  const normalizedB = normalizeCompetencyLabel(b)
+  if (normalizedA && normalizedA === normalizedB) return true
+
+  const codeA = getCompetencyCode(a)
+  const codeB = getCompetencyCode(b)
+  return Boolean(codeA && codeA === codeB)
+}
+
+function focusNextTutorialGradeSelect(currentElement) {
+  const fields = Array.from(document.querySelectorAll('[data-tutorial-grade-select="true"]'))
+  const currentIndex = fields.indexOf(currentElement)
+  if (currentIndex < 0) return
+
+  fields[currentIndex + 1]?.focus()
+}
+
 function getSubjectOptionsForArea(areaFilter) {
   const areas = SUBJECT_AREAS.filter((area) => area.id !== 'tutorial')
   return areas
@@ -138,7 +170,7 @@ function getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, stu
     evaluationContext.uts.filter((ut) => ut.classId === evaluationContext.linkedClassId).map((ut) => ut.id),
   )
   const matchingCompetencies = evaluationContext.competencies.filter(
-    (item) => classUtIds.has(item.utId) && item.name === competency.name,
+    (item) => classUtIds.has(item.utId) && isSameCompetencyName(item.name, competency.name),
   )
   const competencyGrades = matchingCompetencies
     .map((item) => {
@@ -159,6 +191,23 @@ function getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, stu
   return calculateGrade(competencyGrades)
 }
 
+function getTutorialCompetencyGradeSource({
+  classId,
+  competency,
+  evaluationContext,
+  studentId,
+  subject,
+  tutorialMarks,
+}) {
+  const storedGrade = getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency)
+  if (storedGrade) return { source: 'manual', value: storedGrade }
+
+  const linkedGrade = getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject })
+  if (linkedGrade) return { source: 'linked', value: linkedGrade }
+
+  return { source: 'empty', value: '' }
+}
+
 function getTutorialCompetencyGrade({
   classId,
   competency,
@@ -167,11 +216,14 @@ function getTutorialCompetencyGrade({
   subject,
   tutorialMarks,
 }) {
-  return (
-    getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency) ||
-    getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject }) ||
-    ''
-  )
+  return getTutorialCompetencyGradeSource({
+    classId,
+    competency,
+    evaluationContext,
+    studentId,
+    subject,
+    tutorialMarks,
+  }).value
 }
 
 function formatPercent(value) {
@@ -1435,6 +1487,35 @@ export function TutoringView() {
     }),
     [criteria, competencies, linkedClass?.subject, linkedClassId, marks, uts],
   )
+  const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
+  const linkedGradeCount = useMemo(() => {
+    if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
+
+    return classStudents.reduce(
+      (studentTotal, student) =>
+        studentTotal +
+        selectedCompetencies.filter((competency) => {
+          const gradeSource = getTutorialCompetencyGradeSource({
+            classId: activeClassId,
+            competency,
+            evaluationContext,
+            studentId: student.id,
+            subject: selectedSubject,
+            tutorialMarks,
+          })
+          return gradeSource.source === 'linked'
+        }).length,
+      0,
+    )
+  }, [
+    activeClassId,
+    classStudents,
+    evaluationContext,
+    isSelectedSubjectLinked,
+    selectedCompetencies,
+    selectedSubject,
+    tutorialMarks,
+  ])
   const tutorialSummary = useMemo(
     () =>
       summarizeTutorialData({
@@ -1784,6 +1865,17 @@ export function TutoringView() {
                   Posa o revisa la nota de cada competència. Si aquesta classe està vinculada amb una assignatura
                   que ja té notes a Avaluapro, les competències apareixen carregades automàticament.
                 </p>
+                {isSelectedSubjectLinked && (
+                  <div className="tutorial-linked-note">
+                    <CheckCircle2 size={16} />
+                    <span>
+                      {linkedGradeCount > 0
+                        ? `${linkedGradeCount} notes es llegeixen automàticament de ${linkedClass?.name || 'la classe vinculada'}.`
+                        : `Aquesta assignatura està vinculada amb ${linkedClass?.name || 'la classe vinculada'}, però encara no hi ha notes carregades.`}
+                      {' '}Si edites una cel·la aquí, quedarà guardada com a nota tutorial pròpia.
+                    </span>
+                  </div>
+                )}
               </div>
             </header>
 
@@ -1833,7 +1925,7 @@ export function TutoringView() {
                             </button>
                           </th>
                           {selectedCompetencies.map((competency) => {
-                            const value = getTutorialCompetencyGrade({
+                            const gradeSource = getTutorialCompetencyGradeSource({
                               classId: activeClassId,
                               competency,
                               evaluationContext,
@@ -1841,10 +1933,39 @@ export function TutoringView() {
                               subject: selectedSubject,
                               tutorialMarks,
                             })
+                            const value = gradeSource.value
                             return (
                               <td key={`${student.id}_${competency.key}`}>
                                 <select
-                                  className={gradeTextClassName(value)}
+                                  className={`${gradeTextClassName(value)} ${
+                                    gradeSource.source === 'linked' ? 'linked-grade-select' : ''
+                                  }`}
+                                  data-tutorial-grade-select="true"
+                                  onKeyDown={(event) => {
+                                    const key = event.key.toUpperCase()
+                                    const nextValue = key === 'N' ? 'NA' : key
+                                    if (['A', 'B', 'C', 'D', 'NA'].includes(nextValue)) {
+                                      event.preventDefault()
+                                      updateTutorialMark({
+                                        classId: activeClassId,
+                                        studentId: student.id,
+                                        subject: selectedSubject,
+                                        competencyKey: competency.key,
+                                        value: nextValue,
+                                      })
+                                      window.setTimeout(() => focusNextTutorialGradeSelect(event.currentTarget), 0)
+                                    }
+                                    if (event.key === 'Backspace' || event.key === 'Delete') {
+                                      event.preventDefault()
+                                      updateTutorialMark({
+                                        classId: activeClassId,
+                                        studentId: student.id,
+                                        subject: selectedSubject,
+                                        competencyKey: competency.key,
+                                        value: '',
+                                      })
+                                    }
+                                  }}
                                   onChange={(event) =>
                                     updateTutorialMark({
                                       classId: activeClassId,
@@ -1853,6 +1974,11 @@ export function TutoringView() {
                                       competencyKey: competency.key,
                                       value: event.target.value,
                                     })
+                                  }
+                                  title={
+                                    gradeSource.source === 'linked'
+                                      ? `Nota llegida de ${linkedClass?.name || 'la classe vinculada'}. Pots sobreescriure-la.`
+                                      : 'Nota tutorial pròpia'
                                   }
                                   value={value}
                                 >
