@@ -1549,9 +1549,32 @@ button.tutorial-record-pill {
   padding-right: 4px;
 }
 
+.tutorial-profile-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tutorial-profile-filter-tabs button {
+  min-height: 34px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #475569;
+  background: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tutorial-profile-filter-tabs button.active {
+  border-color: #fdba74;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
 .tutorial-student-profile-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
   gap: 10px;
   align-items: center;
   border: 1px solid #e5e7eb;
@@ -1682,6 +1705,73 @@ button.tutorial-record-pill {
   grid-column: 1 / -1;
   color: #b91c1c;
   font-size: 13px;
+}
+
+.tutorial-report-filter-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-report-filter-grid label {
+  display: grid;
+  gap: 5px;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-report-filter-grid select {
+  min-height: 39px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: white;
+  font-weight: 850;
+}
+
+.tutorial-executive-summary {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f0fdf4;
+}
+
+.tutorial-executive-summary.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.tutorial-executive-summary.risk {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-executive-summary strong {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.tutorial-executive-summary ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  font-weight: 800;
+}
+
+.tutorial-executive-summary p {
+  margin: 0;
+  color: #1f2937;
+  font-weight: 900;
+  line-height: 1.4;
 }
 
 .tutorial-tutor-comment-section {

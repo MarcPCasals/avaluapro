@@ -405,6 +405,64 @@ function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tu
   }
 }
 
+function getTutorialProfilePriority(profile, recordRow) {
+  return (
+    profile.notDevelopedCount * 3 +
+    (profile.notDevelopedPercent >= 30 ? 2 : 0) +
+    (profile.averageScore > 0 && profile.averageScore <= 2 ? 2 : 0) +
+    (recordRow?.agenda || 0) +
+    (recordRow?.incident || 0) * 2 +
+    (recordRow?.classroomExpulsion || 0) * 3 +
+    (recordRow?.centerExpulsion || 0) * 4
+  )
+}
+
+function getProfileExecutiveSummary(profile, records) {
+  const notDevelopedText =
+    profile.notDevelopedCount > 0
+      ? `${profile.notDevelopedCount} competència/es no assolides (${formatPercent(profile.notDevelopedPercent)}).`
+      : 'No hi ha competències no assolides registrades.'
+  const recordCounts = TUTORING_RECORD_TYPES.map((type) => ({
+    ...type,
+    count: countByType(records, type.id),
+  }))
+  const relevantRecords = recordCounts.filter((item) => item.count > 0)
+  const weakestEvidence = profile.weakestArea
+    ? `L’àrea més delicada és ${profile.weakestArea.name}.`
+    : 'Encara no hi ha una àrea delicada clara.'
+  const trackingEvidence =
+    relevantRecords.length > 0
+      ? relevantRecords.map((item) => `${item.count} ${item.label.toLowerCase()}`).join(' · ')
+      : 'Sense registres tutorials específics.'
+
+  let title = 'Seguiment ordinari'
+  let tone = 'ok'
+  let action = 'Mantenir observació ordinària i actualitzar el perfil quan entrin noves dades.'
+
+  if (profile.notDevelopedCount >= 2 || profile.notDevelopedPercent >= 30) {
+    title = 'Prioritat acadèmica'
+    tone = 'warning'
+    action = 'Revisar amb l’alumne quines competències pesen més i pactar una acció concreta de millora.'
+  }
+  if (relevantRecords.some((item) => ['incident', 'classroom-expulsion', 'center-expulsion'].includes(item.id))) {
+    title = 'Prioritat tutorial'
+    tone = 'risk'
+    action = 'Contrastar amb l’equip educatiu si els registres tutorial expliquen o agreugen el rendiment.'
+  }
+  if ((profile.notDevelopedCount >= 2 || profile.averageScore <= 2) && relevantRecords.length > 0) {
+    title = 'Prioritat combinada'
+    tone = 'risk'
+    action = 'Preparar una intervenció conjunta: tutor, docent de referència i família si escau.'
+  }
+
+  return {
+    action,
+    bullets: [notDevelopedText, weakestEvidence, trackingEvidence],
+    title,
+    tone,
+  }
+}
+
 function SubjectCatalogCard({ completion, item, onSelect }) {
   const isComplete = completion?.total > 0 && completion.completed === completion.total
 
@@ -440,7 +498,10 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
 
 function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow }) {
   const [tutorComment, setTutorComment] = useState('')
+  const [reportAreaFilter, setReportAreaFilter] = useState('all')
+  const [reportSubjectFilter, setReportSubjectFilter] = useState('all')
   const [printSections, setPrintSections] = useState({
+    executiveSummary: true,
     performanceSummary: true,
     competencyDetail: true,
     trackingSummary: true,
@@ -452,8 +513,23 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
   const records = recordRow?.records || []
   const hasTracking = records.length > 0
   const reportDate = getTodayDateInput()
+  const executiveSummary = getProfileExecutiveSummary(profile, records)
+  const reportAreaOptions = Object.values(
+    profile.evaluatedCompetencies.reduce(
+      (areas, item) => ({ ...areas, [item.areaId]: { id: item.areaId, name: item.areaName } }),
+      {},
+    ),
+  ).sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+  const reportSubjectOptions = Array.from(new Set(profile.evaluatedCompetencies.map((item) => item.subject))).sort(
+    (a, b) => a.localeCompare(b, 'ca'),
+  )
+  const filteredCompetencies = profile.evaluatedCompetencies.filter(
+    (item) =>
+      (reportAreaFilter === 'all' || item.areaId === reportAreaFilter) &&
+      (reportSubjectFilter === 'all' || item.subject === reportSubjectFilter),
+  )
   const groupedByArea = Object.values(
-    profile.evaluatedCompetencies.reduce((areas, item) => {
+    filteredCompetencies.reduce((areas, item) => {
       const area = areas[item.areaId] || { name: item.areaName, rows: [] }
       area.rows.push(item)
       return { ...areas, [item.areaId]: area }
@@ -499,6 +575,14 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
           <div className="tutorial-print-option-grid">
             <label>
               <input
+                checked={printSections.executiveSummary}
+                onChange={() => togglePrintSection('executiveSummary')}
+                type="checkbox"
+              />
+              Resum executiu
+            </label>
+            <label>
+              <input
                 checked={printSections.performanceSummary}
                 onChange={() => togglePrintSection('performanceSummary')}
                 type="checkbox"
@@ -538,10 +622,53 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
               Comentari del tutor
             </label>
           </div>
+          <div className="tutorial-report-filter-grid">
+            <label>
+              Àrea del detall
+              <select
+                onChange={(event) => {
+                  setReportAreaFilter(event.target.value)
+                  setReportSubjectFilter('all')
+                }}
+                value={reportAreaFilter}
+              >
+                <option value="all">Totes les àrees</option>
+                {reportAreaOptions.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Assignatura del detall
+              <select onChange={(event) => setReportSubjectFilter(event.target.value)} value={reportSubjectFilter}>
+                <option value="all">Totes les assignatures</option>
+                {reportSubjectOptions.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {selectedPrintSections === 0 && (
             <strong className="tutorial-print-warning">Selecciona almenys una secció abans d’imprimir.</strong>
           )}
         </section>
+
+        {printSections.executiveSummary && (
+          <section className={`tutorial-executive-summary ${executiveSummary.tone}`}>
+            <h3 className="tutorial-profile-section-title">Resum executiu</h3>
+            <strong>{executiveSummary.title}</strong>
+            <ul>
+              {executiveSummary.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+            <p>{executiveSummary.action}</p>
+          </section>
+        )}
 
         {printSections.tutorComment && (
           <section className="tutorial-tutor-comment-section">
@@ -620,6 +747,9 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                     ))}
                   </section>
                 ))}
+                {filteredCompetencies.length === 0 && (
+                  <div className="empty-state compact">Aquest filtre no té competències registrades.</div>
+                )}
               </div>
             )}
           </section>
@@ -724,6 +854,7 @@ function TutorialRecordStudentModal({ onClose, onDelete, row }) {
 export function TutoringView() {
   const [activePanel, setActivePanel] = useState('evaluation')
   const [areaFilter, setAreaFilter] = useState('all')
+  const [profileFilter, setProfileFilter] = useState('priority')
   const [subjectFilter, setSubjectFilter] = useState('auto')
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const [selectedTutorialRecordStudentId, setSelectedTutorialRecordStudentId] = useState('')
@@ -830,6 +961,25 @@ export function TutoringView() {
   )
   const selectedTutorialRecordRow = tutorialRecordSummary.studentRows.find(
     (row) => row.student.id === selectedTutorialRecordStudentId,
+  )
+  const filteredTutorialProfiles = useMemo(
+    () =>
+      tutorialSummary.studentProfiles
+        .filter((profile) => {
+          const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
+          if (profileFilter === 'all') return true
+          if (profileFilter === 'priority') return getTutorialProfilePriority(profile, recordRow) > 0
+          if (profileFilter === 'not-developed') return profile.notDevelopedCount > 0
+          if (profileFilter === 'tracking') return (recordRow?.total || 0) > 0
+          return true
+        })
+        .sort((a, b) => {
+          const priorityA = getTutorialProfilePriority(a, tutorialRecordRowsByStudent.get(a.student.id))
+          const priorityB = getTutorialProfilePriority(b, tutorialRecordRowsByStudent.get(b.student.id))
+          if (priorityA !== priorityB) return priorityB - priorityA
+          return a.student.name.localeCompare(b.student.name, 'ca')
+        }),
+    [profileFilter, tutorialRecordRowsByStudent, tutorialSummary.studentProfiles],
   )
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
 
@@ -1351,17 +1501,50 @@ export function TutoringView() {
               Consulta el resum de cada alumne amb competències no assolides, àrees delicades i evidències
               preparades per al futur PDF.
             </p>
+            <div className="tutorial-profile-filter-tabs" aria-label="Filtre de perfils tutorials">
+              <button
+                className={profileFilter === 'priority' ? 'active' : ''}
+                onClick={() => setProfileFilter('priority')}
+                type="button"
+              >
+                Prioritaris
+              </button>
+              <button
+                className={profileFilter === 'not-developed' ? 'active' : ''}
+                onClick={() => setProfileFilter('not-developed')}
+                type="button"
+              >
+                No assolides
+              </button>
+              <button
+                className={profileFilter === 'tracking' ? 'active' : ''}
+                onClick={() => setProfileFilter('tracking')}
+                type="button"
+              >
+                Seguiment
+              </button>
+              <button
+                className={profileFilter === 'all' ? 'active' : ''}
+                onClick={() => setProfileFilter('all')}
+                type="button"
+              >
+                Tots
+              </button>
+            </div>
             {tutorialSummary.studentProfiles.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes per començar a preparar perfils tutorials.</div>
+            ) : filteredTutorialProfiles.length === 0 ? (
+              <div className="empty-state compact">Aquest filtre no té cap alumne ara mateix.</div>
             ) : (
               <div className="tutorial-student-profile-list">
-                {tutorialSummary.studentProfiles.map((profile) => {
+                {filteredTutorialProfiles.map((profile) => {
                   const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
                   const trackingCount = recordRow?.total || 0
+                  const priority = getTutorialProfilePriority(profile, recordRow)
                   return (
                     <button
                       className={`tutorial-student-profile-row ${
-                        profile.notDevelopedCount > 0 || trackingCount > 0 ? 'risk' : ''
+                        priority > 0 ? 'risk' : ''
                       }`}
                       key={profile.student.id}
                       onClick={() => setSelectedTutorialProfileId(profile.student.id)}
@@ -1373,6 +1556,7 @@ export function TutoringView() {
                           {profile.weakestArea?.name || 'Sense àrea delicada detectada'} · {trackingCount} registre/s
                         </small>
                       </div>
+                      <span>{priority > 0 ? `P${priority}` : 'OK'}</span>
                       <span>{profile.evaluatedCount} comp.</span>
                       <span>{profile.notDevelopedCount} no assolides</span>
                       <span>{recordRow?.agenda || 0} agenda</span>
