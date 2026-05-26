@@ -1,7 +1,7 @@
 import { COLLECTIONS, EMPTY_DATASET } from '../data/seedData'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 const INDEXES = {
   students: ['classId'],
@@ -15,6 +15,7 @@ const INDEXES = {
   agendaNotes: ['classId', 'studentId'],
   tutorialRecords: ['classId', 'studentId', 'type'],
   tutorialMarks: ['classId', 'studentId', 'subject', 'criterionKey'],
+  tutorialRelations: ['classId', 'sourceStudentId', 'targetStudentId', 'type'],
   seatingCharts: ['classId', 'halfGroup'],
 }
 

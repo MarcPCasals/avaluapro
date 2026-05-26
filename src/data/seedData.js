@@ -13,6 +13,7 @@ export const COLLECTIONS = [
   'agendaNotes',
   'tutorialRecords',
   'tutorialMarks',
+  'tutorialRelations',
   'seatingCharts',
 ]
 
@@ -476,5 +477,6 @@ export const seedDataset = {
   ],
   tutorialRecords: [],
   tutorialMarks: [],
+  tutorialRelations: [],
   seatingCharts: [],
 }

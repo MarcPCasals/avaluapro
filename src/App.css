@@ -1304,6 +1304,293 @@ button.tutorial-record-pill {
   background: #f8fafc;
 }
 
+.tutorial-relationships-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-relationships-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  gap: 14px;
+  align-items: stretch;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #ecfdf5 100%);
+}
+
+.tutorial-relationships-hero h2 {
+  margin: 6px 0;
+  color: #1f2937;
+  font-size: 24px;
+}
+
+.tutorial-relationships-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.tutorial-relationship-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-relationship-summary article {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.tutorial-relationship-summary article.green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-relationship-summary article.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-relationship-summary svg {
+  color: #2563eb;
+}
+
+.tutorial-relationship-summary article.green svg {
+  color: #16a34a;
+}
+
+.tutorial-relationship-summary article.red svg {
+  color: #dc2626;
+}
+
+.tutorial-relationship-summary strong {
+  color: #111827;
+  font-size: 26px;
+  font-weight: 950;
+}
+
+.tutorial-relationship-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-relationships-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.tutorial-relationships-grid.detail {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tutorial-relation-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-relation-form label,
+.tutorial-relation-type-grid {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-relation-form label.full,
+.tutorial-relation-form button.primary-action,
+.tutorial-relation-type-grid {
+  grid-column: 1 / -1;
+}
+
+.tutorial-relation-form input,
+.tutorial-relation-form select,
+.tutorial-relation-form textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: white;
+  font-size: 14px;
+  font-weight: 850;
+  text-transform: none;
+}
+
+.tutorial-relation-form textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.tutorial-relation-type-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.tutorial-relation-type-grid legend {
+  grid-column: 1 / -1;
+  padding: 0;
+}
+
+.tutorial-relation-type-button {
+  min-height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #475569;
+  background: #f8fafc;
+  font-weight: 950;
+}
+
+.tutorial-relation-type-button.green.active {
+  border-color: #86efac;
+  color: #166534;
+  background: #dcfce7;
+}
+
+.tutorial-relation-type-button.blue.active {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.tutorial-relation-type-button.red.active {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.tutorial-sociogram-list,
+.tutorial-relation-history,
+.tutorial-relation-pills {
+  display: grid;
+  gap: 8px;
+  max-height: 460px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tutorial-sociogram-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  color: #334155;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.tutorial-sociogram-row.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.tutorial-sociogram-row strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-sociogram-row small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-sociogram-row > span,
+.tutorial-relation-pill span,
+.tutorial-relation-entry span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #475569;
+  background: white;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.tutorial-sociogram-row > span.green {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.tutorial-sociogram-row > span.red {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.tutorial-relation-pill,
+.tutorial-relation-entry {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.tutorial-relation-entry {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.tutorial-relation-pill.green,
+.tutorial-relation-entry.green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-relation-pill.blue,
+.tutorial-relation-entry.blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.tutorial-relation-pill.red,
+.tutorial-relation-entry.red {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-relation-pill strong,
+.tutorial-relation-entry strong {
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-relation-pill p,
+.tutorial-relation-entry p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .tutorial-tracking-student-list {
   display: grid;
   gap: 8px;
@@ -9673,6 +9960,16 @@ button.profile-followup-card:focus-visible {
     overflow: auto;
   }
 
+  .tutorial-relationships-hero,
+  .tutorial-relationships-grid,
+  .tutorial-relationships-grid.detail {
+    grid-template-columns: 1fr;
+  }
+
+  .tutorial-relationship-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .global-action-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9725,6 +10022,13 @@ button.profile-followup-card:focus-visible {
 
   .initial-class-row,
   .class-order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tutorial-relationship-summary,
+  .tutorial-relation-form,
+  .tutorial-relation-type-grid,
+  .tutorial-sociogram-row {
     grid-template-columns: 1fr;
   }
 }

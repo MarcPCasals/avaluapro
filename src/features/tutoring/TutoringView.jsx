@@ -11,10 +11,13 @@ import {
   FileDown,
   FileSpreadsheet,
   GraduationCap,
+  HeartHandshake,
   Layers3,
+  Network,
   Plus,
   Trash2,
   TrendingDown,
+  UserX,
   UsersRound,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -29,6 +32,11 @@ const TUTORING_RECORD_TYPES = [
   { id: 'classroom-expulsion', label: 'Expulsions d’aula', tone: 'violet' },
   { id: 'center-expulsion', label: 'Expulsions de centre', tone: 'slate' },
 ]
+const TUTORING_RELATION_TYPES = [
+  { id: 'positive', label: 'Treballa bé amb', shortLabel: 'Positiva', tone: 'green' },
+  { id: 'friendship', label: 'S’hi relaciona sovint', shortLabel: 'Afinitat', tone: 'blue' },
+  { id: 'avoid', label: 'Evitar de moment', shortLabel: 'Incompatibilitat', tone: 'red' },
+]
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 
@@ -38,6 +46,10 @@ function countByType(records, type) {
 
 function getRecordTypeMeta(type) {
   return TUTORING_RECORD_TYPES.find((item) => item.id === type) || TUTORING_RECORD_TYPES[0]
+}
+
+function getRelationTypeMeta(type) {
+  return TUTORING_RELATION_TYPES.find((item) => item.id === type) || TUTORING_RELATION_TYPES[0]
 }
 
 function getTodayDateInput() {
@@ -401,6 +413,62 @@ function summarizeTutorialRecords({ students, records }) {
     studentRows,
     recentRecords,
     studentsWithRecords: studentRows.filter((row) => row.total > 0),
+  }
+}
+
+function summarizeTutorialRelations({ relations, students }) {
+  const studentsById = new Map(students.map((student) => [student.id, student]))
+  const studentRows = students
+    .map((student) => {
+      const outgoing = relations.filter((relation) => relation.sourceStudentId === student.id)
+      const incoming = relations.filter((relation) => relation.targetStudentId === student.id)
+      const supportiveCount = [...outgoing, ...incoming].filter(
+        (relation) => relation.type === 'positive' || relation.type === 'friendship',
+      ).length
+      const avoidCount = [...outgoing, ...incoming].filter((relation) => relation.type === 'avoid').length
+
+      return {
+        student,
+        incoming,
+        outgoing,
+        supportiveCount,
+        avoidCount,
+        total: outgoing.length + incoming.length,
+      }
+    })
+    .sort((a, b) => b.total - a.total || a.student.name.localeCompare(b.student.name, 'ca'))
+  const reciprocalPairs = new Set()
+
+  relations
+    .filter((relation) => relation.type === 'positive' || relation.type === 'friendship')
+    .forEach((relation) => {
+      const hasReverse = relations.some(
+        (candidate) =>
+          candidate.sourceStudentId === relation.targetStudentId &&
+          candidate.targetStudentId === relation.sourceStudentId &&
+          (candidate.type === 'positive' || candidate.type === 'friendship'),
+      )
+      if (!hasReverse) return
+      reciprocalPairs.add([relation.sourceStudentId, relation.targetStudentId].sort().join('__'))
+    })
+
+  const enrichedRelations = relations
+    .map((relation) => ({
+      ...relation,
+      sourceStudent: studentsById.get(relation.sourceStudentId),
+      targetStudent: studentsById.get(relation.targetStudentId),
+      typeMeta: getRelationTypeMeta(relation.type),
+    }))
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+
+  return {
+    avoidCount: relations.filter((relation) => relation.type === 'avoid').length,
+    bridgeStudent: studentRows.find((row) => row.supportiveCount > 0)?.student || null,
+    enrichedRelations,
+    isolatedStudents: studentRows.filter((row) => row.total === 0).map((row) => row.student),
+    positiveCount: relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship').length,
+    reciprocalCount: reciprocalPairs.size,
+    studentRows,
   }
 }
 
@@ -1444,6 +1512,14 @@ export function TutoringView() {
     date: getTodayDateInput(),
     note: '',
   })
+  const [relationForm, setRelationForm] = useState({
+    sourceStudentId: '',
+    targetStudentId: '',
+    type: 'positive',
+    strength: '2',
+    note: '',
+  })
+  const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -1453,10 +1529,13 @@ export function TutoringView() {
   const uts = useAvaluaproStore((state) => state.uts)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
+  const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
+  const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
+  const deleteTutorialRelation = useAvaluaproStore((state) => state.deleteTutorialRelation)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -1467,6 +1546,10 @@ export function TutoringView() {
   const classTutorialRecords = useMemo(
     () => tutorialRecords.filter((record) => record.classId === activeClassId),
     [activeClassId, tutorialRecords],
+  )
+  const classTutorialRelations = useMemo(
+    () => tutorialRelations.filter((relation) => relation.classId === activeClassId),
+    [activeClassId, tutorialRelations],
   )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
@@ -1555,6 +1638,10 @@ export function TutoringView() {
     () => summarizeTutorialRecords({ students: classStudents, records: classTutorialRecords }),
     [classStudents, classTutorialRecords],
   )
+  const tutorialRelationSummary = useMemo(
+    () => summarizeTutorialRelations({ students: classStudents, relations: classTutorialRelations }),
+    [classStudents, classTutorialRelations],
+  )
   const tutorialRecordRowsByStudent = useMemo(
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRecordSummary.studentRows],
@@ -1574,6 +1661,9 @@ export function TutoringView() {
   const selectedTutorialRecordRow = tutorialRecordSummary.studentRows.find(
     (row) => row.student.id === selectedTutorialRecordStudentId,
   )
+  const selectedRelationRow =
+    tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
+    tutorialRelationSummary.studentRows[0]
   const filteredTutorialProfiles = useMemo(
     () =>
       tutorialSummary.studentProfiles
@@ -1615,6 +1705,30 @@ export function TutoringView() {
     }))
   }
 
+  const handleSubmitTutorialRelation = async (event) => {
+    event.preventDefault()
+    const sourceStudentId = relationForm.sourceStudentId || classStudents[0]?.id
+    const targetStudentId =
+      relationForm.targetStudentId || classStudents.find((student) => student.id !== sourceStudentId)?.id
+    if (!sourceStudentId || !targetStudentId || sourceStudentId === targetStudentId) return
+
+    await upsertTutorialRelation({
+      classId: activeClassId,
+      note: relationForm.note,
+      sourceStudentId,
+      strength: relationForm.strength,
+      targetStudentId,
+      type: relationForm.type,
+    })
+    setSelectedRelationStudentId(sourceStudentId)
+    setRelationForm((current) => ({
+      ...current,
+      sourceStudentId,
+      targetStudentId: '',
+      note: '',
+    }))
+  }
+
   return (
     <section className="tutoring-view">
       <header className="tutoring-hero">
@@ -1652,6 +1766,14 @@ export function TutoringView() {
         >
           <ClipboardList size={17} />
           Seguiment tutorial
+        </button>
+        <button
+          className={activePanel === 'relationships' ? 'active' : ''}
+          onClick={() => setActivePanel('relationships')}
+          type="button"
+        >
+          <Network size={17} />
+          Relacions i grups
         </button>
         <button
           className={activePanel === 'profile' ? 'active' : ''}
@@ -2148,6 +2270,234 @@ export function TutoringView() {
               </div>
             )}
           </article>
+        </section>
+      )}
+
+      {activePanel === 'relationships' && (
+        <section className="tutorial-relationships-panel">
+          <section className="tutorial-relationships-hero">
+            <div>
+              <span className="section-kicker">
+                <Network size={17} />
+                Relacions del grup
+              </span>
+              <h2>Sociograma inicial</h2>
+              <p>
+                Registra afinitats, parelles que funcionen bé i incompatibilitats abans de generar grups cooperatius.
+              </p>
+            </div>
+            <div className="tutorial-relationship-summary">
+              <article className="green">
+                <HeartHandshake size={19} />
+                <strong>{tutorialRelationSummary.positiveCount}</strong>
+                <span>relacions positives</span>
+              </article>
+              <article className="red">
+                <UserX size={19} />
+                <strong>{tutorialRelationSummary.avoidCount}</strong>
+                <span>incompatibilitats</span>
+              </article>
+              <article>
+                <UsersRound size={19} />
+                <strong>{tutorialRelationSummary.isolatedStudents.length}</strong>
+                <span>sense relacions</span>
+              </article>
+              <article>
+                <Network size={19} />
+                <strong>{tutorialRelationSummary.reciprocalCount}</strong>
+                <span>parelles recíproques</span>
+              </article>
+            </div>
+          </section>
+
+          <div className="tutorial-relationships-grid">
+            <article className="tutoring-card tutorial-relation-form-card">
+              <div>
+                <Plus size={24} />
+                <h2>Registrar relació</h2>
+              </div>
+              <form className="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
+                <label>
+                  Alumne origen
+                  <select
+                    onChange={(event) =>
+                      setRelationForm((current) => ({ ...current, sourceStudentId: event.target.value }))
+                    }
+                    value={relationForm.sourceStudentId}
+                  >
+                    <option value="">Primer alumne de la llista</option>
+                    {classStudents.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        {student.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Alumne relacionat
+                  <select
+                    onChange={(event) =>
+                      setRelationForm((current) => ({ ...current, targetStudentId: event.target.value }))
+                    }
+                    value={relationForm.targetStudentId}
+                  >
+                    <option value="">Tria un alumne</option>
+                    {classStudents
+                      .filter((student) => student.id !== relationForm.sourceStudentId)
+                      .map((student) => (
+                        <option key={student.id} value={student.id}>
+                          {student.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+
+                <fieldset className="tutorial-relation-type-grid">
+                  <legend>Tipus</legend>
+                  {TUTORING_RELATION_TYPES.map((type) => (
+                    <button
+                      className={`tutorial-relation-type-button ${type.tone} ${
+                        relationForm.type === type.id ? 'active' : ''
+                      }`}
+                      key={type.id}
+                      onClick={() => setRelationForm((current) => ({ ...current, type: type.id }))}
+                      type="button"
+                    >
+                      {type.shortLabel}
+                    </button>
+                  ))}
+                </fieldset>
+
+                <label>
+                  Intensitat
+                  <select
+                    onChange={(event) => setRelationForm((current) => ({ ...current, strength: event.target.value }))}
+                    value={relationForm.strength}
+                  >
+                    <option value="1">Baixa</option>
+                    <option value="2">Mitjana</option>
+                    <option value="3">Alta</option>
+                  </select>
+                </label>
+
+                <label className="full">
+                  Nota breu
+                  <textarea
+                    onChange={(event) => setRelationForm((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Ex: treballen bé en tasques obertes, cal evitar-los en exàmens cooperatius..."
+                    value={relationForm.note}
+                  />
+                </label>
+
+                <button className="primary-action" disabled={classStudents.length < 2} type="submit">
+                  Guardar relació
+                </button>
+              </form>
+            </article>
+
+            <article className="tutoring-card tutorial-sociogram-card">
+              <div>
+                <Network size={24} />
+                <h2>Mapa ràpid del grup</h2>
+              </div>
+              {classStudents.length === 0 ? (
+                <div className="empty-state compact">Afegeix alumnes a la tutoria per començar el sociograma.</div>
+              ) : (
+                <div className="tutorial-sociogram-list">
+                  {tutorialRelationSummary.studentRows.map((row) => {
+                    const isSelected = row.student.id === selectedRelationRow?.student.id
+                    return (
+                      <button
+                        className={`tutorial-sociogram-row ${isSelected ? 'active' : ''}`}
+                        key={row.student.id}
+                        onClick={() => setSelectedRelationStudentId(row.student.id)}
+                        type="button"
+                      >
+                        <div>
+                          <strong>{row.student.name}</strong>
+                          <small>{row.student.halfGroup || 'Sense mig grup'}</small>
+                        </div>
+                        <span className="green">{row.supportiveCount} positives</span>
+                        <span className="red">{row.avoidCount} evitar</span>
+                        <span>{row.total} total</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </article>
+          </div>
+
+          <div className="tutorial-relationships-grid detail">
+            <article className="tutoring-card">
+              <div>
+                <UsersRound size={24} />
+                <h2>{selectedRelationRow?.student.name || 'Detall de l’alumne'}</h2>
+              </div>
+              {!selectedRelationRow ? (
+                <div className="empty-state compact">Selecciona un alumne per veure’n les relacions.</div>
+              ) : selectedRelationRow.total === 0 ? (
+                <div className="empty-state compact">Aquest alumne encara no té relacions registrades.</div>
+              ) : (
+                <div className="tutorial-relation-pills">
+                  {[...selectedRelationRow.outgoing, ...selectedRelationRow.incoming].map((relation) => {
+                    const typeMeta = getRelationTypeMeta(relation.type)
+                    const isOutgoing = relation.sourceStudentId === selectedRelationRow.student.id
+                    const otherStudent = classStudents.find(
+                      (student) => student.id === (isOutgoing ? relation.targetStudentId : relation.sourceStudentId),
+                    )
+                    return (
+                      <article className={`tutorial-relation-pill ${typeMeta.tone}`} key={relation.id}>
+                        <strong>
+                          {isOutgoing ? 'Cap a' : 'Rep de'} {otherStudent?.name || 'Alumne no trobat'}
+                        </strong>
+                        <span>
+                          {typeMeta.shortLabel} · intensitat {relation.strength || 2}
+                        </span>
+                        {relation.note && <p>{relation.note}</p>}
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+            </article>
+
+            <article className="tutoring-card">
+              <div>
+                <ClipboardList size={24} />
+                <h2>Relacions registrades</h2>
+              </div>
+              {tutorialRelationSummary.enrichedRelations.length === 0 ? (
+                <div className="empty-state compact">Encara no hi ha cap relació registrada en aquesta tutoria.</div>
+              ) : (
+                <div className="tutorial-relation-history">
+                  {tutorialRelationSummary.enrichedRelations.slice(0, 12).map((relation) => (
+                    <article className={`tutorial-relation-entry ${relation.typeMeta.tone}`} key={relation.id}>
+                      <div>
+                        <strong>
+                          {relation.sourceStudent?.name || 'Alumne no trobat'} →{' '}
+                          {relation.targetStudent?.name || 'Alumne no trobat'}
+                        </strong>
+                        <span>
+                          {relation.typeMeta.shortLabel} · intensitat {relation.strength || 2}
+                        </span>
+                        {relation.note && <p>{relation.note}</p>}
+                      </div>
+                      <button
+                        className="icon-button danger subtle"
+                        onClick={() => deleteTutorialRelation(relation.id)}
+                        title="Eliminar relació"
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </article>
+          </div>
         </section>
       )}
 

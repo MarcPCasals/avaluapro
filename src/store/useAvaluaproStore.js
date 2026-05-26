@@ -335,7 +335,10 @@ function parseBackupDataset(backup) {
   return COLLECTIONS.reduce((dataset, collection) => {
     if (!Array.isArray(source[collection])) {
       if (
-        (collection === 'seatingCharts' || collection === 'tutorialRecords' || collection === 'tutorialMarks') &&
+        (collection === 'seatingCharts' ||
+          collection === 'tutorialRecords' ||
+          collection === 'tutorialMarks' ||
+          collection === 'tutorialRelations') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -1230,6 +1233,12 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialMarks: state.tutorialMarks.filter(
         (mark) => mark.classId !== classId && !studentIds.has(mark.studentId),
       ),
+      tutorialRelations: state.tutorialRelations.filter(
+        (relation) =>
+          relation.classId !== classId &&
+          !studentIds.has(relation.sourceStudentId) &&
+          !studentIds.has(relation.targetStudentId),
+      ),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })
@@ -1395,6 +1404,53 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialRecords: state.tutorialRecords.filter((record) => record.id !== recordId),
     }))
     await persistCollections(set, get, ['tutorialRecords'])
+  },
+
+  upsertTutorialRelation: async ({ classId, sourceStudentId, targetStudentId, type, strength = 2, note }) => {
+    if (!classId || !sourceStudentId || !targetStudentId || !type || sourceStudentId === targetStudentId) return
+
+    const cleanNote = String(note || '').trim()
+    const cleanStrength = Math.min(3, Math.max(1, Number(strength) || 2))
+    const now = new Date().toISOString()
+
+    set((state) => {
+      const existing = state.tutorialRelations.find(
+        (relation) =>
+          relation.classId === classId &&
+          relation.sourceStudentId === sourceStudentId &&
+          relation.targetStudentId === targetStudentId &&
+          relation.type === type,
+      )
+      const nextRelation = {
+        ...(existing || {
+          id: createId('trel'),
+          classId,
+          sourceStudentId,
+          targetStudentId,
+          type,
+          createdAt: now,
+        }),
+        note: cleanNote,
+        strength: cleanStrength,
+        updatedAt: now,
+      }
+
+      return {
+        tutorialRelations: existing
+          ? state.tutorialRelations.map((relation) => (relation.id === existing.id ? nextRelation : relation))
+          : [...state.tutorialRelations, nextRelation],
+      }
+    })
+    await persistCollections(set, get, ['tutorialRelations'])
+  },
+
+  deleteTutorialRelation: async (relationId) => {
+    if (!relationId) return
+
+    set((state) => ({
+      tutorialRelations: state.tutorialRelations.filter((relation) => relation.id !== relationId),
+    }))
+    await persistCollections(set, get, ['tutorialRelations'])
   },
 
   addCompetency: async (utId) => {
