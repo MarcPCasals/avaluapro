@@ -314,11 +314,13 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
 }
 
 function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow }) {
+  const [tutorComment, setTutorComment] = useState('')
   const [printSections, setPrintSections] = useState({
     performanceSummary: true,
     competencyDetail: true,
     trackingSummary: true,
     trackingEvidence: true,
+    tutorComment: true,
   })
   if (!profile) return null
 
@@ -402,11 +404,34 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
               />
               Evidències de seguiment
             </label>
+            <label>
+              <input
+                checked={printSections.tutorComment}
+                onChange={() => togglePrintSection('tutorComment')}
+                type="checkbox"
+              />
+              Comentari del tutor
+            </label>
           </div>
           {selectedPrintSections === 0 && (
             <strong className="tutorial-print-warning">Selecciona almenys una secció abans d’imprimir.</strong>
           )}
         </section>
+
+        {printSections.tutorComment && (
+          <section className="tutorial-tutor-comment-section">
+            <h3 className="tutorial-profile-section-title">Comentari del tutor</h3>
+            <textarea
+              className="tutorial-tutor-comment-editor"
+              onChange={(event) => setTutorComment(event.target.value)}
+              placeholder="Escriu aquí la síntesi docent: què preocupa, què ha millorat, quin acord proposem o quin seguiment cal fer..."
+              value={tutorComment}
+            />
+            <div className={`tutorial-tutor-comment-print ${tutorComment.trim() ? '' : 'empty'}`}>
+              {tutorComment.trim() || 'Sense comentari del tutor afegit.'}
+            </div>
+          </section>
+        )}
 
         {printSections.performanceSummary && (
           <section>

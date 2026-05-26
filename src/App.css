@@ -1556,6 +1556,38 @@ button.tutorial-record-pill {
   font-size: 13px;
 }
 
+.tutorial-tutor-comment-section {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eff6ff;
+}
+
+.tutorial-tutor-comment-editor {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #1f2937;
+  background: white;
+  font: inherit;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.tutorial-tutor-comment-editor:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.tutorial-tutor-comment-print {
+  display: none;
+}
+
 .tutorial-profile-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1729,6 +1761,7 @@ button.tutorial-record-pill {
   body.tutorial-profile-printing .modal-header,
   body.tutorial-profile-printing .tutorial-profile-modal-toolbar,
   body.tutorial-profile-printing .tutorial-print-options,
+  body.tutorial-profile-printing .tutorial-tutor-comment-editor,
   body.tutorial-profile-printing .tutorial-record-entry .icon-button {
     display: none !important;
   }
@@ -1787,6 +1820,7 @@ button.tutorial-record-pill {
   }
 
   body.tutorial-profile-printing .tutorial-profile-summary article,
+  body.tutorial-profile-printing .tutorial-tutor-comment-section,
   body.tutorial-profile-printing .tutorial-profile-area-list section,
   body.tutorial-profile-printing .tutorial-record-entry,
   body.tutorial-profile-printing .empty-state {
@@ -1801,6 +1835,26 @@ button.tutorial-record-pill {
 
   body.tutorial-profile-printing .tutorial-profile-summary strong {
     font-size: 19px;
+  }
+
+  body.tutorial-profile-printing .tutorial-tutor-comment-section {
+    padding: 9px;
+    background: white !important;
+  }
+
+  body.tutorial-profile-printing .tutorial-tutor-comment-print {
+    display: block;
+    min-height: 48px;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+
+  body.tutorial-profile-printing .tutorial-tutor-comment-print.empty {
+    color: #6b7280;
+    font-style: italic;
   }
 
   body.tutorial-profile-printing .tutorial-profile-section-title,
