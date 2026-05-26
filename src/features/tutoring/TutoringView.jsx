@@ -285,6 +285,65 @@ function summarizeTutorialRecords({ students, records }) {
   }
 }
 
+function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tutorialSummary }) {
+  const academicProfiles = tutorialSummary.studentProfiles.filter((profile) => profile.evaluatedCount > 0)
+  const priorityStudents = tutorialSummary.studentProfiles
+    .map((profile) => {
+      const recordRow = recordRowsByStudent.get(profile.student.id)
+      const recordSeverity =
+        (recordRow?.agenda || 0) +
+        (recordRow?.incident || 0) * 2 +
+        (recordRow?.classroomExpulsion || 0) * 3 +
+        (recordRow?.centerExpulsion || 0) * 4
+      const academicSeverity =
+        profile.notDevelopedCount * 2 +
+        (profile.notDevelopedPercent >= 30 ? 2 : 0) +
+        (profile.evaluatedCount > 0 && profile.averageScore <= 2 ? 2 : 0)
+      const score = academicSeverity + recordSeverity
+      const reasons = []
+      if (profile.notDevelopedCount > 0) reasons.push(`${profile.notDevelopedCount} competència/es no assolides`)
+      if (profile.notDevelopedPercent >= 30) reasons.push(`${formatPercent(profile.notDevelopedPercent)} no assolides`)
+      if (recordRow?.agenda) reasons.push(`${recordRow.agenda} nota/es a l’agenda`)
+      if (recordRow?.incident) reasons.push(`${recordRow.incident} incident/s`)
+      if ((recordRow?.classroomExpulsion || 0) + (recordRow?.centerExpulsion || 0) > 0) {
+        reasons.push(`${(recordRow?.classroomExpulsion || 0) + (recordRow?.centerExpulsion || 0)} expulsió/ns`)
+      }
+
+      return {
+        academicSeverity,
+        profile,
+        reasons,
+        recordRow,
+        recordSeverity,
+        score,
+      }
+    })
+    .filter((item) => item.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.academicSeverity - a.academicSeverity ||
+        b.recordSeverity - a.recordSeverity ||
+        a.profile.student.name.localeCompare(b.profile.student.name, 'ca'),
+    )
+
+  const totalRecords = tutorialRecordSummary.studentRows.reduce((total, row) => total + row.total, 0)
+  const studentsWithData = new Set([
+    ...academicProfiles.map((profile) => profile.student.id),
+    ...tutorialRecordSummary.studentsWithRecords.map((row) => row.student.id),
+  ])
+
+  return {
+    academicCoveragePercent:
+      tutorialSummary.studentProfiles.length > 0
+        ? (academicProfiles.length / tutorialSummary.studentProfiles.length) * 100
+        : 0,
+    priorityStudents,
+    studentsWithData: studentsWithData.size,
+    totalRecords,
+  }
+}
+
 function SubjectCatalogCard({ item, onSelect }) {
   return (
     <article className="tutorial-subject-card">
@@ -648,6 +707,15 @@ export function TutoringView() {
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRecordSummary.studentRows],
   )
+  const tutorialGroupSummary = useMemo(
+    () =>
+      summarizeTutorialGroup({
+        recordRowsByStudent: tutorialRecordRowsByStudent,
+        tutorialRecordSummary,
+        tutorialSummary,
+      }),
+    [tutorialRecordRowsByStudent, tutorialRecordSummary, tutorialSummary],
+  )
   const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
     (profile) => profile.student.id === selectedTutorialProfileId,
   )
@@ -726,6 +794,76 @@ export function TutoringView() {
 
       {activePanel === 'evaluation' && (
         <section className="tutorial-evaluation-panel">
+          <section className="tutorial-group-diagnosis">
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <BarChart3 size={17} />
+                  Diagnòstic tutorial del grup
+                </span>
+                <h2>Visió de tutor</h2>
+                <p>
+                  Lectura global del grup combinant competències de totes les assignatures i registres tutorials.
+                </p>
+              </div>
+              <button className="secondary-action compact" onClick={() => setActivePanel('profile')} type="button">
+                Veure perfils
+              </button>
+            </header>
+
+            <div className="tutorial-group-diagnosis-grid">
+              <article>
+                <span>Competències no assolides</span>
+                <strong>{tutorialSummary.evaluatedCount > 0 ? formatPercent(tutorialSummary.notDevelopedPercent) : '-'}</strong>
+                <small>
+                  {tutorialSummary.notDevelopedCount} de {tutorialSummary.evaluatedCount} competències avaluades
+                </small>
+              </article>
+              <article>
+                <span>Cobertura tutorial</span>
+                <strong>{formatPercent(tutorialGroupSummary.academicCoveragePercent)}</strong>
+                <small>{tutorialGroupSummary.studentsWithData} alumnes amb dades acadèmiques o de seguiment</small>
+              </article>
+              <article>
+                <span>Àrea prioritària</span>
+                <strong>{tutorialSummary.weakestArea?.name || '-'}</strong>
+                <small>
+                  {tutorialSummary.weakestArea
+                    ? `${formatPercent(tutorialSummary.weakestArea.notDevelopedPercent)} no assolides`
+                    : 'Encara no hi ha prou dades'}
+                </small>
+              </article>
+              <article className={tutorialGroupSummary.priorityStudents.length > 0 ? 'risk' : 'ok'}>
+                <span>Alumnes prioritaris</span>
+                <strong>{tutorialGroupSummary.priorityStudents.length}</strong>
+                <small>Rendiment baix, registres tutorials o acumulació combinada</small>
+              </article>
+            </div>
+
+            {tutorialGroupSummary.priorityStudents.length > 0 ? (
+              <div className="tutorial-group-priority-list">
+                {tutorialGroupSummary.priorityStudents.slice(0, 6).map((item) => (
+                  <button
+                    className="tutorial-group-priority-row"
+                    key={item.profile.student.id}
+                    onClick={() => setSelectedTutorialProfileId(item.profile.student.id)}
+                    type="button"
+                  >
+                    <div>
+                      <strong>{item.profile.student.name}</strong>
+                      <span>{item.reasons.slice(0, 3).join(' · ')}</span>
+                    </div>
+                    <em>{item.score}</em>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state compact">
+                Quan hi hagi notes tutorials o registres de seguiment, aquí apareixeran els alumnes que cal mirar abans.
+              </div>
+            )}
+          </section>
+
           <div className="tutorial-stats-grid">
             <TutorialStatsCard
               detail={`${tutorialSummary.notDevelopedCount} de ${tutorialSummary.evaluatedCount} competències avaluades`}

@@ -1407,6 +1407,123 @@ button.tutorial-record-pill {
   line-height: 1;
 }
 
+.tutorial-group-diagnosis {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 14px;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 72%);
+}
+
+.tutorial-group-diagnosis > header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.tutorial-group-diagnosis h2 {
+  margin: 4px 0;
+  color: #1f2937;
+  font-size: 22px;
+}
+
+.tutorial-group-diagnosis p {
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.tutorial-group-diagnosis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-group-diagnosis-grid article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e0e7ff;
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.tutorial-group-diagnosis-grid article.risk {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-group-diagnosis-grid article.ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-group-diagnosis-grid span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-group-diagnosis-grid strong {
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.tutorial-group-diagnosis-grid small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.tutorial-group-priority-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-group-priority-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #334155;
+  background: white;
+  text-align: left;
+}
+
+.tutorial-group-priority-row strong {
+  display: block;
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.tutorial-group-priority-row span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-group-priority-row em {
+  min-width: 34px;
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #b91c1c;
+  background: #fee2e2;
+  font-style: normal;
+  font-weight: 950;
+  text-align: center;
+}
+
 .tutorial-profile-panel {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.5fr);
@@ -1874,11 +1991,13 @@ button.tutorial-record-pill {
 
 @media (max-width: 1100px) {
   .tutorial-stats-grid,
+  .tutorial-group-diagnosis-grid,
   .tutorial-profile-summary,
   .tutorial-print-option-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tutorial-group-diagnosis > header,
   .tutorial-profile-panel,
   .tutorial-insight-grid,
   .tutorial-tracking-grid,
