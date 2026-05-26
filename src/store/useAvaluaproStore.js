@@ -1276,8 +1276,9 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['marks'])
   },
 
-  updateTutorialMark: async ({ classId, studentId, subject, criterionKey, value }) => {
-    if (!classId || !studentId || !subject || !criterionKey) return
+  updateTutorialMark: async ({ classId, studentId, subject, competencyKey, criterionKey, value }) => {
+    const targetKey = competencyKey || criterionKey
+    if (!classId || !studentId || !subject || !targetKey) return
 
     set((state) => {
       const existing = state.tutorialMarks.find(
@@ -1285,12 +1286,22 @@ export const useAvaluaproStore = create((set, get) => ({
           mark.classId === classId &&
           mark.studentId === studentId &&
           mark.subject === subject &&
-          mark.criterionKey === criterionKey,
+          (mark.competencyKey === targetKey || (!competencyKey && mark.criterionKey === targetKey)),
       )
       const cleanValue = value || ''
       const tutorialMarks = cleanValue
         ? existing
-          ? state.tutorialMarks.map((mark) => (mark.id === existing.id ? { ...mark, value: cleanValue } : mark))
+          ? state.tutorialMarks.map((mark) =>
+              mark.id === existing.id
+                ? {
+                    ...mark,
+                    competencyKey: competencyKey || mark.competencyKey,
+                    criterionKey: criterionKey || mark.criterionKey,
+                    value: cleanValue,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : mark,
+            )
           : [
               ...state.tutorialMarks,
               {
@@ -1298,7 +1309,8 @@ export const useAvaluaproStore = create((set, get) => ({
                 classId,
                 studentId,
                 subject,
-                criterionKey,
+                competencyKey: competencyKey || null,
+                criterionKey: criterionKey || null,
                 value: cleanValue,
                 updatedAt: new Date().toISOString(),
               },

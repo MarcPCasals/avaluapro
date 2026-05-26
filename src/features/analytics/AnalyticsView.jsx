@@ -21,7 +21,7 @@ import {
   getStudentRedPointCount,
   getStudentTrackingStats,
 } from '../../lib/analytics'
-import { calculateGrade, getNumericFromGrade } from '../../lib/grades'
+import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const insightCopy = {
@@ -627,9 +627,9 @@ function getGlobalDecision(profile) {
 
   if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasHighConsistency(profile)) {
     return {
-      label: 'Reforç conceptual',
-      text: 'Treballa de manera constant, però necessita ajuda sobre els criteris o competències.',
-      tone: 'concept',
+      label: 'Alumne invisible',
+      text: 'Treballa de manera constant, però el rendiment és baix: cal mirar-lo perquè pot passar desapercebut.',
+      tone: 'invisible',
     }
   }
 
@@ -669,6 +669,7 @@ function getDecisionPriority(profile) {
   const toneOrder = {
     danger: 0,
     warning: 1,
+    invisible: 2,
     concept: 2,
     habit: 3,
     dark: 4,
@@ -1441,7 +1442,7 @@ function getStudentActionReason(profile, kind) {
     if (profile.incidents >= 2) reasons.push('incidències repetides')
     return reasons.length > 0 ? reasons.join(' · ') : 'senyals combinades de risc'
   }
-  if (kind === 'concept') return 'fa les tasques, però el rendiment indica dificultat conceptual'
+  if (kind === 'invisible' || kind === 'concept') return 'treballa amb constància, però el rendiment indica dificultat conceptual'
   if (kind === 'habit') return 'té bon rendiment, però els hàbits de treball són fràgils'
   return 'seguiment docent recomanat'
 }
@@ -1462,7 +1463,7 @@ function getActionRecommendation(kind) {
   if (kind === 'risk') {
     return 'Acció recomanada: entrevista breu, revisar les últimes evidències i marcar una mesura concreta per a la propera UT.'
   }
-  if (kind === 'concept') {
+  if (kind === 'invisible' || kind === 'concept') {
     return 'Acció recomanada: no insistir només en “treballar més”; cal reforç conceptual, exemples guiats i comprovació curta de comprensió.'
   }
   if (kind === 'habit') {
@@ -1614,31 +1615,37 @@ function ProgressChangePanel({ declinedRows, improvedRows, onSelectStudent, setI
 function UtCompetencyOverview({ competencies, setInfo }) {
   return (
     <section className="ut-competency-overview">
-      {competencies.map((competency) => (
-        <article className="ut-competency-card" key={competency.id}>
-          <InfoButton
-            label={competency.name}
-            onOpen={() => setInfo({ title: competency.name, text: chartHelp.utCompetencies })}
-          />
-          <header>
-            <span className={`competency-dot ${competency.color}`} />
-            <strong>{competency.name}</strong>
-          </header>
-          <div className="ut-competency-score">
-            <b>{competency.average || '-'}</b>
-            <span>mitjana</span>
-          </div>
-          <div className="mini-grade-strip">
-            {gradeOrder.map((grade) => (
-              <span className={`grade-${grade}`} key={grade}>
-                {grade}
-                <b>{competency.counts[grade]}</b>
-              </span>
-            ))}
-          </div>
-          <small>{competency.riskStudents.length} alumnes amb C/D</small>
-        </article>
-      ))}
+      {competencies.map((competency) => {
+        const averageGrade = getGradeFromAverage(competency.average)
+        const riskPercent = competency.total > 0 ? Math.round((competency.riskStudents.length / competency.total) * 100) : 0
+
+        return (
+          <article className="ut-competency-card" key={competency.id}>
+            <InfoButton
+              label={competency.name}
+              onOpen={() => setInfo({ title: competency.name, text: chartHelp.utCompetencies })}
+            />
+            <header>
+              <span className={`competency-dot ${competency.color}`} />
+              <strong>{competency.name}</strong>
+            </header>
+            <div className="ut-competency-score">
+              <b className={gradeClassName(averageGrade)}>{averageGrade || '-'}</b>
+              <span>mitjana</span>
+              <em>{competency.total > 0 ? `${riskPercent}% no assoleix` : 'sense dades'}</em>
+            </div>
+            <div className="mini-grade-strip">
+              {gradeOrder.map((grade) => (
+                <span className={`grade-${grade}`} key={grade}>
+                  {grade}
+                  <b>{competency.counts[grade]}</b>
+                </span>
+              ))}
+            </div>
+            <small>{competency.riskStudents.length} alumnes amb C/D</small>
+          </article>
+        )
+      })}
     </section>
   )
 }
@@ -1811,7 +1818,7 @@ function UtStatsView({
           help={chartHelp.utSummary}
           label="Mitjana de la UT"
           setInfo={setInfo}
-          value={averageScore || '-'}
+          value={getGradeFromAverage(averageScore) || '-'}
           helper={`${evaluatedProfiles.length} alumnes amb evidències`}
         />
       </div>
@@ -2344,11 +2351,11 @@ export function AnalyticsView() {
           <em className="stat-card-hint">Consultar</em>
         </button>
         <button
-          className="global-action-card concept"
+          className="global-action-card invisible"
           onClick={() =>
             setSelectedInsight({
-              kind: 'concept',
-              title: 'Reforç més probable',
+              kind: 'invisible',
+              title: 'Alumnes invisibles',
               description: 'Alumnes constants que, tot i treballar, no acaben d’assolir.',
               icon: Brain,
               profiles: hardworkingLowAchievement,
@@ -2356,7 +2363,7 @@ export function AnalyticsView() {
           }
           type="button"
         >
-          <span>Reforç més probable</span>
+          <span>Alumnes invisibles</span>
           <strong>{balance.weakest?.name || '-'}</strong>
           <small>{hardworkingLowAchievement.length} alumnes constants amb rendiment baix.</small>
           <em className="stat-card-hint">Consultar</em>
@@ -2420,8 +2427,8 @@ export function AnalyticsView() {
             className="recommendation-text soft clickable"
             onClick={() =>
               setSelectedInsight({
-                kind: 'concept',
-                title: 'Suport conceptual',
+                kind: 'invisible',
+                title: 'Alumnes invisibles',
                 description: pedagogicalSummary.hiddenNeed,
                 icon: Brain,
                 profiles: hardworkingLowAchievement,
@@ -2530,7 +2537,7 @@ export function AnalyticsView() {
                 icon={Brain}
                 profiles={hardworkingLowAchievement}
                 setInfo={setSelectedInfo}
-                title="Qui treballa però no assoleix?"
+                title="Alumnes invisibles"
               />
               <TrackingActionList
                 emptyText="Cap alumne amb constància baixa dins la UT activa."

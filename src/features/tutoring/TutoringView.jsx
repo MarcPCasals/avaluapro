@@ -99,15 +99,72 @@ function buildTutorialCompetencies(subject) {
   }))
 }
 
-function getTutorialMark(tutorialMarks, classId, studentId, subject, criterionKey) {
+function getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency) {
+  const directGrade = tutorialMarks.find(
+    (mark) =>
+      mark.classId === classId &&
+      mark.studentId === studentId &&
+      mark.subject === subject &&
+      mark.competencyKey === competency.key,
+  )?.value
+  if (directGrade) return directGrade
+
+  const legacyCriterionGrades = competency.criteria
+    .map(
+      (criterion) =>
+        tutorialMarks.find(
+          (mark) =>
+            mark.classId === classId &&
+            mark.studentId === studentId &&
+            mark.subject === subject &&
+            mark.criterionKey === criterion.key,
+        )?.value,
+    )
+    .filter(Boolean)
+
+  return calculateGrade(legacyCriterionGrades)
+}
+
+function getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject }) {
+  if (!evaluationContext || subject !== evaluationContext.linkedSubject) return ''
+
+  const classUtIds = new Set(
+    evaluationContext.uts.filter((ut) => ut.classId === evaluationContext.linkedClassId).map((ut) => ut.id),
+  )
+  const matchingCompetencies = evaluationContext.competencies.filter(
+    (item) => classUtIds.has(item.utId) && item.name === competency.name,
+  )
+  const competencyGrades = matchingCompetencies
+    .map((item) => {
+      const competencyCriteria = evaluationContext.criteria.filter((criterion) => criterion.competencyId === item.id)
+      const criterionGrades = competencyCriteria
+        .map(
+          (criterion) =>
+            evaluationContext.marks.find(
+              (mark) => mark.studentId === studentId && mark.criterionId === criterion.id,
+            )?.value,
+        )
+        .filter(Boolean)
+
+      return calculateGrade(criterionGrades)
+    })
+    .filter(Boolean)
+
+  return calculateGrade(competencyGrades)
+}
+
+function getTutorialCompetencyGrade({
+  classId,
+  competency,
+  evaluationContext,
+  studentId,
+  subject,
+  tutorialMarks,
+}) {
   return (
-    tutorialMarks.find(
-      (mark) =>
-        mark.classId === classId &&
-        mark.studentId === studentId &&
-        mark.subject === subject &&
-        mark.criterionKey === criterionKey,
-    )?.value || ''
+    getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency) ||
+    getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject }) ||
+    ''
   )
 }
 
@@ -126,7 +183,7 @@ function average(values) {
   return cleanValues.reduce((total, value) => total + value, 0) / cleanValues.length
 }
 
-function summarizeTutorialData({ classId, students, tutorialMarks }) {
+function summarizeTutorialData({ classId, evaluationContext, students, tutorialMarks }) {
   const subjectOptions = getAllTutorialSubjectOptions()
   const areaBuckets = new Map()
   const subjectBuckets = new Map()
@@ -135,10 +192,14 @@ function summarizeTutorialData({ classId, students, tutorialMarks }) {
 
     subjectOptions.forEach((subjectOption) => {
       buildTutorialCompetencies(subjectOption.subject).forEach((competency) => {
-        const criterionValues = competency.criteria.map((criterion) =>
-          getTutorialMark(tutorialMarks, classId, student.id, subjectOption.subject, criterion.key),
-        )
-        const grade = calculateGrade(criterionValues)
+        const grade = getTutorialCompetencyGrade({
+          classId,
+          competency,
+          evaluationContext,
+          studentId: student.id,
+          subject: subjectOption.subject,
+          tutorialMarks,
+        })
         if (!grade) return
 
         const score = getNumericFromGrade(grade)
@@ -344,16 +405,21 @@ function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tu
   }
 }
 
-function SubjectCatalogCard({ item, onSelect }) {
+function SubjectCatalogCard({ completion, item, onSelect }) {
+  const isComplete = completion?.total > 0 && completion.completed === completion.total
+
   return (
-    <article className="tutorial-subject-card">
+    <article className={`tutorial-subject-card ${isComplete ? 'complete' : ''}`}>
       <div>
         <strong>{item.subject}</strong>
         <small>{item.areaName}</small>
       </div>
-      <span>{item.structure.length} competències</span>
+      <span>
+        {item.structure.length} competències
+        {completion?.total ? ` · ${completion.completed}/${completion.total}` : ''}
+      </span>
       <button className="secondary-action compact" onClick={() => onSelect(item.subject)} type="button">
-        Treballar
+        {isComplete ? 'Omplert' : 'Omplir'}
       </button>
     </article>
   )
@@ -670,6 +736,10 @@ export function TutoringView() {
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
+  const marks = useAvaluaproStore((state) => state.marks)
+  const competencies = useAvaluaproStore((state) => state.competencies)
+  const criteria = useAvaluaproStore((state) => state.criteria)
+  const uts = useAvaluaproStore((state) => state.uts)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
@@ -692,13 +762,52 @@ export function TutoringView() {
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
   const selectedSubjectArea = getSubjectArea(selectedSubject)
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
-  const selectedCriteria = selectedCompetencies.flatMap((competency) =>
-    competency.criteria.map((criterion) => ({ ...criterion, competency })),
+  const evaluationContext = useMemo(
+    () => ({
+      criteria,
+      competencies,
+      linkedClassId,
+      linkedSubject: linkedClass?.subject,
+      marks,
+      uts,
+    }),
+    [criteria, competencies, linkedClass?.subject, linkedClassId, marks, uts],
   )
   const tutorialSummary = useMemo(
-    () => summarizeTutorialData({ classId: activeClassId, students: classStudents, tutorialMarks }),
-    [activeClassId, classStudents, tutorialMarks],
+    () =>
+      summarizeTutorialData({
+        classId: activeClassId,
+        evaluationContext,
+        students: classStudents,
+        tutorialMarks,
+      }),
+    [activeClassId, classStudents, evaluationContext, tutorialMarks],
   )
+  const subjectCompletion = useMemo(() => {
+    const entries = subjectOptions.map((item) => {
+      const subjectCompetencies = buildTutorialCompetencies(item.subject)
+      const total = classStudents.length * subjectCompetencies.length
+      const completed = classStudents.reduce(
+        (studentTotal, student) =>
+          studentTotal +
+          subjectCompetencies.filter((competency) =>
+            getTutorialCompetencyGrade({
+              classId: activeClassId,
+              competency,
+              evaluationContext,
+              studentId: student.id,
+              subject: item.subject,
+              tutorialMarks,
+            }),
+          ).length,
+        0,
+      )
+
+      return [item.subject, { completed, total }]
+    })
+
+    return new Map(entries)
+  }, [activeClassId, classStudents, evaluationContext, subjectOptions, tutorialMarks])
   const tutorialRecordSummary = useMemo(
     () => summarizeTutorialRecords({ students: classStudents, records: classTutorialRecords }),
     [classStudents, classTutorialRecords],
@@ -969,7 +1078,12 @@ export function TutoringView() {
 
           <div className="tutorial-subject-overview">
             {subjectOptions.map((item) => (
-              <SubjectCatalogCard item={item} key={item.subject} onSelect={setSubjectFilter} />
+              <SubjectCatalogCard
+                completion={subjectCompletion.get(item.subject)}
+                item={item}
+                key={item.subject}
+                onSelect={setSubjectFilter}
+              />
             ))}
           </div>
 
@@ -982,15 +1096,15 @@ export function TutoringView() {
               <div>
                 <h2>{selectedSubject || 'Assignatura'}</h2>
                 <p>
-                  Posa la nota dels criteris per tenir una visió tutorial de totes les competències de l’alumne.
-                  Aquestes notes es guarden separades de l’avaluació ordinària de cada UT.
+                  Posa o revisa la nota de cada competència. Si aquesta classe està vinculada amb una assignatura
+                  que ja té notes a Avaluapro, les competències apareixen carregades automàticament.
                 </p>
               </div>
             </header>
 
             {classStudents.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes a la classe vinculada per començar a posar notes.</div>
-            ) : selectedCriteria.length === 0 ? (
+            ) : selectedCompetencies.length === 0 ? (
               <div className="empty-state compact">Aquesta assignatura encara no té competències configurades.</div>
             ) : (
               <div className="tutorial-mark-table-wrap">
@@ -998,10 +1112,10 @@ export function TutoringView() {
                   <thead>
                     <tr>
                       <th>Alumne</th>
-                      {selectedCriteria.map(({ competency, ...criterion }) => (
-                        <th key={criterion.key}>
-                          <span>{competency.name}</span>
-                          <strong>{criterion.name}</strong>
+                      {selectedCompetencies.map((competency) => (
+                        <th key={competency.key}>
+                          <span>{selectedSubject}</span>
+                          <strong>{competency.name}</strong>
                         </th>
                       ))}
                       <th>Resultat</th>
@@ -1009,8 +1123,15 @@ export function TutoringView() {
                   </thead>
                   <tbody>
                     {classStudents.map((student) => {
-                      const rowValues = selectedCriteria.map((criterion) =>
-                        getTutorialMark(tutorialMarks, activeClassId, student.id, selectedSubject, criterion.key),
+                      const rowValues = selectedCompetencies.map((competency) =>
+                        getTutorialCompetencyGrade({
+                          classId: activeClassId,
+                          competency,
+                          evaluationContext,
+                          studentId: student.id,
+                          subject: selectedSubject,
+                          tutorialMarks,
+                        }),
                       )
                       const finalGrade = calculateGrade(rowValues)
 
@@ -1026,16 +1147,17 @@ export function TutoringView() {
                               <small>{student.halfGroup || 'Sense mig grup'}</small>
                             </button>
                           </th>
-                          {selectedCriteria.map((criterion) => {
-                            const value = getTutorialMark(
+                          {selectedCompetencies.map((competency) => {
+                            const value = getTutorialCompetencyGrade({
+                              classId: activeClassId,
+                              competency,
+                              evaluationContext,
+                              studentId: student.id,
+                              subject: selectedSubject,
                               tutorialMarks,
-                              activeClassId,
-                              student.id,
-                              selectedSubject,
-                              criterion.key,
-                            )
+                            })
                             return (
-                              <td key={`${student.id}_${criterion.key}`}>
+                              <td key={`${student.id}_${competency.key}`}>
                                 <select
                                   className={gradeTextClassName(value)}
                                   onChange={(event) =>
@@ -1043,7 +1165,7 @@ export function TutoringView() {
                                       classId: activeClassId,
                                       studentId: student.id,
                                       subject: selectedSubject,
-                                      criterionKey: criterion.key,
+                                      competencyKey: competency.key,
                                       value: event.target.value,
                                     })
                                   }

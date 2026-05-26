@@ -924,6 +924,11 @@ button.tutorial-stat-card {
   background: white;
 }
 
+.tutorial-subject-card.complete {
+  border-color: #86efac;
+  background: linear-gradient(135deg, #f0fdf4, #ffffff 72%);
+}
+
 .tutorial-subject-card > div {
   display: grid;
   gap: 3px;
@@ -944,6 +949,12 @@ button.tutorial-stat-card {
 .tutorial-subject-card button {
   grid-column: 1 / -1;
   width: fit-content;
+}
+
+.tutorial-subject-card.complete button {
+  border-color: #86efac;
+  color: #166534;
+  background: #dcfce7;
 }
 
 .tutorial-mark-grid-card {
@@ -4146,6 +4157,11 @@ button.tutorial-record-pill {
   background: linear-gradient(135deg, #eff6ff, #ffffff 72%);
 }
 
+.global-action-card.invisible {
+  border-color: #fed7aa;
+  background: linear-gradient(135deg, #fff7ed, #ffffff 72%);
+}
+
 .global-action-card.habit {
   border-color: #fed7aa;
   background: linear-gradient(135deg, #fff7ed, #ffffff 72%);
@@ -4466,6 +4482,12 @@ button.tutorial-record-pill {
   background: #eff6ff;
 }
 
+.insight-modal-intro.invisible {
+  color: #9a3412;
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
 .insight-modal-intro.habit {
   color: #9a3412;
   border-color: #fed7aa;
@@ -4727,6 +4749,7 @@ button.tutorial-record-pill {
   display: flex;
   align-items: end;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ut-competency-score b {
@@ -4740,6 +4763,17 @@ button.tutorial-record-pill {
   color: #64748b;
   font-size: 13px;
   font-weight: 850;
+}
+
+.ut-competency-score em {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #991b1b;
+  background: #fee2e2;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
 }
 
 .mini-grade-strip {
@@ -5564,6 +5598,11 @@ button.tutorial-record-pill {
 .decision-pill.concept {
   color: #1e40af;
   background: #dbeafe;
+}
+
+.decision-pill.invisible {
+  color: #9a3412;
+  background: #ffedd5;
 }
 
 .decision-pill.habit {
