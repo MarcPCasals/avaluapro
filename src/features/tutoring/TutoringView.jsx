@@ -37,6 +37,11 @@ const TUTORING_RELATION_TYPES = [
   { id: 'friendship', label: 'S’hi relaciona sovint', shortLabel: 'Afinitat', tone: 'blue' },
   { id: 'avoid', label: 'Evitar de moment', shortLabel: 'Incompatibilitat', tone: 'red' },
 ]
+const COOPERATIVE_GROUP_STRATEGIES = [
+  { id: 'balanced', label: 'Equilibrat' },
+  { id: 'supportive', label: 'Prioritza suports' },
+  { id: 'calm', label: 'Evita tensions' },
+]
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 
@@ -529,6 +534,168 @@ function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tu
     studentsWithData: studentsWithData.size,
     totalRecords,
   }
+}
+
+function getStudentCooperativeProfile({ profile, recordRow, relationRow }) {
+  const recordSeverity =
+    (recordRow?.agenda || 0) +
+    (recordRow?.incident || 0) * 2 +
+    (recordRow?.classroomExpulsion || 0) * 3 +
+    (recordRow?.centerExpulsion || 0) * 4
+  const academicRisk =
+    profile.evaluatedCount > 0 && (profile.averageScore <= 2 || profile.notDevelopedPercent >= 30)
+  const priorityScore =
+    profile.notDevelopedCount * 2 +
+    (profile.notDevelopedPercent >= 30 ? 2 : 0) +
+    (profile.averageScore > 0 && profile.averageScore <= 2 ? 2 : 0) +
+    recordSeverity
+  const performanceLevel =
+    profile.averageScore >= 3.25
+      ? 'alt'
+      : profile.averageScore > 0 && profile.averageScore <= 2
+        ? 'baix'
+        : 'mitjà'
+
+  return {
+    academicRisk,
+    avoidCount: relationRow?.avoidCount || 0,
+    halfGroup: profile.student.halfGroup || 'Sense mig grup',
+    performanceLevel,
+    priorityScore,
+    recordSeverity,
+    relationCount: relationRow?.total || 0,
+    student: profile.student,
+    supportiveCount: relationRow?.supportiveCount || 0,
+    tutorialProfile: profile,
+  }
+}
+
+function relationBetween(relations, studentIdA, studentIdB) {
+  return relations.find(
+    (relation) =>
+      (relation.sourceStudentId === studentIdA && relation.targetStudentId === studentIdB) ||
+      (relation.sourceStudentId === studentIdB && relation.targetStudentId === studentIdA),
+  )
+}
+
+function getCooperativePlacementScore({ candidate, group, groupSize, relations, strategy }) {
+  if (group.members.length >= groupSize) return Number.POSITIVE_INFINITY
+
+  let score = group.members.length * 8
+  const nextMembers = [...group.members, candidate]
+  const averagePerformance =
+    nextMembers.reduce((total, member) => total + (member.tutorialProfile.averageScore || 2.5), 0) / nextMembers.length
+  score += Math.abs(averagePerformance - 2.7) * 10
+
+  const riskCount = group.members.filter((member) => member.priorityScore >= 4).length
+  if (candidate.priorityScore >= 4) score += riskCount * 18
+
+  const sameHalfGroupCount = group.members.filter((member) => member.halfGroup === candidate.halfGroup).length
+  score += sameHalfGroupCount * 2
+
+  group.members.forEach((member) => {
+    const relation = relationBetween(relations, candidate.student.id, member.student.id)
+    if (!relation) return
+    if (relation.type === 'avoid') score += strategy === 'calm' ? 120 : 90
+    if (relation.type === 'positive') score -= strategy === 'supportive' ? 18 : 10
+    if (relation.type === 'friendship') score -= strategy === 'supportive' ? 10 : 5
+  })
+
+  if (strategy === 'calm') score += candidate.avoidCount * 2
+  if (strategy === 'supportive' && candidate.academicRisk) {
+    const hasStrongPeer = group.members.some((member) => member.performanceLevel === 'alt' && member.priorityScore <= 2)
+    score += hasStrongPeer ? -16 : 8
+  }
+
+  return score
+}
+
+function buildCooperativeGroups({ groupSize, profiles, recordRowsByStudent, relationRowsByStudent, relations, strategy }) {
+  const cleanGroupSize = Math.min(6, Math.max(2, Number(groupSize) || 4))
+  const students = profiles
+    .map((profile) =>
+      getStudentCooperativeProfile({
+        profile,
+        recordRow: recordRowsByStudent.get(profile.student.id),
+        relationRow: relationRowsByStudent.get(profile.student.id),
+      }),
+    )
+    .sort((a, b) => {
+      if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore
+      if ((b.tutorialProfile.averageScore || 0) !== (a.tutorialProfile.averageScore || 0)) {
+        return (a.tutorialProfile.averageScore || 0) - (b.tutorialProfile.averageScore || 0)
+      }
+      return a.student.name.localeCompare(b.student.name, 'ca')
+    })
+  const groupCount = Math.max(1, Math.ceil(students.length / cleanGroupSize))
+  const groups = Array.from({ length: groupCount }, (_, index) => ({
+    id: `group_${index + 1}`,
+    members: [],
+    name: `Grup ${index + 1}`,
+  }))
+
+  students.forEach((student) => {
+    const bestGroup = groups
+      .map((group) => ({
+        group,
+        score: getCooperativePlacementScore({
+          candidate: student,
+          group,
+          groupSize: cleanGroupSize,
+          relations,
+          strategy,
+        }),
+      }))
+      .sort((a, b) => a.score - b.score || a.group.members.length - b.group.members.length)[0]?.group
+
+    bestGroup?.members.push(student)
+  })
+
+  return groups.map((group) => {
+    const avoidRelations = []
+    const supportiveRelations = []
+    group.members.forEach((member, memberIndex) => {
+      group.members.slice(memberIndex + 1).forEach((otherMember) => {
+        const relation = relationBetween(relations, member.student.id, otherMember.student.id)
+        if (!relation) return
+        const typeMeta = getRelationTypeMeta(relation.type)
+        const row = {
+          label: `${member.student.name} / ${otherMember.student.name}`,
+          note: relation.note,
+          type: relation.type,
+          typeMeta,
+        }
+        if (relation.type === 'avoid') avoidRelations.push(row)
+        if (relation.type === 'positive' || relation.type === 'friendship') supportiveRelations.push(row)
+      })
+    })
+    const averageScore = average(group.members.map((member) => member.tutorialProfile.averageScore || 0))
+    const priorityMembers = group.members.filter((member) => member.priorityScore >= 4)
+    const highPerformanceCount = group.members.filter((member) => member.performanceLevel === 'alt').length
+    const lowPerformanceCount = group.members.filter((member) => member.performanceLevel === 'baix').length
+
+    return {
+      ...group,
+      averageScore,
+      avoidRelations,
+      highPerformanceCount,
+      lowPerformanceCount,
+      priorityMembers,
+      supportiveRelations,
+    }
+  })
+}
+
+function getCooperativeGroupCopyText(groups) {
+  return groups
+    .map((group) => {
+      const members = group.members.map((member) => `- ${member.student.name}`).join('\n')
+      const warnings = group.avoidRelations.length
+        ? `\nAvisos:\n${group.avoidRelations.map((relation) => `- Evitar: ${relation.label}`).join('\n')}`
+        : ''
+      return `${group.name}\n${members}${warnings}`
+    })
+    .join('\n\n')
 }
 
 function getTutorialProfilePriority(profile, recordRow) {
@@ -1520,6 +1687,8 @@ export function TutoringView() {
     note: '',
   })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
+  const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
+  const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -1646,6 +1815,10 @@ export function TutoringView() {
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRecordSummary.studentRows],
   )
+  const tutorialRelationRowsByStudent = useMemo(
+    () => new Map(tutorialRelationSummary.studentRows.map((row) => [row.student.id, row])),
+    [tutorialRelationSummary.studentRows],
+  )
   const tutorialGroupSummary = useMemo(
     () =>
       summarizeTutorialGroup({
@@ -1664,6 +1837,25 @@ export function TutoringView() {
   const selectedRelationRow =
     tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
     tutorialRelationSummary.studentRows[0]
+  const cooperativeGroups = useMemo(
+    () =>
+      buildCooperativeGroups({
+        groupSize: cooperativeGroupSize,
+        profiles: tutorialSummary.studentProfiles,
+        recordRowsByStudent: tutorialRecordRowsByStudent,
+        relationRowsByStudent: tutorialRelationRowsByStudent,
+        relations: classTutorialRelations,
+        strategy: cooperativeStrategy,
+      }),
+    [
+      classTutorialRelations,
+      cooperativeGroupSize,
+      cooperativeStrategy,
+      tutorialRecordRowsByStudent,
+      tutorialRelationRowsByStudent,
+      tutorialSummary.studentProfiles,
+    ],
+  )
   const filteredTutorialProfiles = useMemo(
     () =>
       tutorialSummary.studentProfiles
@@ -1727,6 +1919,10 @@ export function TutoringView() {
       targetStudentId: '',
       note: '',
     }))
+  }
+
+  const handleCopyCooperativeGroups = async () => {
+    await navigator.clipboard.writeText(getCooperativeGroupCopyText(cooperativeGroups))
   }
 
   return (
@@ -2308,6 +2504,108 @@ export function TutoringView() {
                 <span>parelles recíproques</span>
               </article>
             </div>
+          </section>
+
+          <section className="cooperative-generator-panel">
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <UsersRound size={17} />
+                  Grups cooperatius
+                </span>
+                <h2>Proposta automàtica</h2>
+                <p>
+                  Combina relacions, incompatibilitats, rendiment i seguiment tutorial per preparar una primera
+                  proposta revisable.
+                </p>
+              </div>
+              <div className="cooperative-generator-controls">
+                <label>
+                  Mida
+                  <select
+                    onChange={(event) => setCooperativeGroupSize(event.target.value)}
+                    value={cooperativeGroupSize}
+                  >
+                    <option value="2">Parelles</option>
+                    <option value="3">Grups de 3</option>
+                    <option value="4">Grups de 4</option>
+                    <option value="5">Grups de 5</option>
+                    <option value="6">Grups de 6</option>
+                  </select>
+                </label>
+                <label>
+                  Criteri
+                  <select
+                    onChange={(event) => setCooperativeStrategy(event.target.value)}
+                    value={cooperativeStrategy}
+                  >
+                    {COOPERATIVE_GROUP_STRATEGIES.map((strategy) => (
+                      <option key={strategy.id} value={strategy.id}>
+                        {strategy.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="secondary-action compact" onClick={handleCopyCooperativeGroups} type="button">
+                  <Clipboard size={16} />
+                  Copiar proposta
+                </button>
+              </div>
+            </header>
+
+            {classStudents.length < 2 ? (
+              <div className="empty-state compact">Calen almenys dos alumnes per generar grups cooperatius.</div>
+            ) : (
+              <div className="cooperative-group-grid">
+                {cooperativeGroups.map((group) => (
+                  <article
+                    className={`cooperative-group-card ${group.avoidRelations.length > 0 ? 'warning' : ''}`}
+                    key={group.id}
+                  >
+                    <header>
+                      <div>
+                        <span>{group.name}</span>
+                        <strong>{group.members.length} alumnes</strong>
+                      </div>
+                      <em>{group.averageScore > 0 ? `Mitjana ${group.averageScore.toFixed(2)}` : 'Sense notes'}</em>
+                    </header>
+
+                    <div className="cooperative-group-members">
+                      {group.members.map((member) => (
+                        <div className={`cooperative-member ${member.performanceLevel}`} key={member.student.id}>
+                          <strong>{member.student.name}</strong>
+                          <span>
+                            {member.halfGroup} · {member.performanceLevel}
+                            {member.priorityScore >= 4 ? ' · prioritat' : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="cooperative-group-badges">
+                      <span>{group.highPerformanceCount} alt rendiment</span>
+                      <span>{group.lowPerformanceCount} reforç</span>
+                      <span>{group.priorityMembers.length} prioritaris</span>
+                    </div>
+
+                    {(group.supportiveRelations.length > 0 || group.avoidRelations.length > 0) && (
+                      <div className="cooperative-group-evidence">
+                        {group.supportiveRelations.slice(0, 3).map((relation) => (
+                          <p className="positive" key={`${group.id}_${relation.label}_${relation.type}`}>
+                            {relation.typeMeta.shortLabel}: {relation.label}
+                          </p>
+                        ))}
+                        {group.avoidRelations.slice(0, 3).map((relation) => (
+                          <p className="warning" key={`${group.id}_${relation.label}_${relation.type}`}>
+                            Revisar: {relation.label}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           <div className="tutorial-relationships-grid">

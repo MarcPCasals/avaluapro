@@ -1386,6 +1386,197 @@ button.tutorial-record-pill {
   text-transform: uppercase;
 }
 
+.cooperative-generator-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 16px;
+  background: #faf5ff;
+}
+
+.cooperative-generator-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cooperative-generator-panel h2 {
+  margin: 6px 0;
+  color: #1f2937;
+  font-size: 22px;
+}
+
+.cooperative-generator-panel p {
+  max-width: 760px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.cooperative-generator-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cooperative-generator-controls label {
+  display: grid;
+  gap: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.cooperative-generator-controls select {
+  min-height: 38px;
+  border: 1px solid #d8b4fe;
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #3b0764;
+  background: white;
+  font-weight: 900;
+}
+
+.cooperative-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.cooperative-group-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  padding: 12px;
+  background: white;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.cooperative-group-card.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.cooperative-group-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cooperative-group-card > header span {
+  display: block;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.cooperative-group-card > header strong {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.cooperative-group-card > header em {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.cooperative-group-members {
+  display: grid;
+  gap: 7px;
+}
+
+.cooperative-member {
+  display: grid;
+  gap: 2px;
+  border-left: 4px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.cooperative-member.alt {
+  border-left-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.cooperative-member.mitjà {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.cooperative-member.baix {
+  border-left-color: #ef4444;
+  background: #fff1f2;
+}
+
+.cooperative-member strong {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.cooperative-member span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.cooperative-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cooperative-group-badges span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.cooperative-group-evidence {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.cooperative-group-evidence p {
+  border-radius: 7px;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.cooperative-group-evidence p.positive {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.cooperative-group-evidence p.warning {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
 .tutorial-relationships-grid {
   display: grid;
   grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.15fr);
@@ -9961,9 +10152,19 @@ button.profile-followup-card:focus-visible {
   }
 
   .tutorial-relationships-hero,
+  .cooperative-generator-panel > header,
   .tutorial-relationships-grid,
   .tutorial-relationships-grid.detail {
     grid-template-columns: 1fr;
+  }
+
+  .cooperative-generator-panel > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cooperative-generator-controls {
+    justify-content: flex-start;
   }
 
   .tutorial-relationship-summary {
@@ -10026,9 +10227,15 @@ button.profile-followup-card:focus-visible {
   }
 
   .tutorial-relationship-summary,
+  .cooperative-generator-controls,
   .tutorial-relation-form,
   .tutorial-relation-type-grid,
   .tutorial-sociogram-row {
     grid-template-columns: 1fr;
+  }
+
+  .cooperative-generator-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
