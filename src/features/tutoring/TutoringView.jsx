@@ -43,6 +43,11 @@ const COOPERATIVE_GROUP_STRATEGIES = [
   { id: 'supportive', label: 'Prioritza suports' },
   { id: 'calm', label: 'Evita tensions' },
 ]
+const SOCIOGRAM_FILTERS = [
+  { id: 'all', label: 'Totes' },
+  { id: 'supportive', label: 'Afinitats' },
+  { id: 'avoid', label: 'Evitar' },
+]
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 
@@ -56,6 +61,24 @@ function getRecordTypeMeta(type) {
 
 function getRelationTypeMeta(type) {
   return TUTORING_RELATION_TYPES.find((item) => item.id === type) || TUTORING_RELATION_TYPES[0]
+}
+
+function getRelationCategory(type) {
+  return type === 'avoid' ? 'avoid' : 'supportive'
+}
+
+function getSociogramInitials(name) {
+  const [surnameBlock = '', firstNameBlock = ''] = String(name || '').split(',')
+  const firstName = firstNameBlock.trim().split(/\s+/).filter(Boolean)[0]
+  const firstSurname = surnameBlock.trim().split(/\s+/).filter(Boolean)[0]
+  const fallback = String(name || '')
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+
+  return `${firstName?.[0] || ''}${firstSurname?.[0] || ''}`.toUpperCase() || fallback.toUpperCase() || '?'
 }
 
 function getTodayDateInput() {
@@ -475,6 +498,114 @@ function summarizeTutorialRelations({ relations, students }) {
     positiveCount: relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship').length,
     reciprocalCount: reciprocalPairs.size,
     studentRows,
+  }
+}
+
+function getRingPosition(index, total, radiusX, radiusY, centerX = 50, centerY = 50) {
+  if (total <= 1) {
+    return { x: centerX, y: centerY - radiusY }
+  }
+
+  const angle = -Math.PI / 2 + (index / total) * Math.PI * 2
+  return {
+    x: centerX + Math.cos(angle) * radiusX,
+    y: centerY + Math.sin(angle) * radiusY,
+  }
+}
+
+function buildTutorialSociogramMap({ filter, relations, selectedStudentId, studentRows, students }) {
+  const studentsById = new Map(students.map((student) => [student.id, student]))
+  const rowsByStudentId = new Map(studentRows.map((row) => [row.student.id, row]))
+  const selectedId = selectedStudentId || studentRows[0]?.student.id || students[0]?.id || ''
+  const filteredRelations = relations.filter((relation) => {
+    if (!studentsById.has(relation.sourceStudentId) || !studentsById.has(relation.targetStudentId)) return false
+    if (filter === 'supportive') return getRelationCategory(relation.type) === 'supportive'
+    if (filter === 'avoid') return getRelationCategory(relation.type) === 'avoid'
+    return true
+  })
+  const selectedRelationStudentIds = new Set(
+    filteredRelations
+      .filter((relation) => relation.sourceStudentId === selectedId || relation.targetStudentId === selectedId)
+      .flatMap((relation) => [relation.sourceStudentId, relation.targetStudentId]),
+  )
+  selectedRelationStudentIds.delete(selectedId)
+
+  const selectedStudent = studentsById.get(selectedId)
+  const relatedStudents = [...selectedRelationStudentIds]
+    .map((studentId) => studentsById.get(studentId))
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+  const remainingStudents = students
+    .filter((student) => student.id !== selectedId && !selectedRelationStudentIds.has(student.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+
+  const nodes = []
+  if (selectedStudent) {
+    nodes.push({
+      ...rowsByStudentId.get(selectedStudent.id),
+      id: selectedStudent.id,
+      initials: getSociogramInitials(selectedStudent.name),
+      isDimmed: false,
+      isRelated: false,
+      isSelected: true,
+      student: selectedStudent,
+      x: 50,
+      y: 50,
+    })
+  }
+
+  relatedStudents.forEach((student, index) => {
+    const position = getRingPosition(index, relatedStudents.length, 28, 26)
+    nodes.push({
+      ...rowsByStudentId.get(student.id),
+      id: student.id,
+      initials: getSociogramInitials(student.name),
+      isDimmed: false,
+      isRelated: true,
+      isSelected: false,
+      student,
+      ...position,
+    })
+  })
+
+  remainingStudents.forEach((student, index) => {
+    const position = getRingPosition(index, remainingStudents.length, 44, 37)
+    nodes.push({
+      ...rowsByStudentId.get(student.id),
+      id: student.id,
+      initials: getSociogramInitials(student.name),
+      isDimmed: Boolean(selectedStudent),
+      isRelated: false,
+      isSelected: false,
+      student,
+      ...position,
+    })
+  })
+
+  const nodesByStudentId = new Map(nodes.map((node) => [node.id, node]))
+  const links = filteredRelations
+    .map((relation) => {
+      const source = nodesByStudentId.get(relation.sourceStudentId)
+      const target = nodesByStudentId.get(relation.targetStudentId)
+      if (!source || !target) return null
+      const typeMeta = getRelationTypeMeta(relation.type)
+      return {
+        ...relation,
+        category: getRelationCategory(relation.type),
+        isSelectedLink: relation.sourceStudentId === selectedId || relation.targetStudentId === selectedId,
+        source,
+        target,
+        typeMeta,
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    filteredCount: filteredRelations.length,
+    links,
+    nodes,
+    relatedCount: relatedStudents.length,
+    selectedNode: nodesByStudentId.get(selectedId) || null,
   }
 }
 
@@ -1704,6 +1835,7 @@ export function TutoringView() {
     note: '',
   })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
+  const [sociogramFilter, setSociogramFilter] = useState('all')
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
@@ -1880,6 +2012,23 @@ export function TutoringView() {
   const selectedRelationRow =
     tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
     tutorialRelationSummary.studentRows[0]
+  const tutorialSociogramMap = useMemo(
+    () =>
+      buildTutorialSociogramMap({
+        filter: sociogramFilter,
+        relations: tutorialRelationSummary.enrichedRelations,
+        selectedStudentId: selectedRelationRow?.student.id,
+        studentRows: tutorialRelationSummary.studentRows,
+        students: classStudents,
+      }),
+    [
+      classStudents,
+      selectedRelationRow?.student.id,
+      sociogramFilter,
+      tutorialRelationSummary.enrichedRelations,
+      tutorialRelationSummary.studentRows,
+    ],
+  )
   const cooperativeGroups = useMemo(
     () =>
       buildCooperativeGroups({
@@ -2582,6 +2731,103 @@ export function TutoringView() {
                 <span>parelles recíproques</span>
               </article>
             </div>
+          </section>
+
+          <section className="tutorial-sociogram-visual-card">
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <Network size={17} />
+                  Sociograma visual
+                </span>
+                <h2>Mapa de relacions</h2>
+                <p>
+                  Clica un alumne per posar-lo al centre i veure ràpidament afinitats, incompatibilitats i alumnes sense
+                  connexions registrades.
+                </p>
+              </div>
+              <div className="tutorial-sociogram-filter-tabs" aria-label="Filtre del sociograma">
+                {SOCIOGRAM_FILTERS.map((filter) => (
+                  <button
+                    className={sociogramFilter === filter.id ? 'active' : ''}
+                    key={filter.id}
+                    onClick={() => setSociogramFilter(filter.id)}
+                    type="button"
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </header>
+
+            {classStudents.length === 0 ? (
+              <div className="empty-state compact">Afegeix alumnes a la tutoria per veure el sociograma.</div>
+            ) : (
+              <div className="tutorial-sociogram-canvas" aria-label="Mapa visual de relacions tutorials">
+                <svg aria-hidden="true" className="tutorial-sociogram-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
+                  <defs>
+                    <marker id="sociogram-arrow-green" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    </marker>
+                    <marker id="sociogram-arrow-blue" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    </marker>
+                    <marker id="sociogram-arrow-red" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    </marker>
+                  </defs>
+                  {tutorialSociogramMap.links.map((link) => (
+                    <line
+                      className={`tutorial-sociogram-link ${link.typeMeta.tone} ${
+                        link.isSelectedLink ? 'selected' : 'muted'
+                      }`}
+                      key={link.id}
+                      markerEnd={`url(#sociogram-arrow-${link.typeMeta.tone})`}
+                      strokeWidth={1 + Number(link.strength || 2) * 0.45}
+                      vectorEffect="non-scaling-stroke"
+                      x1={link.source.x}
+                      x2={link.target.x}
+                      y1={link.source.y}
+                      y2={link.target.y}
+                    >
+                      <title>
+                        {link.source.student.name} → {link.target.student.name}: {link.typeMeta.shortLabel}
+                      </title>
+                    </line>
+                  ))}
+                </svg>
+                <div className="tutorial-sociogram-node-layer">
+                  {tutorialSociogramMap.nodes.map((node) => (
+                    <button
+                      className={`tutorial-sociogram-node ${node.isSelected ? 'selected' : ''} ${
+                        node.isRelated ? 'related' : ''
+                      } ${node.isDimmed ? 'dimmed' : ''} ${node.avoidCount > 0 ? 'has-avoid' : ''}`}
+                      key={node.id}
+                      onClick={() => setSelectedRelationStudentId(node.id)}
+                      style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                      title={node.student.name}
+                      type="button"
+                    >
+                      <span>{node.initials}</span>
+                      <strong>{node.student.name}</strong>
+                      <small>
+                        {node.supportiveCount || 0}+ · {node.avoidCount || 0} evitar
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <footer className="tutorial-sociogram-legend">
+              <span className="green">Afinitat / treballa bé</span>
+              <span className="blue">Relació habitual</span>
+              <span className="red">Evitar de moment</span>
+              <strong>
+                {tutorialSociogramMap.selectedNode?.student.name || 'Sense alumne seleccionat'} ·{' '}
+                {tutorialSociogramMap.relatedCount} relació/ns visibles
+              </strong>
+            </footer>
           </section>
 
           <section className="cooperative-generator-panel">
