@@ -83,6 +83,8 @@ const chartHelp = {
     'Resumeix el grup combinant rendiment, constància i seguiment. Serveix per situar-te abans d’entrar al detall.',
   gradeUtMatrix:
     'Mostra quants alumnes tenen A, B, C o D a cada UT i competència. Ajuda a comparar si una mateixa competència millora, empitjora o queda sense evidències entre UTs.',
+  competencyRiskComparison:
+    'Compara el percentatge d’alumnes que no assoleixen cada competència entre UTs. Les competències no treballades o sense nota no embruten el percentatge.',
   competencyBalance:
     'Mesura si el grup està equilibrat entre competències. Una diferència gran indica que hi ha una competència forta i una altra que necessita reforç.',
   globalTrend:
@@ -395,6 +397,45 @@ function buildGradeUtMatrix(state, students, uts, canonicalCompetencies) {
   }))
 }
 
+function buildCompetencyRiskComparison(state, students, uts, canonicalCompetencies) {
+  return canonicalCompetencies
+    .map((canonicalCompetency) => {
+      const utRows = uts.map((ut) => {
+        const competency = getUtCompetencies(state, ut.id).find((item) => item.name === canonicalCompetency.name)
+        if (!competency) {
+          return {
+            evaluated: 0,
+            hasCompetency: false,
+            notAchieved: 0,
+            percent: null,
+            ut,
+          }
+        }
+
+        const grades = students
+          .map((student) => getStudentCompetencyGrade(state, student.id, competency))
+          .filter(Boolean)
+        const notAchieved = grades.filter((grade) => grade === 'D' || grade === 'NA').length
+
+        return {
+          evaluated: grades.length,
+          hasCompetency: true,
+          notAchieved,
+          percent: grades.length > 0 ? Math.round((notAchieved / grades.length) * 100) : null,
+          ut,
+        }
+      })
+
+      return {
+        code: canonicalCompetency.code,
+        key: canonicalCompetency.key,
+        name: canonicalCompetency.name,
+        uts: utRows,
+      }
+    })
+    .filter((row) => row.uts.some((ut) => ut.hasCompetency))
+}
+
 function buildUtTrend(state, students, uts) {
   return uts.map((ut) => {
     const scores = students
@@ -609,6 +650,14 @@ function getGlobalDecision(profile) {
     }
   }
 
+  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasHighConsistency(profile)) {
+    return {
+      label: 'Alumne invisible',
+      text: 'Treballa de manera constant, però el rendiment és baix: cal mirar-lo perquè pot passar desapercebut.',
+      tone: 'invisible',
+    }
+  }
+
   if (profile.riskScore >= 2 && profile.redPointCount >= 3) {
     return {
       label: 'Intervenció + agenda',
@@ -622,14 +671,6 @@ function getGlobalDecision(profile) {
       label: 'Intervenció prioritària',
       text: 'Revisar evidències, tasques i incidències abans de continuar avançant.',
       tone: 'danger',
-    }
-  }
-
-  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasHighConsistency(profile)) {
-    return {
-      label: 'Alumne invisible',
-      text: 'Treballa de manera constant, però el rendiment és baix: cal mirar-lo perquè pot passar desapercebut.',
-      tone: 'invisible',
     }
   }
 
@@ -739,6 +780,71 @@ function GradeUtMatrix({ matrix, setInfo }) {
   )
 }
 
+function CompetencyRiskComparison({ rows, setInfo }) {
+  return (
+    <section className="competency-risk-comparison">
+      <HelpSectionHeading
+        description="% d’alumnes que no assoleixen cada competència, comparat entre UTs."
+        helpKey="competencyRiskComparison"
+        icon={Layers}
+        setInfo={setInfo}
+        title="No assoliment per competència i UT"
+      />
+      {rows.length === 0 ? (
+        <div className="empty-state compact">Encara no hi ha competències actives per comparar.</div>
+      ) : (
+        <div className="competency-risk-table">
+          <div
+            className="competency-risk-head"
+            style={{ gridTemplateColumns: `minmax(190px, 1.4fr) repeat(${rows[0]?.uts.length || 1}, minmax(100px, 1fr))` }}
+          >
+            <span>Competència</span>
+            {rows[0]?.uts.map((ut) => (
+              <span key={ut.ut.id}>{ut.ut.name}</span>
+            ))}
+          </div>
+          {rows.map((row) => (
+            <div
+              className="competency-risk-row"
+              key={row.key}
+              style={{ gridTemplateColumns: `minmax(190px, 1.4fr) repeat(${row.uts.length || 1}, minmax(100px, 1fr))` }}
+            >
+              <strong>{row.name}</strong>
+              {row.uts.map((utRow) => {
+                const isHighRisk = utRow.percent !== null && utRow.percent >= 40
+                const isMediumRisk = utRow.percent !== null && utRow.percent >= 20
+                return (
+                  <span
+                    className={`competency-risk-pill ${
+                      !utRow.hasCompetency || utRow.percent === null
+                        ? 'empty'
+                        : isHighRisk
+                          ? 'high'
+                          : isMediumRisk
+                            ? 'medium'
+                            : 'low'
+                    }`}
+                    key={utRow.ut.id}
+                    title={
+                      utRow.hasCompetency && utRow.percent !== null
+                        ? `${utRow.notAchieved} de ${utRow.evaluated} alumnes no assoleixen ${row.name}`
+                        : utRow.hasCompetency
+                          ? 'Competència activa però encara sense notes'
+                          : 'Competència no treballada en aquesta UT'
+                    }
+                  >
+                    {utRow.hasCompetency && utRow.percent !== null ? `${utRow.percent}%` : '-'}
+                  </span>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function BalanceBar({ balance, setInfo }) {
   const spreadPercent = Math.min(100, Math.round((balance.spread / 3) * 100))
   const level = balance.spread >= 1.5 ? 'important' : balance.spread >= 0.75 ? 'moderate' : 'stable'
@@ -789,7 +895,7 @@ function TrendCard({ trend, setInfo }) {
   const last = plottedTrend.at(-1)?.average || 0
   const direction = last > first ? 'Progrés sostingut' : last < first ? 'Tendència a revisar' : 'Estable'
   const trendSummary = plottedTrend
-    .map((item) => `${item.ut.name}: ${getGradeFromAverage(item.average) || '-'} (${item.average})`)
+    .map((item) => `${item.ut.name}: ${getGradeFromAverage(item.average) || '-'}`)
     .join(' · ')
 
   return (
@@ -928,7 +1034,7 @@ function PriorityCard({ balance, setInfo }) {
       <div className="priority-bar">
         <span style={{ width: `${Math.min(100, ((balance.weakest?.average || 0) / 4) * 100)}%` }} />
       </div>
-      <small>Mitjana: {balance.weakest?.average || '-'}</small>
+      <small>Mitjana: {getGradeFromAverage(balance.weakest?.average) || '-'}</small>
     </article>
   )
 }
@@ -1115,9 +1221,7 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
           </div>
           <div>
             <span>Nota mitjana actual</span>
-            <strong>
-              {evolution.grade || '-'} {evolution.average ? <small>({evolution.average.toFixed(2)})</small> : null}
-            </strong>
+            <strong>{evolution.grade || '-'}</strong>
           </div>
         </section>
 
@@ -1248,7 +1352,7 @@ function ScatterStudentModal({ onClose, profile, state, tasks }) {
           <article className="scatter-detail-card evaluation">
             <span>Rendiment</span>
             <strong>{profile.evaluation.grade || '-'}</strong>
-            <small>Nota mitjana: {profile.evaluation.score || '-'}</small>
+            <small>Nota mitjana: {profile.evaluation.grade || '-'}</small>
           </article>
           <article className="scatter-detail-card tracking">
             <span>Constància</span>
@@ -2201,6 +2305,7 @@ export function AnalyticsView() {
   const Icon = currentInsight.icon
   const canonicalCompetencies = buildCanonicalCompetencies(state, classUts)
   const gradeMatrix = buildGradeUtMatrix(state, students, classUts, canonicalCompetencies)
+  const competencyRiskComparison = buildCompetencyRiskComparison(state, students, classUts, canonicalCompetencies)
   const trend = buildUtTrend(state, students, classUts)
   const balance = buildCompetencyBalance(state, students, classUts)
   const criterionDistributions = buildCriterionDistributions(state, students, classUts)
@@ -2308,6 +2413,8 @@ export function AnalyticsView() {
           <PriorityCard balance={balance} setInfo={setSelectedInfo} />
         </div>
       </section>
+
+          <CompetencyRiskComparison rows={competencyRiskComparison} setInfo={setSelectedInfo} />
 
           <section className="global-action-strip" aria-label="Decisions ràpides d’Estadístiques Globals" data-tour="stats-decision-cards">
         <button
@@ -2650,9 +2757,11 @@ export function AnalyticsView() {
                     className={`profile-analysis-row ${
                       decision.tone === 'danger' || decision.tone === 'warning'
                         ? 'risk'
-                        : decision.tone === 'stable'
-                          ? 'stable'
-                          : 'monitor'
+                        : decision.tone === 'invisible'
+                          ? 'invisible'
+                          : decision.tone === 'stable'
+                            ? 'stable'
+                            : 'monitor'
                     }`}
                     key={profile.student.id}
                   >

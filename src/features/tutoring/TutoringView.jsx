@@ -283,6 +283,18 @@ function average(values) {
   return cleanValues.reduce((total, value) => total + value, 0) / cleanValues.length
 }
 
+function getGradeFromAverageScore(score) {
+  if (!score) return ''
+  if (score >= 3.5) return 'A'
+  if (score >= 2.5) return 'B'
+  if (score >= 1.5) return 'C'
+  return 'D'
+}
+
+function formatAverageGrade(score) {
+  return getGradeFromAverageScore(score) || '-'
+}
+
 function summarizeTutorialData({ classId, evaluationContext, students, tutorialMarks }) {
   const subjectOptions = getAllTutorialSubjectOptions()
   const areaBuckets = new Map()
@@ -385,6 +397,7 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
     .map((area) => ({
       ...area,
       averageScore: average(area.scores),
+      averageGrade: formatAverageGrade(average(area.scores)),
       notDevelopedPercent: area.evaluated > 0 ? (area.notDeveloped / area.evaluated) * 100 : 0,
     }))
     .sort((a, b) => a.averageScore - b.averageScore || b.notDevelopedPercent - a.notDevelopedPercent)
@@ -392,12 +405,22 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
     .map((subject) => ({
       ...subject,
       averageScore: average(subject.scores),
+      averageGrade: formatAverageGrade(average(subject.scores)),
       notDevelopedPercent: subject.evaluated > 0 ? (subject.notDeveloped / subject.evaluated) * 100 : 0,
     }))
     .sort((a, b) => a.averageScore - b.averageScore || b.notDevelopedPercent - a.notDevelopedPercent)
 
+  const globalGradeCounts = { A: 0, B: 0, C: 0, D: 0, NA: 0 }
+  studentProfiles.forEach((profile) => {
+    profile.evaluatedCompetencies.forEach((item) => {
+      if (globalGradeCounts[item.grade] !== undefined) globalGradeCounts[item.grade] += 1
+    })
+  })
+
   return {
     evaluatedCount,
+    globalAverageGrade: formatAverageGrade(average(studentProfiles.map((profile) => profile.averageScore))),
+    globalGradeCounts,
     notDevelopedCount,
     notDevelopedPercent: evaluatedCount > 0 ? (notDevelopedCount / evaluatedCount) * 100 : 0,
     studentProfiles,
@@ -734,7 +757,7 @@ function relationBetween(relations, studentIdA, studentIdB) {
   )
 }
 
-function getCooperativePlacementScore({ candidate, group, groupSize, relations, strategy }) {
+function getCooperativePlacementScore({ candidate, group, groupSize, prioritizeHalfGroups, relations, strategy }) {
   if (group.members.length >= groupSize) return Number.POSITIVE_INFINITY
 
   let score = group.members.length * 8
@@ -747,7 +770,13 @@ function getCooperativePlacementScore({ candidate, group, groupSize, relations, 
   if (candidate.priorityScore >= 4) score += riskCount * 18
 
   const sameHalfGroupCount = group.members.filter((member) => member.halfGroup === candidate.halfGroup).length
-  score += sameHalfGroupCount * 2
+  const differentHalfGroupCount = group.members.filter((member) => member.halfGroup !== candidate.halfGroup).length
+  if (prioritizeHalfGroups) {
+    score += differentHalfGroupCount * 28
+    score -= sameHalfGroupCount * 8
+  } else {
+    score += sameHalfGroupCount * 2
+  }
 
   group.members.forEach((member) => {
     const relation = relationBetween(relations, candidate.student.id, member.student.id)
@@ -802,7 +831,15 @@ function enrichCooperativeGroups(groups, relations) {
   })
 }
 
-function buildCooperativeGroups({ groupSize, profiles, recordRowsByStudent, relationRowsByStudent, relations, strategy }) {
+function buildCooperativeGroups({
+  groupSize,
+  prioritizeHalfGroups,
+  profiles,
+  recordRowsByStudent,
+  relationRowsByStudent,
+  relations,
+  strategy,
+}) {
   const cleanGroupSize = Math.min(6, Math.max(2, Number(groupSize) || 4))
   const students = profiles
     .map((profile) =>
@@ -834,6 +871,7 @@ function buildCooperativeGroups({ groupSize, profiles, recordRowsByStudent, rela
           candidate: student,
           group,
           groupSize: cleanGroupSize,
+          prioritizeHalfGroups,
           relations,
           strategy,
         }),
@@ -951,6 +989,7 @@ function getProfileSubjectSummaries(profile) {
     .map((subject) => ({
       ...subject,
       averageScore: average(subject.scores),
+      averageGrade: formatAverageGrade(average(subject.scores)),
       notDevelopedPercent: subject.evaluated > 0 ? (subject.notDeveloped / subject.evaluated) * 100 : 0,
     }))
     .sort((a, b) => b.notDevelopedPercent - a.notDevelopedPercent || a.averageScore - b.averageScore)
@@ -975,6 +1014,7 @@ function getProfileAreaSummaries(profile) {
     .map((area) => ({
       ...area,
       averageScore: average(area.scores),
+      averageGrade: formatAverageGrade(average(area.scores)),
       notDevelopedPercent: area.evaluated > 0 ? (area.notDeveloped / area.evaluated) * 100 : 0,
     }))
     .sort((a, b) => b.notDevelopedPercent - a.notDevelopedPercent || a.averageScore - b.averageScore)
@@ -1202,7 +1242,7 @@ function TutoringBulkImportModal({
             touched: matrix[rowIndex]?.[columnIndex]?.touched,
             value: matrix[rowIndex]?.[columnIndex]?.value || '',
           }))
-          .filter((update) => update.touched && update.value),
+          .filter((update) => update.touched),
       ),
     [classId, matrix, scopedColumns, students],
   )
@@ -1428,6 +1468,83 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
       <small>{detail}</small>
       {onClick && <em>Consultar</em>}
     </Component>
+  )
+}
+
+function TutorialGroupGradeChart({ summary }) {
+  const chartGrades = ['A', 'B', 'C', 'D']
+  const counts = {
+    A: summary.globalGradeCounts?.A || 0,
+    B: summary.globalGradeCounts?.B || 0,
+    C: summary.globalGradeCounts?.C || 0,
+    D: (summary.globalGradeCounts?.D || 0) + (summary.globalGradeCounts?.NA || 0),
+  }
+  const total = chartGrades.reduce((sum, grade) => sum + counts[grade], 0)
+  const maxCount = Math.max(1, ...chartGrades.map((grade) => counts[grade]))
+
+  return (
+    <article className="tutorial-chart-card">
+      <header>
+        <div>
+          <span>Radiografia global</span>
+          <strong>{summary.globalAverageGrade}</strong>
+        </div>
+        <small>{total} competències avaluades</small>
+      </header>
+      <div className="tutorial-grade-bar-chart" aria-label="Distribució global de notes tutorials">
+        {chartGrades.map((grade) => (
+          <div className="tutorial-grade-bar-row" key={grade}>
+            <span className={gradeClassName(grade)}>{grade}</span>
+            <div>
+              <i className={`grade-${grade}`} style={{ width: `${Math.max(6, (counts[grade] / maxCount) * 100)}%` }} />
+            </div>
+            <b>{counts[grade]}</b>
+          </div>
+        ))}
+      </div>
+      <p>
+        Lectura agregada de totes les assignatures: només compta les competències amb nota i ignora les marcades com a
+        no avaluades.
+      </p>
+    </article>
+  )
+}
+
+function TutorialSubjectAverageChart({ subjects }) {
+  const visibleSubjects = [...subjects]
+    .filter((subject) => subject.evaluated > 0)
+    .sort((a, b) => b.averageScore - a.averageScore || a.subject.localeCompare(b.subject, 'ca'))
+  const maxScore = 4
+
+  return (
+    <article className="tutorial-chart-card wide">
+      <header>
+        <div>
+          <span>Comparativa per assignatura</span>
+          <strong>{visibleSubjects.length ? 'Millor / pitjor' : '-'}</strong>
+        </div>
+        <small>Mitjana de les competències de cada matèria</small>
+      </header>
+      {visibleSubjects.length === 0 ? (
+        <div className="empty-state compact">Encara no hi ha notes suficients per comparar assignatures.</div>
+      ) : (
+        <div className="tutorial-subject-bar-chart">
+          {visibleSubjects.map((subject) => {
+            const grade = subject.averageGrade || formatAverageGrade(subject.averageScore)
+            return (
+              <div className="tutorial-subject-bar-row" key={subject.subject}>
+                <strong>{subject.subject}</strong>
+                <div>
+                  <i className={`grade-${grade || 'empty'}`} style={{ width: `${(subject.averageScore / maxScore) * 100}%` }} />
+                </div>
+                <span className={gradeClassName(grade)}>{grade || '-'}</span>
+                <small>{formatPercent(subject.notDevelopedPercent)} no assolides</small>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </article>
   )
 }
 
@@ -1658,7 +1775,7 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                     <div className="tutorial-profile-insight-row" key={area.id}>
                       <strong>{area.name}</strong>
                       <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
-                      <small>{area.evaluated} comp. · mitjana {area.averageScore.toFixed(2)}</small>
+                      <small>{area.evaluated} comp. · mitjana {area.averageGrade}</small>
                     </div>
                   ))
                 )}
@@ -1686,7 +1803,7 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                     <div className="tutorial-profile-insight-row ok" key={subject.subject}>
                       <strong>{subject.subject}</strong>
                       <span>Cap no assolida</span>
-                      <small>Mitjana {subject.averageScore.toFixed(2)}</small>
+                      <small>Mitjana {subject.averageGrade}</small>
                     </div>
                   ))
                 )}
@@ -1865,6 +1982,7 @@ export function TutoringView() {
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
+  const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
@@ -2091,6 +2209,7 @@ export function TutoringView() {
     () =>
       buildCooperativeGroups({
         groupSize: cooperativeGroupSize,
+        prioritizeHalfGroups,
         profiles: tutorialSummary.studentProfiles,
         recordRowsByStudent: tutorialRecordRowsByStudent,
         relationRowsByStudent: tutorialRelationRowsByStudent,
@@ -2101,6 +2220,7 @@ export function TutoringView() {
       classTutorialRelations,
       cooperativeGroupSize,
       cooperativeStrategy,
+      prioritizeHalfGroups,
       tutorialRecordRowsByStudent,
       tutorialRelationRowsByStudent,
       tutorialSummary.studentProfiles,
@@ -2252,6 +2372,7 @@ export function TutoringView() {
       groupSize: cooperativeGroupSize,
       groups: cooperativeGroups,
       name: cooperativeGroupSetName || fallbackName,
+      prioritizeHalfGroups,
       strategy: cooperativeStrategy,
     })
     setCooperativeGroupSetName('')
@@ -2398,6 +2519,8 @@ export function TutoringView() {
           </section>
 
           <div className="tutorial-stats-grid">
+            <TutorialGroupGradeChart summary={tutorialSummary} />
+            <TutorialSubjectAverageChart subjects={tutorialSummary.subjectSummaries} />
             <TutorialStatsCard
               detail={`${tutorialSummary.notDevelopedCount} de ${tutorialSummary.evaluatedCount} competències avaluades`}
               icon={TrendingDown}
@@ -2408,7 +2531,7 @@ export function TutoringView() {
             <TutorialStatsCard
               detail={
                 tutorialSummary.weakestArea
-                  ? `${tutorialSummary.weakestArea.notDeveloped} no assolides · mitjana ${tutorialSummary.weakestArea.averageScore.toFixed(2)}`
+                  ? `${tutorialSummary.weakestArea.notDeveloped} no assolides · mitjana ${tutorialSummary.weakestArea.averageGrade}`
                   : 'Encara no hi ha prou dades'
               }
               icon={BarChart3}
@@ -2445,7 +2568,7 @@ export function TutoringView() {
                     <div className="tutorial-insight-row" key={area.id}>
                       <strong>{area.name}</strong>
                       <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
-                      <small>Mitjana {area.averageScore.toFixed(2)}</small>
+                      <small>Mitjana {area.averageGrade}</small>
                     </div>
                   ))}
                 </div>
@@ -3015,6 +3138,16 @@ export function TutoringView() {
                     ))}
                   </select>
                 </label>
+                <label className="cooperative-toggle-control">
+                  Mig grup
+                  <button
+                    className={prioritizeHalfGroups ? 'active' : ''}
+                    onClick={() => setPrioritizeHalfGroups((current) => !current)}
+                    type="button"
+                  >
+                    {prioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
+                  </button>
+                </label>
                 <label className="wide">
                   Nom versió
                   <input
@@ -3092,7 +3225,7 @@ export function TutoringView() {
                         <span>{group.name}</span>
                         <strong>{group.members.length} alumnes</strong>
                       </div>
-                      <em>{group.averageScore > 0 ? `Mitjana ${group.averageScore.toFixed(2)}` : 'Sense notes'}</em>
+                      <em>{group.averageScore > 0 ? `Mitjana ${formatAverageGrade(group.averageScore)}` : 'Sense notes'}</em>
                     </header>
 
                     <div className="cooperative-group-members">

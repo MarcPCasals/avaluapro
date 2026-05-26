@@ -1344,7 +1344,7 @@ export const useAvaluaproStore = create((set, get) => ({
         competencyKey: update.competencyKey,
         value: update.value || '',
       }))
-      .filter((update) => update.classId && update.studentId && update.subject && update.competencyKey && update.value)
+      .filter((update) => update.classId && update.studentId && update.subject && update.competencyKey)
     if (cleanUpdates.length === 0) return
 
     set((state) => {
@@ -1361,16 +1361,18 @@ export const useAvaluaproStore = create((set, get) => ({
       const now = new Date().toISOString()
       const tutorialMarks = [
         ...untouchedMarks,
-        ...cleanUpdates.map((update) => ({
-          id: createId('tmark'),
-          classId: update.classId,
-          studentId: update.studentId,
-          subject: update.subject,
-          competencyKey: update.competencyKey,
-          criterionKey: null,
-          value: update.value,
-          updatedAt: now,
-        })),
+        ...cleanUpdates
+          .filter((update) => update.value)
+          .map((update) => ({
+            id: createId('tmark'),
+            classId: update.classId,
+            studentId: update.studentId,
+            subject: update.subject,
+            competencyKey: update.competencyKey,
+            criterionKey: null,
+            value: update.value,
+            updatedAt: now,
+          })),
       ]
 
       return { tutorialMarks }
@@ -1457,7 +1459,7 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialRelations'])
   },
 
-  saveTutorialGroupSet: async ({ classId, name, groupSize, strategy, groups }) => {
+  saveTutorialGroupSet: async ({ classId, name, groupSize, prioritizeHalfGroups, strategy, groups }) => {
     if (!classId || !Array.isArray(groups) || groups.length === 0) return
 
     const cleanName = String(name || '').trim() || `Grups cooperatius ${new Date().toISOString().slice(0, 10)}`
@@ -1479,6 +1481,7 @@ export const useAvaluaproStore = create((set, get) => ({
           groupSize: Number(groupSize) || 4,
           groups: cleanGroups,
           name: cleanName,
+          prioritizeHalfGroups: Boolean(prioritizeHalfGroups),
           strategy: strategy || 'balanced',
           updatedAt: now,
         },
