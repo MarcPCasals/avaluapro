@@ -1417,11 +1417,17 @@ button.tutorial-record-pill {
   line-height: 1.45;
 }
 
+.tutorial-sociogram-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .tutorial-sociogram-filter-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
 }
 
 .tutorial-sociogram-filter-tabs button {
@@ -1452,6 +1458,7 @@ button.tutorial-record-pill {
     linear-gradient(0deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
     #ffffff;
   background-size: auto, 20% 100%, 100% 25%, auto;
+  touch-action: none;
 }
 
 .tutorial-sociogram-lines,
@@ -1518,19 +1525,37 @@ button.tutorial-record-pill {
   color: #334155;
   background: rgba(255, 255, 255, 0.93);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  cursor: grab;
   text-align: center;
+  touch-action: none;
+  user-select: none;
 }
 
-.tutorial-sociogram-node span {
+.tutorial-sociogram-node:active {
+  cursor: grabbing;
+}
+
+.tutorial-sociogram-node span,
+.tutorial-sociogram-node-photo {
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
   border-radius: 999px;
+}
+
+.tutorial-sociogram-node span {
   color: #1d4ed8;
   background: #dbeafe;
   font-size: 13px;
   font-weight: 950;
+}
+
+.tutorial-sociogram-node-photo {
+  object-fit: cover;
+  border: 2px solid white;
+  background: #e2e8f0;
+  box-shadow: 0 5px 10px rgba(15, 23, 42, 0.16);
 }
 
 .tutorial-sociogram-node strong {
@@ -1559,9 +1584,13 @@ button.tutorial-record-pill {
   box-shadow: 0 18px 34px rgba(37, 99, 235, 0.22);
 }
 
-.tutorial-sociogram-node.selected span {
+.tutorial-sociogram-node.selected span,
+.tutorial-sociogram-node.selected .tutorial-sociogram-node-photo {
   width: 42px;
   height: 42px;
+}
+
+.tutorial-sociogram-node.selected span {
   color: white;
   background: #2563eb;
 }
@@ -10480,6 +10509,7 @@ button.profile-followup-card:focus-visible {
     flex-direction: column;
   }
 
+  .tutorial-sociogram-actions,
   .tutorial-sociogram-filter-tabs {
     justify-content: flex-start;
   }
@@ -10591,13 +10621,15 @@ button.profile-followup-card:focus-visible {
     flex-direction: column;
   }
 
+  .tutorial-sociogram-actions,
   .tutorial-sociogram-filter-tabs,
   .tutorial-sociogram-legend {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .tutorial-sociogram-filter-tabs button {
+  .tutorial-sociogram-filter-tabs button,
+  .tutorial-sociogram-actions .secondary-action {
     width: 100%;
   }
 

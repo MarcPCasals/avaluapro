@@ -339,7 +339,8 @@ function parseBackupDataset(backup) {
           collection === 'tutorialRecords' ||
           collection === 'tutorialMarks' ||
           collection === 'tutorialRelations' ||
-          collection === 'tutorialGroupSets') &&
+          collection === 'tutorialGroupSets' ||
+          collection === 'tutorialSociogramLayouts') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -1241,6 +1242,7 @@ export const useAvaluaproStore = create((set, get) => ({
           !studentIds.has(relation.targetStudentId),
       ),
       tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId !== classId),
+      tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })
@@ -1493,6 +1495,46 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.id !== groupSetId),
     }))
     await persistCollections(set, get, ['tutorialGroupSets'])
+  },
+
+  upsertTutorialSociogramLayout: async ({ classId, positions }) => {
+    if (!classId || !positions) return
+
+    const now = new Date().toISOString()
+    const cleanPositions = Object.entries(positions)
+      .map(([studentId, position]) => ({
+        studentId,
+        x: Math.min(94, Math.max(6, Number(position?.x) || 50)),
+        y: Math.min(92, Math.max(8, Number(position?.y) || 50)),
+      }))
+      .filter((position) => position.studentId)
+
+    set((state) => {
+      const existing = (state.tutorialSociogramLayouts || []).find((layout) => layout.classId === classId)
+      const nextLayout = {
+        id: existing?.id || createId('sociogram'),
+        classId,
+        createdAt: existing?.createdAt || now,
+        positions: cleanPositions,
+        updatedAt: now,
+      }
+
+      return {
+        tutorialSociogramLayouts: existing
+          ? (state.tutorialSociogramLayouts || []).map((layout) => (layout.id === existing.id ? nextLayout : layout))
+          : [nextLayout, ...(state.tutorialSociogramLayouts || [])],
+      }
+    })
+    await persistCollections(set, get, ['tutorialSociogramLayouts'])
+  },
+
+  resetTutorialSociogramLayout: async (classId) => {
+    if (!classId) return
+
+    set((state) => ({
+      tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
+    }))
+    await persistCollections(set, get, ['tutorialSociogramLayouts'])
   },
 
   addCompetency: async (utId) => {
@@ -1844,6 +1886,10 @@ export const useAvaluaproStore = create((set, get) => ({
           memberIds: (group.memberIds || []).filter((memberId) => memberId !== studentId),
         })),
       })),
+      tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).map((layout) => ({
+        ...layout,
+        positions: (layout.positions || []).filter((position) => position.studentId !== studentId),
+      })),
     }))
     await persistCollections(set, get, [
       'students',
@@ -1852,6 +1898,7 @@ export const useAvaluaproStore = create((set, get) => ({
       'behaviorEvents',
       'agendaNotes',
       'tutorialGroupSets',
+      'tutorialSociogramLayouts',
     ])
   },
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -15,6 +15,7 @@ import {
   Layers3,
   Network,
   Plus,
+  RotateCcw,
   Save,
   Trash2,
   TrendingDown,
@@ -513,7 +514,23 @@ function getRingPosition(index, total, radiusX, radiusY, centerX = 50, centerY =
   }
 }
 
-function buildTutorialSociogramMap({ filter, relations, selectedStudentId, studentRows, students }) {
+function clampSociogramPosition(value, min, max, fallback) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return fallback
+  return Math.min(max, Math.max(min, numericValue))
+}
+
+function getSociogramPosition(studentId, fallback, positionsByStudentId) {
+  const customPosition = positionsByStudentId?.get(studentId)
+  if (!customPosition) return fallback
+
+  return {
+    x: clampSociogramPosition(customPosition.x, 6, 94, fallback.x),
+    y: clampSociogramPosition(customPosition.y, 8, 92, fallback.y),
+  }
+}
+
+function buildTutorialSociogramMap({ filter, positionsByStudentId, relations, selectedStudentId, studentRows, students }) {
   const studentsById = new Map(students.map((student) => [student.id, student]))
   const rowsByStudentId = new Map(studentRows.map((row) => [row.student.id, row]))
   const selectedId = selectedStudentId || studentRows[0]?.student.id || students[0]?.id || ''
@@ -549,13 +566,16 @@ function buildTutorialSociogramMap({ filter, relations, selectedStudentId, stude
       isRelated: false,
       isSelected: true,
       student: selectedStudent,
-      x: 50,
-      y: 50,
+      ...getSociogramPosition(selectedStudent.id, { x: 50, y: 50 }, positionsByStudentId),
     })
   }
 
   relatedStudents.forEach((student, index) => {
-    const position = getRingPosition(index, relatedStudents.length, 28, 26)
+    const position = getSociogramPosition(
+      student.id,
+      getRingPosition(index, relatedStudents.length, 28, 26),
+      positionsByStudentId,
+    )
     nodes.push({
       ...rowsByStudentId.get(student.id),
       id: student.id,
@@ -569,7 +589,11 @@ function buildTutorialSociogramMap({ filter, relations, selectedStudentId, stude
   })
 
   remainingStudents.forEach((student, index) => {
-    const position = getRingPosition(index, remainingStudents.length, 44, 37)
+    const position = getSociogramPosition(
+      student.id,
+      getRingPosition(index, remainingStudents.length, 44, 37),
+      positionsByStudentId,
+    )
     nodes.push({
       ...rowsByStudentId.get(student.id),
       id: student.id,
@@ -1814,6 +1838,8 @@ function TutorialRecordStudentModal({ onClose, onDelete, row }) {
 }
 
 export function TutoringView() {
+  const sociogramCanvasRef = useRef(null)
+  const sociogramDragRef = useRef(null)
   const [activePanel, setActivePanel] = useState('evaluation')
   const [areaFilter, setAreaFilter] = useState('all')
   const [showBulkImport, setShowBulkImport] = useState(false)
@@ -1836,6 +1862,7 @@ export function TutoringView() {
   })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [sociogramFilter, setSociogramFilter] = useState('all')
+  const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
@@ -1851,6 +1878,7 @@ export function TutoringView() {
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
   const tutorialGroupSets = useAvaluaproStore((state) => state.tutorialGroupSets)
+  const tutorialSociogramLayouts = useAvaluaproStore((state) => state.tutorialSociogramLayouts)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
@@ -1859,6 +1887,8 @@ export function TutoringView() {
   const deleteTutorialRelation = useAvaluaproStore((state) => state.deleteTutorialRelation)
   const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
+  const upsertTutorialSociogramLayout = useAvaluaproStore((state) => state.upsertTutorialSociogramLayout)
+  const resetTutorialSociogramLayout = useAvaluaproStore((state) => state.resetTutorialSociogramLayout)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -1881,6 +1911,31 @@ export function TutoringView() {
         .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
     [activeClassId, tutorialGroupSets],
   )
+  const classTutorialSociogramLayout = useMemo(
+    () => (tutorialSociogramLayouts || []).find((layout) => layout.classId === activeClassId) || null,
+    [activeClassId, tutorialSociogramLayouts],
+  )
+  const savedSociogramPositionsByStudentId = useMemo(
+    () =>
+      new Map(
+        (classTutorialSociogramLayout?.positions || []).map((position) => [
+          position.studentId,
+          { x: position.x, y: position.y },
+        ]),
+      ),
+    [classTutorialSociogramLayout],
+  )
+  const sociogramPositionsByStudentId = useMemo(
+    () =>
+      new Map([
+        ...savedSociogramPositionsByStudentId,
+        ...Object.entries(sociogramDraftPositions).map(([studentId, position]) => [
+          studentId,
+          { x: position.x, y: position.y },
+        ]),
+      ]),
+    [savedSociogramPositionsByStudentId, sociogramDraftPositions],
+  )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
   const bulkImportColumns = useMemo(() => buildTutorialImportColumns(allSubjectOptions), [allSubjectOptions])
@@ -1900,6 +1955,7 @@ export function TutoringView() {
     }),
     [criteria, competencies, linkedClass?.subject, linkedClassId, marks, uts],
   )
+
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
   const linkedGradeCount = useMemo(() => {
     if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
@@ -2016,6 +2072,7 @@ export function TutoringView() {
     () =>
       buildTutorialSociogramMap({
         filter: sociogramFilter,
+        positionsByStudentId: sociogramPositionsByStudentId,
         relations: tutorialRelationSummary.enrichedRelations,
         selectedStudentId: selectedRelationRow?.student.id,
         studentRows: tutorialRelationSummary.studentRows,
@@ -2025,6 +2082,7 @@ export function TutoringView() {
       classStudents,
       selectedRelationRow?.student.id,
       sociogramFilter,
+      sociogramPositionsByStudentId,
       tutorialRelationSummary.enrichedRelations,
       tutorialRelationSummary.studentRows,
     ],
@@ -2124,6 +2182,65 @@ export function TutoringView() {
       targetStudentId: '',
       note: '',
     }))
+  }
+
+  const persistSociogramPosition = async (studentId, position) => {
+    if (!activeClassId || !studentId || !position) return
+
+    const nextPositions = {
+      ...Object.fromEntries(savedSociogramPositionsByStudentId),
+      ...sociogramDraftPositions,
+      [studentId]: position,
+    }
+    await upsertTutorialSociogramLayout({ classId: activeClassId, positions: nextPositions })
+  }
+
+  const handleSociogramPointerDown = (event, node) => {
+    if (!sociogramCanvasRef.current) return
+
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setSelectedRelationStudentId(node.id)
+    sociogramDragRef.current = {
+      lastPosition: null,
+      moved: false,
+      pointerId: event.pointerId,
+      studentId: node.id,
+    }
+  }
+
+  const handleSociogramPointerMove = (event, node) => {
+    const dragState = sociogramDragRef.current
+    const canvasElement = sociogramCanvasRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId || dragState.studentId !== node.id || !canvasElement) {
+      return
+    }
+
+    const rect = canvasElement.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+
+    const nextPosition = {
+      x: clampSociogramPosition(((event.clientX - rect.left) / rect.width) * 100, 6, 94, node.x),
+      y: clampSociogramPosition(((event.clientY - rect.top) / rect.height) * 100, 8, 92, node.y),
+    }
+    sociogramDragRef.current = { ...dragState, lastPosition: nextPosition, moved: true }
+    setSociogramDraftPositions((current) => ({ ...current, [node.id]: nextPosition }))
+  }
+
+  const handleSociogramPointerUp = async (event, node) => {
+    const dragState = sociogramDragRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId || dragState.studentId !== node.id) return
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    sociogramDragRef.current = null
+    if (dragState.moved && dragState.lastPosition) {
+      await persistSociogramPosition(node.id, dragState.lastPosition)
+    }
+  }
+
+  const handleResetSociogramLayout = async () => {
+    setSociogramDraftPositions({})
+    sociogramDragRef.current = null
+    await resetTutorialSociogramLayout(activeClassId)
   }
 
   const handleSaveCooperativeGroupSet = async () => {
@@ -2746,24 +2863,39 @@ export function TutoringView() {
                   connexions registrades.
                 </p>
               </div>
-              <div className="tutorial-sociogram-filter-tabs" aria-label="Filtre del sociograma">
-                {SOCIOGRAM_FILTERS.map((filter) => (
-                  <button
-                    className={sociogramFilter === filter.id ? 'active' : ''}
-                    key={filter.id}
-                    onClick={() => setSociogramFilter(filter.id)}
-                    type="button"
-                  >
-                    {filter.label}
-                  </button>
-                ))}
+              <div className="tutorial-sociogram-actions">
+                <div className="tutorial-sociogram-filter-tabs" aria-label="Filtre del sociograma">
+                  {SOCIOGRAM_FILTERS.map((filter) => (
+                    <button
+                      className={sociogramFilter === filter.id ? 'active' : ''}
+                      key={filter.id}
+                      onClick={() => setSociogramFilter(filter.id)}
+                      type="button"
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="secondary-action compact"
+                  disabled={!classTutorialSociogramLayout && Object.keys(sociogramDraftPositions).length === 0}
+                  onClick={handleResetSociogramLayout}
+                  type="button"
+                >
+                  <RotateCcw size={16} />
+                  Restablir mapa
+                </button>
               </div>
             </header>
 
             {classStudents.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes a la tutoria per veure el sociograma.</div>
             ) : (
-              <div className="tutorial-sociogram-canvas" aria-label="Mapa visual de relacions tutorials">
+              <div
+                aria-label="Mapa visual de relacions tutorials"
+                className="tutorial-sociogram-canvas"
+                ref={sociogramCanvasRef}
+              >
                 <svg aria-hidden="true" className="tutorial-sociogram-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
                   <defs>
                     <marker id="sociogram-arrow-green" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
@@ -2804,11 +2936,24 @@ export function TutoringView() {
                       } ${node.isDimmed ? 'dimmed' : ''} ${node.avoidCount > 0 ? 'has-avoid' : ''}`}
                       key={node.id}
                       onClick={() => setSelectedRelationStudentId(node.id)}
+                      onPointerCancel={(event) => handleSociogramPointerUp(event, node)}
+                      onPointerDown={(event) => handleSociogramPointerDown(event, node)}
+                      onPointerMove={(event) => handleSociogramPointerMove(event, node)}
+                      onPointerUp={(event) => handleSociogramPointerUp(event, node)}
                       style={{ left: `${node.x}%`, top: `${node.y}%` }}
                       title={node.student.name}
                       type="button"
                     >
-                      <span>{node.initials}</span>
+                      {node.student.photoUrl ? (
+                        <img
+                          alt=""
+                          className="tutorial-sociogram-node-photo"
+                          draggable="false"
+                          src={node.student.photoUrl}
+                        />
+                      ) : (
+                        <span>{node.initials}</span>
+                      )}
                       <strong>{node.student.name}</strong>
                       <small>
                         {node.supportiveCount || 0}+ · {node.avoidCount || 0} evitar

@@ -14,6 +14,7 @@ const IMPORTANT_COLLECTIONS = [
   ['tutorialRecords', 'registres de tutoria'],
   ['tutorialRelations', 'relacions tutorials'],
   ['tutorialGroupSets', 'versions de grups'],
+  ['tutorialSociogramLayouts', 'mapes de sociograma'],
   ['seatingCharts', 'llocs fixos'],
 ]
 
