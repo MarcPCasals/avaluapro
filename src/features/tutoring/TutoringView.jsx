@@ -4,9 +4,12 @@ import {
   BarChart3,
   BookOpenCheck,
   CalendarDays,
+  CheckCircle2,
+  Clipboard,
   ClipboardList,
   Eye,
   FileDown,
+  FileSpreadsheet,
   GraduationCap,
   Layers3,
   Plus,
@@ -16,6 +19,7 @@ import {
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
+import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
@@ -25,6 +29,8 @@ const TUTORING_RECORD_TYPES = [
   { id: 'classroom-expulsion', label: 'Expulsions d’aula', tone: 'violet' },
   { id: 'center-expulsion', label: 'Expulsions de centre', tone: 'slate' },
 ]
+const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
+const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 
 function countByType(records, type) {
   return records.filter((record) => record.type === type).length
@@ -483,6 +489,306 @@ function SubjectCatalogCard({ completion, item, onSelect }) {
   )
 }
 
+function normalizeImportGrade(value) {
+  const cleanValue = String(value || '').trim().toUpperCase()
+  if (EMPTY_IMPORT_MARKS.has(cleanValue)) return { invalid: false, raw: String(value || '').trim(), value: '' }
+  if (VALID_IMPORT_GRADES.has(cleanValue)) return { invalid: false, raw: cleanValue, value: cleanValue }
+  return { invalid: Boolean(cleanValue), raw: String(value || '').trim(), value: '' }
+}
+
+function buildTutorialImportColumns(subjectOptions) {
+  return subjectOptions.flatMap((subjectOption) =>
+    buildTutorialCompetencies(subjectOption.subject).map((competency) => ({
+      areaName: subjectOption.areaName,
+      competency,
+      id: `${subjectOption.subject}_${competency.key}`,
+      label: competency.name,
+      subject: subjectOption.subject,
+    })),
+  )
+}
+
+function createTutorialImportMatrix({ classId, columns, evaluationContext, students, tutorialMarks }) {
+  return students.map((student) =>
+    columns.map((column) => {
+      const value = getTutorialCompetencyGrade({
+        classId,
+        competency: column.competency,
+        evaluationContext,
+        studentId: student.id,
+        subject: column.subject,
+        tutorialMarks,
+      })
+
+      return { invalid: false, raw: value, touched: false, value }
+    }),
+  )
+}
+
+function detectImportSeparator(text) {
+  const firstLine = String(text || '').split(/\r?\n/).find((line) => line.trim()) || ''
+  if (firstLine.includes('\t')) return '\t'
+  if (firstLine.includes(';')) return ';'
+  return ','
+}
+
+function splitImportRows(rawText) {
+  const separator = detectImportSeparator(rawText)
+  return String(rawText || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .filter((row) => row.trim())
+    .map((row) => row.split(separator).map((cell) => cell.trim()))
+}
+
+function rowLooksLikeTutorialHeader(row) {
+  const firstCell = String(row[0] || '').toLowerCase()
+  return firstCell.includes('alumne') || row.some((cell) => String(cell || '').includes(' · C'))
+}
+
+function removeLeadingStudentName(row, columnCount) {
+  if (row.length !== columnCount + 1) return row
+  return normalizeImportGrade(row[0]).invalid ? row.slice(1) : row
+}
+
+function buildTutorialMatrixFromText(rawText, currentMatrix, columns, students) {
+  const matrix = currentMatrix.map((row) => row.map((cell) => ({ ...cell, raw: '', touched: false, value: '' })))
+  const rawRows = splitImportRows(rawText)
+  const rows = rawRows[0] && rowLooksLikeTutorialHeader(rawRows[0]) ? rawRows.slice(1) : rawRows
+
+  rows.slice(0, students.length).forEach((row, rowIndex) => {
+    const cells = removeLeadingStudentName(row, columns.length)
+    cells.slice(0, columns.length).forEach((cell, columnIndex) => {
+      matrix[rowIndex][columnIndex] = {
+        ...normalizeImportGrade(cell),
+        touched: Boolean(String(cell || '').trim()),
+      }
+    })
+  })
+
+  return { ignoredRows: Math.max(0, rows.length - students.length), matrix }
+}
+
+function buildTutorialTemplateText({ classId, columns, evaluationContext, students, tutorialMarks }) {
+  const header = ['Alumne', ...columns.map((column) => `${column.subject} · ${column.label}`)]
+  const rows = students.map((student) => [
+    student.name,
+    ...columns.map((column) =>
+      getTutorialCompetencyGrade({
+        classId,
+        competency: column.competency,
+        evaluationContext,
+        studentId: student.id,
+        subject: column.subject,
+        tutorialMarks,
+      }),
+    ),
+  ])
+
+  return [header, ...rows].map((row) => row.join('\t')).join('\n')
+}
+
+function countImportValues(matrix) {
+  return matrix.flat().filter((cell) => cell.value).length
+}
+
+function countImportInvalids(matrix) {
+  return matrix.flat().filter((cell) => cell.invalid).length
+}
+
+function TutoringBulkImportModal({
+  activeClass,
+  classId,
+  columns,
+  evaluationContext,
+  onClose,
+  onSave,
+  students,
+  tutorialMarks,
+}) {
+  const [{ ignoredRows, matrix }, setImportState] = useState(() => ({
+    ignoredRows: 0,
+    matrix: createTutorialImportMatrix({ classId, columns, evaluationContext, students, tutorialMarks }),
+  }))
+  const importedValues = useMemo(() => countImportValues(matrix), [matrix])
+  const invalidValues = useMemo(() => countImportInvalids(matrix), [matrix])
+  const updates = useMemo(
+    () =>
+      students.flatMap((student, rowIndex) =>
+        columns
+          .map((column, columnIndex) => ({
+            classId,
+            competencyKey: column.competency.key,
+            studentId: student.id,
+            subject: column.subject,
+            touched: matrix[rowIndex]?.[columnIndex]?.touched,
+            value: matrix[rowIndex]?.[columnIndex]?.value || '',
+          }))
+          .filter((update) => update.touched && update.value),
+      ),
+    [classId, columns, matrix, students],
+  )
+
+  const applyText = (text) => {
+    setImportState((current) => buildTutorialMatrixFromText(text, current.matrix, columns, students))
+  }
+
+  const updateCell = (rowIndex, columnIndex, value) => {
+    setImportState((current) => {
+      const nextMatrix = current.matrix.map((row) => row.map((cell) => ({ ...cell })))
+      nextMatrix[rowIndex][columnIndex] = {
+        ...normalizeImportGrade(value),
+        touched: Boolean(String(value || '').trim()),
+      }
+      return { ...current, matrix: nextMatrix }
+    })
+  }
+
+  const handlePaste = (event) => {
+    const text = event.clipboardData.getData('text/plain')
+    if (!text.includes('\t') && !text.includes('\n') && !text.includes(';')) return
+
+    event.preventDefault()
+    applyText(text)
+  }
+
+  const downloadTemplate = () => {
+    const templateText = buildTutorialTemplateText({
+      classId,
+      columns,
+      evaluationContext,
+      students,
+      tutorialMarks,
+    })
+    const blob = new Blob([templateText], { type: 'text/tab-separated-values;charset=utf-8' })
+    downloadBlob(blob, `avaluapro-tutoria-${activeClass?.name || 'classe'}-${getTodaySlug()}.tsv`)
+  }
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    applyText(await file.text())
+    event.target.value = ''
+  }
+
+  const handleSave = async () => {
+    await onSave(updates)
+    onClose()
+  }
+
+  return (
+    <Modal onClose={onClose} size="xl" title="Importació massiva de tutoria">
+      <div className="tutorial-bulk-import-panel">
+        <section className="excel-import-help">
+          <FileSpreadsheet size={22} />
+          <div>
+            <strong>Una plantilla per a totes les matèries</strong>
+            <p>
+              Descarrega la plantilla, omple les notes A/B/C/D/NA a Excel i torna-la a carregar. Les columnes estan
+              agrupades per matèria i competència.
+            </p>
+          </div>
+        </section>
+
+        <div className="tutorial-bulk-import-actions">
+          <button className="secondary-action" onClick={downloadTemplate} type="button">
+            <FileDown size={17} />
+            Descarregar plantilla Excel
+          </button>
+          <label className="secondary-action file-action">
+            <FileSpreadsheet size={17} />
+            Carregar plantilla omplerta
+            <input accept=".csv,.tsv,.txt" onChange={handleFileUpload} type="file" />
+          </label>
+          <button
+            className="secondary-action"
+            onClick={async () => navigator.clipboard.writeText(buildTutorialTemplateText({
+              classId,
+              columns,
+              evaluationContext,
+              students,
+              tutorialMarks,
+            }))}
+            type="button"
+          >
+            <Clipboard size={17} />
+            Copiar plantilla
+          </button>
+        </div>
+
+        <div className="excel-import-status">
+          <span className="ok">
+            <CheckCircle2 size={16} />
+            {importedValues} notes vàlides
+          </span>
+          {invalidValues > 0 && (
+            <span className="warning">
+              <AlertTriangle size={16} />
+              {invalidValues} cel·les ignorades perquè no són A/B/C/D/NA
+            </span>
+          )}
+          {ignoredRows > 0 && (
+            <span className="warning">
+              <AlertTriangle size={16} />
+              {ignoredRows} files sobrants ignorades
+            </span>
+          )}
+        </div>
+
+        <div className="tutorial-bulk-preview-wrap">
+          <table className="tutorial-bulk-preview-table">
+            <thead>
+              <tr>
+                <th rowSpan="2">Alumne</th>
+                {columns.map((column) => (
+                  <th className="subject-header" key={`${column.id}_subject`}>
+                    {column.subject}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column.id}>{column.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((student, rowIndex) => (
+                <tr key={student.id}>
+                  <th>{student.name}</th>
+                  {columns.map((column, columnIndex) => {
+                    const cell = matrix[rowIndex]?.[columnIndex] || { invalid: false, raw: '', value: '' }
+                    return (
+                      <td className={cell.invalid ? 'invalid-import-cell' : gradeTextClassName(cell.value)} key={column.id}>
+                        <input
+                          aria-label={`${student.name} ${column.subject} ${column.label}`}
+                          className={cell.invalid ? 'invalid' : gradeTextClassName(cell.value)}
+                          onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)}
+                          onPaste={rowIndex === 0 && columnIndex === 0 ? handlePaste : undefined}
+                          placeholder="-"
+                          value={cell.raw || cell.value}
+                        />
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <footer className="excel-import-actions">
+          <span>{updates.length} canvis preparats</span>
+          <button className="primary-action" disabled={updates.length === 0 || invalidValues > 0} onClick={handleSave} type="button">
+            <CheckCircle2 size={17} />
+            Importar totes les notes
+          </button>
+        </footer>
+      </div>
+    </Modal>
+  )
+}
+
 function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral', onClick }) {
   const Component = onClick ? 'button' : 'article'
   return (
@@ -854,6 +1160,7 @@ function TutorialRecordStudentModal({ onClose, onDelete, row }) {
 export function TutoringView() {
   const [activePanel, setActivePanel] = useState('evaluation')
   const [areaFilter, setAreaFilter] = useState('all')
+  const [showBulkImport, setShowBulkImport] = useState(false)
   const [profileFilter, setProfileFilter] = useState('priority')
   const [subjectFilter, setSubjectFilter] = useState('auto')
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
@@ -874,6 +1181,7 @@ export function TutoringView() {
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
+  const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
@@ -888,6 +1196,8 @@ export function TutoringView() {
     [activeClassId, tutorialRecords],
   )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
+  const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
+  const bulkImportColumns = useMemo(() => buildTutorialImportColumns(allSubjectOptions), [allSubjectOptions])
   const autoSubject =
     linkedClass?.subject && SUBJECT_STRUCTURES[linkedClass.subject] ? linkedClass.subject : subjectOptions[0]?.subject
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
@@ -1224,6 +1534,10 @@ export function TutoringView() {
                 ))}
               </select>
             </label>
+            <button className="secondary-action tutorial-import-all-button" onClick={() => setShowBulkImport(true)} type="button">
+              <FileSpreadsheet size={17} />
+              Importar totes les matèries
+            </button>
           </div>
 
           <div className="tutorial-subject-overview">
@@ -1614,6 +1928,18 @@ export function TutoringView() {
           onClose={() => setSelectedTutorialRecordStudentId('')}
           onDelete={deleteTutorialRecord}
           row={selectedTutorialRecordRow}
+        />
+      )}
+      {showBulkImport && (
+        <TutoringBulkImportModal
+          activeClass={activeClass}
+          classId={activeClassId}
+          columns={bulkImportColumns}
+          evaluationContext={evaluationContext}
+          onClose={() => setShowBulkImport(false)}
+          onSave={importTutorialMarks}
+          students={classStudents}
+          tutorialMarks={tutorialMarks}
         />
       )}
     </section>

@@ -1322,6 +1322,49 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialMarks'])
   },
 
+  importTutorialMarks: async (updates) => {
+    const cleanUpdates = updates
+      .map((update) => ({
+        classId: update.classId,
+        studentId: update.studentId,
+        subject: update.subject,
+        competencyKey: update.competencyKey,
+        value: update.value || '',
+      }))
+      .filter((update) => update.classId && update.studentId && update.subject && update.competencyKey && update.value)
+    if (cleanUpdates.length === 0) return
+
+    set((state) => {
+      const updateMap = new Map(
+        cleanUpdates.map((update) => [
+          `${update.classId}_${update.studentId}_${update.subject}_${update.competencyKey}`,
+          update,
+        ]),
+      )
+      const touchedKeys = new Set(updateMap.keys())
+      const untouchedMarks = state.tutorialMarks.filter(
+        (mark) => !touchedKeys.has(`${mark.classId}_${mark.studentId}_${mark.subject}_${mark.competencyKey}`),
+      )
+      const now = new Date().toISOString()
+      const tutorialMarks = [
+        ...untouchedMarks,
+        ...cleanUpdates.map((update) => ({
+          id: createId('tmark'),
+          classId: update.classId,
+          studentId: update.studentId,
+          subject: update.subject,
+          competencyKey: update.competencyKey,
+          criterionKey: null,
+          value: update.value,
+          updatedAt: now,
+        })),
+      ]
+
+      return { tutorialMarks }
+    })
+    await persistCollections(set, get, ['tutorialMarks'])
+  },
+
   addTutorialRecord: async ({ classId, studentId, type, date, note }) => {
     if (!classId || !studentId || !type) return
 

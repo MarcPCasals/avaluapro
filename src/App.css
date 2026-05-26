@@ -878,8 +878,9 @@ button.tutorial-stat-card {
 
 .tutorial-filter-bar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) auto;
   gap: 12px;
+  align-items: end;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 14px;
@@ -905,6 +906,11 @@ button.tutorial-stat-card {
   font-size: 14px;
   font-weight: 850;
   text-transform: none;
+}
+
+.tutorial-import-all-button {
+  min-height: 42px;
+  white-space: nowrap;
 }
 
 .tutorial-subject-overview {
@@ -8094,6 +8100,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .excel-import-panel,
+.tutorial-bulk-import-panel,
 .seating-panel {
   display: grid;
   gap: 16px;
@@ -8149,6 +8156,113 @@ button.profile-followup-card:focus-visible {
 .excel-import-status .warning {
   color: #9a3412;
   background: #ffedd5;
+}
+
+.tutorial-bulk-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.file-action {
+  position: relative;
+  cursor: pointer;
+}
+
+.file-action input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tutorial-bulk-preview-wrap {
+  max-height: 58vh;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+}
+
+.tutorial-bulk-preview-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.tutorial-bulk-preview-table th,
+.tutorial-bulk-preview-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tutorial-bulk-preview-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-width: 92px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.tutorial-bulk-preview-table thead tr:nth-child(2) th {
+  top: 34px;
+  background: #ffffff;
+}
+
+.tutorial-bulk-preview-table .subject-header {
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.tutorial-bulk-preview-table thead th:first-child,
+.tutorial-bulk-preview-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 230px;
+  max-width: 260px;
+  overflow: hidden;
+  padding: 8px 10px;
+  color: #1f2937;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #ffffff;
+}
+
+.tutorial-bulk-preview-table thead th:first-child {
+  z-index: 4;
+  background: #f8fafc;
+}
+
+.tutorial-bulk-preview-table input {
+  width: 58px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 7px 8px;
+  text-align: center;
+  font-weight: 950;
+  text-transform: uppercase;
+  outline: none;
+  background: white;
+}
+
+.tutorial-bulk-preview-table input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px #ffedd5;
+}
+
+.tutorial-bulk-preview-table input.invalid {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fef2f2;
 }
 
 .excel-preview-wrap {
