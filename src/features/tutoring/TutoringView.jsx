@@ -424,6 +424,8 @@ function getTutorialProfilePriority(profile, recordRow) {
 }
 
 function getProfileExecutiveSummary(profile, records) {
+  const subjectSummaries = getProfileSubjectSummaries(profile)
+  const weakestSubject = subjectSummaries[0]
   const notDevelopedText =
     profile.notDevelopedCount > 0
       ? `${profile.notDevelopedCount} competència/es no assolides (${formatPercent(profile.notDevelopedPercent)}).`
@@ -434,7 +436,9 @@ function getProfileExecutiveSummary(profile, records) {
   }))
   const relevantRecords = recordCounts.filter((item) => item.count > 0)
   const weakestEvidence = profile.weakestArea
-    ? `L’àrea més delicada és ${profile.weakestArea.name}.`
+    ? `L’àrea més delicada és ${profile.weakestArea.name}${
+        weakestSubject ? `, sobretot a ${weakestSubject.subject}` : ''
+      }.`
     : 'Encara no hi ha una àrea delicada clara.'
   const trackingEvidence =
     relevantRecords.length > 0
@@ -467,6 +471,54 @@ function getProfileExecutiveSummary(profile, records) {
     title,
     tone,
   }
+}
+
+function getProfileSubjectSummaries(profile) {
+  return Object.values(
+    profile.evaluatedCompetencies.reduce((subjects, item) => {
+      const subject = subjects[item.subject] || {
+        areaName: item.areaName,
+        evaluated: 0,
+        notDeveloped: 0,
+        scores: [],
+        subject: item.subject,
+      }
+      subject.evaluated += 1
+      subject.notDeveloped += item.notDeveloped ? 1 : 0
+      subject.scores.push(item.score)
+      return { ...subjects, [item.subject]: subject }
+    }, {}),
+  )
+    .map((subject) => ({
+      ...subject,
+      averageScore: average(subject.scores),
+      notDevelopedPercent: subject.evaluated > 0 ? (subject.notDeveloped / subject.evaluated) * 100 : 0,
+    }))
+    .sort((a, b) => b.notDevelopedPercent - a.notDevelopedPercent || a.averageScore - b.averageScore)
+}
+
+function getProfileAreaSummaries(profile) {
+  return Object.values(
+    profile.evaluatedCompetencies.reduce((areas, item) => {
+      const area = areas[item.areaId] || {
+        evaluated: 0,
+        id: item.areaId,
+        name: item.areaName,
+        notDeveloped: 0,
+        scores: [],
+      }
+      area.evaluated += 1
+      area.notDeveloped += item.notDeveloped ? 1 : 0
+      area.scores.push(item.score)
+      return { ...areas, [item.areaId]: area }
+    }, {}),
+  )
+    .map((area) => ({
+      ...area,
+      averageScore: average(area.scores),
+      notDevelopedPercent: area.evaluated > 0 ? (area.notDeveloped / area.evaluated) * 100 : 0,
+    }))
+    .sort((a, b) => b.notDevelopedPercent - a.notDevelopedPercent || a.averageScore - b.averageScore)
 }
 
 function SubjectCatalogCard({ completion, item, onSelect }) {
@@ -508,6 +560,25 @@ function buildTutorialImportColumns(subjectOptions) {
   )
 }
 
+function groupImportColumnsBySubject(columns) {
+  return columns.reduce((groups, column) => {
+    const lastGroup = groups[groups.length - 1]
+    if (lastGroup?.subject === column.subject) {
+      lastGroup.columns.push(column)
+      return groups
+    }
+    return [...groups, { areaName: column.areaName, columns: [column], subject: column.subject }]
+  }, [])
+}
+
+function filterImportColumns(columns, areaFilter, subjectFilter) {
+  return columns.filter(
+    (column) =>
+      (areaFilter === 'all' || column.areaName === areaFilter) &&
+      (subjectFilter === 'all' || column.subject === subjectFilter),
+  )
+}
+
 function createTutorialImportMatrix({ classId, columns, evaluationContext, students, tutorialMarks }) {
   return students.map((student) =>
     columns.map((column) => {
@@ -543,7 +614,13 @@ function splitImportRows(rawText) {
 
 function rowLooksLikeTutorialHeader(row) {
   const firstCell = String(row[0] || '').toLowerCase()
-  return firstCell.includes('alumne') || row.some((cell) => String(cell || '').includes(' · C'))
+  return (
+    firstCell.includes('alumne') ||
+    firstCell.includes('competència') ||
+    firstCell.includes('materia') ||
+    firstCell.includes('matèria') ||
+    row.some((cell) => String(cell || '').includes(' · C'))
+  )
 }
 
 function removeLeadingStudentName(row, columnCount) {
@@ -554,7 +631,10 @@ function removeLeadingStudentName(row, columnCount) {
 function buildTutorialMatrixFromText(rawText, currentMatrix, columns, students) {
   const matrix = currentMatrix.map((row) => row.map((cell) => ({ ...cell, raw: '', touched: false, value: '' })))
   const rawRows = splitImportRows(rawText)
-  const rows = rawRows[0] && rowLooksLikeTutorialHeader(rawRows[0]) ? rawRows.slice(1) : rawRows
+  let rows = rawRows
+  while (rows[0] && rowLooksLikeTutorialHeader(rows[0])) {
+    rows = rows.slice(1)
+  }
 
   rows.slice(0, students.length).forEach((row, rowIndex) => {
     const cells = removeLeadingStudentName(row, columns.length)
@@ -570,7 +650,8 @@ function buildTutorialMatrixFromText(rawText, currentMatrix, columns, students) 
 }
 
 function buildTutorialTemplateText({ classId, columns, evaluationContext, students, tutorialMarks }) {
-  const header = ['Alumne', ...columns.map((column) => `${column.subject} · ${column.label}`)]
+  const subjectHeader = ['Alumne', ...columns.map((column) => column.subject)]
+  const competencyHeader = ['Competència', ...columns.map((column) => column.label)]
   const rows = students.map((student) => [
     student.name,
     ...columns.map((column) =>
@@ -585,7 +666,7 @@ function buildTutorialTemplateText({ classId, columns, evaluationContext, studen
     ),
   ])
 
-  return [header, ...rows].map((row) => row.join('\t')).join('\n')
+  return [subjectHeader, competencyHeader, ...rows].map((row) => row.join('\t')).join('\n')
 }
 
 function countImportValues(matrix) {
@@ -606,16 +687,54 @@ function TutoringBulkImportModal({
   students,
   tutorialMarks,
 }) {
+  const [importAreaFilter, setImportAreaFilter] = useState('all')
+  const [importSubjectFilter, setImportSubjectFilter] = useState('all')
+  const importAreaOptions = useMemo(
+    () =>
+      Object.values(
+        columns.reduce((areas, column) => ({ ...areas, [column.areaName]: column.areaName }), {}),
+      ).sort((a, b) => a.localeCompare(b, 'ca')),
+    [columns],
+  )
+  const importSubjectOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          columns
+            .filter((column) => importAreaFilter === 'all' || column.areaName === importAreaFilter)
+            .map((column) => column.subject),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'ca')),
+    [columns, importAreaFilter],
+  )
+  const scopedColumns = useMemo(
+    () => filterImportColumns(columns, importAreaFilter, importSubjectFilter),
+    [columns, importAreaFilter, importSubjectFilter],
+  )
+  const groupedColumns = useMemo(() => groupImportColumnsBySubject(scopedColumns), [scopedColumns])
   const [{ ignoredRows, matrix }, setImportState] = useState(() => ({
     ignoredRows: 0,
     matrix: createTutorialImportMatrix({ classId, columns, evaluationContext, students, tutorialMarks }),
   }))
+  const resetImportMatrix = (nextAreaFilter, nextSubjectFilter) => {
+    const nextColumns = filterImportColumns(columns, nextAreaFilter, nextSubjectFilter)
+    setImportState({
+      ignoredRows: 0,
+      matrix: createTutorialImportMatrix({
+        classId,
+        columns: nextColumns,
+        evaluationContext,
+        students,
+        tutorialMarks,
+      }),
+    })
+  }
   const importedValues = useMemo(() => countImportValues(matrix), [matrix])
   const invalidValues = useMemo(() => countImportInvalids(matrix), [matrix])
   const updates = useMemo(
     () =>
       students.flatMap((student, rowIndex) =>
-        columns
+        scopedColumns
           .map((column, columnIndex) => ({
             classId,
             competencyKey: column.competency.key,
@@ -626,11 +745,11 @@ function TutoringBulkImportModal({
           }))
           .filter((update) => update.touched && update.value),
       ),
-    [classId, columns, matrix, students],
+    [classId, matrix, scopedColumns, students],
   )
 
   const applyText = (text) => {
-    setImportState((current) => buildTutorialMatrixFromText(text, current.matrix, columns, students))
+    setImportState((current) => buildTutorialMatrixFromText(text, current.matrix, scopedColumns, students))
   }
 
   const updateCell = (rowIndex, columnIndex, value) => {
@@ -655,7 +774,7 @@ function TutoringBulkImportModal({
   const downloadTemplate = () => {
     const templateText = buildTutorialTemplateText({
       classId,
-      columns,
+      columns: scopedColumns,
       evaluationContext,
       students,
       tutorialMarks,
@@ -675,6 +794,17 @@ function TutoringBulkImportModal({
     await onSave(updates)
     onClose()
   }
+  const copyTemplate = async () => {
+    await navigator.clipboard.writeText(
+      buildTutorialTemplateText({
+        classId,
+        columns: scopedColumns,
+        evaluationContext,
+        students,
+        tutorialMarks,
+      }),
+    )
+  }
 
   return (
     <Modal onClose={onClose} size="xl" title="Importació massiva de tutoria">
@@ -684,11 +814,56 @@ function TutoringBulkImportModal({
           <div>
             <strong>Una plantilla per a totes les matèries</strong>
             <p>
-              Descarrega la plantilla, omple les notes A/B/C/D/NA a Excel i torna-la a carregar. Les columnes estan
-              agrupades per matèria i competència.
+              Descarrega la plantilla, omple les notes A/B/C/D/NA a Excel i torna-la a carregar. La primera fila
+              agrupa les columnes per matèria i la segona indica la competència exacta.
             </p>
           </div>
         </section>
+
+        <div className="tutorial-bulk-filter-grid">
+          <label>
+            Àrea de la plantilla
+            <select
+              onChange={(event) => {
+                const nextAreaFilter = event.target.value
+                setImportAreaFilter(nextAreaFilter)
+                setImportSubjectFilter('all')
+                resetImportMatrix(nextAreaFilter, 'all')
+              }}
+              value={importAreaFilter}
+            >
+              <option value="all">Totes les àrees</option>
+              {importAreaOptions.map((areaName) => (
+                <option key={areaName} value={areaName}>
+                  {areaName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Matèria de la plantilla
+            <select
+              onChange={(event) => {
+                const nextSubjectFilter = event.target.value
+                setImportSubjectFilter(nextSubjectFilter)
+                resetImportMatrix(importAreaFilter, nextSubjectFilter)
+              }}
+              value={importSubjectFilter}
+            >
+              <option value="all">Totes les matèries</option>
+              {importSubjectOptions.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </label>
+          <article>
+            <strong>{scopedColumns.length}</strong>
+            <span>competències incloses</span>
+            <small>{columns.length - scopedColumns.length} ocultes pel filtre</small>
+          </article>
+        </div>
 
         <div className="tutorial-bulk-import-actions">
           <button className="secondary-action" onClick={downloadTemplate} type="button">
@@ -702,13 +877,7 @@ function TutoringBulkImportModal({
           </label>
           <button
             className="secondary-action"
-            onClick={async () => navigator.clipboard.writeText(buildTutorialTemplateText({
-              classId,
-              columns,
-              evaluationContext,
-              students,
-              tutorialMarks,
-            }))}
+            onClick={copyTemplate}
             type="button"
           >
             <Clipboard size={17} />
@@ -740,14 +909,15 @@ function TutoringBulkImportModal({
             <thead>
               <tr>
                 <th rowSpan="2">Alumne</th>
-                {columns.map((column) => (
-                  <th className="subject-header" key={`${column.id}_subject`}>
-                    {column.subject}
+                {groupedColumns.map((group) => (
+                  <th className="subject-header" colSpan={group.columns.length} key={`${group.subject}_subject`}>
+                    <span>{group.areaName}</span>
+                    <strong>{group.subject}</strong>
                   </th>
                 ))}
               </tr>
               <tr>
-                {columns.map((column) => (
+                {scopedColumns.map((column) => (
                   <th key={column.id}>{column.label}</th>
                 ))}
               </tr>
@@ -756,7 +926,7 @@ function TutoringBulkImportModal({
               {students.map((student, rowIndex) => (
                 <tr key={student.id}>
                   <th>{student.name}</th>
-                  {columns.map((column, columnIndex) => {
+                  {scopedColumns.map((column, columnIndex) => {
                     const cell = matrix[rowIndex]?.[columnIndex] || { invalid: false, raw: '', value: '' }
                     return (
                       <td className={cell.invalid ? 'invalid-import-cell' : gradeTextClassName(cell.value)} key={column.id}>
@@ -834,6 +1004,13 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
       (reportAreaFilter === 'all' || item.areaId === reportAreaFilter) &&
       (reportSubjectFilter === 'all' || item.subject === reportSubjectFilter),
   )
+  const profileAreaSummaries = getProfileAreaSummaries(profile)
+  const profileSubjectSummaries = getProfileSubjectSummaries(profile)
+  const weakestSubjects = profileSubjectSummaries.filter((subject) => subject.notDeveloped > 0).slice(0, 4)
+  const strongestSubjects = profileSubjectSummaries
+    .filter((subject) => subject.evaluated > 0 && subject.notDeveloped === 0)
+    .sort((a, b) => b.averageScore - a.averageScore || a.subject.localeCompare(b.subject, 'ca'))
+    .slice(0, 4)
   const groupedByArea = Object.values(
     filteredCompetencies.reduce((areas, item) => {
       const area = areas[item.areaId] || { name: item.areaName, rows: [] }
@@ -1010,6 +1187,50 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
               <article>
                 <span>Àrea més delicada</span>
                 <strong>{profile.weakestArea?.name || '-'}</strong>
+              </article>
+            </div>
+            <div className="tutorial-profile-insight-grid">
+              <article>
+                <h4>Àrees del perfil</h4>
+                {profileAreaSummaries.length === 0 ? (
+                  <p>Encara no hi ha prou dades per detectar àrees fortes o delicades.</p>
+                ) : (
+                  profileAreaSummaries.slice(0, 4).map((area) => (
+                    <div className="tutorial-profile-insight-row" key={area.id}>
+                      <strong>{area.name}</strong>
+                      <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
+                      <small>{area.evaluated} comp. · mitjana {area.averageScore.toFixed(2)}</small>
+                    </div>
+                  ))
+                )}
+              </article>
+              <article>
+                <h4>Matèries a prioritzar</h4>
+                {weakestSubjects.length === 0 ? (
+                  <p>No hi ha cap matèria amb competències no assolides registrades.</p>
+                ) : (
+                  weakestSubjects.map((subject) => (
+                    <div className="tutorial-profile-insight-row risk" key={subject.subject}>
+                      <strong>{subject.subject}</strong>
+                      <span>{subject.notDeveloped}/{subject.evaluated} no assolides</span>
+                      <small>{subject.areaName}</small>
+                    </div>
+                  ))
+                )}
+              </article>
+              <article>
+                <h4>Punts forts</h4>
+                {strongestSubjects.length === 0 ? (
+                  <p>Encara no hi ha matèries completament assolides o sense risc.</p>
+                ) : (
+                  strongestSubjects.map((subject) => (
+                    <div className="tutorial-profile-insight-row ok" key={subject.subject}>
+                      <strong>{subject.subject}</strong>
+                      <span>Cap no assolida</span>
+                      <small>Mitjana {subject.averageScore.toFixed(2)}</small>
+                    </div>
+                  ))
+                )}
               </article>
             </div>
           </section>
