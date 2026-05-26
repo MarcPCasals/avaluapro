@@ -11,6 +11,9 @@ const IMPORTANT_COLLECTIONS = [
   ['taskRecords', 'registres de tasques'],
   ['behaviorEvents', 'comportament'],
   ['agendaNotes', 'anotacions'],
+  ['tutorialRecords', 'registres de tutoria'],
+  ['tutorialRelations', 'relacions tutorials'],
+  ['tutorialGroupSets', 'versions de grups'],
   ['seatingCharts', 'llocs fixos'],
 ]
 

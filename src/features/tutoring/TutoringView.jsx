@@ -15,6 +15,7 @@ import {
   Layers3,
   Network,
   Plus,
+  Save,
   Trash2,
   TrendingDown,
   UserX,
@@ -610,6 +611,42 @@ function getCooperativePlacementScore({ candidate, group, groupSize, relations, 
   return score
 }
 
+function enrichCooperativeGroups(groups, relations) {
+  return groups.map((group) => {
+    const avoidRelations = []
+    const supportiveRelations = []
+    group.members.forEach((member, memberIndex) => {
+      group.members.slice(memberIndex + 1).forEach((otherMember) => {
+        const relation = relationBetween(relations, member.student.id, otherMember.student.id)
+        if (!relation) return
+        const typeMeta = getRelationTypeMeta(relation.type)
+        const row = {
+          label: `${member.student.name} / ${otherMember.student.name}`,
+          note: relation.note,
+          type: relation.type,
+          typeMeta,
+        }
+        if (relation.type === 'avoid') avoidRelations.push(row)
+        if (relation.type === 'positive' || relation.type === 'friendship') supportiveRelations.push(row)
+      })
+    })
+    const averageScore = average(group.members.map((member) => member.tutorialProfile.averageScore || 0))
+    const priorityMembers = group.members.filter((member) => member.priorityScore >= 4)
+    const highPerformanceCount = group.members.filter((member) => member.performanceLevel === 'alt').length
+    const lowPerformanceCount = group.members.filter((member) => member.performanceLevel === 'baix').length
+
+    return {
+      ...group,
+      averageScore,
+      avoidRelations,
+      highPerformanceCount,
+      lowPerformanceCount,
+      priorityMembers,
+      supportiveRelations,
+    }
+  })
+}
+
 function buildCooperativeGroups({ groupSize, profiles, recordRowsByStudent, relationRowsByStudent, relations, strategy }) {
   const cleanGroupSize = Math.min(6, Math.max(2, Number(groupSize) || 4))
   const students = profiles
@@ -651,39 +688,19 @@ function buildCooperativeGroups({ groupSize, profiles, recordRowsByStudent, rela
     bestGroup?.members.push(student)
   })
 
-  return groups.map((group) => {
-    const avoidRelations = []
-    const supportiveRelations = []
-    group.members.forEach((member, memberIndex) => {
-      group.members.slice(memberIndex + 1).forEach((otherMember) => {
-        const relation = relationBetween(relations, member.student.id, otherMember.student.id)
-        if (!relation) return
-        const typeMeta = getRelationTypeMeta(relation.type)
-        const row = {
-          label: `${member.student.name} / ${otherMember.student.name}`,
-          note: relation.note,
-          type: relation.type,
-          typeMeta,
-        }
-        if (relation.type === 'avoid') avoidRelations.push(row)
-        if (relation.type === 'positive' || relation.type === 'friendship') supportiveRelations.push(row)
-      })
-    })
-    const averageScore = average(group.members.map((member) => member.tutorialProfile.averageScore || 0))
-    const priorityMembers = group.members.filter((member) => member.priorityScore >= 4)
-    const highPerformanceCount = group.members.filter((member) => member.performanceLevel === 'alt').length
-    const lowPerformanceCount = group.members.filter((member) => member.performanceLevel === 'baix').length
+  return enrichCooperativeGroups(groups, relations)
+}
 
-    return {
-      ...group,
-      averageScore,
-      avoidRelations,
-      highPerformanceCount,
-      lowPerformanceCount,
-      priorityMembers,
-      supportiveRelations,
-    }
-  })
+function materializeSavedCooperativeGroups({ profilesByStudentId, relations, savedGroupSet }) {
+  if (!savedGroupSet) return []
+
+  const groups = (savedGroupSet.groups || []).map((group, index) => ({
+    id: group.id || `saved_group_${index + 1}`,
+    members: (group.memberIds || []).map((studentId) => profilesByStudentId.get(studentId)).filter(Boolean),
+    name: group.name || `Grup ${index + 1}`,
+  }))
+
+  return enrichCooperativeGroups(groups, relations)
 }
 
 function getCooperativeGroupCopyText(groups) {
@@ -1689,6 +1706,8 @@ export function TutoringView() {
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
+  const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
+  const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -1699,12 +1718,15 @@ export function TutoringView() {
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
+  const tutorialGroupSets = useAvaluaproStore((state) => state.tutorialGroupSets)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
   const deleteTutorialRelation = useAvaluaproStore((state) => state.deleteTutorialRelation)
+  const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
+  const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -1719,6 +1741,13 @@ export function TutoringView() {
   const classTutorialRelations = useMemo(
     () => tutorialRelations.filter((relation) => relation.classId === activeClassId),
     [activeClassId, tutorialRelations],
+  )
+  const classTutorialGroupSets = useMemo(
+    () =>
+      (tutorialGroupSets || [])
+        .filter((groupSet) => groupSet.classId === activeClassId)
+        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
+    [activeClassId, tutorialGroupSets],
   )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
@@ -1828,6 +1857,20 @@ export function TutoringView() {
       }),
     [tutorialRecordRowsByStudent, tutorialRecordSummary, tutorialSummary],
   )
+  const cooperativeProfilesByStudentId = useMemo(
+    () =>
+      new Map(
+        tutorialSummary.studentProfiles.map((profile) => [
+          profile.student.id,
+          getStudentCooperativeProfile({
+            profile,
+            recordRow: tutorialRecordRowsByStudent.get(profile.student.id),
+            relationRow: tutorialRelationRowsByStudent.get(profile.student.id),
+          }),
+        ]),
+      ),
+    [tutorialRecordRowsByStudent, tutorialRelationRowsByStudent, tutorialSummary.studentProfiles],
+  )
   const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
     (profile) => profile.student.id === selectedTutorialProfileId,
   )
@@ -1855,6 +1898,19 @@ export function TutoringView() {
       tutorialRelationRowsByStudent,
       tutorialSummary.studentProfiles,
     ],
+  )
+  const selectedCooperativeGroupSet =
+    classTutorialGroupSets.find((groupSet) => groupSet.id === selectedCooperativeGroupSetId) || null
+  const visibleCooperativeGroups = useMemo(
+    () =>
+      selectedCooperativeGroupSet
+        ? materializeSavedCooperativeGroups({
+            profilesByStudentId: cooperativeProfilesByStudentId,
+            relations: classTutorialRelations,
+            savedGroupSet: selectedCooperativeGroupSet,
+          })
+        : cooperativeGroups,
+    [classTutorialRelations, cooperativeGroups, cooperativeProfilesByStudentId, selectedCooperativeGroupSet],
   )
   const filteredTutorialProfiles = useMemo(
     () =>
@@ -1921,8 +1977,30 @@ export function TutoringView() {
     }))
   }
 
+  const handleSaveCooperativeGroupSet = async () => {
+    if (cooperativeGroups.length === 0) return
+
+    const fallbackName = `Grups cooperatius ${formatShortDate(getTodayDateInput())}`
+    await saveTutorialGroupSet({
+      classId: activeClassId,
+      groupSize: cooperativeGroupSize,
+      groups: cooperativeGroups,
+      name: cooperativeGroupSetName || fallbackName,
+      strategy: cooperativeStrategy,
+    })
+    setCooperativeGroupSetName('')
+    setSelectedCooperativeGroupSetId('')
+  }
+
+  const handleDeleteCooperativeGroupSet = async (groupSetId) => {
+    await deleteTutorialGroupSet(groupSetId)
+    if (selectedCooperativeGroupSetId === groupSetId) {
+      setSelectedCooperativeGroupSetId('')
+    }
+  }
+
   const handleCopyCooperativeGroups = async () => {
-    await navigator.clipboard.writeText(getCooperativeGroupCopyText(cooperativeGroups))
+    await navigator.clipboard.writeText(getCooperativeGroupCopyText(visibleCooperativeGroups))
   }
 
   return (
@@ -2546,6 +2624,18 @@ export function TutoringView() {
                     ))}
                   </select>
                 </label>
+                <label className="wide">
+                  Nom versió
+                  <input
+                    onChange={(event) => setCooperativeGroupSetName(event.target.value)}
+                    placeholder="Ex: Laboratori UT2"
+                    value={cooperativeGroupSetName}
+                  />
+                </label>
+                <button className="secondary-action compact" onClick={handleSaveCooperativeGroupSet} type="button">
+                  <Save size={16} />
+                  Guardar versió
+                </button>
                 <button className="secondary-action compact" onClick={handleCopyCooperativeGroups} type="button">
                   <Clipboard size={16} />
                   Copiar proposta
@@ -2553,11 +2643,55 @@ export function TutoringView() {
               </div>
             </header>
 
+            {selectedCooperativeGroupSet && (
+              <div className="cooperative-saved-active">
+                <div>
+                  <strong>Veient versió guardada: {selectedCooperativeGroupSet.name}</strong>
+                  <span>
+                    {formatShortDate(selectedCooperativeGroupSet.createdAt?.slice(0, 10))} ·{' '}
+                    {selectedCooperativeGroupSet.groups?.length || 0} grups
+                  </span>
+                </div>
+                <button
+                  className="secondary-action compact"
+                  onClick={() => setSelectedCooperativeGroupSetId('')}
+                  type="button"
+                >
+                  Tornar a proposta actual
+                </button>
+              </div>
+            )}
+
+            {classTutorialGroupSets.length > 0 && (
+              <div className="cooperative-saved-list">
+                {classTutorialGroupSets.map((groupSet) => (
+                  <article className={selectedCooperativeGroupSetId === groupSet.id ? 'active' : ''} key={groupSet.id}>
+                    <button onClick={() => setSelectedCooperativeGroupSetId(groupSet.id)} type="button">
+                      <strong>{groupSet.name}</strong>
+                      <span>
+                        {formatShortDate(groupSet.createdAt?.slice(0, 10))} · {groupSet.groups?.length || 0} grups ·{' '}
+                        {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === groupSet.strategy)?.label ||
+                          'Equilibrat'}
+                      </span>
+                    </button>
+                    <button
+                      className="icon-button danger subtle"
+                      onClick={() => handleDeleteCooperativeGroupSet(groupSet.id)}
+                      title="Eliminar versió"
+                      type="button"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+
             {classStudents.length < 2 ? (
               <div className="empty-state compact">Calen almenys dos alumnes per generar grups cooperatius.</div>
             ) : (
               <div className="cooperative-group-grid">
-                {cooperativeGroups.map((group) => (
+                {visibleCooperativeGroups.map((group) => (
                   <article
                     className={`cooperative-group-card ${group.avoidRelations.length > 0 ? 'warning' : ''}`}
                     key={group.id}

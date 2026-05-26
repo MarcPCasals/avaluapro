@@ -1433,6 +1433,11 @@ button.tutorial-record-pill {
   text-transform: uppercase;
 }
 
+.cooperative-generator-controls label.wide {
+  min-width: 180px;
+}
+
+.cooperative-generator-controls input,
 .cooperative-generator-controls select {
   min-height: 38px;
   border: 1px solid #d8b4fe;
@@ -1441,6 +1446,83 @@ button.tutorial-record-pill {
   color: #3b0764;
   background: white;
   font-weight: 900;
+}
+
+.cooperative-generator-controls input::placeholder {
+  color: #a78bfa;
+}
+
+.cooperative-saved-active {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f5f3ff;
+}
+
+.cooperative-saved-active div {
+  display: grid;
+  gap: 3px;
+}
+
+.cooperative-saved-active strong {
+  color: #4c1d95;
+  font-weight: 950;
+}
+
+.cooperative-saved-active span {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.cooperative-saved-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.cooperative-saved-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px;
+  background: white;
+}
+
+.cooperative-saved-list article.active {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+  box-shadow: 0 10px 22px rgba(124, 58, 237, 0.12);
+}
+
+.cooperative-saved-list article > button:first-child {
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 6px 8px;
+  color: #1f2937;
+  background: transparent;
+  text-align: left;
+}
+
+.cooperative-saved-list article > button:first-child strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 950;
+}
+
+.cooperative-saved-list article > button:first-child span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .cooperative-group-grid {
@@ -10167,6 +10249,11 @@ button.profile-followup-card:focus-visible {
     justify-content: flex-start;
   }
 
+  .cooperative-saved-active {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .tutorial-relationship-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -10235,6 +10322,11 @@ button.profile-followup-card:focus-visible {
   }
 
   .cooperative-generator-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cooperative-saved-active {
     align-items: stretch;
     flex-direction: column;
   }

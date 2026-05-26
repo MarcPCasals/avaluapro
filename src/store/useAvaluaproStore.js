@@ -338,7 +338,8 @@ function parseBackupDataset(backup) {
         (collection === 'seatingCharts' ||
           collection === 'tutorialRecords' ||
           collection === 'tutorialMarks' ||
-          collection === 'tutorialRelations') &&
+          collection === 'tutorialRelations' ||
+          collection === 'tutorialGroupSets') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -1239,6 +1240,7 @@ export const useAvaluaproStore = create((set, get) => ({
           !studentIds.has(relation.sourceStudentId) &&
           !studentIds.has(relation.targetStudentId),
       ),
+      tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId !== classId),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })
@@ -1451,6 +1453,46 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialRelations: state.tutorialRelations.filter((relation) => relation.id !== relationId),
     }))
     await persistCollections(set, get, ['tutorialRelations'])
+  },
+
+  saveTutorialGroupSet: async ({ classId, name, groupSize, strategy, groups }) => {
+    if (!classId || !Array.isArray(groups) || groups.length === 0) return
+
+    const cleanName = String(name || '').trim() || `Grups cooperatius ${new Date().toISOString().slice(0, 10)}`
+    const now = new Date().toISOString()
+    const cleanGroups = groups.map((group, index) => ({
+      id: group.id || `group_${index + 1}`,
+      memberIds: (group.members || [])
+        .map((member) => member.student?.id || member.studentId || member.id)
+        .filter(Boolean),
+      name: group.name || `Grup ${index + 1}`,
+    }))
+
+    set((state) => ({
+      tutorialGroupSets: [
+        {
+          id: createId('tgroups'),
+          classId,
+          createdAt: now,
+          groupSize: Number(groupSize) || 4,
+          groups: cleanGroups,
+          name: cleanName,
+          strategy: strategy || 'balanced',
+          updatedAt: now,
+        },
+        ...(state.tutorialGroupSets || []),
+      ],
+    }))
+    await persistCollections(set, get, ['tutorialGroupSets'])
+  },
+
+  deleteTutorialGroupSet: async (groupSetId) => {
+    if (!groupSetId) return
+
+    set((state) => ({
+      tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.id !== groupSetId),
+    }))
+    await persistCollections(set, get, ['tutorialGroupSets'])
   },
 
   addCompetency: async (utId) => {
@@ -1795,6 +1837,13 @@ export const useAvaluaproStore = create((set, get) => ({
       taskRecords: state.taskRecords.filter((record) => record.studentId !== studentId),
       behaviorEvents: state.behaviorEvents.filter((event) => event.studentId !== studentId),
       agendaNotes: state.agendaNotes.filter((note) => note.studentId !== studentId),
+      tutorialGroupSets: (state.tutorialGroupSets || []).map((groupSet) => ({
+        ...groupSet,
+        groups: (groupSet.groups || []).map((group) => ({
+          ...group,
+          memberIds: (group.memberIds || []).filter((memberId) => memberId !== studentId),
+        })),
+      })),
     }))
     await persistCollections(set, get, [
       'students',
@@ -1802,6 +1851,7 @@ export const useAvaluaproStore = create((set, get) => ({
       'taskRecords',
       'behaviorEvents',
       'agendaNotes',
+      'tutorialGroupSets',
     ])
   },
 
