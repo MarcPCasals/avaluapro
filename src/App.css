@@ -1427,11 +1427,11 @@ button.tutorial-record-pill {
 }
 
 .relationship-tool-panel {
-  display: none;
+  display: none !important;
 }
 
 .relationship-tool-panel.active {
-  display: grid;
+  display: grid !important;
   position: fixed;
   inset: 18px;
   z-index: 1200;
