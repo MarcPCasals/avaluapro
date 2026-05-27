@@ -58,6 +58,15 @@ const SOCIOGRAM_FILTERS = [
 ]
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
+const SEATING_GRID_COLUMNS = 9
+const SEATING_GRID_ROWS = 5
+const DEFAULT_SEATING_ACTIVE_SEATS = [
+  [0, 1, 3, 4, 5, 7, 8],
+  [0, 1, 3, 4, 5, 7, 8],
+  [0, 1, 4, 5, 7, 8],
+  [0, 1, 4, 5, 8],
+  [],
+]
 
 function countByType(records, type) {
   return records.filter((record) => record.type === type).length
@@ -840,44 +849,43 @@ function findStudentBySearch(students, searchValue) {
   )
 }
 
-function normalizeSeatingLayout(layout) {
-  const columns = Math.min(4, Math.max(1, Number(layout?.columns) || 3))
-  const rows = Math.min(7, Math.max(2, Number(layout?.rows) || 4))
-  const sourcePlaces = Array.isArray(layout?.placesByColumn)
-    ? layout.placesByColumn
-    : Array.from({ length: columns }, () => Number(layout?.places) || 2)
-  const placesByColumn = Array.from({ length: columns }, (_, index) =>
-    Math.min(3, Math.max(1, Number(sourcePlaces[index]) || 2)),
+function getGridSeatId(x, y) {
+  return `seat_${x}_${y}`
+}
+
+function getDefaultSeatingActiveSeatIds() {
+  return DEFAULT_SEATING_ACTIVE_SEATS.flatMap((columns, rowIndex) =>
+    columns.map((columnIndex) => getGridSeatId(columnIndex, rowIndex)),
   )
+}
+
+function getSeatZone(seat) {
+  const x = Number(seat?.x ?? seat?.block ?? 0)
+  if (x <= 2) return 0
+  if (x <= 5) return 1
+  return 2
+}
+
+function normalizeSeatingLayout(layout) {
   const validSeatIds = new Set()
-  Array.from({ length: rows }).forEach((_, row) => {
-    placesByColumn.forEach((places, block) => {
-      Array.from({ length: places }).forEach((__, place) => validSeatIds.add(`seat_${block}_${row}_${place}`))
-    })
+  Array.from({ length: SEATING_GRID_ROWS }).forEach((_, y) => {
+    Array.from({ length: SEATING_GRID_COLUMNS }).forEach((__, x) => validSeatIds.add(getGridSeatId(x, y)))
   })
+  const activeSeatIds =
+    Array.isArray(layout?.activeSeatIds) && layout.activeSeatIds.length > 0
+      ? layout.activeSeatIds
+      : getDefaultSeatingActiveSeatIds()
 
   return {
-    columns,
-    disabledSeatIds: (layout?.disabledSeatIds || []).filter((seatId) => validSeatIds.has(seatId)),
-    placesByColumn,
-    rows,
+    activeSeatIds: activeSeatIds.filter((seatId) => validSeatIds.has(seatId)),
+    columns: SEATING_GRID_COLUMNS,
+    rows: SEATING_GRID_ROWS,
   }
 }
 
 function getSeatingCapacity(layout) {
   const cleanLayout = normalizeSeatingLayout(layout)
-  const disabled = new Set(cleanLayout.disabledSeatIds)
-  return cleanLayout.placesByColumn.reduce(
-    (total, places, block) =>
-      total +
-      Array.from({ length: cleanLayout.rows }).reduce(
-        (rowTotal, _, row) =>
-          rowTotal +
-          Array.from({ length: places }).filter((__, place) => !disabled.has(`seat_${block}_${row}_${place}`)).length,
-        0,
-      ),
-    0,
-  )
+  return cleanLayout.activeSeatIds.length
 }
 
 function getHalfGroupClassName(halfGroup) {
@@ -1075,35 +1083,35 @@ function buildCooperativeGroups({
 
 function isSeatAdjacent(seatA, seatB) {
   if (!seatA || !seatB) return false
-  if (seatA.block !== seatB.block) return false
-  return Math.abs(seatA.row - seatB.row) + Math.abs(seatA.place - seatB.place) <= 1
+  return Math.abs((seatA.x ?? 0) - (seatB.x ?? 0)) + Math.abs((seatA.y ?? 0) - (seatB.y ?? 0)) <= 1
 }
 
 function buildTutorialSeatingPlan({
   layout,
+  manualEmptySeatIds = [],
+  manualSeatByStudentId = {},
   problemSeatsByStudentId = {},
   prioritizeHalfGroups,
   profilesByStudentId,
   relations,
   students,
+  unseatedStudentIds = [],
   variant,
 }) {
   const cleanLayout = normalizeSeatingLayout(layout)
-  const columns = cleanLayout.columns
-  const rows = cleanLayout.rows
-  const disabledSeatIds = new Set(cleanLayout.disabledSeatIds)
+  const activeSeatIds = new Set(cleanLayout.activeSeatIds)
+  const manualEmptySeats = new Set(manualEmptySeatIds)
+  const forcedUnseated = new Set(unseatedStudentIds)
   const seats = []
-  Array.from({ length: rows }).forEach((_, row) => {
-    cleanLayout.placesByColumn.forEach((places, block) => {
-      Array.from({ length: places }).forEach((__, place) => {
-        const seatId = `seat_${block}_${row}_${place}`
-        seats.push({
-          block,
-          enabled: !disabledSeatIds.has(seatId),
-          id: seatId,
-          place,
-          row,
-        })
+  Array.from({ length: cleanLayout.rows }).forEach((_, y) => {
+    Array.from({ length: cleanLayout.columns }).forEach((__, x) => {
+      const seatId = getGridSeatId(x, y)
+      seats.push({
+        enabled: activeSeatIds.has(seatId),
+        id: seatId,
+        x,
+        y,
+        zone: getSeatZone({ x }),
       })
     })
   })
@@ -1121,19 +1129,41 @@ function buildTutorialSeatingPlan({
     })
 
   const halfGroups = [...new Set(studentsToPlace.map((student) => student.halfGroup || 'Sense mig grup'))]
-  const halfGroupBlock = new Map(halfGroups.map((halfGroup, index) => [halfGroup, index % columns]))
+  const halfGroupZone = new Map(halfGroups.map((halfGroup, index) => [halfGroup, index % 3]))
   const placed = []
+  const activeSeatMap = new Map(seats.filter((seat) => seat.enabled).map((seat) => [seat.id, seat]))
+  const placedStudentIds = new Set()
+
+  Object.entries(manualSeatByStudentId || {}).forEach(([studentId, seatId]) => {
+    if (forcedUnseated.has(studentId)) return
+    const student = profilesByStudentId.get(studentId)
+    const seat = activeSeatMap.get(seatId)
+    if (!student || !seat || placed.some((placement) => placement.seat.id === seat.id)) return
+    placed.push({
+      halfGroup: student.halfGroup,
+      isConflict: student.isConflict,
+      isStar: student.isStar,
+      seat,
+      student,
+      studentId: student.student.id,
+    })
+    placedStudentIds.add(student.student.id)
+  })
 
   studentsToPlace.forEach((student, studentIndex) => {
+    if (forcedUnseated.has(student.student.id) || placedStudentIds.has(student.student.id)) return
     const availableSeats = seats.filter(
-      (seat) => seat.enabled && !placed.some((placement) => placement.seat.id === seat.id),
+      (seat) =>
+        seat.enabled &&
+        !manualEmptySeats.has(seat.id) &&
+        !placed.some((placement) => placement.seat.id === seat.id),
     )
     const bestSeat = availableSeats
       .map((seat) => {
-        let score = Math.abs(seat.block - ((studentIndex + variant) % columns)) * 2 + seat.row
+        let score = Math.abs(seat.zone - ((studentIndex + variant) % 3)) * 2 + seat.y
         if (problemSeatsByStudentId[student.student.id] === seat.id) score += 1500
         if (prioritizeHalfGroups) {
-          score += seat.block === halfGroupBlock.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
+          score += seat.zone === halfGroupZone.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
         }
         placed.forEach((placement) => {
           const adjacent = isSeatAdjacent(seat, placement.seat)
@@ -1148,7 +1178,7 @@ function buildTutorialSeatingPlan({
         })
         return { score, seat }
       })
-      .sort((a, b) => a.score - b.score || a.seat.row - b.seat.row || a.seat.block - b.seat.block)[0]?.seat
+      .sort((a, b) => a.score - b.score || a.seat.y - b.seat.y || a.seat.x - b.seat.x)[0]?.seat
 
     if (bestSeat) {
       placed.push({
@@ -1159,16 +1189,18 @@ function buildTutorialSeatingPlan({
         student,
         studentId: student.student.id,
       })
+      placedStudentIds.add(student.student.id)
     }
   })
 
+  const unplacedProfiles = studentsToPlace.filter((student) => !placedStudentIds.has(student.student.id))
   const warnings = []
   if (placed.length < studentsToPlace.length) {
     warnings.push(`Falten ${studentsToPlace.length - placed.length} alumne/s per falta de llocs actius.`)
   }
   if (
     prioritizeHalfGroups &&
-    placed.some((placement) => placement.seat.block !== halfGroupBlock.get(placement.halfGroup || 'Sense mig grup'))
+    placed.some((placement) => placement.seat.zone !== halfGroupZone.get(placement.halfGroup || 'Sense mig grup'))
   ) {
     warnings.push('No s’ha pogut mantenir algun alumne dins del bloc del seu mig grup.')
   }
@@ -1191,42 +1223,42 @@ function buildTutorialSeatingPlan({
 
   return {
     canRespectCriteria: warnings.length === 0,
-    columns,
+    columns: cleanLayout.columns,
     layout: cleanLayout,
     placements: placed,
-    placesByColumn: cleanLayout.placesByColumn,
-    rows,
+    rows: cleanLayout.rows,
     seats,
+    unplacedProfiles,
     warnings: [...new Set(warnings)],
   }
 }
 
 function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
   const cleanLayout = normalizeSeatingLayout(plan?.layout)
-  const disabledSeatIds = new Set(cleanLayout.disabledSeatIds)
+  const activeSeatIds = new Set(cleanLayout.activeSeatIds)
   const seats = []
   Array.from({ length: cleanLayout.rows }).forEach((_, row) => {
-    cleanLayout.placesByColumn.forEach((places, block) => {
-      Array.from({ length: places }).forEach((__, place) => {
-        const seatId = `seat_${block}_${row}_${place}`
-        seats.push({ block, enabled: !disabledSeatIds.has(seatId), id: seatId, place, row })
-      })
+    Array.from({ length: cleanLayout.columns }).forEach((__, column) => {
+      const seatId = getGridSeatId(column, row)
+      seats.push({ enabled: activeSeatIds.has(seatId), id: seatId, x: column, y: row, zone: getSeatZone({ x: column }) })
     })
   })
   const placements = (plan?.seats || [])
     .map((seat) => {
       const profile = profilesByStudentId.get(seat.studentId)
       if (!profile) return null
+      const x = Number.isFinite(Number(seat.x)) ? Number(seat.x) : Number(seat.block || 0) * 3 + Number(seat.place || 0)
+      const y = Number.isFinite(Number(seat.y)) ? Number(seat.y) : Number(seat.row || 0)
       return {
         halfGroup: profile.halfGroup,
         isConflict: profile.isConflict,
         isStar: profile.isStar,
         seat: {
-          block: seat.block,
           enabled: true,
-          id: `seat_${seat.block}_${seat.row}_${seat.place}`,
-          place: seat.place,
-          row: seat.row,
+          id: getGridSeatId(x, y),
+          x,
+          y,
+          zone: getSeatZone({ x }),
         },
         student: profile,
         studentId: profile.student.id,
@@ -1239,9 +1271,9 @@ function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
     columns: cleanLayout.columns,
     layout: cleanLayout,
     placements,
-    placesByColumn: cleanLayout.placesByColumn,
     rows: cleanLayout.rows,
     seats,
+    unplacedProfiles: [],
     warnings: [],
   }
 }
@@ -2350,10 +2382,14 @@ export function TutoringView() {
   const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
-  const [seatingLayout, setSeatingLayout] = useState({ columns: 3, disabledSeatIds: [], placesByColumn: [2, 3, 2], rows: 4 })
+  const [seatingLayout, setSeatingLayout] = useState({ activeSeatIds: getDefaultSeatingActiveSeatIds(), columns: 9, rows: 5 })
+  const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
+  const [seatingManualEmptySeatIds, setSeatingManualEmptySeatIds] = useState([])
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
+  const [seatingUnseatedStudentIds, setSeatingUnseatedStudentIds] = useState([])
+  const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
@@ -2664,11 +2700,14 @@ export function TutoringView() {
     () =>
       buildTutorialSeatingPlan({
         layout: seatingLayout,
+        manualEmptySeatIds: seatingManualEmptySeatIds,
+        manualSeatByStudentId: seatingManualSeatByStudentId,
         problemSeatsByStudentId: seatingProblemSeats,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
         students: classStudents,
+        unseatedStudentIds: seatingUnseatedStudentIds,
         variant: seatingVariant,
       }),
     [
@@ -2676,8 +2715,11 @@ export function TutoringView() {
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
       seatingLayout,
+      seatingManualEmptySeatIds,
+      seatingManualSeatByStudentId,
       seatingProblemSeats,
       seatingPrioritizeHalfGroups,
+      seatingUnseatedStudentIds,
       seatingVariant,
     ],
   )
@@ -2770,45 +2812,35 @@ export function TutoringView() {
     }
   }
 
-  const updateSeatingColumnCount = (columns) => {
+  const resetSeatingManualChanges = () => {
+    setSeatingManualSeatByStudentId({})
+    setSeatingManualEmptySeatIds([])
+    setSeatingProblemSeats({})
+    setSeatingUnseatedStudentIds([])
+  }
+
+  const toggleSeatingGridSeat = (seat, placement) => {
+    if (selectedSeatingPlan) return
     setSelectedSeatingPlanId('')
-    setSeatingLayout((current) => {
-      const cleanLayout = normalizeSeatingLayout(current)
-      return normalizeSeatingLayout({
-        ...cleanLayout,
-        columns,
-        placesByColumn: Array.from({ length: columns }, (_, index) => cleanLayout.placesByColumn[index] || 2),
+    if (placement?.studentId) {
+      setSeatingUnseatedStudentIds((current) => [...new Set([...current, placement.studentId])])
+      setSeatingManualEmptySeatIds((current) => [...new Set([...current, placement.seat.id])])
+      setSeatingManualSeatByStudentId((current) => {
+        const next = { ...current }
+        delete next[placement.studentId]
+        return next
       })
-    })
-  }
+      return
+    }
 
-  const updateSeatingRows = (rows) => {
-    setSelectedSeatingPlanId('')
-    setSeatingLayout((current) => normalizeSeatingLayout({ ...current, rows }))
-  }
-
-  const updateSeatingColumnPlaces = (columnIndex, places) => {
-    setSelectedSeatingPlanId('')
     setSeatingLayout((current) => {
       const cleanLayout = normalizeSeatingLayout(current)
-      return normalizeSeatingLayout({
-        ...cleanLayout,
-        placesByColumn: cleanLayout.placesByColumn.map((currentPlaces, index) =>
-          index === columnIndex ? places : currentPlaces,
-        ),
-      })
+      const activeSeatIds = cleanLayout.activeSeatIds.includes(seat.id)
+        ? cleanLayout.activeSeatIds.filter((seatId) => seatId !== seat.id)
+        : [...cleanLayout.activeSeatIds, seat.id]
+      return normalizeSeatingLayout({ ...cleanLayout, activeSeatIds })
     })
-  }
-
-  const toggleSeatingSeatDisabled = (seatId) => {
-    setSelectedSeatingPlanId('')
-    setSeatingLayout((current) => {
-      const cleanLayout = normalizeSeatingLayout(current)
-      const disabledSeatIds = cleanLayout.disabledSeatIds.includes(seatId)
-        ? cleanLayout.disabledSeatIds.filter((currentSeatId) => currentSeatId !== seatId)
-        : [...cleanLayout.disabledSeatIds, seatId]
-      return normalizeSeatingLayout({ ...cleanLayout, disabledSeatIds })
-    })
+    setSeatingManualEmptySeatIds((current) => current.filter((seatId) => seatId !== seat.id))
   }
 
   const toggleSeatingProblemSeat = (placement) => {
@@ -2820,6 +2852,52 @@ export function TutoringView() {
     }))
   }
 
+  const handleSeatingDragStart = (event, placement) => {
+    if (selectedSeatingPlan || !placement?.studentId) return
+    setDraggingSeatingStudentId(placement.studentId)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', placement.studentId)
+  }
+
+  const handleSeatingPendingDragStart = (event, studentId) => {
+    if (selectedSeatingPlan || !studentId) return
+    setDraggingSeatingStudentId(studentId)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', studentId)
+  }
+
+  const handleSeatingDrop = (event, targetSeat, targetPlacement) => {
+    event.preventDefault()
+    if (selectedSeatingPlan || !targetSeat?.enabled) return
+    const draggedStudentId = event.dataTransfer.getData('text/plain') || draggingSeatingStudentId
+    if (!draggedStudentId) return
+    const sourcePlacement = generatedSeatingPlan.placements.find((placement) => placement.studentId === draggedStudentId)
+    if (targetPlacement?.studentId === draggedStudentId) return
+
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId((current) => {
+      const next = { ...current, [draggedStudentId]: targetSeat.id }
+      if (targetPlacement?.studentId) {
+        if (sourcePlacement?.seat?.id) next[targetPlacement.studentId] = sourcePlacement.seat.id
+        else delete next[targetPlacement.studentId]
+      }
+      return next
+    })
+    setSeatingUnseatedStudentIds((current) => {
+      const next = new Set(current.filter((studentId) => studentId !== draggedStudentId))
+      if (targetPlacement?.studentId && !sourcePlacement?.seat?.id) next.add(targetPlacement.studentId)
+      return [...next]
+    })
+    setSeatingManualEmptySeatIds((current) => {
+      const next = new Set(current)
+      next.delete(targetSeat.id)
+      if (sourcePlacement?.seat?.id && !targetPlacement) next.add(sourcePlacement.seat.id)
+      if (targetPlacement && sourcePlacement?.seat?.id) next.delete(sourcePlacement.seat.id)
+      return [...next]
+    })
+    setDraggingSeatingStudentId('')
+  }
+
   const handleSaveTutorialSeatingPlan = async () => {
     await saveTutorialSeatingPlan({
       classId: activeClassId,
@@ -2828,13 +2906,12 @@ export function TutoringView() {
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
       },
       seats: generatedSeatingPlan.placements.map((placement) => ({
-        block: placement.seat.block,
         halfGroup: placement.halfGroup,
         isConflict: placement.isConflict,
         isStar: placement.isStar,
-        place: placement.seat.place,
-        row: placement.seat.row,
         studentId: placement.studentId,
+        x: placement.seat.x,
+        y: placement.seat.y,
       })),
       title: 'Disposició recomanada',
     })
@@ -3881,28 +3958,6 @@ export function TutoringView() {
                 <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
                   Tornar a eines
                 </button>
-                <label>
-                  Columnes
-                  <select
-                    onChange={(event) => updateSeatingColumnCount(Number(event.target.value))}
-                    value={normalizeSeatingLayout(seatingLayout).columns}
-                  >
-                    <option value={1}>1</option>
-                    <option value={2}>2</option>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                  </select>
-                </label>
-                <label>
-                  Files
-                  <select onChange={(event) => updateSeatingRows(Number(event.target.value))} value={normalizeSeatingLayout(seatingLayout).rows}>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                    <option value={5}>5</option>
-                    <option value={6}>6</option>
-                    <option value={7}>7</option>
-                  </select>
-                </label>
                 <label className="cooperative-toggle-control">
                   Mig grup
                   <button
@@ -3924,6 +3979,10 @@ export function TutoringView() {
                   <Shuffle size={16} />
                   Canviar proposta
                 </button>
+                <button className="secondary-action compact" onClick={resetSeatingManualChanges} type="button">
+                  <RotateCcw size={16} />
+                  Netejar canvis
+                </button>
                 <button className="secondary-action compact" onClick={handleSaveTutorialSeatingPlan} type="button">
                   <Save size={16} />
                   Guardar disposició
@@ -3931,7 +3990,7 @@ export function TutoringView() {
               </div>
             </header>
 
-            <div className="tutorial-seating-column-editor">
+            <div className="tutorial-seating-matrix-help">
               <article className="tutorial-seating-capacity">
                 <strong>Capacitat activa</strong>
                 <div>
@@ -3940,23 +3999,14 @@ export function TutoringView() {
                   </span>
                 </div>
               </article>
-              {normalizeSeatingLayout(seatingLayout).placesByColumn.map((places, columnIndex) => (
-                <article key={`seating-column-editor-${columnIndex}`}>
-                  <strong>Columna {columnIndex + 1}</strong>
-                  <div>
-                    {[1, 2, 3].map((option) => (
-                      <button
-                        className={places === option ? 'active' : ''}
-                        key={option}
-                        onClick={() => updateSeatingColumnPlaces(columnIndex, option)}
-                        type="button"
-                      >
-                        {option} taula{option > 1 ? 'es' : ''}
-                      </button>
-                    ))}
-                  </div>
-                </article>
-              ))}
+              <article>
+                <strong>Matriu 9 x 5</strong>
+                <p>Clica una cel·la buida per crear una taula. Clica una taula sense alumne per deixar-la com a espai.</p>
+              </article>
+              <article>
+                <strong>Moure alumnes</strong>
+                <p>Arrossega un alumne a una altra taula per moure’l o intercanviar-lo amb qui hi seu.</p>
+              </article>
             </div>
 
             {(generatedSeatingPlan.warnings.length > 0 || hasRelationChangesAfterSeatingSave) && (
@@ -3995,61 +4045,99 @@ export function TutoringView() {
               </div>
             )}
 
-            <div
-              className="tutorial-seating-board"
-              style={{ '--tutorial-seating-columns': visibleSeatingPlan.columns }}
-            >
-              {Array.from({ length: visibleSeatingPlan.columns }).map((_, blockIndex) => (
-                <div className="tutorial-seating-block" key={`block_${blockIndex}`}>
-                  <strong>Bloc {blockIndex + 1}</strong>
-                  {Array.from({ length: visibleSeatingPlan.rows }).map((__, rowIndex) => (
-                    <div className="tutorial-seating-row" key={`row_${blockIndex}_${rowIndex}`}>
-                      {Array.from({ length: visibleSeatingPlan.placesByColumn[blockIndex] || 0 }).map((___, placeIndex) => {
-                        const seatId = `seat_${blockIndex}_${rowIndex}_${placeIndex}`
-                        const seat = visibleSeatingPlan.seats.find((item) => item.id === seatId)
-                        const placement = visibleSeatingPlan.placements.find(
-                          (item) =>
-                            item.seat.block === blockIndex &&
-                            item.seat.row === rowIndex &&
-                            item.seat.place === placeIndex,
-                        )
-                        return (
-                          <button
-                            className={`tutorial-seat-card ${placement?.isStar ? 'star' : ''} ${
-                              placement?.isConflict ? 'conflict' : ''
-                            } ${placement ? getHalfGroupClassName(placement.halfGroup) : ''} ${
-                              !seat?.enabled ? 'disabled' : ''
-                            } ${seatingProblemSeats[placement?.studentId] === placement?.seat?.id ? 'problem' : ''}`}
-                            key={`seat_${blockIndex}_${rowIndex}_${placeIndex}`}
-                            onClick={() => (placement ? toggleSeatingProblemSeat(placement) : toggleSeatingSeatDisabled(seatId))}
-                            type="button"
-                          >
-                            {!seat?.enabled ? (
-                              <span className="empty">Taula lliure</span>
-                            ) : placement ? (
-                              <>
-                                <span>
-                                  {placement.student.student.name}
-                                  {placement.isStar ? <Star size={14} /> : null}
-                                  {placement.isConflict ? <i aria-label="conflictiu" /> : null}
-                                </span>
-                                <small>
-                                  {placement.halfGroup}
-                                  {seatingProblemSeats[placement.studentId] === placement.seat.id
-                                    ? ' · revisar lloc'
-                                    : ''}
-                                </small>
-                              </>
-                            ) : (
-                              <span className="empty">Lliure</span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
+            {generatedSeatingPlan.unplacedProfiles.length > 0 && !selectedSeatingPlan && (
+              <div className="tutorial-seating-pending-list">
+                <strong>Alumnes pendents de col·locar</strong>
+                <div>
+                  {generatedSeatingPlan.unplacedProfiles.map((profile) => (
+                    <button
+                      draggable
+                      key={profile.student.id}
+                      onDragStart={(event) => handleSeatingPendingDragStart(event, profile.student.id)}
+                      type="button"
+                    >
+                      {profile.student.name}
+                    </button>
                   ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            <div className="tutorial-seating-board-grid">
+              {visibleSeatingPlan.seats.map((seat) => {
+                const placement = visibleSeatingPlan.placements.find((item) => item.seat.id === seat.id)
+                const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
+                return (
+                  <div
+                    className={`tutorial-seat-card ${seat.enabled ? 'active-table' : 'disabled'} ${
+                      placement?.isStar ? 'star' : ''
+                    } ${placement?.isConflict ? 'conflict' : ''} ${
+                      placement ? getHalfGroupClassName(placement.halfGroup) : ''
+                    } ${seatingProblemSeats[placement?.studentId] === placement?.seat?.id ? 'problem' : ''} ${
+                      draggingSeatingStudentId ? 'drop-ready' : ''
+                    }`}
+                    draggable={Boolean(placement && !selectedSeatingPlan)}
+                    key={seat.id}
+                    onClick={() => toggleSeatingGridSeat(seat, placement)}
+                    onDragEnd={() => setDraggingSeatingStudentId('')}
+                    onDragOver={(event) => {
+                      if (seat.enabled && !selectedSeatingPlan) event.preventDefault()
+                    }}
+                    onDragStart={(event) => handleSeatingDragStart(event, placement)}
+                    onDrop={(event) => handleSeatingDrop(event, seat, placement)}
+                    role="button"
+                    tabIndex={0}
+                    title={
+                      placement
+                        ? 'Clica per deixar aquesta taula buida. Arrossega per intercanviar lloc.'
+                        : seat.enabled
+                          ? 'Clica per deixar aquest espai buit.'
+                          : 'Clica per crear una taula.'
+                    }
+                  >
+                    {!seat.enabled ? (
+                      <span className="empty">Espai</span>
+                    ) : placement ? (
+                      <>
+                        <div className="tutorial-seat-student-media">
+                          {placement.student.student.photoUrl ? (
+                            <img alt="" draggable="false" src={placement.student.student.photoUrl} />
+                          ) : (
+                            <span>{getSociogramInitials(placement.student.student.name)}</span>
+                          )}
+                        </div>
+                        <div className="tutorial-seat-student-copy">
+                          <strong>
+                            {placement.student.student.name}
+                            {placement.isStar ? <Star size={14} /> : null}
+                            {placement.isConflict ? <i aria-label="conflictiu" /> : null}
+                          </strong>
+                          <small>
+                            {placement.halfGroup}
+                            {seatingProblemSeats[placement.studentId] === placement.seat.id
+                              ? ' · revisar lloc'
+                              : ''}
+                          </small>
+                        </div>
+                        {!selectedSeatingPlan && (
+                          <button
+                            className="tutorial-seat-problem-button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              toggleSeatingProblemSeat(placement)
+                            }}
+                            type="button"
+                          >
+                            Revisar
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="empty">{isManualEmpty ? 'Buida' : 'Taula lliure'}</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
 
