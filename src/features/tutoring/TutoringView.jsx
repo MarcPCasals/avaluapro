@@ -509,7 +509,7 @@ function summarizeTutorialRelations({ relations, students }) {
         total: outgoing.length + incoming.length,
       }
     })
-    .sort((a, b) => b.total - a.total || a.student.name.localeCompare(b.student.name, 'ca'))
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca'))
   const reciprocalPairs = new Set()
 
   relations
@@ -840,6 +840,53 @@ function findStudentBySearch(students, searchValue) {
   )
 }
 
+function normalizeSeatingLayout(layout) {
+  const columns = Math.min(4, Math.max(1, Number(layout?.columns) || 3))
+  const rows = Math.min(7, Math.max(2, Number(layout?.rows) || 4))
+  const sourcePlaces = Array.isArray(layout?.placesByColumn)
+    ? layout.placesByColumn
+    : Array.from({ length: columns }, () => Number(layout?.places) || 2)
+  const placesByColumn = Array.from({ length: columns }, (_, index) =>
+    Math.min(3, Math.max(1, Number(sourcePlaces[index]) || 2)),
+  )
+  const validSeatIds = new Set()
+  Array.from({ length: rows }).forEach((_, row) => {
+    placesByColumn.forEach((places, block) => {
+      Array.from({ length: places }).forEach((__, place) => validSeatIds.add(`seat_${block}_${row}_${place}`))
+    })
+  })
+
+  return {
+    columns,
+    disabledSeatIds: (layout?.disabledSeatIds || []).filter((seatId) => validSeatIds.has(seatId)),
+    placesByColumn,
+    rows,
+  }
+}
+
+function getSeatingCapacity(layout) {
+  const cleanLayout = normalizeSeatingLayout(layout)
+  const disabled = new Set(cleanLayout.disabledSeatIds)
+  return cleanLayout.placesByColumn.reduce(
+    (total, places, block) =>
+      total +
+      Array.from({ length: cleanLayout.rows }).reduce(
+        (rowTotal, _, row) =>
+          rowTotal +
+          Array.from({ length: places }).filter((__, place) => !disabled.has(`seat_${block}_${row}_${place}`)).length,
+        0,
+      ),
+    0,
+  )
+}
+
+function getHalfGroupClassName(halfGroup) {
+  const cleanValue = String(halfGroup || '').toLocaleLowerCase('ca')
+  if (cleanValue.includes('a')) return 'half-a'
+  if (cleanValue.includes('b')) return 'half-b'
+  return 'half-none'
+}
+
 function getCooperativePlacementScore({ candidate, group, groupSize, prioritizeHalfGroups, relations, strategy }) {
   if (group.members.length >= groupSize) return Number.POSITIVE_INFINITY
   if (candidate.isConflict && group.members.some((member) => member.isConflict)) return Number.POSITIVE_INFINITY
@@ -875,6 +922,11 @@ function getCooperativePlacementScore({ candidate, group, groupSize, prioritizeH
     if (relation.type === 'positive') score -= strategy === 'supportive' ? 18 : 10
     if (relation.type === 'friendship') score -= strategy === 'supportive' ? 10 : 5
   })
+
+  const hasAcademicRisk = group.members.some((member) => member.academicRisk)
+  const hasStarPeer = group.members.some((member) => member.isStar)
+  if (candidate.academicRisk && hasStarPeer) score -= strategy === 'supportive' ? 32 : 22
+  if (candidate.isStar && hasAcademicRisk) score -= strategy === 'supportive' ? 32 : 22
 
   if (strategy === 'calm') score += candidate.avoidCount * 2
   if (strategy === 'supportive' && candidate.academicRisk) {
@@ -1029,22 +1081,26 @@ function isSeatAdjacent(seatA, seatB) {
 
 function buildTutorialSeatingPlan({
   layout,
+  problemSeatsByStudentId = {},
   prioritizeHalfGroups,
   profilesByStudentId,
   relations,
   students,
   variant,
 }) {
-  const columns = Math.min(3, Math.max(2, Number(layout?.columns) || 3))
-  const places = Math.min(3, Math.max(2, Number(layout?.places) || 2))
-  const rows = Math.min(6, Math.max(2, Number(layout?.rows) || 4))
+  const cleanLayout = normalizeSeatingLayout(layout)
+  const columns = cleanLayout.columns
+  const rows = cleanLayout.rows
+  const disabledSeatIds = new Set(cleanLayout.disabledSeatIds)
   const seats = []
   Array.from({ length: rows }).forEach((_, row) => {
-    Array.from({ length: columns }).forEach((_, block) => {
+    cleanLayout.placesByColumn.forEach((places, block) => {
       Array.from({ length: places }).forEach((__, place) => {
+        const seatId = `seat_${block}_${row}_${place}`
         seats.push({
           block,
-          id: `seat_${block}_${row}_${place}`,
+          enabled: !disabledSeatIds.has(seatId),
+          id: seatId,
           place,
           row,
         })
@@ -1057,6 +1113,9 @@ function buildTutorialSeatingPlan({
     .filter(Boolean)
     .sort((a, b) => {
       if ((b.isConflict ? 1 : 0) !== (a.isConflict ? 1 : 0)) return (b.isConflict ? 1 : 0) - (a.isConflict ? 1 : 0)
+      const problemA = problemSeatsByStudentId[a.student.id] ? 1 : 0
+      const problemB = problemSeatsByStudentId[b.student.id] ? 1 : 0
+      if (problemB !== problemA) return problemB - problemA
       if ((b.priorityScore || 0) !== (a.priorityScore || 0)) return (b.priorityScore || 0) - (a.priorityScore || 0)
       return a.student.name.localeCompare(b.student.name, 'ca')
     })
@@ -1066,10 +1125,13 @@ function buildTutorialSeatingPlan({
   const placed = []
 
   studentsToPlace.forEach((student, studentIndex) => {
-    const availableSeats = seats.filter((seat) => !placed.some((placement) => placement.seat.id === seat.id))
+    const availableSeats = seats.filter(
+      (seat) => seat.enabled && !placed.some((placement) => placement.seat.id === seat.id),
+    )
     const bestSeat = availableSeats
       .map((seat) => {
         let score = Math.abs(seat.block - ((studentIndex + variant) % columns)) * 2 + seat.row
+        if (problemSeatsByStudentId[student.student.id] === seat.id) score += 1500
         if (prioritizeHalfGroups) {
           score += seat.block === halfGroupBlock.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
         }
@@ -1100,12 +1162,87 @@ function buildTutorialSeatingPlan({
     }
   })
 
+  const warnings = []
+  if (placed.length < studentsToPlace.length) {
+    warnings.push(`Falten ${studentsToPlace.length - placed.length} alumne/s per falta de llocs actius.`)
+  }
+  if (
+    prioritizeHalfGroups &&
+    placed.some((placement) => placement.seat.block !== halfGroupBlock.get(placement.halfGroup || 'Sense mig grup'))
+  ) {
+    warnings.push('No s’ha pogut mantenir algun alumne dins del bloc del seu mig grup.')
+  }
+  placed.forEach((placement, index) => {
+    placed.slice(index + 1).forEach((otherPlacement) => {
+      if (!isSeatAdjacent(placement.seat, otherPlacement.seat)) return
+      const relation = relationBetween(relations, placement.student.student.id, otherPlacement.student.student.id)
+      if (relation?.type === 'avoid') {
+        warnings.push(
+          `${placement.student.student.name} i ${otherPlacement.student.student.name} tenen una relació a evitar i queden massa a prop.`,
+        )
+      }
+      if (placement.isConflict && otherPlacement.isConflict) {
+        warnings.push(
+          `${placement.student.student.name} i ${otherPlacement.student.student.name} estan marcats com a conflictius i queden massa a prop.`,
+        )
+      }
+    })
+  })
+
   return {
+    canRespectCriteria: warnings.length === 0,
     columns,
-    places,
+    layout: cleanLayout,
     placements: placed,
+    placesByColumn: cleanLayout.placesByColumn,
     rows,
     seats,
+    warnings: [...new Set(warnings)],
+  }
+}
+
+function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
+  const cleanLayout = normalizeSeatingLayout(plan?.layout)
+  const disabledSeatIds = new Set(cleanLayout.disabledSeatIds)
+  const seats = []
+  Array.from({ length: cleanLayout.rows }).forEach((_, row) => {
+    cleanLayout.placesByColumn.forEach((places, block) => {
+      Array.from({ length: places }).forEach((__, place) => {
+        const seatId = `seat_${block}_${row}_${place}`
+        seats.push({ block, enabled: !disabledSeatIds.has(seatId), id: seatId, place, row })
+      })
+    })
+  })
+  const placements = (plan?.seats || [])
+    .map((seat) => {
+      const profile = profilesByStudentId.get(seat.studentId)
+      if (!profile) return null
+      return {
+        halfGroup: profile.halfGroup,
+        isConflict: profile.isConflict,
+        isStar: profile.isStar,
+        seat: {
+          block: seat.block,
+          enabled: true,
+          id: `seat_${seat.block}_${seat.row}_${seat.place}`,
+          place: seat.place,
+          row: seat.row,
+        },
+        student: profile,
+        studentId: profile.student.id,
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    canRespectCriteria: true,
+    columns: cleanLayout.columns,
+    layout: cleanLayout,
+    placements,
+    placesByColumn: cleanLayout.placesByColumn,
+    rows: cleanLayout.rows,
+    seats,
+    warnings: [],
   }
 }
 
@@ -2204,6 +2341,7 @@ export function TutoringView() {
   })
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
+  const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
   const [sociogramFilter, setSociogramFilter] = useState('all')
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [sociogramFullscreen, setSociogramFullscreen] = useState(false)
@@ -2212,9 +2350,11 @@ export function TutoringView() {
   const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
-  const [seatingLayout, setSeatingLayout] = useState({ columns: 3, places: 2, rows: 4 })
+  const [seatingLayout, setSeatingLayout] = useState({ columns: 3, disabledSeatIds: [], placesByColumn: [2, 3, 2], rows: 4 })
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
+  const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
+  const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -2235,7 +2375,6 @@ export function TutoringView() {
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
-  const deleteTutorialRelation = useAvaluaproStore((state) => state.deleteTutorialRelation)
   const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
   const upsertTutorialSociogramLayout = useAvaluaproStore((state) => state.upsertTutorialSociogramLayout)
@@ -2286,7 +2425,18 @@ export function TutoringView() {
     [activeClassId, tutorialSociogramLayouts],
   )
   const classTutorialSeatingPlan = useMemo(
-    () => (tutorialSeatingPlans || []).find((plan) => plan.classId === activeClassId) || null,
+    () =>
+      (tutorialSeatingPlans || [])
+        .filter((plan) => plan.classId === activeClassId)
+        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))[0] ||
+      null,
+    [activeClassId, tutorialSeatingPlans],
+  )
+  const classTutorialSeatingPlans = useMemo(
+    () =>
+      (tutorialSeatingPlans || [])
+        .filter((plan) => plan.classId === activeClassId)
+        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
     [activeClassId, tutorialSeatingPlans],
   )
   const savedSociogramPositionsByStudentId = useMemo(
@@ -2400,8 +2550,8 @@ export function TutoringView() {
     [classStudents, classTutorialRecords],
   )
   const tutorialRelationSummary = useMemo(
-    () => summarizeTutorialRelations({ students: classStudents, relations: effectiveTutorialRelations }),
-    [classStudents, effectiveTutorialRelations],
+    () => summarizeTutorialRelations({ students: classStudents, relations: classTutorialRelations }),
+    [classStudents, classTutorialRelations],
   )
   const tutorialRecordRowsByStudent = useMemo(
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
@@ -2490,6 +2640,15 @@ export function TutoringView() {
   )
   const selectedCooperativeGroupSet =
     classTutorialGroupSets.find((groupSet) => groupSet.id === selectedCooperativeGroupSetId) || null
+  const latestCooperativeGroupSet = classTutorialGroupSets[0] || null
+  const hasRelationChangesAfterGroupSave = Boolean(
+    latestCooperativeGroupSet &&
+      classTutorialRelations.some(
+        (relation) =>
+          String(relation.updatedAt || relation.createdAt || '') >
+          String(latestCooperativeGroupSet.updatedAt || latestCooperativeGroupSet.createdAt || ''),
+      ),
+  )
   const visibleCooperativeGroups = useMemo(
     () =>
       selectedCooperativeGroupSet
@@ -2505,6 +2664,7 @@ export function TutoringView() {
     () =>
       buildTutorialSeatingPlan({
         layout: seatingLayout,
+        problemSeatsByStudentId: seatingProblemSeats,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
@@ -2516,9 +2676,22 @@ export function TutoringView() {
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
       seatingLayout,
+      seatingProblemSeats,
       seatingPrioritizeHalfGroups,
       seatingVariant,
     ],
+  )
+  const selectedSeatingPlan =
+    classTutorialSeatingPlans.find((plan) => plan.id === selectedSeatingPlanId) || null
+  const visibleSeatingPlan = selectedSeatingPlan
+    ? materializeSavedSeatingPlan({ plan: selectedSeatingPlan, profilesByStudentId: cooperativeProfilesByStudentId })
+    : generatedSeatingPlan
+  const seatingCapacity = getSeatingCapacity(seatingLayout)
+  const hasRelationChangesAfterSeatingSave = Boolean(
+    classTutorialSeatingPlan &&
+      classTutorialRelations.some(
+        (relation) => String(relation.updatedAt || relation.createdAt || '') > String(classTutorialSeatingPlan.updatedAt || ''),
+      ),
   )
   const filteredTutorialProfiles = useMemo(
     () =>
@@ -2597,14 +2770,62 @@ export function TutoringView() {
     }
   }
 
+  const updateSeatingColumnCount = (columns) => {
+    setSelectedSeatingPlanId('')
+    setSeatingLayout((current) => {
+      const cleanLayout = normalizeSeatingLayout(current)
+      return normalizeSeatingLayout({
+        ...cleanLayout,
+        columns,
+        placesByColumn: Array.from({ length: columns }, (_, index) => cleanLayout.placesByColumn[index] || 2),
+      })
+    })
+  }
+
+  const updateSeatingRows = (rows) => {
+    setSelectedSeatingPlanId('')
+    setSeatingLayout((current) => normalizeSeatingLayout({ ...current, rows }))
+  }
+
+  const updateSeatingColumnPlaces = (columnIndex, places) => {
+    setSelectedSeatingPlanId('')
+    setSeatingLayout((current) => {
+      const cleanLayout = normalizeSeatingLayout(current)
+      return normalizeSeatingLayout({
+        ...cleanLayout,
+        placesByColumn: cleanLayout.placesByColumn.map((currentPlaces, index) =>
+          index === columnIndex ? places : currentPlaces,
+        ),
+      })
+    })
+  }
+
+  const toggleSeatingSeatDisabled = (seatId) => {
+    setSelectedSeatingPlanId('')
+    setSeatingLayout((current) => {
+      const cleanLayout = normalizeSeatingLayout(current)
+      const disabledSeatIds = cleanLayout.disabledSeatIds.includes(seatId)
+        ? cleanLayout.disabledSeatIds.filter((currentSeatId) => currentSeatId !== seatId)
+        : [...cleanLayout.disabledSeatIds, seatId]
+      return normalizeSeatingLayout({ ...cleanLayout, disabledSeatIds })
+    })
+  }
+
+  const toggleSeatingProblemSeat = (placement) => {
+    if (!placement?.studentId || !placement?.seat?.id) return
+    setSelectedSeatingPlanId('')
+    setSeatingProblemSeats((current) => ({
+      ...current,
+      [placement.studentId]: current[placement.studentId] === placement.seat.id ? undefined : placement.seat.id,
+    }))
+  }
+
   const handleSaveTutorialSeatingPlan = async () => {
     await saveTutorialSeatingPlan({
       classId: activeClassId,
       layout: {
-        columns: generatedSeatingPlan.columns,
-        places: generatedSeatingPlan.places,
+        ...generatedSeatingPlan.layout,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
-        rows: generatedSeatingPlan.rows,
       },
       seats: generatedSeatingPlan.placements.map((placement) => ({
         block: placement.seat.block,
@@ -2617,6 +2838,7 @@ export function TutoringView() {
       })),
       title: 'Disposició recomanada',
     })
+    setSelectedSeatingPlanId('')
   }
 
   const persistSociogramPosition = async (studentId, position) => {
@@ -3291,7 +3513,29 @@ export function TutoringView() {
             </div>
           </section>
 
-          <section className={`tutorial-sociogram-visual-card ${sociogramFullscreen ? 'fullscreen' : ''}`}>
+          <section className="tutorial-tool-launch-grid">
+            <button onClick={() => setActiveRelationshipTool('sociogram')} type="button">
+              <Network size={25} />
+              <strong>Sociograma</strong>
+              <span>Mapa visual de relacions reals del grup.</span>
+            </button>
+            <button onClick={() => setActiveRelationshipTool('groups')} type="button">
+              <UsersRound size={25} />
+              <strong>Grups cooperatius</strong>
+              <span>Proposta automàtica amb rols, notes i relacions.</span>
+            </button>
+            <button onClick={() => setActiveRelationshipTool('seating')} type="button">
+              <LayoutGrid size={25} />
+              <strong>Disposició d’aula</strong>
+              <span>Matriu flexible de taules i cadires.</span>
+            </button>
+          </section>
+
+          <section
+            className={`tutorial-sociogram-visual-card relationship-tool-panel ${
+              activeRelationshipTool === 'sociogram' ? 'active' : ''
+            } ${sociogramFullscreen ? 'fullscreen' : ''}`}
+          >
             <header>
               <div>
                 <span className="section-kicker">
@@ -3305,6 +3549,9 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="tutorial-sociogram-actions">
+                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                  Tornar a eines
+                </button>
                 <div className="tutorial-sociogram-filter-tabs" aria-label="Filtre del sociograma">
                   {SOCIOGRAM_FILTERS.map((filter) => (
                     <button
@@ -3428,7 +3675,11 @@ export function TutoringView() {
             </footer>
           </section>
 
-          <section className="cooperative-generator-panel">
+          <section
+            className={`cooperative-generator-panel relationship-tool-panel ${
+              activeRelationshipTool === 'groups' ? 'active' : ''
+            }`}
+          >
             <header>
               <div>
                 <span className="section-kicker">
@@ -3442,6 +3693,9 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="cooperative-generator-controls">
+                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                  Tornar a eines
+                </button>
                 <label>
                   Mida
                   <select
@@ -3513,6 +3767,16 @@ export function TutoringView() {
                 >
                   Tornar a proposta actual
                 </button>
+              </div>
+            )}
+
+            {hasRelationChangesAfterGroupSave && (
+              <div className="tutorial-seating-warning">
+                <AlertTriangle size={18} />
+                <div>
+                  <strong>Les relacions han canviat des de l’última versió de grups guardada.</strong>
+                  <p>Revisa la proposta abans de reutilitzar-la perquè pot haver canviat algun criteri important.</p>
+                </div>
               </div>
             )}
 
@@ -3596,7 +3860,11 @@ export function TutoringView() {
             )}
           </section>
 
-          <section className="tutorial-seating-planner-panel">
+          <section
+            className={`tutorial-seating-planner-panel relationship-tool-panel ${
+              activeRelationshipTool === 'seating' ? 'active' : ''
+            }`}
+          >
             <header>
               <div>
                 <span className="section-kicker">
@@ -3610,41 +3878,29 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="tutorial-seating-controls">
+                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                  Tornar a eines
+                </button>
                 <label>
                   Columnes
                   <select
-                    onChange={(event) =>
-                      setSeatingLayout((current) => ({ ...current, columns: Number(event.target.value) }))
-                    }
-                    value={seatingLayout.columns}
+                    onChange={(event) => updateSeatingColumnCount(Number(event.target.value))}
+                    value={normalizeSeatingLayout(seatingLayout).columns}
                   >
+                    <option value={1}>1</option>
                     <option value={2}>2</option>
                     <option value={3}>3</option>
-                  </select>
-                </label>
-                <label>
-                  Taules per columna
-                  <select
-                    onChange={(event) =>
-                      setSeatingLayout((current) => ({ ...current, places: Number(event.target.value) }))
-                    }
-                    value={seatingLayout.places}
-                  >
-                    <option value={2}>2</option>
-                    <option value={3}>3</option>
+                    <option value={4}>4</option>
                   </select>
                 </label>
                 <label>
                   Files
-                  <select
-                    onChange={(event) =>
-                      setSeatingLayout((current) => ({ ...current, rows: Number(event.target.value) }))
-                    }
-                    value={seatingLayout.rows}
-                  >
+                  <select onChange={(event) => updateSeatingRows(Number(event.target.value))} value={normalizeSeatingLayout(seatingLayout).rows}>
+                    <option value={3}>3</option>
                     <option value={4}>4</option>
                     <option value={5}>5</option>
                     <option value={6}>6</option>
+                    <option value={7}>7</option>
                   </select>
                 </label>
                 <label className="cooperative-toggle-control">
@@ -3659,7 +3915,10 @@ export function TutoringView() {
                 </label>
                 <button
                   className="secondary-action compact"
-                  onClick={() => setSeatingVariant((current) => current + 1)}
+                  onClick={() => {
+                    setSelectedSeatingPlanId('')
+                    setSeatingVariant((current) => current + 1)
+                  }}
                   type="button"
                 >
                   <Shuffle size={16} />
@@ -3672,48 +3931,119 @@ export function TutoringView() {
               </div>
             </header>
 
-            {classTutorialSeatingPlan && (
-              <div className="tutorial-seating-saved-note">
-                Última disposició guardada: {formatShortDate(classTutorialSeatingPlan.updatedAt?.slice(0, 10))}
+            <div className="tutorial-seating-column-editor">
+              <article className="tutorial-seating-capacity">
+                <strong>Capacitat activa</strong>
+                <div>
+                  <span>
+                    {seatingCapacity}/{classStudents.length} llocs
+                  </span>
+                </div>
+              </article>
+              {normalizeSeatingLayout(seatingLayout).placesByColumn.map((places, columnIndex) => (
+                <article key={`seating-column-editor-${columnIndex}`}>
+                  <strong>Columna {columnIndex + 1}</strong>
+                  <div>
+                    {[1, 2, 3].map((option) => (
+                      <button
+                        className={places === option ? 'active' : ''}
+                        key={option}
+                        onClick={() => updateSeatingColumnPlaces(columnIndex, option)}
+                        type="button"
+                      >
+                        {option} taula{option > 1 ? 'es' : ''}
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {(generatedSeatingPlan.warnings.length > 0 || hasRelationChangesAfterSeatingSave) && (
+              <div className="tutorial-seating-warning">
+                <AlertTriangle size={18} />
+                <div>
+                  <strong>No es poden respectar tots els criteris amb aquesta matriu.</strong>
+                  {hasRelationChangesAfterSeatingSave && (
+                    <p>Les relacions han canviat des de l’última disposició guardada. Revisa-la o genera’n una de nova.</p>
+                  )}
+                  {generatedSeatingPlan.warnings.slice(0, 3).map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {classTutorialSeatingPlans.length > 0 && (
+              <div className="tutorial-seating-saved-list">
+                {classTutorialSeatingPlans.slice(0, 5).map((plan) => (
+                  <button
+                    className={selectedSeatingPlanId === plan.id ? 'active' : ''}
+                    key={plan.id}
+                    onClick={() => setSelectedSeatingPlanId(plan.id)}
+                    type="button"
+                  >
+                    <strong>{plan.title || 'Disposició guardada'}</strong>
+                    <span>{formatShortDate(plan.updatedAt?.slice(0, 10))}</span>
+                  </button>
+                ))}
+                {selectedSeatingPlan && (
+                  <button className="secondary-action compact" onClick={() => setSelectedSeatingPlanId('')} type="button">
+                    Tornar a proposta actual
+                  </button>
+                )}
               </div>
             )}
 
             <div
               className="tutorial-seating-board"
-              style={{ '--tutorial-seating-columns': generatedSeatingPlan.columns }}
+              style={{ '--tutorial-seating-columns': visibleSeatingPlan.columns }}
             >
-              {Array.from({ length: generatedSeatingPlan.columns }).map((_, blockIndex) => (
+              {Array.from({ length: visibleSeatingPlan.columns }).map((_, blockIndex) => (
                 <div className="tutorial-seating-block" key={`block_${blockIndex}`}>
                   <strong>Bloc {blockIndex + 1}</strong>
-                  {Array.from({ length: generatedSeatingPlan.rows }).map((__, rowIndex) => (
+                  {Array.from({ length: visibleSeatingPlan.rows }).map((__, rowIndex) => (
                     <div className="tutorial-seating-row" key={`row_${blockIndex}_${rowIndex}`}>
-                      {Array.from({ length: generatedSeatingPlan.places }).map((___, placeIndex) => {
-                        const placement = generatedSeatingPlan.placements.find(
+                      {Array.from({ length: visibleSeatingPlan.placesByColumn[blockIndex] || 0 }).map((___, placeIndex) => {
+                        const seatId = `seat_${blockIndex}_${rowIndex}_${placeIndex}`
+                        const seat = visibleSeatingPlan.seats.find((item) => item.id === seatId)
+                        const placement = visibleSeatingPlan.placements.find(
                           (item) =>
                             item.seat.block === blockIndex &&
                             item.seat.row === rowIndex &&
                             item.seat.place === placeIndex,
                         )
                         return (
-                          <article
+                          <button
                             className={`tutorial-seat-card ${placement?.isStar ? 'star' : ''} ${
                               placement?.isConflict ? 'conflict' : ''
-                            }`}
+                            } ${placement ? getHalfGroupClassName(placement.halfGroup) : ''} ${
+                              !seat?.enabled ? 'disabled' : ''
+                            } ${seatingProblemSeats[placement?.studentId] === placement?.seat?.id ? 'problem' : ''}`}
                             key={`seat_${blockIndex}_${rowIndex}_${placeIndex}`}
+                            onClick={() => (placement ? toggleSeatingProblemSeat(placement) : toggleSeatingSeatDisabled(seatId))}
+                            type="button"
                           >
-                            {placement ? (
+                            {!seat?.enabled ? (
+                              <span className="empty">Taula lliure</span>
+                            ) : placement ? (
                               <>
-                                <span>{placement.student.student.name}</span>
+                                <span>
+                                  {placement.student.student.name}
+                                  {placement.isStar ? <Star size={14} /> : null}
+                                  {placement.isConflict ? <i aria-label="conflictiu" /> : null}
+                                </span>
                                 <small>
                                   {placement.halfGroup}
-                                  {placement.isStar ? ' · estrella' : ''}
-                                  {placement.isConflict ? ' · conflictiu' : ''}
+                                  {seatingProblemSeats[placement.studentId] === placement.seat.id
+                                    ? ' · revisar lloc'
+                                    : ''}
                                 </small>
                               </>
                             ) : (
                               <span className="empty">Lliure</span>
                             )}
-                          </article>
+                          </button>
                         )
                       })}
                     </div>
@@ -3908,10 +4238,72 @@ export function TutoringView() {
           </div>
 
           <div className="tutorial-relationships-grid detail">
-            <article className="tutoring-card">
+            <article className="tutoring-card tutorial-student-relation-search">
               <div>
+                <Search size={24} />
+                <h2>Cercador per alumne</h2>
+              </div>
+              <label>
+                Alumne
+                <div className="tutorial-relation-picker">
+                  <Search size={16} />
+                  <input
+                    list="tutorial-summary-students"
+                    onChange={(event) => {
+                      const matchedStudent = findStudentBySearch(classStudents, event.target.value)
+                      if (matchedStudent) setSelectedRelationStudentId(matchedStudent.id)
+                    }}
+                    placeholder="Escriu el nom..."
+                  />
+                  <select
+                    onChange={(event) => setSelectedRelationStudentId(event.target.value)}
+                    value={selectedRelationRow?.student.id || ''}
+                  >
+                    {classStudents.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        {student.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+              <datalist id="tutorial-summary-students">
+                {classStudents.map((student) => (
+                  <option key={student.id} value={student.name} />
+                ))}
+              </datalist>
+            </article>
+
+            <article className="tutoring-card tutorial-student-relation-card">
+              <button
+                onClick={() => {
+                  setActiveRelationshipTool('sociogram')
+                  setSociogramFullscreen(true)
+                }}
+                type="button"
+              >
+                <Network size={24} />
+                <strong>Sociograma centrat</strong>
+                <span>{selectedRelationRow?.student.name || 'Selecciona un alumne'}</span>
+              </button>
+            </article>
+
+            <article className="tutoring-card tutorial-student-relation-card">
+              <button onClick={() => setActiveRelationshipTool('groups')} type="button">
                 <UsersRound size={24} />
-                <h2>{selectedRelationRow?.student.name || 'Detall de l’alumne'}</h2>
+                <strong>Grup cooperatiu</strong>
+                <span>
+                  {visibleCooperativeGroups.find((group) =>
+                    group.members.some((member) => member.student.id === selectedRelationRow?.student.id),
+                  )?.name || 'Encara no assignat'}
+                </span>
+              </button>
+            </article>
+
+            <article className="tutoring-card tutorial-student-relations-log">
+              <div>
+                <ClipboardList size={24} />
+                <h2>Relacions i comentaris</h2>
               </div>
               {!selectedRelationRow ? (
                 <div className="empty-state compact">Selecciona un alumne per veure’n les relacions.</div>
@@ -3937,44 +4329,6 @@ export function TutoringView() {
                       </article>
                     )
                   })}
-                </div>
-              )}
-            </article>
-
-            <article className="tutoring-card">
-              <div>
-                <ClipboardList size={24} />
-                <h2>Relacions registrades</h2>
-              </div>
-              {classTutorialRelations.length === 0 ? (
-                <div className="empty-state compact">Encara no hi ha cap relació registrada en aquesta tutoria.</div>
-              ) : (
-                <div className="tutorial-relation-history">
-                  {tutorialRelationSummary.enrichedRelations
-                    .filter((relation) => !relation.isSynthetic)
-                    .slice(0, 12)
-                    .map((relation) => (
-                    <article className={`tutorial-relation-entry ${relation.typeMeta.tone}`} key={relation.id}>
-                      <div>
-                        <strong>
-                          {relation.sourceStudent?.name || 'Alumne no trobat'} →{' '}
-                          {relation.targetStudent?.name || 'Alumne no trobat'}
-                        </strong>
-                        <span>
-                          {relation.typeMeta.shortLabel} · intensitat {relation.strength || 2}
-                        </span>
-                        {relation.note && <p>{relation.note}</p>}
-                      </div>
-                      <button
-                        className="icon-button danger subtle"
-                        onClick={() => deleteTutorialRelation(relation.id)}
-                        title="Eliminar relació"
-                        type="button"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </article>
-                  ))}
                 </div>
               )}
             </article>

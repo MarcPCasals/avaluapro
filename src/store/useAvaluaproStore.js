@@ -1634,11 +1634,10 @@ export const useAvaluaproStore = create((set, get) => ({
 
     const now = new Date().toISOString()
     set((state) => {
-      const existing = (state.tutorialSeatingPlans || []).find((plan) => plan.classId === classId)
       const nextPlan = {
-        id: existing?.id || createId('tseat'),
+        id: createId('tseat'),
         classId,
-        createdAt: existing?.createdAt || now,
+        createdAt: now,
         layout,
         seats,
         title: String(title || '').trim() || 'Disposició recomanada',
@@ -1646,9 +1645,7 @@ export const useAvaluaproStore = create((set, get) => ({
       }
 
       return {
-        tutorialSeatingPlans: existing
-          ? (state.tutorialSeatingPlans || []).map((plan) => (plan.id === existing.id ? nextPlan : plan))
-          : [nextPlan, ...(state.tutorialSeatingPlans || [])],
+        tutorialSeatingPlans: [nextPlan, ...(state.tutorialSeatingPlans || [])],
       }
     })
     await persistCollections(set, get, ['tutorialSeatingPlans'])
