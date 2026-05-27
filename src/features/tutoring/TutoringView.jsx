@@ -13,10 +13,17 @@ import {
   GraduationCap,
   HeartHandshake,
   Layers3,
+  LayoutGrid,
+  Maximize2,
+  Minimize2,
   Network,
   Plus,
   RotateCcw,
   Save,
+  Search,
+  ShieldAlert,
+  Shuffle,
+  Star,
   Trash2,
   TrendingDown,
   UserX,
@@ -205,32 +212,45 @@ function getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, sub
   return calculateGrade(legacyCriterionGrades)
 }
 
-function getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject }) {
-  if (!evaluationContext || subject !== evaluationContext.linkedSubject) return ''
+function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContext, studentId, subject }) {
+  if (!evaluationContext || subject !== evaluationContext.linkedSubject) return null
 
-  const classUtIds = new Set(
-    evaluationContext.uts.filter((ut) => ut.classId === evaluationContext.linkedClassId).map((ut) => ut.id),
-  )
-  const matchingCompetencies = evaluationContext.competencies.filter(
-    (item) => classUtIds.has(item.utId) && isSameCompetencyName(item.name, competency.name),
-  )
-  const competencyGrades = matchingCompetencies
-    .map((item) => {
-      const competencyCriteria = evaluationContext.criteria.filter((criterion) => criterion.competencyId === item.id)
-      const criterionGrades = competencyCriteria
-        .map(
-          (criterion) =>
-            evaluationContext.marks.find(
-              (mark) => mark.studentId === studentId && mark.criterionId === criterion.id,
-            )?.value,
-        )
-        .filter(Boolean)
+  const classSemesters = (evaluationContext.semesters || [])
+    .filter((semester) => semester.classId === evaluationContext.linkedClassId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+  const semesterOrderById = new Map(classSemesters.map((semester, index) => [semester.id, semester.order || index + 1]))
+  const classUts = evaluationContext.uts
+    .filter((ut) => ut.classId === evaluationContext.linkedClassId)
+    .sort(
+      (a, b) =>
+        (semesterOrderById.get(a.semesterId) || 0) - (semesterOrderById.get(b.semesterId) || 0) ||
+        (a.order || 0) - (b.order || 0) ||
+        a.name.localeCompare(b.name, 'ca'),
+    )
+  const utOrderById = new Map(classUts.map((ut, index) => [ut.id, index]))
+  const utsById = new Map(classUts.map((ut) => [ut.id, ut]))
+  const matchingCompetencies = evaluationContext.competencies
+    .filter((item) => utOrderById.has(item.utId) && isSameCompetencyName(item.name, competency.name))
+    .sort((a, b) => (utOrderById.get(b.utId) || 0) - (utOrderById.get(a.utId) || 0))
 
-      return calculateGrade(criterionGrades)
-    })
-    .filter(Boolean)
+  for (const item of matchingCompetencies) {
+    const competencyCriteria = evaluationContext.criteria.filter((criterion) => criterion.competencyId === item.id)
+    const criterionGrades = competencyCriteria
+      .map(
+        (criterion) =>
+          evaluationContext.marks.find(
+            (mark) => mark.studentId === studentId && mark.criterionId === criterion.id,
+          )?.value,
+      )
+      .filter(Boolean)
+    const grade = calculateGrade(criterionGrades)
+    if (grade) {
+      const sourceUt = utsById.get(item.utId)
+      return { source: 'linked', utName: sourceUt?.name || 'UT anterior', value: grade }
+    }
+  }
 
-  return calculateGrade(competencyGrades)
+  return null
 }
 
 function getTutorialCompetencyGradeSource({
@@ -244,8 +264,8 @@ function getTutorialCompetencyGradeSource({
   const storedGrade = getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency)
   if (storedGrade) return { source: 'manual', value: storedGrade }
 
-  const linkedGrade = getLinkedEvaluationCompetencyGrade({ competency, evaluationContext, studentId, subject })
-  if (linkedGrade) return { source: 'linked', value: linkedGrade }
+  const linkedGrade = getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContext, studentId, subject })
+  if (linkedGrade) return linkedGrade
 
   return { source: 'empty', value: '' }
 }
@@ -553,7 +573,15 @@ function getSociogramPosition(studentId, fallback, positionsByStudentId) {
   }
 }
 
-function buildTutorialSociogramMap({ filter, positionsByStudentId, relations, selectedStudentId, studentRows, students }) {
+function buildTutorialSociogramMap({
+  filter,
+  positionsByStudentId,
+  relations,
+  roleRowsByStudent,
+  selectedStudentId,
+  studentRows,
+  students,
+}) {
   const studentsById = new Map(students.map((student) => [student.id, student]))
   const rowsByStudentId = new Map(studentRows.map((row) => [row.student.id, row]))
   const selectedId = selectedStudentId || studentRows[0]?.student.id || students[0]?.id || ''
@@ -585,9 +613,11 @@ function buildTutorialSociogramMap({ filter, positionsByStudentId, relations, se
       ...rowsByStudentId.get(selectedStudent.id),
       id: selectedStudent.id,
       initials: getSociogramInitials(selectedStudent.name),
+      isConflict: Boolean(roleRowsByStudent?.get(selectedStudent.id)?.conflict),
       isDimmed: false,
       isRelated: false,
       isSelected: true,
+      isStar: Boolean(roleRowsByStudent?.get(selectedStudent.id)?.star),
       student: selectedStudent,
       ...getSociogramPosition(selectedStudent.id, { x: 50, y: 50 }, positionsByStudentId),
     })
@@ -603,9 +633,11 @@ function buildTutorialSociogramMap({ filter, positionsByStudentId, relations, se
       ...rowsByStudentId.get(student.id),
       id: student.id,
       initials: getSociogramInitials(student.name),
+      isConflict: Boolean(roleRowsByStudent?.get(student.id)?.conflict),
       isDimmed: false,
       isRelated: true,
       isSelected: false,
+      isStar: Boolean(roleRowsByStudent?.get(student.id)?.star),
       student,
       ...position,
     })
@@ -621,9 +653,11 @@ function buildTutorialSociogramMap({ filter, positionsByStudentId, relations, se
       ...rowsByStudentId.get(student.id),
       id: student.id,
       initials: getSociogramInitials(student.name),
+      isConflict: Boolean(roleRowsByStudent?.get(student.id)?.conflict),
       isDimmed: Boolean(selectedStudent),
       isRelated: false,
       isSelected: false,
+      isStar: Boolean(roleRowsByStudent?.get(student.id)?.star),
       student,
       ...position,
     })
@@ -715,7 +749,7 @@ function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tu
   }
 }
 
-function getStudentCooperativeProfile({ profile, recordRow, relationRow }) {
+function getStudentCooperativeProfile({ profile, recordRow, relationRow, roleRow }) {
   const recordSeverity =
     (recordRow?.agenda || 0) +
     (recordRow?.incident || 0) * 2 +
@@ -739,6 +773,8 @@ function getStudentCooperativeProfile({ profile, recordRow, relationRow }) {
     academicRisk,
     avoidCount: relationRow?.avoidCount || 0,
     halfGroup: profile.student.halfGroup || 'Sense mig grup',
+    isConflict: Boolean(roleRow?.conflict),
+    isStar: Boolean(roleRow?.star),
     performanceLevel,
     priorityScore,
     recordSeverity,
@@ -757,8 +793,62 @@ function relationBetween(relations, studentIdA, studentIdB) {
   )
 }
 
+function buildTutorialRoleRows(students, roles) {
+  const rolesByStudentId = new Map(students.map((student) => [student.id, { conflict: false, star: false }]))
+  roles.forEach((role) => {
+    const row = rolesByStudentId.get(role.studentId)
+    if (!row) return
+    if (role.role === 'star') row.star = true
+    if (role.role === 'conflict') row.conflict = true
+  })
+  return rolesByStudentId
+}
+
+function buildEffectiveTutorialRelations({ relations, rolesByStudentId, students }) {
+  const explicitPairKeys = new Set(
+    relations.map((relation) => [relation.sourceStudentId, relation.targetStudentId].sort().join('__')),
+  )
+  const syntheticRelations = []
+
+  students.forEach((student) => {
+    if (!rolesByStudentId.get(student.id)?.star) return
+    students.forEach((otherStudent) => {
+      if (otherStudent.id === student.id) return
+      const pairKey = [student.id, otherStudent.id].sort().join('__')
+      if (explicitPairKeys.has(pairKey)) return
+      syntheticRelations.push({
+        id: `synthetic_star_${student.id}_${otherStudent.id}`,
+        isSynthetic: true,
+        note: 'Alumne estrella: pot oferir ajuda acadèmica sense indicar amistat.',
+        sourceStudentId: student.id,
+        strength: 2,
+        targetStudentId: otherStudent.id,
+        type: 'positive',
+      })
+    })
+  })
+
+  return [...relations, ...syntheticRelations]
+}
+
+function findStudentBySearch(students, searchValue) {
+  const cleanValue = String(searchValue || '').trim().toLocaleLowerCase('ca')
+  if (!cleanValue) return null
+  return (
+    students.find((student) => student.name.toLocaleLowerCase('ca') === cleanValue) ||
+    students.find((student) => student.name.toLocaleLowerCase('ca').includes(cleanValue))
+  )
+}
+
 function getCooperativePlacementScore({ candidate, group, groupSize, prioritizeHalfGroups, relations, strategy }) {
   if (group.members.length >= groupSize) return Number.POSITIVE_INFINITY
+  if (candidate.isConflict && group.members.some((member) => member.isConflict)) return Number.POSITIVE_INFINITY
+  if (
+    prioritizeHalfGroups &&
+    group.members.some((member) => member.halfGroup && member.halfGroup !== candidate.halfGroup)
+  ) {
+    return Number.POSITIVE_INFINITY
+  }
 
   let score = group.members.length * 8
   const nextMembers = [...group.members, candidate]
@@ -838,6 +928,7 @@ function buildCooperativeGroups({
   recordRowsByStudent,
   relationRowsByStudent,
   relations,
+  roleRowsByStudent,
   strategy,
 }) {
   const cleanGroupSize = Math.min(6, Math.max(2, Number(groupSize) || 4))
@@ -847,6 +938,7 @@ function buildCooperativeGroups({
         profile,
         recordRow: recordRowsByStudent.get(profile.student.id),
         relationRow: relationRowsByStudent.get(profile.student.id),
+        roleRow: roleRowsByStudent?.get(profile.student.id),
       }),
     )
     .sort((a, b) => {
@@ -856,6 +948,51 @@ function buildCooperativeGroups({
       }
       return a.student.name.localeCompare(b.student.name, 'ca')
     })
+
+  if (prioritizeHalfGroups) {
+    const studentsByHalfGroup = new Map()
+    students.forEach((student) => {
+      const key = student.halfGroup || 'Sense mig grup'
+      studentsByHalfGroup.set(key, [...(studentsByHalfGroup.get(key) || []), student])
+    })
+
+    let globalIndex = 0
+    const halfGroupGroups = []
+    studentsByHalfGroup.forEach((halfGroupStudents, halfGroupName) => {
+      const localGroupCount = Math.max(1, Math.ceil(halfGroupStudents.length / cleanGroupSize))
+      const localGroups = Array.from({ length: localGroupCount }, () => {
+        globalIndex += 1
+        return {
+          halfGroupName,
+          id: `group_${globalIndex}`,
+          members: [],
+          name: `Grup ${globalIndex} · ${halfGroupName}`,
+        }
+      })
+
+      halfGroupStudents.forEach((student) => {
+        const bestGroup = localGroups
+          .map((group) => ({
+            group,
+            score: getCooperativePlacementScore({
+              candidate: student,
+              group,
+              groupSize: cleanGroupSize,
+              prioritizeHalfGroups: false,
+              relations,
+              strategy,
+            }),
+          }))
+          .sort((a, b) => a.score - b.score || a.group.members.length - b.group.members.length)[0]?.group
+
+        bestGroup?.members.push(student)
+      })
+      halfGroupGroups.push(...localGroups)
+    })
+
+    return enrichCooperativeGroups(halfGroupGroups, relations)
+  }
+
   const groupCount = Math.max(1, Math.ceil(students.length / cleanGroupSize))
   const groups = Array.from({ length: groupCount }, (_, index) => ({
     id: `group_${index + 1}`,
@@ -882,6 +1019,94 @@ function buildCooperativeGroups({
   })
 
   return enrichCooperativeGroups(groups, relations)
+}
+
+function isSeatAdjacent(seatA, seatB) {
+  if (!seatA || !seatB) return false
+  if (seatA.block !== seatB.block) return false
+  return Math.abs(seatA.row - seatB.row) + Math.abs(seatA.place - seatB.place) <= 1
+}
+
+function buildTutorialSeatingPlan({
+  layout,
+  prioritizeHalfGroups,
+  profilesByStudentId,
+  relations,
+  students,
+  variant,
+}) {
+  const columns = Math.min(3, Math.max(2, Number(layout?.columns) || 3))
+  const places = Math.min(3, Math.max(2, Number(layout?.places) || 2))
+  const rows = Math.min(6, Math.max(2, Number(layout?.rows) || 4))
+  const seats = []
+  Array.from({ length: rows }).forEach((_, row) => {
+    Array.from({ length: columns }).forEach((_, block) => {
+      Array.from({ length: places }).forEach((__, place) => {
+        seats.push({
+          block,
+          id: `seat_${block}_${row}_${place}`,
+          place,
+          row,
+        })
+      })
+    })
+  })
+
+  const studentsToPlace = students
+    .map((student) => profilesByStudentId.get(student.id))
+    .filter(Boolean)
+    .sort((a, b) => {
+      if ((b.isConflict ? 1 : 0) !== (a.isConflict ? 1 : 0)) return (b.isConflict ? 1 : 0) - (a.isConflict ? 1 : 0)
+      if ((b.priorityScore || 0) !== (a.priorityScore || 0)) return (b.priorityScore || 0) - (a.priorityScore || 0)
+      return a.student.name.localeCompare(b.student.name, 'ca')
+    })
+
+  const halfGroups = [...new Set(studentsToPlace.map((student) => student.halfGroup || 'Sense mig grup'))]
+  const halfGroupBlock = new Map(halfGroups.map((halfGroup, index) => [halfGroup, index % columns]))
+  const placed = []
+
+  studentsToPlace.forEach((student, studentIndex) => {
+    const availableSeats = seats.filter((seat) => !placed.some((placement) => placement.seat.id === seat.id))
+    const bestSeat = availableSeats
+      .map((seat) => {
+        let score = Math.abs(seat.block - ((studentIndex + variant) % columns)) * 2 + seat.row
+        if (prioritizeHalfGroups) {
+          score += seat.block === halfGroupBlock.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
+        }
+        placed.forEach((placement) => {
+          const adjacent = isSeatAdjacent(seat, placement.seat)
+          const relation = relationBetween(relations, student.student.id, placement.student.student.id)
+          if (student.isConflict && placement.student.isConflict) score += 10000
+          if (!adjacent) return
+          if (relation?.type === 'avoid') score += 500
+          if (relation?.type === 'friendship') score += 8
+          if (relation?.type === 'positive') score -= 8
+          if (student.isStar && placement.student.academicRisk) score -= 14
+          if (placement.student.isStar && student.academicRisk) score -= 14
+        })
+        return { score, seat }
+      })
+      .sort((a, b) => a.score - b.score || a.seat.row - b.seat.row || a.seat.block - b.seat.block)[0]?.seat
+
+    if (bestSeat) {
+      placed.push({
+        halfGroup: student.halfGroup,
+        isConflict: student.isConflict,
+        isStar: student.isStar,
+        seat: bestSeat,
+        student,
+        studentId: student.student.id,
+      })
+    }
+  })
+
+  return {
+    columns,
+    places,
+    placements: placed,
+    rows,
+    seats,
+  }
 }
 
 function materializeSavedCooperativeGroups({ profilesByStudentId, relations, savedGroupSet }) {
@@ -1977,26 +2202,34 @@ export function TutoringView() {
     strength: '2',
     note: '',
   })
+  const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [sociogramFilter, setSociogramFilter] = useState('all')
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
+  const [sociogramFullscreen, setSociogramFullscreen] = useState(false)
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
+  const [seatingLayout, setSeatingLayout] = useState({ columns: 3, places: 2, rows: 4 })
+  const [seatingVariant, setSeatingVariant] = useState(0)
+  const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
   const marks = useAvaluaproStore((state) => state.marks)
   const competencies = useAvaluaproStore((state) => state.competencies)
   const criteria = useAvaluaproStore((state) => state.criteria)
+  const semesters = useAvaluaproStore((state) => state.semesters)
   const uts = useAvaluaproStore((state) => state.uts)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
   const tutorialGroupSets = useAvaluaproStore((state) => state.tutorialGroupSets)
   const tutorialSociogramLayouts = useAvaluaproStore((state) => state.tutorialSociogramLayouts)
+  const tutorialStudentRoles = useAvaluaproStore((state) => state.tutorialStudentRoles)
+  const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
@@ -2007,6 +2240,8 @@ export function TutoringView() {
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
   const upsertTutorialSociogramLayout = useAvaluaproStore((state) => state.upsertTutorialSociogramLayout)
   const resetTutorialSociogramLayout = useAvaluaproStore((state) => state.resetTutorialSociogramLayout)
+  const toggleTutorialStudentRole = useAvaluaproStore((state) => state.toggleTutorialStudentRole)
+  const saveTutorialSeatingPlan = useAvaluaproStore((state) => state.saveTutorialSeatingPlan)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -2022,6 +2257,23 @@ export function TutoringView() {
     () => tutorialRelations.filter((relation) => relation.classId === activeClassId),
     [activeClassId, tutorialRelations],
   )
+  const classTutorialStudentRoles = useMemo(
+    () => (tutorialStudentRoles || []).filter((role) => role.classId === activeClassId),
+    [activeClassId, tutorialStudentRoles],
+  )
+  const tutorialRoleRowsByStudent = useMemo(
+    () => buildTutorialRoleRows(classStudents, classTutorialStudentRoles),
+    [classStudents, classTutorialStudentRoles],
+  )
+  const effectiveTutorialRelations = useMemo(
+    () =>
+      buildEffectiveTutorialRelations({
+        relations: classTutorialRelations,
+        rolesByStudentId: tutorialRoleRowsByStudent,
+        students: classStudents,
+      }),
+    [classStudents, classTutorialRelations, tutorialRoleRowsByStudent],
+  )
   const classTutorialGroupSets = useMemo(
     () =>
       (tutorialGroupSets || [])
@@ -2032,6 +2284,10 @@ export function TutoringView() {
   const classTutorialSociogramLayout = useMemo(
     () => (tutorialSociogramLayouts || []).find((layout) => layout.classId === activeClassId) || null,
     [activeClassId, tutorialSociogramLayouts],
+  )
+  const classTutorialSeatingPlan = useMemo(
+    () => (tutorialSeatingPlans || []).find((plan) => plan.classId === activeClassId) || null,
+    [activeClassId, tutorialSeatingPlans],
   )
   const savedSociogramPositionsByStudentId = useMemo(
     () =>
@@ -2069,9 +2325,10 @@ export function TutoringView() {
       linkedClassId,
       linkedSubject: linkedClass?.subject,
       marks,
+      semesters,
       uts,
     }),
-    [criteria, competencies, linkedClass?.subject, linkedClassId, marks, uts],
+    [criteria, competencies, linkedClass?.subject, linkedClassId, marks, semesters, uts],
   )
 
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
@@ -2143,8 +2400,8 @@ export function TutoringView() {
     [classStudents, classTutorialRecords],
   )
   const tutorialRelationSummary = useMemo(
-    () => summarizeTutorialRelations({ students: classStudents, relations: classTutorialRelations }),
-    [classStudents, classTutorialRelations],
+    () => summarizeTutorialRelations({ students: classStudents, relations: effectiveTutorialRelations }),
+    [classStudents, effectiveTutorialRelations],
   )
   const tutorialRecordRowsByStudent = useMemo(
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
@@ -2172,10 +2429,11 @@ export function TutoringView() {
             profile,
             recordRow: tutorialRecordRowsByStudent.get(profile.student.id),
             relationRow: tutorialRelationRowsByStudent.get(profile.student.id),
+            roleRow: tutorialRoleRowsByStudent.get(profile.student.id),
           }),
         ]),
       ),
-    [tutorialRecordRowsByStudent, tutorialRelationRowsByStudent, tutorialSummary.studentProfiles],
+    [tutorialRecordRowsByStudent, tutorialRelationRowsByStudent, tutorialRoleRowsByStudent, tutorialSummary.studentProfiles],
   )
   const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
     (profile) => profile.student.id === selectedTutorialProfileId,
@@ -2192,6 +2450,7 @@ export function TutoringView() {
         filter: sociogramFilter,
         positionsByStudentId: sociogramPositionsByStudentId,
         relations: tutorialRelationSummary.enrichedRelations,
+        roleRowsByStudent: tutorialRoleRowsByStudent,
         selectedStudentId: selectedRelationRow?.student.id,
         studentRows: tutorialRelationSummary.studentRows,
         students: classStudents,
@@ -2202,6 +2461,7 @@ export function TutoringView() {
       sociogramFilter,
       sociogramPositionsByStudentId,
       tutorialRelationSummary.enrichedRelations,
+      tutorialRoleRowsByStudent,
       tutorialRelationSummary.studentRows,
     ],
   )
@@ -2213,16 +2473,18 @@ export function TutoringView() {
         profiles: tutorialSummary.studentProfiles,
         recordRowsByStudent: tutorialRecordRowsByStudent,
         relationRowsByStudent: tutorialRelationRowsByStudent,
-        relations: classTutorialRelations,
+        relations: effectiveTutorialRelations,
+        roleRowsByStudent: tutorialRoleRowsByStudent,
         strategy: cooperativeStrategy,
       }),
     [
-      classTutorialRelations,
       cooperativeGroupSize,
       cooperativeStrategy,
+      effectiveTutorialRelations,
       prioritizeHalfGroups,
       tutorialRecordRowsByStudent,
       tutorialRelationRowsByStudent,
+      tutorialRoleRowsByStudent,
       tutorialSummary.studentProfiles,
     ],
   )
@@ -2233,11 +2495,30 @@ export function TutoringView() {
       selectedCooperativeGroupSet
         ? materializeSavedCooperativeGroups({
             profilesByStudentId: cooperativeProfilesByStudentId,
-            relations: classTutorialRelations,
+            relations: effectiveTutorialRelations,
             savedGroupSet: selectedCooperativeGroupSet,
           })
         : cooperativeGroups,
-    [classTutorialRelations, cooperativeGroups, cooperativeProfilesByStudentId, selectedCooperativeGroupSet],
+    [cooperativeGroups, cooperativeProfilesByStudentId, effectiveTutorialRelations, selectedCooperativeGroupSet],
+  )
+  const generatedSeatingPlan = useMemo(
+    () =>
+      buildTutorialSeatingPlan({
+        layout: seatingLayout,
+        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
+        profilesByStudentId: cooperativeProfilesByStudentId,
+        relations: effectiveTutorialRelations,
+        students: classStudents,
+        variant: seatingVariant,
+      }),
+    [
+      classStudents,
+      cooperativeProfilesByStudentId,
+      effectiveTutorialRelations,
+      seatingLayout,
+      seatingPrioritizeHalfGroups,
+      seatingVariant,
+    ],
   )
   const filteredTutorialProfiles = useMemo(
     () =>
@@ -2302,6 +2583,40 @@ export function TutoringView() {
       targetStudentId: '',
       note: '',
     }))
+    setRelationSearch((current) => ({ ...current, target: '' }))
+  }
+
+  const handleRelationSearchChange = (field, value) => {
+    const matchedStudent = findStudentBySearch(classStudents, value)
+    setRelationSearch((current) => ({ ...current, [field]: value }))
+    if (matchedStudent) {
+      setRelationForm((current) => ({
+        ...current,
+        [field === 'source' ? 'sourceStudentId' : 'targetStudentId']: matchedStudent.id,
+      }))
+    }
+  }
+
+  const handleSaveTutorialSeatingPlan = async () => {
+    await saveTutorialSeatingPlan({
+      classId: activeClassId,
+      layout: {
+        columns: generatedSeatingPlan.columns,
+        places: generatedSeatingPlan.places,
+        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
+        rows: generatedSeatingPlan.rows,
+      },
+      seats: generatedSeatingPlan.placements.map((placement) => ({
+        block: placement.seat.block,
+        halfGroup: placement.halfGroup,
+        isConflict: placement.isConflict,
+        isStar: placement.isStar,
+        place: placement.seat.place,
+        row: placement.seat.row,
+        studentId: placement.studentId,
+      })),
+      title: 'Disposició recomanada',
+    })
   }
 
   const persistSociogramPosition = async (studentId, position) => {
@@ -2762,7 +3077,7 @@ export function TutoringView() {
                                   }
                                   title={
                                     gradeSource.source === 'linked'
-                                      ? `Nota llegida de ${linkedClass?.name || 'la classe vinculada'}. Pots sobreescriure-la.`
+                                      ? `Nota llegida de ${linkedClass?.name || 'la classe vinculada'} (${gradeSource.utName || 'última mirada'}). Pots sobreescriure-la.`
                                       : 'Nota tutorial pròpia'
                                   }
                                   value={value}
@@ -2773,6 +3088,9 @@ export function TutoringView() {
                                     </option>
                                   ))}
                                 </select>
+                                {gradeSource.source === 'linked' && (
+                                  <small className="tutorial-linked-ut">{gradeSource.utName || 'Última mirada'}</small>
+                                )}
                               </td>
                             )
                           })}
@@ -2973,7 +3291,7 @@ export function TutoringView() {
             </div>
           </section>
 
-          <section className="tutorial-sociogram-visual-card">
+          <section className={`tutorial-sociogram-visual-card ${sociogramFullscreen ? 'fullscreen' : ''}`}>
             <header>
               <div>
                 <span className="section-kicker">
@@ -3007,6 +3325,14 @@ export function TutoringView() {
                 >
                   <RotateCcw size={16} />
                   Restablir mapa
+                </button>
+                <button
+                  className="secondary-action compact"
+                  onClick={() => setSociogramFullscreen((current) => !current)}
+                  type="button"
+                >
+                  {sociogramFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  {sociogramFullscreen ? 'Sortir' : 'Pantalla completa'}
                 </button>
               </div>
             </header>
@@ -3056,7 +3382,9 @@ export function TutoringView() {
                     <button
                       className={`tutorial-sociogram-node ${node.isSelected ? 'selected' : ''} ${
                         node.isRelated ? 'related' : ''
-                      } ${node.isDimmed ? 'dimmed' : ''} ${node.avoidCount > 0 ? 'has-avoid' : ''}`}
+                      } ${node.isDimmed ? 'dimmed' : ''} ${node.avoidCount > 0 ? 'has-avoid' : ''} ${
+                        node.isStar ? 'is-star' : ''
+                      } ${node.isConflict ? 'is-conflict' : ''}`}
                       key={node.id}
                       onClick={() => setSelectedRelationStudentId(node.id)}
                       onPointerCancel={(event) => handleSociogramPointerUp(event, node)}
@@ -3079,6 +3407,8 @@ export function TutoringView() {
                       )}
                       <strong>{node.student.name}</strong>
                       <small>
+                        {node.isStar ? 'estrella · ' : ''}
+                        {node.isConflict ? 'conflictiu · ' : ''}
                         {node.supportiveCount || 0}+ · {node.avoidCount || 0} evitar
                       </small>
                     </button>
@@ -3266,6 +3596,133 @@ export function TutoringView() {
             )}
           </section>
 
+          <section className="tutorial-seating-planner-panel">
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <LayoutGrid size={17} />
+                  Disposició d’aula
+                </span>
+                <h2>Proposta de llocs</h2>
+                <p>
+                  Defineix una matriu senzilla i Avaluapro distribueix els alumnes tenint en compte mig grup,
+                  incompatibilitats, alumnes estrella i perfils que necessiten suport.
+                </p>
+              </div>
+              <div className="tutorial-seating-controls">
+                <label>
+                  Columnes
+                  <select
+                    onChange={(event) =>
+                      setSeatingLayout((current) => ({ ...current, columns: Number(event.target.value) }))
+                    }
+                    value={seatingLayout.columns}
+                  >
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
+                </label>
+                <label>
+                  Taules per columna
+                  <select
+                    onChange={(event) =>
+                      setSeatingLayout((current) => ({ ...current, places: Number(event.target.value) }))
+                    }
+                    value={seatingLayout.places}
+                  >
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
+                </label>
+                <label>
+                  Files
+                  <select
+                    onChange={(event) =>
+                      setSeatingLayout((current) => ({ ...current, rows: Number(event.target.value) }))
+                    }
+                    value={seatingLayout.rows}
+                  >
+                    <option value={4}>4</option>
+                    <option value={5}>5</option>
+                    <option value={6}>6</option>
+                  </select>
+                </label>
+                <label className="cooperative-toggle-control">
+                  Mig grup
+                  <button
+                    className={seatingPrioritizeHalfGroups ? 'active' : ''}
+                    onClick={() => setSeatingPrioritizeHalfGroups((current) => !current)}
+                    type="button"
+                  >
+                    {seatingPrioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
+                  </button>
+                </label>
+                <button
+                  className="secondary-action compact"
+                  onClick={() => setSeatingVariant((current) => current + 1)}
+                  type="button"
+                >
+                  <Shuffle size={16} />
+                  Canviar proposta
+                </button>
+                <button className="secondary-action compact" onClick={handleSaveTutorialSeatingPlan} type="button">
+                  <Save size={16} />
+                  Guardar disposició
+                </button>
+              </div>
+            </header>
+
+            {classTutorialSeatingPlan && (
+              <div className="tutorial-seating-saved-note">
+                Última disposició guardada: {formatShortDate(classTutorialSeatingPlan.updatedAt?.slice(0, 10))}
+              </div>
+            )}
+
+            <div
+              className="tutorial-seating-board"
+              style={{ '--tutorial-seating-columns': generatedSeatingPlan.columns }}
+            >
+              {Array.from({ length: generatedSeatingPlan.columns }).map((_, blockIndex) => (
+                <div className="tutorial-seating-block" key={`block_${blockIndex}`}>
+                  <strong>Bloc {blockIndex + 1}</strong>
+                  {Array.from({ length: generatedSeatingPlan.rows }).map((__, rowIndex) => (
+                    <div className="tutorial-seating-row" key={`row_${blockIndex}_${rowIndex}`}>
+                      {Array.from({ length: generatedSeatingPlan.places }).map((___, placeIndex) => {
+                        const placement = generatedSeatingPlan.placements.find(
+                          (item) =>
+                            item.seat.block === blockIndex &&
+                            item.seat.row === rowIndex &&
+                            item.seat.place === placeIndex,
+                        )
+                        return (
+                          <article
+                            className={`tutorial-seat-card ${placement?.isStar ? 'star' : ''} ${
+                              placement?.isConflict ? 'conflict' : ''
+                            }`}
+                            key={`seat_${blockIndex}_${rowIndex}_${placeIndex}`}
+                          >
+                            {placement ? (
+                              <>
+                                <span>{placement.student.student.name}</span>
+                                <small>
+                                  {placement.halfGroup}
+                                  {placement.isStar ? ' · estrella' : ''}
+                                  {placement.isConflict ? ' · conflictiu' : ''}
+                                </small>
+                              </>
+                            ) : (
+                              <span className="empty">Lliure</span>
+                            )}
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+
           <div className="tutorial-relationships-grid">
             <article className="tutoring-card tutorial-relation-form-card">
               <div>
@@ -3275,39 +3732,73 @@ export function TutoringView() {
               <form className="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
                 <label>
                   Alumne origen
-                  <select
-                    onChange={(event) =>
-                      setRelationForm((current) => ({ ...current, sourceStudentId: event.target.value }))
-                    }
-                    value={relationForm.sourceStudentId}
-                  >
-                    <option value="">Primer alumne de la llista</option>
-                    {classStudents.map((student) => (
-                      <option key={student.id} value={student.id}>
-                        {student.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Alumne relacionat
-                  <select
-                    onChange={(event) =>
-                      setRelationForm((current) => ({ ...current, targetStudentId: event.target.value }))
-                    }
-                    value={relationForm.targetStudentId}
-                  >
-                    <option value="">Tria un alumne</option>
-                    {classStudents
-                      .filter((student) => student.id !== relationForm.sourceStudentId)
-                      .map((student) => (
+                  <div className="tutorial-relation-picker">
+                    <Search size={16} />
+                    <input
+                      list="tutorial-source-students"
+                      onChange={(event) => handleRelationSearchChange('source', event.target.value)}
+                      placeholder="Escriu el nom..."
+                      value={relationSearch.source}
+                    />
+                    <select
+                      onChange={(event) => {
+                        const student = classStudents.find((item) => item.id === event.target.value)
+                        setRelationForm((current) => ({ ...current, sourceStudentId: event.target.value }))
+                        setRelationSearch((current) => ({ ...current, source: student?.name || '' }))
+                      }}
+                      value={relationForm.sourceStudentId}
+                    >
+                      <option value="">Primer alumne de la llista</option>
+                      {classStudents.map((student) => (
                         <option key={student.id} value={student.id}>
                           {student.name}
                         </option>
                       ))}
-                  </select>
+                    </select>
+                  </div>
                 </label>
+
+                <label>
+                  Alumne relacionat
+                  <div className="tutorial-relation-picker">
+                    <Search size={16} />
+                    <input
+                      list="tutorial-target-students"
+                      onChange={(event) => handleRelationSearchChange('target', event.target.value)}
+                      placeholder="Escriu el nom..."
+                      value={relationSearch.target}
+                    />
+                    <select
+                      onChange={(event) => {
+                        const student = classStudents.find((item) => item.id === event.target.value)
+                        setRelationForm((current) => ({ ...current, targetStudentId: event.target.value }))
+                        setRelationSearch((current) => ({ ...current, target: student?.name || '' }))
+                      }}
+                      value={relationForm.targetStudentId}
+                    >
+                      <option value="">Tria un alumne</option>
+                      {classStudents
+                        .filter((student) => student.id !== relationForm.sourceStudentId)
+                        .map((student) => (
+                          <option key={student.id} value={student.id}>
+                            {student.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </label>
+                <datalist id="tutorial-source-students">
+                  {classStudents.map((student) => (
+                    <option key={student.id} value={student.name} />
+                  ))}
+                </datalist>
+                <datalist id="tutorial-target-students">
+                  {classStudents
+                    .filter((student) => student.id !== relationForm.sourceStudentId)
+                    .map((student) => (
+                      <option key={student.id} value={student.name} />
+                    ))}
+                </datalist>
 
                 <fieldset className="tutorial-relation-type-grid">
                   <legend>Tipus</legend>
@@ -3363,21 +3854,52 @@ export function TutoringView() {
                 <div className="tutorial-sociogram-list">
                   {tutorialRelationSummary.studentRows.map((row) => {
                     const isSelected = row.student.id === selectedRelationRow?.student.id
+                    const roleRow = tutorialRoleRowsByStudent.get(row.student.id)
                     return (
-                      <button
+                      <article
                         className={`tutorial-sociogram-row ${isSelected ? 'active' : ''}`}
                         key={row.student.id}
-                        onClick={() => setSelectedRelationStudentId(row.student.id)}
-                        type="button"
                       >
-                        <div>
-                          <strong>{row.student.name}</strong>
-                          <small>{row.student.halfGroup || 'Sense mig grup'}</small>
+                        <button
+                          className="tutorial-sociogram-row-main"
+                          onClick={() => setSelectedRelationStudentId(row.student.id)}
+                          type="button"
+                        >
+                          <div>
+                            <strong>{row.student.name}</strong>
+                            <small>{row.student.halfGroup || 'Sense mig grup'}</small>
+                          </div>
+                          <span className="green">{row.supportiveCount} positives</span>
+                          <span className="red">{row.avoidCount} evitar</span>
+                          <span>{row.total} total</span>
+                        </button>
+                        <div className="tutorial-role-actions">
+                          <button
+                            className={roleRow?.star ? 'active star' : ''}
+                            onClick={() =>
+                              toggleTutorialStudentRole({ classId: activeClassId, role: 'star', studentId: row.student.id })
+                            }
+                            type="button"
+                          >
+                            <Star size={15} />
+                            Estrella
+                          </button>
+                          <button
+                            className={roleRow?.conflict ? 'active conflict' : ''}
+                            onClick={() =>
+                              toggleTutorialStudentRole({
+                                classId: activeClassId,
+                                role: 'conflict',
+                                studentId: row.student.id,
+                              })
+                            }
+                            type="button"
+                          >
+                            <ShieldAlert size={15} />
+                            Conflictiu
+                          </button>
                         </div>
-                        <span className="green">{row.supportiveCount} positives</span>
-                        <span className="red">{row.avoidCount} evitar</span>
-                        <span>{row.total} total</span>
-                      </button>
+                      </article>
                     )
                   })}
                 </div>
@@ -3424,11 +3946,14 @@ export function TutoringView() {
                 <ClipboardList size={24} />
                 <h2>Relacions registrades</h2>
               </div>
-              {tutorialRelationSummary.enrichedRelations.length === 0 ? (
+              {classTutorialRelations.length === 0 ? (
                 <div className="empty-state compact">Encara no hi ha cap relació registrada en aquesta tutoria.</div>
               ) : (
                 <div className="tutorial-relation-history">
-                  {tutorialRelationSummary.enrichedRelations.slice(0, 12).map((relation) => (
+                  {tutorialRelationSummary.enrichedRelations
+                    .filter((relation) => !relation.isSynthetic)
+                    .slice(0, 12)
+                    .map((relation) => (
                     <article className={`tutorial-relation-entry ${relation.typeMeta.tone}`} key={relation.id}>
                       <div>
                         <strong>

@@ -47,18 +47,52 @@ function writePreferences(preferences) {
   }
 }
 
+function getClassTimelineSelection(dataset, classId, preferences = {}) {
+  const classSemesters = dataset.semesters
+    .filter((semester) => semester.classId === classId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+  const classUts = dataset.uts
+    .filter((ut) => ut.classId === classId)
+    .sort((a, b) => {
+      const semesterA = classSemesters.find((semester) => semester.id === a.semesterId)
+      const semesterB = classSemesters.find((semester) => semester.id === b.semesterId)
+      return (
+        (semesterA?.order || 0) - (semesterB?.order || 0) ||
+        (a.order || 0) - (b.order || 0) ||
+        a.name.localeCompare(b.name, 'ca')
+      )
+    })
+  const classMemory = preferences.lastUiByClass?.[classId] || {}
+  const requestedUtId = classMemory.activeUtId || preferences.activeUtId
+  const activeUt = classUts.find((ut) => ut.id === requestedUtId) || classUts[0]
+  const requestedSemesterId = classMemory.activeSemesterId || preferences.activeSemesterId
+  const activeSemester =
+    classSemesters.find((semester) => semester.id === activeUt?.semesterId) ||
+    classSemesters.find((semester) => semester.id === requestedSemesterId) ||
+    classSemesters[0]
+
+  return {
+    activeSemesterId: activeSemester?.id || '',
+    activeUtId:
+      activeUt?.id ||
+      dataset.uts
+        .filter((ut) => ut.semesterId === activeSemester?.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0))[0]?.id ||
+      '',
+  }
+}
+
 function getInitialUi(dataset) {
   const preferences = readPreferences()
   const firstClass = dataset.classes[0]
-  const activeClassId = preferences.activeClassId || firstClass?.id || ''
-  const firstSemester = dataset.semesters.find((semester) => semester.classId === activeClassId)
-  const activeSemesterId = preferences.activeSemesterId || firstSemester?.id || ''
-  const firstUt = dataset.uts.find((ut) => ut.semesterId === activeSemesterId)
+  const preferredClass = dataset.classes.find((classItem) => classItem.id === preferences.activeClassId)
+  const activeClassId = preferredClass?.id || firstClass?.id || ''
+  const timelineSelection = getClassTimelineSelection(dataset, activeClassId, preferences)
 
   return {
     activeClassId,
-    activeSemesterId,
-    activeUtId: preferences.activeUtId || firstUt?.id || '',
+    activeSemesterId: timelineSelection.activeSemesterId,
+    activeUtId: timelineSelection.activeUtId,
     activeMode: preferences.activeMode || 'evaluation',
     activeInsight: preferences.activeInsight || 'dashboard',
   }
@@ -184,7 +218,19 @@ function setUiWithPreferences(set, patch) {
   set((state) => {
     const nextUi = { ...state.ui, ...patch }
     const preferences = readPreferences()
-    writePreferences({ ...preferences, ...nextUi })
+    const nextPreferences = { ...preferences, ...nextUi }
+    if (nextUi.activeClassId) {
+      nextPreferences.lastUiByClass = {
+        ...(preferences.lastUiByClass || {}),
+        [nextUi.activeClassId]: {
+          activeInsight: nextUi.activeInsight,
+          activeMode: nextUi.activeMode,
+          activeSemesterId: nextUi.activeSemesterId,
+          activeUtId: nextUi.activeUtId,
+        },
+      }
+    }
+    writePreferences(nextPreferences)
     return { ui: nextUi }
   })
 }
@@ -340,7 +386,9 @@ function parseBackupDataset(backup) {
           collection === 'tutorialMarks' ||
           collection === 'tutorialRelations' ||
           collection === 'tutorialGroupSets' ||
-          collection === 'tutorialSociogramLayouts') &&
+          collection === 'tutorialSociogramLayouts' ||
+          collection === 'tutorialStudentRoles' ||
+          collection === 'tutorialSeatingPlans') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -788,16 +836,16 @@ export const useAvaluaproStore = create((set, get) => ({
     const timeline = activeClass?.subject ? ensureFixedCourseForClass(state, classId) : null
     const workingSemesters = timeline?.semesters || state.semesters
     const workingUts = timeline?.uts || state.uts
-    const semester = workingSemesters
-      .filter((item) => item.classId === classId)
-      .sort((a, b) => a.order - b.order)[0]
-    const ut = workingUts
-      .filter((item) => item.semesterId === semester?.id)
-      .sort((a, b) => a.order - b.order)[0]
+    const preferences = readPreferences()
+    const selection = getClassTimelineSelection(
+      { ...state, semesters: workingSemesters, uts: workingUts },
+      classId,
+      preferences,
+    )
     const ui = {
       activeClassId: classId,
-      activeSemesterId: semester?.id || '',
-      activeUtId: ut?.id || '',
+      activeSemesterId: selection.activeSemesterId,
+      activeUtId: selection.activeUtId,
       activeMode:
         state.ui.activeMode === 'tutoring' && !(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
           ? 'evaluation'
@@ -809,7 +857,7 @@ export const useAvaluaproStore = create((set, get) => ({
       uts: workingUts,
       ui: { ...current.ui, ...ui },
     }))
-    writePreferences({ ...readPreferences(), ...get().ui })
+    setUiWithPreferences(set, ui)
     if (activeClass?.subject) {
       await persistCollections(set, get, ['semesters', 'uts'])
     }
@@ -937,11 +985,20 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   setActiveSemester: (semesterId) => {
-    const ut = get().uts.find((item) => item.semesterId === semesterId)
+    const preferences = readPreferences()
+    const activeClassId = get().ui.activeClassId
+    const classMemory = preferences.lastUiByClass?.[activeClassId] || {}
+    const semesterUts = get()
+      .uts.filter((item) => item.semesterId === semesterId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+    const ut = semesterUts.find((item) => item.id === classMemory.activeUtId) || semesterUts[0]
     setUiWithPreferences(set, { activeSemesterId: semesterId, activeUtId: ut?.id || '' })
   },
 
-  setActiveUt: (activeUtId) => setUiWithPreferences(set, { activeUtId }),
+  setActiveUt: (activeUtId) => {
+    const ut = get().uts.find((item) => item.id === activeUtId)
+    setUiWithPreferences(set, { activeSemesterId: ut?.semesterId || get().ui.activeSemesterId, activeUtId })
+  },
   setActiveMode: (activeMode) => setUiWithPreferences(set, { activeMode }),
   setActiveInsight: (activeInsight) => setUiWithPreferences(set, { activeInsight }),
   setDefaultSubject: (defaultSubject) => setProfileWithPreferences(set, { defaultSubject }),
@@ -1243,6 +1300,10 @@ export const useAvaluaproStore = create((set, get) => ({
       ),
       tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId !== classId),
       tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
+      tutorialStudentRoles: (state.tutorialStudentRoles || []).filter(
+        (role) => role.classId !== classId && !studentIds.has(role.studentId),
+      ),
+      tutorialSeatingPlans: (state.tutorialSeatingPlans || []).filter((plan) => plan.classId !== classId),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
       ui,
     })
@@ -1538,6 +1599,59 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
     }))
     await persistCollections(set, get, ['tutorialSociogramLayouts'])
+  },
+
+  toggleTutorialStudentRole: async ({ classId, studentId, role }) => {
+    if (!classId || !studentId || !role) return
+
+    const now = new Date().toISOString()
+    set((state) => {
+      const existing = (state.tutorialStudentRoles || []).find(
+        (item) => item.classId === classId && item.studentId === studentId && item.role === role,
+      )
+
+      return {
+        tutorialStudentRoles: existing
+          ? (state.tutorialStudentRoles || []).filter((item) => item.id !== existing.id)
+          : [
+              {
+                id: createId('trole'),
+                classId,
+                createdAt: now,
+                role,
+                studentId,
+                updatedAt: now,
+              },
+              ...(state.tutorialStudentRoles || []),
+            ],
+      }
+    })
+    await persistCollections(set, get, ['tutorialStudentRoles'])
+  },
+
+  saveTutorialSeatingPlan: async ({ classId, layout, seats, title }) => {
+    if (!classId || !layout || !Array.isArray(seats)) return
+
+    const now = new Date().toISOString()
+    set((state) => {
+      const existing = (state.tutorialSeatingPlans || []).find((plan) => plan.classId === classId)
+      const nextPlan = {
+        id: existing?.id || createId('tseat'),
+        classId,
+        createdAt: existing?.createdAt || now,
+        layout,
+        seats,
+        title: String(title || '').trim() || 'Disposició recomanada',
+        updatedAt: now,
+      }
+
+      return {
+        tutorialSeatingPlans: existing
+          ? (state.tutorialSeatingPlans || []).map((plan) => (plan.id === existing.id ? nextPlan : plan))
+          : [nextPlan, ...(state.tutorialSeatingPlans || [])],
+      }
+    })
+    await persistCollections(set, get, ['tutorialSeatingPlans'])
   },
 
   addCompetency: async (utId) => {

@@ -1396,6 +1396,20 @@ button.tutorial-record-pill {
   box-shadow: 0 12px 28px rgba(30, 64, 175, 0.08);
 }
 
+.tutorial-sociogram-visual-card.fullscreen {
+  position: fixed;
+  inset: 18px;
+  z-index: 1200;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.38);
+}
+
+.tutorial-sociogram-visual-card.fullscreen .tutorial-sociogram-canvas {
+  min-height: 0;
+  height: 100%;
+}
+
 .tutorial-sociogram-visual-card > header {
   display: flex;
   align-items: flex-start;
@@ -1604,6 +1618,16 @@ button.tutorial-record-pill {
   border-color: #fecaca;
 }
 
+.tutorial-sociogram-node.is-star {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.tutorial-sociogram-node.is-conflict {
+  border-color: #fca5a5;
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.17);
+}
+
 .tutorial-sociogram-node.dimmed {
   opacity: 0.58;
 }
@@ -1656,6 +1680,148 @@ button.tutorial-record-pill {
   border-radius: 10px;
   padding: 16px;
   background: #faf5ff;
+}
+
+.tutorial-seating-planner-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff7ed;
+}
+
+.tutorial-seating-planner-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.tutorial-seating-planner-panel h2 {
+  margin: 6px 0;
+  color: #1f2937;
+  font-size: 22px;
+}
+
+.tutorial-seating-planner-panel p {
+  max-width: 780px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.tutorial-seating-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 8px;
+  min-width: min(680px, 100%);
+}
+
+.tutorial-seating-controls label {
+  display: grid;
+  gap: 5px;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-seating-controls select {
+  min-height: 38px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: white;
+  color: #1f2937;
+  font-weight: 900;
+}
+
+.tutorial-seating-controls .secondary-action,
+.tutorial-seating-controls .cooperative-toggle-control {
+  align-self: end;
+}
+
+.tutorial-seating-saved-note {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-weight: 900;
+}
+
+.tutorial-seating-board {
+  display: grid;
+  grid-template-columns: repeat(var(--tutorial-seating-columns, 3), minmax(0, 1fr));
+  gap: 16px;
+  overflow: auto;
+}
+
+.tutorial-seating-block {
+  display: grid;
+  gap: 10px;
+  min-width: 240px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.tutorial-seating-block > strong {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-seating-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.tutorial-seat-card {
+  min-height: 64px;
+  border: 1px solid #e7d8c4;
+  border-radius: 8px;
+  padding: 8px;
+  color: #1f2937;
+  background: #f5ecdc;
+  box-shadow: inset 0 -5px 0 rgba(168, 85, 247, 0.2);
+}
+
+.tutorial-seat-card:nth-child(even) {
+  box-shadow: inset 0 -5px 0 rgba(244, 114, 182, 0.18);
+}
+
+.tutorial-seat-card.star {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.tutorial-seat-card.conflict {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.tutorial-seat-card span {
+  display: block;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.tutorial-seat-card small {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.tutorial-seat-card .empty {
+  color: #94a3b8;
 }
 
 .cooperative-generator-panel > header {
@@ -1970,6 +2136,17 @@ button.tutorial-record-pill {
   text-transform: none;
 }
 
+.tutorial-relation-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(100px, 0.8fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.tutorial-relation-picker svg {
+  color: #64748b;
+}
+
 .tutorial-relation-form textarea {
   min-height: 88px;
   resize: vertical;
@@ -2027,14 +2204,25 @@ button.tutorial-record-pill {
 
 .tutorial-sociogram-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  align-items: center;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 10px;
   color: #334155;
   background: #f8fafc;
+  text-align: left;
+}
+
+.tutorial-sociogram-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
   text-align: left;
 }
 
@@ -2056,7 +2244,7 @@ button.tutorial-record-pill {
   font-weight: 850;
 }
 
-.tutorial-sociogram-row > span,
+.tutorial-sociogram-row-main > span,
 .tutorial-relation-pill span,
 .tutorial-relation-entry span {
   border-radius: 999px;
@@ -2068,14 +2256,54 @@ button.tutorial-record-pill {
   white-space: nowrap;
 }
 
-.tutorial-sociogram-row > span.green {
+.tutorial-sociogram-row-main > span.green {
   color: #166534;
   background: #dcfce7;
 }
 
-.tutorial-sociogram-row > span.red {
+.tutorial-sociogram-row-main > span.red {
   color: #991b1b;
   background: #fee2e2;
+}
+
+.tutorial-role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tutorial-role-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #64748b;
+  background: white;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.tutorial-role-actions button.active.star {
+  border-color: #facc15;
+  color: #854d0e;
+  background: #fef9c3;
+}
+
+.tutorial-role-actions button.active.conflict {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.tutorial-linked-ut {
+  display: block;
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 950;
 }
 
 .tutorial-relation-pill,
