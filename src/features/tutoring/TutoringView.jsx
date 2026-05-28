@@ -14,8 +14,7 @@ import {
   HeartHandshake,
   Layers3,
   LayoutGrid,
-  Maximize2,
-  Minimize2,
+  Lock,
   Network,
   Plus,
   RotateCcw,
@@ -255,7 +254,12 @@ function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContex
     const grade = calculateGrade(criterionGrades)
     if (grade) {
       const sourceUt = utsById.get(item.utId)
-      return { source: 'linked', utName: sourceUt?.name || 'UT anterior', value: grade }
+      return {
+        source: 'linked',
+        utName: sourceUt?.name || 'UT anterior',
+        utOrder: utOrderById.get(item.utId) ?? 0,
+        value: grade,
+      }
     }
   }
 
@@ -328,12 +332,13 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
   const subjectOptions = getAllTutorialSubjectOptions()
   const areaBuckets = new Map()
   const subjectBuckets = new Map()
+  const trajectoryBuckets = new Map()
   const studentProfiles = students.map((student) => {
     const evaluatedCompetencies = []
 
     subjectOptions.forEach((subjectOption) => {
       buildTutorialCompetencies(subjectOption.subject).forEach((competency) => {
-        const grade = getTutorialCompetencyGrade({
+        const gradeSource = getTutorialCompetencyGradeSource({
           classId,
           competency,
           evaluationContext,
@@ -341,6 +346,7 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
           subject: subjectOption.subject,
           tutorialMarks,
         })
+        const grade = gradeSource.value
         if (!grade) return
 
         const score = getNumericFromGrade(grade)
@@ -351,9 +357,20 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
           competencyName: competency.name,
           grade,
           score,
+          sourceLabel: gradeSource.utName || 'Dades manuals',
+          sourceOrder: Number.isFinite(gradeSource.utOrder) ? gradeSource.utOrder : 999,
           notDeveloped: isNotDeveloped(grade),
         }
         evaluatedCompetencies.push(row)
+
+        const trajectoryKey = row.sourceLabel
+        const trajectoryBucket = trajectoryBuckets.get(trajectoryKey) || {
+          label: row.sourceLabel,
+          order: row.sourceOrder,
+          scores: [],
+        }
+        trajectoryBucket.scores.push(score)
+        trajectoryBuckets.set(trajectoryKey, trajectoryBucket)
 
         const areaBucket = areaBuckets.get(subjectOption.areaId) || {
           id: subjectOption.areaId,
@@ -456,6 +473,15 @@ function summarizeTutorialData({ classId, evaluationContext, students, tutorialM
     riskProfiles,
     areaSummaries,
     subjectSummaries,
+    trajectory: [...trajectoryBuckets.values()]
+      .map((bucket) => ({
+        ...bucket,
+        averageScore: average(bucket.scores),
+        averageGrade: formatAverageGrade(average(bucket.scores)),
+      }))
+      .filter((bucket) => bucket.averageScore > 0)
+      .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'ca'))
+      .slice(-4),
     weakestArea: areaSummaries[0] || null,
     weakestSubject: subjectSummaries[0] || null,
   }
@@ -1088,6 +1114,7 @@ function isSeatAdjacent(seatA, seatB) {
 
 function buildTutorialSeatingPlan({
   layout,
+  lockedStudentIds = [],
   manualEmptySeatIds = [],
   manualSeatByStudentId = {},
   problemSeatsByStudentId = {},
@@ -1102,6 +1129,7 @@ function buildTutorialSeatingPlan({
   const activeSeatIds = new Set(cleanLayout.activeSeatIds)
   const manualEmptySeats = new Set(manualEmptySeatIds)
   const forcedUnseated = new Set(unseatedStudentIds)
+  const lockedStudents = new Set(lockedStudentIds)
   const seats = []
   Array.from({ length: cleanLayout.rows }).forEach((_, y) => {
     Array.from({ length: cleanLayout.columns }).forEach((__, x) => {
@@ -1142,6 +1170,7 @@ function buildTutorialSeatingPlan({
     placed.push({
       halfGroup: student.halfGroup,
       isConflict: student.isConflict,
+      isLocked: lockedStudents.has(student.student.id),
       isStar: student.isStar,
       seat,
       student,
@@ -1184,6 +1213,7 @@ function buildTutorialSeatingPlan({
       placed.push({
         halfGroup: student.halfGroup,
         isConflict: student.isConflict,
+        isLocked: lockedStudents.has(student.student.id),
         isStar: student.isStar,
         seat: bestSeat,
         student,
@@ -1235,6 +1265,7 @@ function buildTutorialSeatingPlan({
 
 function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
   const cleanLayout = normalizeSeatingLayout(plan?.layout)
+  const lockedStudents = new Set(plan?.layout?.lockedStudentIds || [])
   const activeSeatIds = new Set(cleanLayout.activeSeatIds)
   const seats = []
   Array.from({ length: cleanLayout.rows }).forEach((_, row) => {
@@ -1252,6 +1283,7 @@ function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
       return {
         halfGroup: profile.halfGroup,
         isConflict: profile.isConflict,
+        isLocked: Boolean(seat.isLocked || lockedStudents.has(profile.student.id)),
         isStar: profile.isStar,
         seat: {
           enabled: true,
@@ -1866,40 +1898,54 @@ function TutorialStatsCard({ icon: Icon, label, value, detail, tone = 'neutral',
 }
 
 function TutorialGroupGradeChart({ summary }) {
-  const chartGrades = ['A', 'B', 'C', 'D']
-  const counts = {
-    A: summary.globalGradeCounts?.A || 0,
-    B: summary.globalGradeCounts?.B || 0,
-    C: summary.globalGradeCounts?.C || 0,
-    D: (summary.globalGradeCounts?.D || 0) + (summary.globalGradeCounts?.NA || 0),
-  }
-  const total = chartGrades.reduce((sum, grade) => sum + counts[grade], 0)
-  const maxCount = Math.max(1, ...chartGrades.map((grade) => counts[grade]))
+  const points = summary.trajectory || []
+  const hasTrend = points.length > 0
+  const width = 520
+  const height = 250
+  const padding = { top: 24, right: 34, bottom: 54, left: 86 }
+  const plotWidth = width - padding.left - padding.right
+  const plotHeight = height - padding.top - padding.bottom
+  const getX = (index) => padding.left + (points.length <= 1 ? plotWidth : (index / (points.length - 1)) * plotWidth)
+  const getY = (score) => padding.top + ((4 - Math.min(4, Math.max(1, score))) / 3) * plotHeight
+  const linePoints = points.map((point, index) => `${getX(index)},${getY(point.averageScore)}`).join(' ')
+  const areaPoints = hasTrend ? `${padding.left},${getY(1)} ${linePoints} ${getX(points.length - 1)},${getY(1)}` : ''
 
   return (
-    <article className="tutorial-chart-card">
+    <article className="tutorial-chart-card tutorial-line-chart-card">
       <header>
         <div>
-          <span>Radiografia global</span>
+          <span>Trajectòria temporal</span>
           <strong>{summary.globalAverageGrade}</strong>
         </div>
-        <small>{total} competències avaluades</small>
+        <small>Mitjana global de totes les assignatures amb dades</small>
       </header>
-      <div className="tutorial-grade-bar-chart" aria-label="Distribució global de notes tutorials">
-        {chartGrades.map((grade) => (
-          <div className="tutorial-grade-bar-row" key={grade}>
-            <span className={gradeClassName(grade)}>{grade}</span>
-            <div>
-              <i className={`grade-${grade}`} style={{ width: `${Math.max(6, (counts[grade] / maxCount) * 100)}%` }} />
-            </div>
-            <b>{counts[grade]}</b>
-          </div>
-        ))}
-      </div>
-      <p>
-        Lectura agregada de totes les assignatures: només compta les competències amb nota i ignora les marcades com a
-        no avaluades.
-      </p>
+      {hasTrend ? (
+        <svg className="tutorial-line-chart" role="img" viewBox={`0 0 ${width} ${height}`}>
+          {[4, 3, 2, 1].map((score) => (
+            <g key={score}>
+              <line x1={padding.left} x2={width - padding.right} y1={getY(score)} y2={getY(score)} />
+              <text className="axis-number" x={padding.left - 52} y={getY(score) + 7}>
+                {score.toFixed(1).replace('.', ',')}
+              </text>
+              <text className={`axis-grade grade-${formatAverageGrade(score)}`} x={padding.left - 16} y={getY(score) + 7}>
+                {formatAverageGrade(score)}
+              </text>
+            </g>
+          ))}
+          <polygon className="line-area" points={areaPoints} />
+          <polyline className="line-stroke" points={linePoints} />
+          {points.map((point, index) => (
+            <g key={`${point.label}-${index}`}>
+              <circle cx={getX(index)} cy={getY(point.averageScore)} r="7" />
+              <text className="x-label" x={getX(index)} y={height - 18}>
+                {point.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      ) : (
+        <div className="empty-state compact">Encara no hi ha prou dades per veure una trajectòria del grup.</div>
+      )}
     </article>
   )
 }
@@ -2376,7 +2422,6 @@ export function TutoringView() {
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
   const [sociogramFilter, setSociogramFilter] = useState('all')
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
-  const [sociogramFullscreen, setSociogramFullscreen] = useState(false)
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
@@ -2385,6 +2430,7 @@ export function TutoringView() {
   const [seatingLayout, setSeatingLayout] = useState({ activeSeatIds: getDefaultSeatingActiveSeatIds(), columns: 9, rows: 5 })
   const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
   const [seatingManualEmptySeatIds, setSeatingManualEmptySeatIds] = useState([])
+  const [seatingLockedStudentIds, setSeatingLockedStudentIds] = useState([])
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
@@ -2700,6 +2746,7 @@ export function TutoringView() {
     () =>
       buildTutorialSeatingPlan({
         layout: seatingLayout,
+        lockedStudentIds: seatingLockedStudentIds,
         manualEmptySeatIds: seatingManualEmptySeatIds,
         manualSeatByStudentId: seatingManualSeatByStudentId,
         problemSeatsByStudentId: seatingProblemSeats,
@@ -2715,6 +2762,7 @@ export function TutoringView() {
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
       seatingLayout,
+      seatingLockedStudentIds,
       seatingManualEmptySeatIds,
       seatingManualSeatByStudentId,
       seatingProblemSeats,
@@ -2813,16 +2861,19 @@ export function TutoringView() {
   }
 
   const resetSeatingManualChanges = () => {
-    setSeatingManualSeatByStudentId({})
+    setSeatingManualSeatByStudentId((current) =>
+      Object.fromEntries(Object.entries(current).filter(([studentId]) => seatingLockedStudentIds.includes(studentId))),
+    )
     setSeatingManualEmptySeatIds([])
     setSeatingProblemSeats({})
-    setSeatingUnseatedStudentIds([])
+    setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
   }
 
   const toggleSeatingGridSeat = (seat, placement) => {
     if (selectedSeatingPlan) return
     setSelectedSeatingPlanId('')
     if (placement?.studentId) {
+      if (seatingLockedStudentIds.includes(placement.studentId)) return
       setSeatingUnseatedStudentIds((current) => [...new Set([...current, placement.studentId])])
       setSeatingManualEmptySeatIds((current) => [...new Set([...current, placement.seat.id])])
       setSeatingManualSeatByStudentId((current) => {
@@ -2843,6 +2894,22 @@ export function TutoringView() {
     setSeatingManualEmptySeatIds((current) => current.filter((seatId) => seatId !== seat.id))
   }
 
+  const toggleSeatingLockedStudent = (placement) => {
+    if (!placement?.studentId || !placement?.seat?.id) return
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId((current) => ({
+      ...current,
+      [placement.studentId]: placement.seat.id,
+    }))
+    setSeatingManualEmptySeatIds((current) => current.filter((seatId) => seatId !== placement.seat.id))
+    setSeatingUnseatedStudentIds((current) => current.filter((studentId) => studentId !== placement.studentId))
+    setSeatingLockedStudentIds((current) =>
+      current.includes(placement.studentId)
+        ? current.filter((studentId) => studentId !== placement.studentId)
+        : [...current, placement.studentId],
+    )
+  }
+
   const toggleSeatingProblemSeat = (placement) => {
     if (!placement?.studentId || !placement?.seat?.id) return
     setSelectedSeatingPlanId('')
@@ -2854,6 +2921,7 @@ export function TutoringView() {
 
   const handleSeatingDragStart = (event, placement) => {
     if (selectedSeatingPlan || !placement?.studentId) return
+    if (seatingLockedStudentIds.includes(placement.studentId)) return
     setDraggingSeatingStudentId(placement.studentId)
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', placement.studentId)
@@ -2871,6 +2939,10 @@ export function TutoringView() {
     if (selectedSeatingPlan || !targetSeat?.enabled) return
     const draggedStudentId = event.dataTransfer.getData('text/plain') || draggingSeatingStudentId
     if (!draggedStudentId) return
+    if (seatingLockedStudentIds.includes(draggedStudentId) || seatingLockedStudentIds.includes(targetPlacement?.studentId)) {
+      setDraggingSeatingStudentId('')
+      return
+    }
     const sourcePlacement = generatedSeatingPlan.placements.find((placement) => placement.studentId === draggedStudentId)
     if (targetPlacement?.studentId === draggedStudentId) return
 
@@ -2903,11 +2975,13 @@ export function TutoringView() {
       classId: activeClassId,
       layout: {
         ...generatedSeatingPlan.layout,
+        lockedStudentIds: seatingLockedStudentIds,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
       },
       seats: generatedSeatingPlan.placements.map((placement) => ({
         halfGroup: placement.halfGroup,
         isConflict: placement.isConflict,
+        isLocked: placement.isLocked,
         isStar: placement.isStar,
         studentId: placement.studentId,
         x: placement.seat.x,
@@ -3611,7 +3685,7 @@ export function TutoringView() {
           <section
             className={`tutorial-sociogram-visual-card relationship-tool-panel ${
               activeRelationshipTool === 'sociogram' ? 'active' : ''
-            } ${sociogramFullscreen ? 'fullscreen' : ''}`}
+            }`}
           >
             <header>
               <div>
@@ -3649,14 +3723,6 @@ export function TutoringView() {
                 >
                   <RotateCcw size={16} />
                   Restablir mapa
-                </button>
-                <button
-                  className="secondary-action compact"
-                  onClick={() => setSociogramFullscreen((current) => !current)}
-                  type="button"
-                >
-                  {sociogramFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                  {sociogramFullscreen ? 'Sortir' : 'Pantalla completa'}
                 </button>
               </div>
             </header>
@@ -3949,10 +4015,7 @@ export function TutoringView() {
                   Disposició d’aula
                 </span>
                 <h2>Proposta de llocs</h2>
-                <p>
-                  Defineix una matriu senzilla i Avaluapro distribueix els alumnes tenint en compte mig grup,
-                  incompatibilitats, alumnes estrella i perfils que necessiten suport.
-                </p>
+                <p>Matriu editable amb mig grup, relacions i llocs fixats.</p>
               </div>
               <div className="tutorial-seating-controls">
                 <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
@@ -3990,7 +4053,7 @@ export function TutoringView() {
               </div>
             </header>
 
-            <div className="tutorial-seating-matrix-help">
+            <div className="tutorial-seating-matrix-help compact">
               <article className="tutorial-seating-capacity">
                 <strong>Capacitat activa</strong>
                 <div>
@@ -4001,11 +4064,11 @@ export function TutoringView() {
               </article>
               <article>
                 <strong>Matriu 9 x 5</strong>
-                <p>Clica una cel·la buida per crear una taula. Clica una taula sense alumne per deixar-la com a espai.</p>
+                <p>Clica espais buits per crear o eliminar taules.</p>
               </article>
               <article>
                 <strong>Moure alumnes</strong>
-                <p>Arrossega un alumne a una altra taula per moure’l o intercanviar-lo amb qui hi seu.</p>
+                <p>Arrossega per intercanviar. El candau fixa el lloc.</p>
               </article>
             </div>
 
@@ -4067,6 +4130,7 @@ export function TutoringView() {
               {visibleSeatingPlan.seats.map((seat) => {
                 const placement = visibleSeatingPlan.placements.find((item) => item.seat.id === seat.id)
                 const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
+                const isLocked = Boolean(placement?.isLocked || seatingLockedStudentIds.includes(placement?.studentId))
                 return (
                   <div
                     className={`tutorial-seat-card ${seat.enabled ? 'active-table' : 'disabled'} ${
@@ -4074,9 +4138,11 @@ export function TutoringView() {
                     } ${placement?.isConflict ? 'conflict' : ''} ${
                       placement ? getHalfGroupClassName(placement.halfGroup) : ''
                     } ${seatingProblemSeats[placement?.studentId] === placement?.seat?.id ? 'problem' : ''} ${
+                      isLocked ? 'locked' : ''
+                    } ${
                       draggingSeatingStudentId ? 'drop-ready' : ''
                     }`}
-                    draggable={Boolean(placement && !selectedSeatingPlan)}
+                    draggable={Boolean(placement && !selectedSeatingPlan && !isLocked)}
                     key={seat.id}
                     onClick={() => toggleSeatingGridSeat(seat, placement)}
                     onDragEnd={() => setDraggingSeatingStudentId('')}
@@ -4089,7 +4155,9 @@ export function TutoringView() {
                     tabIndex={0}
                     title={
                       placement
-                        ? 'Clica per deixar aquesta taula buida. Arrossega per intercanviar lloc.'
+                        ? isLocked
+                          ? 'Aquest alumne està fixat en aquest lloc.'
+                          : 'Clica per deixar aquesta taula buida. Arrossega per intercanviar lloc.'
                         : seat.enabled
                           ? 'Clica per deixar aquest espai buit.'
                           : 'Clica per crear una taula.'
@@ -4120,16 +4188,29 @@ export function TutoringView() {
                           </small>
                         </div>
                         {!selectedSeatingPlan && (
-                          <button
-                            className="tutorial-seat-problem-button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              toggleSeatingProblemSeat(placement)
-                            }}
-                            type="button"
-                          >
-                            Revisar
-                          </button>
+                          <div className="tutorial-seat-actions">
+                            <button
+                              className={`tutorial-seat-lock-button ${isLocked ? 'active' : ''}`}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggleSeatingLockedStudent(placement)
+                              }}
+                              title={isLocked ? 'Desfixar aquest lloc' : 'Fixar aquest alumne en aquest lloc'}
+                              type="button"
+                            >
+                              <Lock size={13} />
+                            </button>
+                            <button
+                              className="tutorial-seat-problem-button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggleSeatingProblemSeat(placement)
+                              }}
+                              type="button"
+                            >
+                              Revisar
+                            </button>
+                          </div>
                         )}
                       </>
                     ) : (
@@ -4366,7 +4447,6 @@ export function TutoringView() {
               <button
                 onClick={() => {
                   setActiveRelationshipTool('sociogram')
-                  setSociogramFullscreen(true)
                 }}
                 type="button"
               >

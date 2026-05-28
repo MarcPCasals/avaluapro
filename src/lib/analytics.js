@@ -146,7 +146,7 @@ export function buildTrackingInterventions(students, taskRecords, tasks, behavio
 
 export function buildStudentProfiles(state, classId, utId) {
   const students = state.students.filter((student) => student.classId === classId)
-  const tasks = state.tasks.filter((task) => task.classId === classId && task.utId === utId)
+  const tasks = state.tasks.filter((task) => task.classId === classId && (!utId || task.utId === utId))
   const behaviorEvents = state.behaviorEvents.filter((event) => event.classId === classId)
 
   return students.map((student) => {

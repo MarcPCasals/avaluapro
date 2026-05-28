@@ -2296,6 +2296,7 @@ export function AnalyticsView() {
 
   const { activeClassId, activeUtId } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
+  const crossProfiles = buildStudentProfiles(state, activeClassId)
   const students = state.students
     .filter((student) => student.classId === activeClassId)
     .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
@@ -2314,23 +2315,24 @@ export function AnalyticsView() {
   const activeUtCompetencyRows = buildUtCompetencyRows(state, students, activeUtCompetencies)
   const activeUtCriterionRows = buildUtCriterionRows(state, students, activeUtCompetencies)
   const activeBehaviorEvents = state.behaviorEvents.filter((event) => event.classId === activeClassId)
+  const classTasks = state.tasks.filter((task) => task.classId === activeClassId)
   const trackingRows = buildTrackingRows(students, currentTasks, state.taskRecords, activeBehaviorEvents)
   const trackingInterventions = buildTrackingInterventions(students, state.taskRecords, currentTasks, activeBehaviorEvents)
-  const atRisk = profiles.filter((profile) => profile.riskScore >= 2)
-  const hardworkingLowAchievement = profiles.filter(
+  const atRisk = crossProfiles.filter((profile) => profile.riskScore >= 2)
+  const hardworkingLowAchievement = crossProfiles.filter(
     (profile) => hasHighConsistency(profile) && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
   )
-  const lowConsistencyGoodAchievement = profiles.filter(
+  const lowConsistencyGoodAchievement = crossProfiles.filter(
     (profile) => hasLowConsistency(profile) && profile.evaluation.score >= 3,
   )
-  const averageConsistency = getAverageConsistency(profiles)
+  const averageConsistency = getAverageConsistency(crossProfiles)
   const hasTrackingDataset = currentTasks.length > 0 && profiles.some((profile) => profile.tracking.hasTrackingData)
   const activeUtTracking = students.map((student) =>
     getStudentTrackingStats(student.id, state.taskRecords, currentTasks),
   )
   const lateTotal = activeUtTracking.reduce((sum, item) => sum + item.late, 0)
-  const redPointTotal = profiles.reduce((sum, profile) => sum + profile.redPointCount, 0)
-  const agendaCandidates = profiles.filter(
+  const redPointTotal = crossProfiles.reduce((sum, profile) => sum + profile.redPointCount, 0)
+  const agendaCandidates = crossProfiles.filter(
     (profile) => profile.redPointCount >= 3 || profile.redPointCount + profile.incidents >= 3,
   )
   const lowTrackingProfiles = profiles
@@ -2342,8 +2344,8 @@ export function AnalyticsView() {
   const incidentProfiles = profiles
     .filter((profile) => profile.incidents > 0)
     .sort((a, b) => b.incidents - a.incidents || a.student.name.localeCompare(b.student.name))
-  const priorityProfiles = sortProfilesByTeachingPriority(profiles)
-  const alphabeticalProfiles = [...profiles].sort((a, b) => a.student.name.localeCompare(b.student.name))
+  const priorityProfiles = sortProfilesByTeachingPriority(crossProfiles)
+  const alphabeticalProfiles = [...crossProfiles].sort((a, b) => a.student.name.localeCompare(b.student.name))
   const visibleProfiles = profileSortMode === 'alphabetical' ? alphabeticalProfiles : priorityProfiles
   const topPriority = priorityProfiles.find((profile) => getDecisionPriority(profile) <= 1)
   const topPriorityDecision = topPriority ? getGlobalDecision(topPriority) : null
@@ -2751,7 +2753,7 @@ export function AnalyticsView() {
             <tbody>
               {visibleProfiles.map((profile) => {
                 const decision = getGlobalDecision(profile)
-                const evidence = buildTrackingEvidence(profile, state, currentTasks, activeBehaviorEvents)
+                const evidence = buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents)
                 return (
                   <tr
                     className={`profile-analysis-row ${
