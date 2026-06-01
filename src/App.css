@@ -5744,7 +5744,7 @@ button.tutorial-record-pill {
   background: linear-gradient(135deg, #eff6ff, #ffffff 72%);
 }
 
-.global-action-card.invisible {
+.global-action-card.student-invisible {
   border-color: #fed7aa;
   background: linear-gradient(135deg, #fff7ed, #ffffff 72%);
 }
@@ -6069,7 +6069,7 @@ button.tutorial-record-pill {
   background: #eff6ff;
 }
 
-.insight-modal-intro.invisible {
+.insight-modal-intro.student-invisible {
   color: #9a3412;
   border-color: #fed7aa;
   background: #fff7ed;
@@ -7190,7 +7190,7 @@ button.tutorial-record-pill {
   background: #dbeafe;
 }
 
-.decision-pill.invisible {
+.decision-pill.student-invisible {
   color: #9a3412;
   background: #ffedd5;
 }
@@ -11443,7 +11443,7 @@ button.profile-followup-card:focus-visible {
   background: #f1f5f9;
 }
 
-.profile-analysis-row.invisible {
+.profile-analysis-row.student-invisible {
   border-left-color: #f97316;
   background: linear-gradient(90deg, rgba(249, 115, 22, 0.11), transparent 42%);
 }

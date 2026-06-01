@@ -709,6 +709,10 @@ function getGlobalDecision(profile) {
   }
 }
 
+function getToneClassName(tone) {
+  return tone === 'invisible' ? 'student-invisible' : tone
+}
+
 function getDecisionPriority(profile) {
   const decision = getGlobalDecision(profile)
   const toneOrder = {
@@ -1587,7 +1591,7 @@ function StudentInsightModal({ insight, onClose }) {
   return (
     <Modal onClose={onClose} size="lg" title={insight.title}>
       <div className="student-insight-modal">
-        <section className={`insight-modal-intro ${insight.kind}`}>
+        <section className={`insight-modal-intro ${getToneClassName(insight.kind)}`}>
           <Icon size={24} />
           <div>
             <strong>{insight.profiles.length} alumnes detectats</strong>
@@ -2464,7 +2468,7 @@ export function AnalyticsView() {
           <em className="stat-card-hint">Consultar</em>
         </button>
         <button
-          className="global-action-card invisible"
+          className="global-action-card student-invisible"
           onClick={() =>
             setSelectedInsight({
               kind: 'invisible',
@@ -2764,7 +2768,7 @@ export function AnalyticsView() {
                       decision.tone === 'danger' || decision.tone === 'warning'
                         ? 'risk'
                         : decision.tone === 'invisible'
-                          ? 'invisible'
+                          ? 'student-invisible'
                           : decision.tone === 'stable'
                             ? 'stable'
                             : 'monitor'
@@ -2817,7 +2821,7 @@ export function AnalyticsView() {
                       </button>
                     </td>
                     <td>
-                      <span className={`decision-pill ${decision.tone}`}>{decision.label}</span>
+                      <span className={`decision-pill ${getToneClassName(decision.tone)}`}>{decision.label}</span>
                     </td>
                     <td>
                       <span className="decision-text">{decision.text}</span>
