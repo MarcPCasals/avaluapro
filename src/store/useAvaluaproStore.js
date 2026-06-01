@@ -510,9 +510,12 @@ function ensureSubjectStructureForClass(state, classId, subjectName, classUts) {
   const nextCriteria = [...state.criteria]
 
   classUts.forEach((ut) => {
+    const disabledNames = new Set(ut.disabledCompetencyNames || [])
     const existingUtCompetencies = nextCompetencies.filter((competency) => competency.utId === ut.id)
     const existingNames = new Set(existingUtCompetencies.map((competency) => competency.name))
-    const missingStructure = subjectStructure.filter((competency) => !existingNames.has(competency.name))
+    const missingStructure = subjectStructure.filter(
+      (competency) => !existingNames.has(competency.name) && !disabledNames.has(competency.name),
+    )
     const created = createSubjectStructureForUts({
       classId,
       subjectName,
@@ -1697,6 +1700,89 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['competencies', 'criteria', 'indicators', 'marks'])
   },
 
+  setUtCompetencyActive: async (utId, competencyName, isActive) => {
+    const state = get()
+    const ut = state.uts.find((item) => item.id === utId)
+    if (!ut || !competencyName) return
+
+    const activeClass = state.classes.find((classItem) => classItem.id === ut.classId)
+    const subjectName = getSubjectOption(activeClass?.subject)?.name || activeClass?.subject
+    const subjectStructure = getSubjectStructure(subjectName)
+    const competencyTemplate = subjectStructure?.find((item) => item.name === competencyName)
+    if (!activeClass || !competencyTemplate) return
+
+    const existingCompetency = state.competencies.find(
+      (competency) => competency.utId === utId && competency.name === competencyName,
+    )
+    const disabledNames = new Set(ut.disabledCompetencyNames || [])
+
+    if (!isActive) {
+      disabledNames.add(competencyName)
+      const criterionIds = existingCompetency
+        ? state.criteria
+            .filter((criterion) => criterion.competencyId === existingCompetency.id)
+            .map((criterion) => criterion.id)
+        : []
+
+      set((current) => ({
+        uts: current.uts.map((item) =>
+          item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
+        ),
+        competencies: existingCompetency
+          ? current.competencies.filter((competency) => competency.id !== existingCompetency.id)
+          : current.competencies,
+        criteria: existingCompetency
+          ? current.criteria.filter((criterion) => criterion.competencyId !== existingCompetency.id)
+          : current.criteria,
+        marks: criterionIds.length > 0
+          ? current.marks.filter((mark) => !criterionIds.includes(mark.criterionId))
+          : current.marks,
+      }))
+      await persistCollections(set, get, ['uts', 'competencies', 'criteria', 'marks'])
+      return
+    }
+
+    disabledNames.delete(competencyName)
+    if (existingCompetency) {
+      set((current) => ({
+        uts: current.uts.map((item) =>
+          item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
+        ),
+      }))
+      await persistCollections(set, get, ['uts'])
+      return
+    }
+
+    const existingUtCompetencies = state.competencies.filter((competency) => competency.utId === utId)
+    const competencyId = createId('comp')
+    const templateOrder = subjectStructure.findIndex((item) => item.name === competencyName)
+    const newCompetency = {
+      id: competencyId,
+      classId: activeClass.id,
+      utId,
+      name: competencyTemplate.name,
+      color: competencyTemplate.color,
+      order: templateOrder >= 0 ? templateOrder + 1 : existingUtCompetencies.length + 1,
+      source: subjectName,
+    }
+    const newCriteria = competencyTemplate.criteria.map((criterionName, criterionIndex) => ({
+      id: createId('crit'),
+      competencyId,
+      name: criterionName,
+      order: criterionIndex + 1,
+      rubric: { A: '', B: '', C: '', D: '' },
+    }))
+
+    set((current) => ({
+      uts: current.uts.map((item) =>
+        item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
+      ),
+      competencies: [...current.competencies, newCompetency],
+      criteria: [...current.criteria, ...newCriteria],
+    }))
+    await persistCollections(set, get, ['uts', 'competencies', 'criteria'])
+  },
+
   addCriterion: async (competencyId) => {
     const existingCriteria = get().criteria.filter((criterion) => criterion.competencyId === competencyId)
     set((state) => ({
@@ -1775,6 +1861,8 @@ export const useAvaluaproStore = create((set, get) => ({
     const activeClass = get().classes.find((classItem) => classItem.id === get().ui.activeClassId)
     const subject = getSubjectOption(activeClass?.subject)
     if (!subject || !utId) return
+    const targetUt = get().uts.find((ut) => ut.id === utId)
+    const disabledNames = new Set(targetUt?.disabledCompetencyNames || [])
 
     const existingCompetencies = get().competencies.filter((competency) => competency.utId === utId)
     const existingCompetencyNames = new Set(existingCompetencies.map((competency) => competency.name))
@@ -1790,8 +1878,12 @@ export const useAvaluaproStore = create((set, get) => ({
     const competenciesToCreate = structure.filter(
       (competencyTemplate) =>
         (!requestedNames || requestedNames.has(competencyTemplate.name)) &&
+        (requestedNames || !disabledNames.has(competencyTemplate.name)) &&
         !existingCompetencyNames.has(competencyTemplate.name),
     )
+    if (requestedNames) {
+      requestedNames.forEach((name) => disabledNames.delete(name))
+    }
     const newCompetencies = []
     const newCriteria = []
 
@@ -1817,13 +1909,26 @@ export const useAvaluaproStore = create((set, get) => ({
       })
     })
 
-    if (newCompetencies.length === 0) return
+    if (newCompetencies.length === 0) {
+      if (requestedNames && targetUt) {
+        set((state) => ({
+          uts: state.uts.map((ut) =>
+            ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
+          ),
+        }))
+        await persistCollections(set, get, ['uts'])
+      }
+      return
+    }
 
     set((state) => ({
+      uts: state.uts.map((ut) =>
+        ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
+      ),
       competencies: [...state.competencies, ...newCompetencies],
       criteria: [...state.criteria, ...newCriteria],
     }))
-    await persistCollections(set, get, ['competencies', 'criteria'])
+    await persistCollections(set, get, ['uts', 'competencies', 'criteria'])
   },
 
   updateTaskRecord: async (studentId, taskId, status) => {

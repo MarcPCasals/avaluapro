@@ -23,7 +23,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
   const updateCriterion = useAvaluaproStore((store) => store.updateCriterion)
   const deleteCriterion = useAvaluaproStore((store) => store.deleteCriterion)
   const copyCompetenciesToUt = useAvaluaproStore((store) => store.copyCompetenciesToUt)
-  const applySubjectCfnToUt = useAvaluaproStore((store) => store.applySubjectCfnToUt)
+  const setUtCompetencyActive = useAvaluaproStore((store) => store.setUtCompetencyActive)
   const [selectedCompetencies, setSelectedCompetencies] = useState([])
   const [targetClassId, setTargetClassId] = useState(state.ui.activeClassId)
   const targetSemesters = state.semesters.filter((semester) => semester.classId === targetClassId)
@@ -74,13 +74,13 @@ export function EditStructureModal({ activeUtId, onClose }) {
 
   const handleSubjectCompetencyToggle = async (competencyName, isActive) => {
     const activeCompetency = activeCompetencyByName.get(competencyName)
-    if (isActive && activeCompetency) {
-      await deleteCompetency(activeCompetency.id)
-      setSelectedCompetencies((current) => current.filter((id) => id !== activeCompetency.id))
+    if (isActive) {
+      await setUtCompetencyActive(activeUtId, competencyName, false)
+      setSelectedCompetencies((current) => current.filter((id) => id !== activeCompetency?.id))
       return
     }
 
-    await applySubjectCfnToUt(activeUtId, [competencyName])
+    await setUtCompetencyActive(activeUtId, competencyName, true)
   }
 
   const handleCopy = async () => {

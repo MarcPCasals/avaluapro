@@ -4305,6 +4305,11 @@ button.tutorial-record-pill {
   font-weight: 950;
 }
 
+.mark-cell select:focus-visible {
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 2px #2563eb, 0 0 0 2px rgba(37, 99, 235, 0.16);
+}
+
 .grade {
   min-width: 42px;
   min-height: 34px;
@@ -9607,6 +9612,76 @@ button.profile-followup-card:focus-visible {
 
 .criterion-rubric-button:hover {
   color: #1d4ed8;
+}
+
+@media (max-width: 1180px) and (orientation: landscape) {
+  .evaluation-table {
+    min-width: 980px;
+  }
+
+  .header-student,
+  .student-cell {
+    width: 300px;
+    min-width: 300px;
+  }
+
+  .student-cell {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .student-index {
+    flex-basis: 22px;
+    font-size: 13px;
+  }
+
+  .student-note-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .student-name {
+    max-width: 205px;
+    font-size: 14px;
+  }
+
+  .header-student span {
+    gap: 8px;
+    font-size: 17px;
+  }
+
+  .note-signal {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+
+  .competency-header {
+    height: 48px;
+    padding: 8px 10px;
+    font-size: 18px;
+  }
+
+  .criterion-header,
+  .final-header {
+    height: 40px;
+    padding: 5px 6px;
+    font-size: 12px;
+  }
+
+  .criterion-direct,
+  .criterion-mark-cell {
+    min-width: 108px;
+  }
+
+  .mark-cell,
+  .aggregate-cell {
+    height: 42px;
+  }
+
+  .mark-cell select {
+    height: 38px;
+  }
 }
 
 .rubric-grid {

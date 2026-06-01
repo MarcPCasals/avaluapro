@@ -109,14 +109,27 @@ export function EvaluationView() {
   )
   const studentOrder = new Map(filteredStudents.map((student, index) => [student.id, index]))
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
+  const criterionOrder = new Map(flatCriteria.map((criterion, index) => [criterion.id, index]))
   const classSeatingCharts = seatingCharts.filter((chart) => chart.classId === activeClassId)
-  const getEvaluationTabIndex = (studentId, competencyIndex, criterionIndex) => {
+  const getEvaluationTabIndex = (studentId, criterionId) => {
     const studentIndex = studentOrder.get(studentId) ?? 0
-    const previousCompetencySlots = competencies
-      .slice(0, competencyIndex)
-      .reduce((total, competency) => total + competency.criteria.length * filteredStudents.length, 0)
+    const criterionIndex = criterionOrder.get(criterionId) ?? 0
 
-    return previousCompetencySlots + studentIndex * competencies[competencyIndex].criteria.length + criterionIndex + 1
+    return studentIndex * flatCriteria.length + criterionIndex + 1
+  }
+  const focusNextEvaluationSelect = (studentId, criterionId) => {
+    const studentIndex = studentOrder.get(studentId) ?? 0
+    const criterionIndex = criterionOrder.get(criterionId) ?? 0
+    const currentFlatIndex = studentIndex * flatCriteria.length + criterionIndex
+    const nextFlatIndex = currentFlatIndex + 1
+    const nextStudent = filteredStudents[Math.floor(nextFlatIndex / flatCriteria.length)]
+    const nextCriterion = flatCriteria[nextFlatIndex % flatCriteria.length]
+    if (!nextStudent || !nextCriterion) return
+
+    const nextSelect = document.querySelector(
+      `[data-evaluation-select="${nextStudent.id}_${nextCriterion.id}"]`,
+    )
+    nextSelect?.focus()
   }
 
   useEffect(() => {
@@ -309,15 +322,21 @@ export function EvaluationView() {
                     <small>{student.halfGroup}</small>
                   </button>
                 </td>
-                {competencies.flatMap((competency, competencyIndex) => [
-                  ...competency.criteria.map((criterion, criterionIndex) => {
+                {competencies.flatMap((competency) => [
+                  ...competency.criteria.map((criterion) => {
                     const value = getCriterionMark(marks, student.id, criterion.id)
                     return (
                       <td className="mark-cell criterion-mark-cell" key={`${student.id}_${criterion.id}`}>
                         <select
                           className={gradeTextClassName(value)}
+                          data-evaluation-select={`${student.id}_${criterion.id}`}
                           onChange={(event) => updateMark(student.id, criterion.id, event.target.value)}
-                          tabIndex={getEvaluationTabIndex(student.id, competencyIndex, criterionIndex)}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Tab' || event.shiftKey) return
+                            event.preventDefault()
+                            focusNextEvaluationSelect(student.id, criterion.id)
+                          }}
+                          tabIndex={getEvaluationTabIndex(student.id, criterion.id)}
                           value={value}
                         >
                           {GRADE_OPTIONS.map((option) => (

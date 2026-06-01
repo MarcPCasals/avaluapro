@@ -40,16 +40,22 @@ function removeLeadingStudentNameIfPresent(row, criteriaCount) {
   return first.invalid ? row.slice(1) : row
 }
 
-function buildMatrixFromClipboard(rawText, students, criteria) {
-  const matrix = createEmptyMatrix(students, criteria)
+function buildMatrixFromClipboard(rawText, students, criteria, baseMatrix, startRow = 0, startColumn = 0) {
+  const matrix = baseMatrix.map((row) => row.map((cell) => ({ ...cell })))
   const rawRows = splitClipboardRows(rawText)
   const rows = rawRows[0] && rowLooksLikeHeader(rawRows[0]) ? rawRows.slice(1) : rawRows
 
   rows.slice(0, students.length).forEach((row, rowIndex) => {
-    const gradeCells = removeLeadingStudentNameIfPresent(row, criteria.length)
+    const targetRowIndex = startRow + rowIndex
+    if (!students[targetRowIndex]) return
+
+    const gradeCells = startColumn === 0 ? removeLeadingStudentNameIfPresent(row, criteria.length) : row
     gradeCells.slice(0, criteria.length).forEach((cell, columnIndex) => {
+      const targetColumnIndex = startColumn + columnIndex
+      if (!criteria[targetColumnIndex]) return
+
       const normalized = normalizeGrade(cell)
-      matrix[rowIndex][columnIndex] = {
+      matrix[targetRowIndex][targetColumnIndex] = {
         ...normalized,
         raw: String(cell || '').trim(),
         touched: Boolean(String(cell || '').trim()),
@@ -57,7 +63,7 @@ function buildMatrixFromClipboard(rawText, students, criteria) {
     })
   })
 
-  return { matrix, ignoredRows: Math.max(0, rows.length - students.length) }
+  return { matrix, ignoredRows: Math.max(0, startRow + rows.length - students.length) }
 }
 
 function countMatrixValues(matrix) {
@@ -85,14 +91,15 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
             criterionId: criterion.id,
             value: matrix[rowIndex]?.[columnIndex]?.value || '',
             touched: matrix[rowIndex]?.[columnIndex]?.touched,
+            invalid: matrix[rowIndex]?.[columnIndex]?.invalid,
           }))
-          .filter((update) => update.touched && update.value),
+          .filter((update) => update.touched && !update.invalid),
       ),
     [criteria, matrix, students],
   )
 
-  const applyClipboardText = (text) => {
-    setImportState(buildMatrixFromClipboard(text, students, criteria))
+  const applyClipboardText = (text, startRow = 0, startColumn = 0) => {
+    setImportState((current) => buildMatrixFromClipboard(text, students, criteria, current.matrix, startRow, startColumn))
   }
 
   const updateCell = (rowIndex, columnIndex, value) => {
@@ -108,12 +115,12 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
     })
   }
 
-  const handleCellPaste = (event) => {
+  const handleCellPaste = (event, rowIndex, columnIndex) => {
     const text = event.clipboardData.getData('text/plain')
     if (!text.includes('\t') && !text.includes('\n')) return
 
     event.preventDefault()
-    applyClipboardText(text)
+    applyClipboardText(text, rowIndex, columnIndex)
   }
 
   const copyTemplate = async () => {
@@ -135,8 +142,8 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
           <div>
             <strong>Com importar notes ràpidament?</strong>
             <p>
-              Selecciona les cel·les amb notes al teu Excel i copia-les. Fes clic a la primera cel·la blanca d’aquesta
-              taula i prem Ctrl + V.
+              Selecciona les cel·les amb notes al teu Excel i copia-les. Fes clic a la cel·la d’inici d’aquesta taula
+              i prem Ctrl + V. Pots escriure A/B/C/D/NA o “-” per deixar una cel·la sense nota.
             </p>
           </div>
         </section>
@@ -183,7 +190,7 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
                           autoFocus={rowIndex === 0 && columnIndex === 0}
                           className={cell.invalid ? 'invalid' : gradeTextClassName(cell.value)}
                           onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)}
-                          onPaste={rowIndex === 0 && columnIndex === 0 ? handleCellPaste : undefined}
+                          onPaste={(event) => handleCellPaste(event, rowIndex, columnIndex)}
                           placeholder="-"
                           value={cell.raw || cell.value}
                         />
