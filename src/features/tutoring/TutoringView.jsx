@@ -2532,6 +2532,7 @@ export function TutoringView() {
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
+  const [seatingAppliedProblemSeats, setSeatingAppliedProblemSeats] = useState({})
   const [seatingUnseatedStudentIds, setSeatingUnseatedStudentIds] = useState([])
   const [seatingPlanName, setSeatingPlanName] = useState('')
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
@@ -2870,7 +2871,7 @@ export function TutoringView() {
         lockedStudentIds: seatingLockedStudentIds,
         manualEmptySeatIds: seatingManualEmptySeatIds,
         manualSeatByStudentId: seatingManualSeatByStudentId,
-        problemSeatsByStudentId: seatingProblemSeats,
+        problemSeatsByStudentId: seatingAppliedProblemSeats,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
@@ -2883,10 +2884,10 @@ export function TutoringView() {
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
       seatingLayout,
+      seatingAppliedProblemSeats,
       seatingLockedStudentIds,
       seatingManualEmptySeatIds,
       seatingManualSeatByStudentId,
-      seatingProblemSeats,
       seatingPrioritizeHalfGroups,
       seatingUnseatedStudentIds,
       seatingVariant,
@@ -2904,9 +2905,7 @@ export function TutoringView() {
         (relation) => String(relation.updatedAt || relation.createdAt || '') > String(classTutorialSeatingPlan.updatedAt || ''),
       ),
   )
-  const seatingReviewRows = visibleSeatingPlan.placements.filter(
-    (placement) => seatingProblemSeats[placement.studentId] === placement.seat.id,
-  )
+  const seatingReviewRows = visibleSeatingPlan.placements.filter((placement) => seatingProblemSeats[placement.studentId])
   const filteredTutorialProfiles = useMemo(
     () =>
       tutorialSummary.studentProfiles
@@ -2998,14 +2997,31 @@ export function TutoringView() {
     )
     setSeatingManualEmptySeatIds([])
     setSeatingProblemSeats({})
+    setSeatingAppliedProblemSeats({})
     setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
   }
 
   const handleGenerateSeatingVariant = () => {
     setSelectedSeatingPlanId('')
-    setSeatingManualSeatByStudentId((current) =>
-      Object.fromEntries(Object.entries(current).filter(([studentId]) => seatingLockedStudentIds.includes(studentId))),
+    const reviewSeatEntries = Object.entries(seatingProblemSeats).filter(([, seatId]) => Boolean(seatId))
+    const reviewedStudentIds = new Set(reviewSeatEntries.map(([studentId]) => studentId))
+    const lockedAssignments = Object.fromEntries(
+      Object.entries(seatingManualSeatByStudentId).filter(([studentId]) => seatingLockedStudentIds.includes(studentId)),
     )
+
+    setSeatingAppliedProblemSeats(Object.fromEntries(reviewSeatEntries))
+    setSeatingManualSeatByStudentId(() => {
+      if (reviewedStudentIds.size === 0) return lockedAssignments
+
+      const stableAssignments = {}
+      generatedSeatingPlan.placements.forEach((placement) => {
+        if (!placement?.studentId || !placement?.seat?.id) return
+        if (reviewedStudentIds.has(placement.studentId)) return
+        stableAssignments[placement.studentId] = placement.seat.id
+      })
+
+      return { ...stableAssignments, ...lockedAssignments }
+    })
     setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
     setSeatingVariant((current) => current + 1)
   }
@@ -3054,10 +3070,23 @@ export function TutoringView() {
   const toggleSeatingProblemSeat = (placement) => {
     if (!placement?.studentId || !placement?.seat?.id) return
     setSelectedSeatingPlanId('')
-    setSeatingProblemSeats((current) => ({
-      ...current,
-      [placement.studentId]: current[placement.studentId] === placement.seat.id ? undefined : placement.seat.id,
-    }))
+    const wasMarked = Boolean(seatingProblemSeats[placement.studentId])
+    setSeatingProblemSeats((current) => {
+      const next = { ...current }
+      if (next[placement.studentId]) {
+        delete next[placement.studentId]
+      } else {
+        next[placement.studentId] = placement.seat.id
+      }
+      return next
+    })
+    if (wasMarked) {
+      setSeatingAppliedProblemSeats((current) => {
+        const next = { ...current }
+        delete next[placement.studentId]
+        return next
+      })
+    }
   }
 
   const handleSeatingDragStart = (event, placement) => {
@@ -4263,7 +4292,7 @@ export function TutoringView() {
                   type="button"
                 >
                   <Shuffle size={16} />
-                  Canviar proposta
+                  Generar proposta
                 </button>
                 <label className="wide">
                   Nom versió
@@ -4335,7 +4364,7 @@ export function TutoringView() {
               <div className="tutorial-seating-review-summary">
                 <strong>{seatingReviewRows.length} alumne/s marcats per revisar</strong>
                 <p>
-                  En clicar “Canviar proposta”, el programa intentarà recol·locar sobretot aquests alumnes,
+                  En clicar “Generar proposta”, el programa intentarà recol·locar sobretot aquests alumnes,
                   respectant els llocs bloquejats i els criteris de relacions, mig grup i ajuda acadèmica.
                 </p>
                 <div>
@@ -4396,7 +4425,7 @@ export function TutoringView() {
                       placement?.isStar ? 'star' : ''
                     } ${placement?.isConflict ? 'conflict' : ''} ${
                       placement ? getHalfGroupClassName(placement.halfGroup) : ''
-                    } ${seatingProblemSeats[placement?.studentId] === placement?.seat?.id ? 'problem' : ''} ${
+                    } ${seatingProblemSeats[placement?.studentId] ? 'problem' : ''} ${
                       isLocked ? 'locked' : ''
                     } ${
                       draggingSeatingStudentId ? 'drop-ready' : ''
@@ -4441,7 +4470,7 @@ export function TutoringView() {
                           </strong>
                           <small>
                             {placement.halfGroup}
-                            {seatingProblemSeats[placement.studentId] === placement.seat.id
+                            {seatingProblemSeats[placement.studentId]
                               ? ' · revisar lloc'
                               : ''}
                           </small>

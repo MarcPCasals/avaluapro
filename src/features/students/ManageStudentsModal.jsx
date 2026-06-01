@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, Plus, Trash2, UserRoundPlus, Users } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle2, Download, Plus, Trash2, UserRoundPlus, Users, X } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function normalizeName(name) {
@@ -168,6 +169,17 @@ export function ManageStudentsModal({ classId, onClose }) {
 
     await Promise.all(selectedStudentIds.map((studentId) => deleteStudent(studentId)))
     setSelectedStudentIds([])
+  }
+
+  const handlePhotoUpload = async (studentId, file) => {
+    if (!file) return
+
+    try {
+      const photoUrl = await imageFileToCompressedDataUrl(file, { maxSize: 480 })
+      await updateStudent(studentId, { photoUrl })
+    } catch (error) {
+      window.alert(error.message || 'No s’ha pogut carregar aquesta foto.')
+    }
   }
 
   const exportStudents = () => {
@@ -348,6 +360,30 @@ export function ManageStudentsModal({ classId, onClose }) {
                     type="checkbox"
                   />
                 </label>
+                <div className="student-photo-editor">
+                  {student.photoUrl ? (
+                    <img alt="" src={student.photoUrl} />
+                  ) : (
+                    <Camera size={18} />
+                  )}
+                  <label title="Carregar foto">
+                    Foto
+                    <input
+                      accept="image/*"
+                      onChange={(event) => handlePhotoUpload(student.id, event.target.files?.[0])}
+                      type="file"
+                    />
+                  </label>
+                  {student.photoUrl && (
+                    <button
+                      aria-label={`Treure foto de ${student.name}`}
+                      onClick={() => updateStudent(student.id, { photoUrl: '' })}
+                      type="button"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
                 <input
                   aria-label={`Nom de ${student.name}`}
                   onBlur={(event) => updateStudent(student.id, { name: formatStudentNameForDisplay(event.target.value) })}

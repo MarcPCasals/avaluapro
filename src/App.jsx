@@ -13,7 +13,7 @@ import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
 
 function DemoBanner() {
-  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+  const openGuide = useAvaluaproStore((state) => state.openGuide)
   const startOwnData = useAvaluaproStore((state) => state.startOwnData)
 
   return (
@@ -32,7 +32,7 @@ function DemoBanner() {
         </div>
       </div>
       <div className="demo-banner-actions">
-        <button className="secondary-action compact" onClick={() => setGuideOpen(true)} type="button">
+        <button className="secondary-action compact" onClick={() => openGuide('demo')} type="button">
           <PlayCircle size={16} />
           Veure guia
         </button>

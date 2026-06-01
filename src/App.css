@@ -548,7 +548,6 @@
 
 .mode-tab,
 .insight-tab,
-.guide-tab,
 .semester-tab,
 .ut-tab,
 .tool-button {
@@ -591,18 +590,6 @@
   color: #047857;
   border-color: #a7f3d0;
   background: #ecfdf5;
-}
-
-.guide-tab {
-  color: #7c2d12;
-  border-color: #fed7aa;
-  background: #fff7ed;
-}
-
-.guide-tab:hover {
-  color: #ea580c;
-  border-color: #fdba74;
-  background: #ffedd5;
 }
 
 .urgent-tab {
@@ -6842,13 +6829,31 @@ button.tutorial-record-pill {
 .tracking-behavior-row,
 .tracking-agenda-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, max-content);
   gap: 12px;
   align-items: center;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 12px;
   background: #f8fafc;
+}
+
+.tracking-task-card > div,
+.tracking-ranking-row > div,
+.tracking-behavior-row > div,
+.tracking-agenda-row > div {
+  min-width: 0;
+}
+
+.tracking-task-card strong,
+.tracking-ranking-row strong,
+.tracking-behavior-row strong,
+.tracking-agenda-row strong {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tracking-ranking-row.priority {
@@ -6898,6 +6903,7 @@ button.tutorial-record-pill {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
 }
 
 .tracking-ranking-metrics b,
@@ -6909,6 +6915,7 @@ button.tutorial-record-pill {
   padding: 4px 8px;
   font-size: 12px;
   font-weight: 950;
+  white-space: nowrap;
 }
 
 .tracking-ranking-metrics b {
@@ -6917,8 +6924,11 @@ button.tutorial-record-pill {
 }
 
 .tracking-ranking-metrics small {
+  max-width: 150px;
+  overflow: hidden;
   color: #475569;
   background: white;
+  text-overflow: ellipsis;
 }
 
 .tracking-ranking-metrics small.danger {
@@ -8858,7 +8868,7 @@ button.profile-followup-card:focus-visible {
 
 .student-editor-row {
   display: grid;
-  grid-template-columns: 28px minmax(230px, 1fr) minmax(132px, 0.34fr) 38px;
+  grid-template-columns: 28px minmax(96px, 0.28fr) minmax(230px, 1fr) minmax(132px, 0.34fr) 38px;
   gap: 8px;
   align-items: center;
   border: 1px solid #eef2f7;
@@ -8873,6 +8883,59 @@ button.profile-followup-card:focus-visible {
 
 .student-editor-row .copy-check {
   justify-content: center;
+}
+
+.student-photo-editor {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 28px;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px;
+  background: white;
+}
+
+.student-photo-editor > img,
+.student-photo-editor > svg {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.student-photo-editor > svg {
+  padding: 7px;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.student-photo-editor label,
+.student-photo-editor button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.student-photo-editor label {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.student-photo-editor input {
+  display: none;
+}
+
+.student-photo-editor button {
+  color: #b91c1c;
+  background: #fee2e2;
 }
 
 .danger-soft.mini {
@@ -10355,6 +10418,7 @@ button.profile-followup-card:focus-visible {
     grid-template-columns: 28px 1fr 44px;
   }
 
+  .student-photo-editor,
   .student-editor-row input:not(:first-of-type),
   .student-editor-row select {
     grid-column: 1 / -1;
@@ -11011,6 +11075,49 @@ button.profile-followup-card:focus-visible {
   line-height: 1.45;
 }
 
+.help-guide-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.help-guide-picker button {
+  min-height: 118px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  justify-items: start;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 14px;
+  color: #1f2937;
+  background: #fff7ed;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.help-guide-picker button:hover {
+  border-color: #fb923c;
+  background: #ffedd5;
+}
+
+.help-guide-picker svg {
+  color: #ea580c;
+}
+
+.help-guide-picker strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.help-guide-picker span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .help-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -11405,6 +11512,7 @@ button.profile-followup-card:focus-visible {
   .backup-diagnosis-grid,
   .collection-summary > div,
   .global-action-strip,
+  .help-guide-picker,
   .help-grid,
   .help-reference > div,
   .security-status-grid,
@@ -11880,7 +11988,6 @@ button.profile-followup-card:focus-visible {
 
   .mode-tab,
   .insight-tab,
-  .guide-tab,
   .urgent-tab,
   .semester-tab,
   .ut-tab,

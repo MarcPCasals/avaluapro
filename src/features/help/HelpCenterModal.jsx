@@ -69,16 +69,37 @@ const helpSections = [
   },
 ]
 
-export function HelpCenterModal({ onClose, onOpenGuide }) {
-  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+const guideLaunchers = [
+  {
+    icon: PlayCircle,
+    id: 'demo',
+    title: 'Guia inicial demo',
+    text: 'Repassa el programa amb dades fictícies riques abans de començar amb dades reals.',
+  },
+  {
+    icon: Users,
+    id: 'own',
+    title: 'Guia amb dades pròpies',
+    text: 'Configuració inicial, gestió d’alumnes, mitjos grups, importació i seguiment real.',
+  },
+  {
+    icon: GraduationCap,
+    id: 'tutoring',
+    title: 'Guia de tutoria',
+    text: 'Mode tutoria, avaluació tutorial, seguiment, relacions, grups i perfil de reunió.',
+  },
+]
 
-  const openGuidedTour = () => {
+export function HelpCenterModal({ onClose, onOpenGuide }) {
+  const openGuide = useAvaluaproStore((state) => state.openGuide)
+
+  const openGuidedTour = (guideMode = 'demo') => {
     if (onOpenGuide) {
-      onOpenGuide()
+      onOpenGuide(guideMode)
       return
     }
     onClose()
-    window.setTimeout(() => setGuideOpen(true), 120)
+    window.setTimeout(() => openGuide(guideMode), 120)
   }
 
   return (
@@ -96,11 +117,24 @@ export function HelpCenterModal({ onClose, onOpenGuide }) {
               interactiva funciona com un manual: et fa passar per avaluació, seguiment, estadístiques
               i còpies de seguretat abans de començar amb dades pròpies.
             </p>
-            <button className="primary-action compact" onClick={openGuidedTour} type="button">
+            <button className="primary-action compact" onClick={() => openGuidedTour('demo')} type="button">
               <PlayCircle size={16} />
               Obrir guia interactiva
             </button>
           </div>
+        </section>
+
+        <section className="help-guide-picker">
+          {guideLaunchers.map((item) => {
+            const Icon = item.icon
+            return (
+              <button key={item.id} onClick={() => openGuidedTour(item.id)} type="button">
+                <Icon size={20} />
+                <strong>{item.title}</strong>
+                <span>{item.text}</span>
+              </button>
+            )
+          })}
         </section>
 
         <section className="help-grid">

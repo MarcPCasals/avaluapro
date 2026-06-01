@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, GraduationCap, HelpCircle, TableProperties } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles } from '../lib/analytics'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
@@ -91,25 +91,14 @@ export function MainNavigation() {
   const { activeClassId, activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
-  const openGuide = useAvaluaproStore((state) => state.openGuide)
   const onboarding = useAvaluaproStore((state) => state.onboarding)
   const activeClass = useAvaluaproStore((state) => state.classes.find((classItem) => classItem.id === activeClassId))
   const urgentProfiles = useMemo(() => getUrgentProfiles(state), [state])
   const hasTutoringMode = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
-  const currentGuideMode = hasTutoringMode && activeMode === 'tutoring'
-    ? 'tutoring'
-    : onboarding.demoMode
-      ? 'demo'
-      : 'own'
-
-  const handleOpenGuide = () => {
-    openGuide(currentGuideMode)
-  }
-
   const handleOpenTutoring = () => {
     setActiveMode('tutoring')
     if (!onboarding.tutoringGuideSeen) {
-      openGuide('tutoring')
+      useAvaluaproStore.getState().openGuide('tutoring')
     }
   }
 
@@ -160,10 +149,6 @@ export function MainNavigation() {
             Mode tutoria
           </button>
         )}
-        <button className="guide-tab" data-tour="guide-button" onClick={handleOpenGuide} type="button">
-          <HelpCircle size={18} />
-          Guia
-        </button>
         <button
           className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
           data-tour="urgent-button"

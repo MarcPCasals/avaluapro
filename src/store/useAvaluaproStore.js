@@ -63,13 +63,17 @@ function getClassTimelineSelection(dataset, classId, preferences = {}) {
       )
     })
   const classMemory = preferences.lastUiByClass?.[classId] || {}
-  const requestedUtId = classMemory.activeUtId || preferences.activeUtId
-  const activeUt = classUts.find((ut) => ut.id === requestedUtId) || classUts[0]
-  const requestedSemesterId = classMemory.activeSemesterId || preferences.activeSemesterId
+  const lastPosition = preferences.lastPosition?.activeClassId === classId ? preferences.lastPosition : {}
+  const requestedSemesterId =
+    lastPosition.activeSemesterId || classMemory.activeSemesterId || preferences.activeSemesterId
   const activeSemester =
-    classSemesters.find((semester) => semester.id === activeUt?.semesterId) ||
     classSemesters.find((semester) => semester.id === requestedSemesterId) ||
     classSemesters[0]
+  const requestedUtId = lastPosition.activeUtId || classMemory.activeUtId || preferences.activeUtId
+  const activeUt =
+    classUts.find((ut) => ut.id === requestedUtId && (!activeSemester?.id || ut.semesterId === activeSemester.id)) ||
+    classUts.find((ut) => ut.semesterId === activeSemester?.id) ||
+    classUts[0]
 
   return {
     activeSemesterId: activeSemester?.id || '',
@@ -85,7 +89,10 @@ function getClassTimelineSelection(dataset, classId, preferences = {}) {
 function getInitialUi(dataset) {
   const preferences = readPreferences()
   const firstClass = dataset.classes[0]
-  const preferredClass = dataset.classes.find((classItem) => classItem.id === preferences.activeClassId)
+  const preferredClass = dataset.classes.find(
+    (classItem) =>
+      classItem.id === preferences.lastPosition?.activeClassId || classItem.id === preferences.activeClassId,
+  )
   const activeClassId = preferredClass?.id || firstClass?.id || ''
   const timelineSelection = getClassTimelineSelection(dataset, activeClassId, preferences)
 
@@ -219,7 +226,18 @@ function setUiWithPreferences(set, patch) {
   set((state) => {
     const nextUi = { ...state.ui, ...patch }
     const preferences = readPreferences()
-    const nextPreferences = { ...preferences, ...nextUi }
+    const nextPreferences = {
+      ...preferences,
+      ...nextUi,
+      lastPosition: {
+        activeClassId: nextUi.activeClassId,
+        activeInsight: nextUi.activeInsight,
+        activeMode: nextUi.activeMode,
+        activeSemesterId: nextUi.activeSemesterId,
+        activeUtId: nextUi.activeUtId,
+        savedAt: new Date().toISOString(),
+      },
+    }
     if (nextUi.activeClassId) {
       nextPreferences.lastUiByClass = {
         ...(preferences.lastUiByClass || {}),

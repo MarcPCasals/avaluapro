@@ -132,7 +132,7 @@ export function TopBar() {
   const activeClassId = state.ui.activeClassId
   const activeUtId = state.ui.activeUtId
   const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
-  const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+  const openGuide = useAvaluaproStore((state) => state.openGuide)
   const reorderClassToIndex = useAvaluaproStore((state) => state.reorderClassToIndex)
   const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
   const createBackup = useAvaluaproStore((state) => state.createBackup)
@@ -339,7 +339,13 @@ export function TopBar() {
         >
           <Settings size={22} />
         </button>
-        <button className="icon-button" onClick={() => setShowHelp(true)} title="Ajuda i primera configuració" type="button">
+        <button
+          className="icon-button"
+          data-tour="guide-button"
+          onClick={() => setShowHelp(true)}
+          title="Ajuda i primera configuració"
+          type="button"
+        >
           <HelpCircle size={22} />
         </button>
         <span className="top-divider" />
@@ -514,9 +520,9 @@ export function TopBar() {
       {showHelp && (
         <HelpCenterModal
           onClose={() => setShowHelp(false)}
-          onOpenGuide={() => {
+          onOpenGuide={(guideMode) => {
             setShowHelp(false)
-            window.setTimeout(() => setGuideOpen(true), 120)
+            window.setTimeout(() => openGuide(guideMode), 120)
           }}
         />
       )}
