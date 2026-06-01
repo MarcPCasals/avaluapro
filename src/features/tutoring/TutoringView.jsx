@@ -328,8 +328,19 @@ function formatAverageGrade(score) {
   return getGradeFromAverageScore(score) || '-'
 }
 
-function summarizeTutorialData({ classId, evaluationContext, students, tutorialMarks }) {
-  const subjectOptions = getAllTutorialSubjectOptions()
+function summarizeTutorialData({
+  areaFilter = 'all',
+  classId,
+  evaluationContext,
+  students,
+  subjectFilter = 'all',
+  tutorialMarks,
+}) {
+  const subjectOptions = getAllTutorialSubjectOptions().filter(
+    (option) =>
+      (areaFilter === 'all' || option.areaId === areaFilter) &&
+      (subjectFilter === 'all' || option.subject === subjectFilter),
+  )
   const areaBuckets = new Map()
   const subjectBuckets = new Map()
   const trajectoryBuckets = new Map()
@@ -1011,6 +1022,28 @@ function enrichCooperativeGroups(groups, relations) {
       supportiveRelations,
     }
   })
+}
+
+function moveCooperativeMemberToGroup(groups, studentId, targetGroupId, relations) {
+  if (!studentId || !targetGroupId) return groups
+  let movingMember = null
+  const nextGroups = groups.map((group) => {
+    const remainingMembers = group.members.filter((member) => {
+      const isMoving = member.student.id === studentId
+      if (isMoving) movingMember = member
+      return !isMoving
+    })
+    return { ...group, members: remainingMembers }
+  })
+
+  if (!movingMember) return groups
+
+  return enrichCooperativeGroups(
+    nextGroups.map((group) =>
+      group.id === targetGroupId ? { ...group, members: [...group.members, movingMember] } : group,
+    ),
+    relations,
+  )
 }
 
 function buildCooperativeGroups({
@@ -2196,6 +2229,39 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
           </section>
         )}
 
+        <section className="tutorial-meeting-dashboard">
+          <article className={executiveSummary.tone}>
+            <span>Mirada de reunió</span>
+            <strong>{executiveSummary.title}</strong>
+            <small>{executiveSummary.action}</small>
+          </article>
+          <article className={profile.weakestArea ? 'warning' : 'ok'}>
+            <span>Focus acadèmic</span>
+            <strong>{profile.weakestArea?.name || 'Sense focus delicat'}</strong>
+            <small>
+              {profile.notDevelopedCount} no assolides · {formatPercent(profile.notDevelopedPercent)}
+            </small>
+          </article>
+          <article className={weakestSubjects.length > 0 ? 'warning' : 'ok'}>
+            <span>Assignatura clau</span>
+            <strong>{weakestSubjects[0]?.subject || strongestSubjects[0]?.subject || '-'}</strong>
+            <small>
+              {weakestSubjects[0]
+                ? `${weakestSubjects[0].notDeveloped}/${weakestSubjects[0].evaluated} no assolides`
+                : 'Cap matèria amb risc destacat'}
+            </small>
+          </article>
+          <article className={hasTracking ? 'amber' : 'ok'}>
+            <span>Seguiment</span>
+            <strong>{records.length}</strong>
+            <small>
+              {hasTracking
+                ? `${countByType(records, 'agenda')} agenda · ${countByType(records, 'incident')} incidències`
+                : 'Sense registres tutorials'}
+            </small>
+          </article>
+        </section>
+
         {printSections.tutorComment && (
           <section className="tutorial-tutor-comment-section">
             <h3 className="tutorial-profile-section-title">Comentari del tutor</h3>
@@ -2426,8 +2492,12 @@ export function TutoringView() {
   const sociogramDragRef = useRef(null)
   const [activePanel, setActivePanel] = useState('evaluation')
   const [areaFilter, setAreaFilter] = useState('all')
+  const [diagnosisAreaFilter, setDiagnosisAreaFilter] = useState('all')
+  const [diagnosisSubjectFilter, setDiagnosisSubjectFilter] = useState('all')
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [profileFilter, setProfileFilter] = useState('priority')
+  const [profileAreaFilter, setProfileAreaFilter] = useState('all')
+  const [profileSubjectFilter, setProfileSubjectFilter] = useState('all')
   const [subjectFilter, setSubjectFilter] = useState('auto')
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const [selectedTutorialRecordStudentId, setSelectedTutorialRecordStudentId] = useState('')
@@ -2453,6 +2523,7 @@ export function TutoringView() {
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
   const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
+  const [manualCooperativeGroups, setManualCooperativeGroups] = useState([])
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
   const [seatingLayout, setSeatingLayout] = useState({ activeSeatIds: getDefaultSeatingActiveSeatIds(), columns: 9, rows: 5 })
   const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
@@ -2462,6 +2533,7 @@ export function TutoringView() {
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
   const [seatingUnseatedStudentIds, setSeatingUnseatedStudentIds] = useState([])
+  const [seatingPlanName, setSeatingPlanName] = useState('')
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
@@ -2571,6 +2643,8 @@ export function TutoringView() {
   )
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
+  const diagnosisSubjectOptions = useMemo(() => getSubjectOptionsForArea(diagnosisAreaFilter), [diagnosisAreaFilter])
+  const profileSubjectOptions = useMemo(() => getSubjectOptionsForArea(profileAreaFilter), [profileAreaFilter])
   const bulkImportColumns = useMemo(() => buildTutorialImportColumns(allSubjectOptions), [allSubjectOptions])
   const autoSubject =
     linkedClass?.subject && SUBJECT_STRUCTURES[linkedClass.subject] ? linkedClass.subject : subjectOptions[0]?.subject
@@ -2629,6 +2703,18 @@ export function TutoringView() {
       }),
     [activeClassId, classStudents, evaluationContext, tutorialMarks],
   )
+  const diagnosisSummary = useMemo(
+    () =>
+      summarizeTutorialData({
+        areaFilter: diagnosisAreaFilter,
+        classId: activeClassId,
+        evaluationContext,
+        students: classStudents,
+        subjectFilter: diagnosisSubjectFilter,
+        tutorialMarks,
+      }),
+    [activeClassId, classStudents, diagnosisAreaFilter, diagnosisSubjectFilter, evaluationContext, tutorialMarks],
+  )
   const subjectCompletion = useMemo(() => {
     const entries = subjectOptions.map((item) => {
       const subjectCompetencies = buildTutorialCompetencies(item.subject)
@@ -2670,14 +2756,14 @@ export function TutoringView() {
     () => new Map(tutorialRelationSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRelationSummary.studentRows],
   )
-  const tutorialGroupSummary = useMemo(
+  const diagnosisGroupSummary = useMemo(
     () =>
       summarizeTutorialGroup({
         recordRowsByStudent: tutorialRecordRowsByStudent,
         tutorialRecordSummary,
-        tutorialSummary,
+        tutorialSummary: diagnosisSummary,
       }),
-    [tutorialRecordRowsByStudent, tutorialRecordSummary, tutorialSummary],
+    [diagnosisSummary, tutorialRecordRowsByStudent, tutorialRecordSummary],
   )
   const cooperativeProfilesByStudentId = useMemo(
     () =>
@@ -2766,8 +2852,16 @@ export function TutoringView() {
             relations: effectiveTutorialRelations,
             savedGroupSet: selectedCooperativeGroupSet,
           })
+        : manualCooperativeGroups.length > 0
+          ? enrichCooperativeGroups(manualCooperativeGroups, effectiveTutorialRelations)
         : cooperativeGroups,
-    [cooperativeGroups, cooperativeProfilesByStudentId, effectiveTutorialRelations, selectedCooperativeGroupSet],
+    [
+      cooperativeGroups,
+      cooperativeProfilesByStudentId,
+      effectiveTutorialRelations,
+      manualCooperativeGroups,
+      selectedCooperativeGroupSet,
+    ],
   )
   const generatedSeatingPlan = useMemo(
     () =>
@@ -2810,6 +2904,9 @@ export function TutoringView() {
         (relation) => String(relation.updatedAt || relation.createdAt || '') > String(classTutorialSeatingPlan.updatedAt || ''),
       ),
   )
+  const seatingReviewRows = visibleSeatingPlan.placements.filter(
+    (placement) => seatingProblemSeats[placement.studentId] === placement.seat.id,
+  )
   const filteredTutorialProfiles = useMemo(
     () =>
       tutorialSummary.studentProfiles
@@ -2821,13 +2918,21 @@ export function TutoringView() {
           if (profileFilter === 'tracking') return (recordRow?.total || 0) > 0
           return true
         })
+        .filter((profile) =>
+          profile.evaluatedCompetencies.some(
+            (item) =>
+              (profileAreaFilter === 'all' || item.areaId === profileAreaFilter) &&
+              (profileSubjectFilter === 'all' || item.subject === profileSubjectFilter),
+          ) ||
+          (profileAreaFilter === 'all' && profileSubjectFilter === 'all'),
+        )
         .sort((a, b) => {
           const priorityA = getTutorialProfilePriority(a, tutorialRecordRowsByStudent.get(a.student.id))
           const priorityB = getTutorialProfilePriority(b, tutorialRecordRowsByStudent.get(b.student.id))
           if (priorityA !== priorityB) return priorityB - priorityA
           return a.student.name.localeCompare(b.student.name, 'ca')
         }),
-    [profileFilter, tutorialRecordRowsByStudent, tutorialSummary.studentProfiles],
+    [profileAreaFilter, profileFilter, profileSubjectFilter, tutorialRecordRowsByStudent, tutorialSummary.studentProfiles],
   )
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
 
@@ -2901,7 +3006,7 @@ export function TutoringView() {
     setSeatingManualSeatByStudentId((current) =>
       Object.fromEntries(Object.entries(current).filter(([studentId]) => seatingLockedStudentIds.includes(studentId))),
     )
-    setSeatingUnseatedStudentIds([])
+    setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
     setSeatingVariant((current) => current + 1)
   }
 
@@ -3007,6 +3112,7 @@ export function TutoringView() {
   }
 
   const handleSaveTutorialSeatingPlan = async () => {
+    const fallbackName = `Disposició ${formatShortDate(getTodayDateInput())}`
     await saveTutorialSeatingPlan({
       classId: activeClassId,
       layout: {
@@ -3021,10 +3127,11 @@ export function TutoringView() {
         isStar: placement.isStar,
         studentId: placement.studentId,
         x: placement.seat.x,
-        y: placement.seat.y,
-      })),
-      title: 'Disposició recomanada',
+          y: placement.seat.y,
+        })),
+      title: seatingPlanName.trim() || fallbackName,
     })
+    setSeatingPlanName('')
     setSelectedSeatingPlanId('')
   }
 
@@ -3088,13 +3195,13 @@ export function TutoringView() {
   }
 
   const handleSaveCooperativeGroupSet = async () => {
-    if (cooperativeGroups.length === 0) return
+    if (visibleCooperativeGroups.length === 0) return
 
     const fallbackName = `Grups cooperatius ${formatShortDate(getTodayDateInput())}`
     await saveTutorialGroupSet({
       classId: activeClassId,
       groupSize: cooperativeGroupSize,
-      groups: cooperativeGroups,
+      groups: visibleCooperativeGroups,
       name: cooperativeGroupSetName || fallbackName,
       prioritizeHalfGroups,
       strategy: cooperativeStrategy,
@@ -3112,6 +3219,18 @@ export function TutoringView() {
 
   const handleCopyCooperativeGroups = async () => {
     await navigator.clipboard.writeText(getCooperativeGroupCopyText(visibleCooperativeGroups))
+  }
+
+  const handleMoveCooperativeMember = (studentId, targetGroupId) => {
+    setSelectedCooperativeGroupSetId('')
+    setManualCooperativeGroups((current) =>
+      moveCooperativeMemberToGroup(
+        current.length > 0 ? current : visibleCooperativeGroups,
+        studentId,
+        targetGroupId,
+        effectiveTutorialRelations,
+      ),
+    )
   }
 
   return (
@@ -3189,38 +3308,72 @@ export function TutoringView() {
               </button>
             </header>
 
+            <div className="tutorial-diagnosis-filter-bar">
+              <label>
+                Filtrar àrea
+                <select
+                  onChange={(event) => {
+                    setDiagnosisAreaFilter(event.target.value)
+                    setDiagnosisSubjectFilter('all')
+                  }}
+                  value={diagnosisAreaFilter}
+                >
+                  <option value="all">Totes les àrees</option>
+                  {SUBJECT_AREAS.filter((area) => area.id !== 'tutorial').map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Filtrar assignatura
+                <select
+                  onChange={(event) => setDiagnosisSubjectFilter(event.target.value)}
+                  value={diagnosisSubjectFilter}
+                >
+                  <option value="all">Totes les assignatures</option>
+                  {diagnosisSubjectOptions.map((item) => (
+                    <option key={item.subject} value={item.subject}>
+                      {item.subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <div className="tutorial-group-diagnosis-grid">
               <article>
                 <span>Competències no assolides</span>
-                <strong>{tutorialSummary.evaluatedCount > 0 ? formatPercent(tutorialSummary.notDevelopedPercent) : '-'}</strong>
+                <strong>{diagnosisSummary.evaluatedCount > 0 ? formatPercent(diagnosisSummary.notDevelopedPercent) : '-'}</strong>
                 <small>
-                  {tutorialSummary.notDevelopedCount} de {tutorialSummary.evaluatedCount} competències avaluades
+                  {diagnosisSummary.notDevelopedCount} de {diagnosisSummary.evaluatedCount} competències avaluades
                 </small>
               </article>
               <article>
                 <span>Cobertura tutorial</span>
-                <strong>{formatPercent(tutorialGroupSummary.academicCoveragePercent)}</strong>
-                <small>{tutorialGroupSummary.studentsWithData} alumnes amb dades acadèmiques o de seguiment</small>
+                <strong>{formatPercent(diagnosisGroupSummary.academicCoveragePercent)}</strong>
+                <small>{diagnosisGroupSummary.studentsWithData} alumnes amb dades acadèmiques o de seguiment</small>
               </article>
               <article>
                 <span>Àrea prioritària</span>
-                <strong>{tutorialSummary.weakestArea?.name || '-'}</strong>
+                <strong>{diagnosisSummary.weakestArea?.name || '-'}</strong>
                 <small>
-                  {tutorialSummary.weakestArea
-                    ? `${formatPercent(tutorialSummary.weakestArea.notDevelopedPercent)} no assolides`
+                  {diagnosisSummary.weakestArea
+                    ? `${formatPercent(diagnosisSummary.weakestArea.notDevelopedPercent)} no assolides`
                     : 'Encara no hi ha prou dades'}
                 </small>
               </article>
-              <article className={tutorialGroupSummary.priorityStudents.length > 0 ? 'risk' : 'ok'}>
+              <article className={diagnosisGroupSummary.priorityStudents.length > 0 ? 'risk' : 'ok'}>
                 <span>Alumnes prioritaris</span>
-                <strong>{tutorialGroupSummary.priorityStudents.length}</strong>
+                <strong>{diagnosisGroupSummary.priorityStudents.length}</strong>
                 <small>Rendiment baix, registres tutorials o acumulació combinada</small>
               </article>
             </div>
 
-            {tutorialGroupSummary.priorityStudents.length > 0 ? (
+            {diagnosisGroupSummary.priorityStudents.length > 0 ? (
               <div className="tutorial-group-priority-list">
-                {tutorialGroupSummary.priorityStudents.slice(0, 6).map((item) => (
+                {diagnosisGroupSummary.priorityStudents.slice(0, 6).map((item) => (
                   <button
                     className="tutorial-group-priority-row"
                     key={item.profile.student.id}
@@ -3243,44 +3396,44 @@ export function TutoringView() {
           </section>
 
           <div className="tutorial-stats-grid">
-            <TutorialGroupGradeChart summary={tutorialSummary} />
-            <TutorialSubjectAverageChart subjects={tutorialSummary.subjectSummaries} />
+            <TutorialGroupGradeChart summary={diagnosisSummary} />
+            <TutorialSubjectAverageChart subjects={diagnosisSummary.subjectSummaries} />
             <TutorialStatsCard
-              detail={`${tutorialSummary.notDevelopedCount} de ${tutorialSummary.evaluatedCount} competències avaluades`}
+              detail={`${diagnosisSummary.notDevelopedCount} de ${diagnosisSummary.evaluatedCount} competències avaluades`}
               icon={TrendingDown}
               label="Competències no assolides"
-              tone={tutorialSummary.notDevelopedPercent >= 30 ? 'risk' : 'neutral'}
-              value={tutorialSummary.evaluatedCount > 0 ? formatPercent(tutorialSummary.notDevelopedPercent) : '-'}
+              tone={diagnosisSummary.notDevelopedPercent >= 30 ? 'risk' : 'neutral'}
+              value={diagnosisSummary.evaluatedCount > 0 ? formatPercent(diagnosisSummary.notDevelopedPercent) : '-'}
             />
             <TutorialStatsCard
               detail={
-                tutorialSummary.weakestArea
-                  ? `${tutorialSummary.weakestArea.notDeveloped} no assolides · mitjana ${tutorialSummary.weakestArea.averageGrade}`
+                diagnosisSummary.weakestArea
+                  ? `${diagnosisSummary.weakestArea.notDeveloped} no assolides · mitjana ${diagnosisSummary.weakestArea.averageGrade}`
                   : 'Encara no hi ha prou dades'
               }
               icon={BarChart3}
               label="Àrea amb més dificultat"
               tone="amber"
-              value={tutorialSummary.weakestArea?.name || '-'}
+              value={diagnosisSummary.weakestArea?.name || '-'}
             />
             <TutorialStatsCard
               detail="Baix assoliment o acumulació de competències no assolides"
               icon={AlertTriangle}
               label="Alumnes a mirar"
               onClick={() => setActivePanel('profile')}
-              tone={tutorialSummary.riskProfiles.length > 0 ? 'risk' : 'ok'}
-              value={tutorialSummary.riskProfiles.length}
+              tone={diagnosisSummary.riskProfiles.length > 0 ? 'risk' : 'ok'}
+              value={diagnosisSummary.riskProfiles.length}
             />
             <TutorialStatsCard
               detail="Competències amb alguna nota tutorial registrada"
               icon={Eye}
               label="Cobertura de dades"
               tone="blue"
-              value={tutorialSummary.evaluatedCount}
+              value={diagnosisSummary.evaluatedCount}
             />
           </div>
 
-          {tutorialSummary.evaluatedCount > 0 && (
+          {diagnosisSummary.evaluatedCount > 0 && (
             <div className="tutorial-insight-grid">
               <article className="tutoring-card compact">
                 <div>
@@ -3288,7 +3441,7 @@ export function TutoringView() {
                   <h2>Àrees de dificultat</h2>
                 </div>
                 <div className="tutorial-insight-list">
-                  {tutorialSummary.areaSummaries.slice(0, 4).map((area) => (
+                  {diagnosisSummary.areaSummaries.slice(0, 4).map((area) => (
                     <div className="tutorial-insight-row" key={area.id}>
                       <strong>{area.name}</strong>
                       <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
@@ -3304,7 +3457,7 @@ export function TutoringView() {
                   <h2>Assignatures a revisar</h2>
                 </div>
                 <div className="tutorial-insight-list">
-                  {tutorialSummary.subjectSummaries.slice(0, 5).map((subject) => (
+                  {diagnosisSummary.subjectSummaries.slice(0, 5).map((subject) => (
                     <div className="tutorial-insight-row" key={subject.subject}>
                       <strong>{subject.subject}</strong>
                       <span>{formatPercent(subject.notDevelopedPercent)} no assolides</span>
@@ -3878,7 +4031,11 @@ export function TutoringView() {
                 <label>
                   Mida
                   <select
-                    onChange={(event) => setCooperativeGroupSize(event.target.value)}
+                    onChange={(event) => {
+                      setCooperativeGroupSize(event.target.value)
+                      setManualCooperativeGroups([])
+                      setSelectedCooperativeGroupSetId('')
+                    }}
                     value={cooperativeGroupSize}
                   >
                     <option value="2">Parelles</option>
@@ -3891,7 +4048,11 @@ export function TutoringView() {
                 <label>
                   Criteri
                   <select
-                    onChange={(event) => setCooperativeStrategy(event.target.value)}
+                    onChange={(event) => {
+                      setCooperativeStrategy(event.target.value)
+                      setManualCooperativeGroups([])
+                      setSelectedCooperativeGroupSetId('')
+                    }}
                     value={cooperativeStrategy}
                   >
                     {COOPERATIVE_GROUP_STRATEGIES.map((strategy) => (
@@ -3905,7 +4066,11 @@ export function TutoringView() {
                   Mig grup
                   <button
                     className={prioritizeHalfGroups ? 'active' : ''}
-                    onClick={() => setPrioritizeHalfGroups((current) => !current)}
+                    onClick={() => {
+                      setPrioritizeHalfGroups((current) => !current)
+                      setManualCooperativeGroups([])
+                      setSelectedCooperativeGroupSetId('')
+                    }}
                     type="button"
                   >
                     {prioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
@@ -3923,6 +4088,16 @@ export function TutoringView() {
                   <Save size={16} />
                   Guardar versió
                 </button>
+                {manualCooperativeGroups.length > 0 && (
+                  <button
+                    className="secondary-action compact"
+                    onClick={() => setManualCooperativeGroups([])}
+                    type="button"
+                  >
+                    <RotateCcw size={16} />
+                    Tornar a automàtic
+                  </button>
+                )}
                 <button className="secondary-action compact" onClick={handleCopyCooperativeGroups} type="button">
                   <Clipboard size={16} />
                   Copiar proposta
@@ -4004,11 +4179,26 @@ export function TutoringView() {
                     <div className="cooperative-group-members">
                       {group.members.map((member) => (
                         <div className={`cooperative-member ${member.performanceLevel}`} key={member.student.id}>
-                          <strong>{member.student.name}</strong>
-                          <span>
-                            {member.halfGroup} · {member.performanceLevel}
-                            {member.priorityScore >= 4 ? ' · prioritat' : ''}
-                          </span>
+                          <div>
+                            <strong>{member.student.name}</strong>
+                            <span>
+                              {member.halfGroup} · {member.performanceLevel}
+                              {member.priorityScore >= 4 ? ' · prioritat' : ''}
+                            </span>
+                          </div>
+                          <label>
+                            Moure a
+                            <select
+                              onChange={(event) => handleMoveCooperativeMember(member.student.id, event.target.value)}
+                              value={group.id}
+                            >
+                              {visibleCooperativeGroups.map((targetGroup) => (
+                                <option key={targetGroup.id} value={targetGroup.id}>
+                                  {targetGroup.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
                         </div>
                       ))}
                     </div>
@@ -4075,6 +4265,14 @@ export function TutoringView() {
                   <Shuffle size={16} />
                   Canviar proposta
                 </button>
+                <label className="wide">
+                  Nom versió
+                  <input
+                    onChange={(event) => setSeatingPlanName(event.target.value)}
+                    placeholder="Ex: inici de curs"
+                    value={seatingPlanName}
+                  />
+                </label>
                 <button className="secondary-action compact" onClick={resetSeatingManualChanges} type="button">
                   <RotateCcw size={16} />
                   Netejar canvis
@@ -4105,6 +4303,19 @@ export function TutoringView() {
               </article>
             </div>
 
+            <div className="tutorial-seating-version-presets">
+              {['inici de curs', '2n trimestre', 'grups laboratori', 'disposició d’examen'].map((preset) => (
+                <button
+                  className={seatingPlanName === preset ? 'active' : ''}
+                  key={preset}
+                  onClick={() => setSeatingPlanName(preset)}
+                  type="button"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
             {(generatedSeatingPlan.warnings.length > 0 || hasRelationChangesAfterSeatingSave) && (
               <div className="tutorial-seating-warning">
                 <AlertTriangle size={18} />
@@ -4115,6 +4326,21 @@ export function TutoringView() {
                   )}
                   {generatedSeatingPlan.warnings.slice(0, 3).map((warning) => (
                     <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {seatingReviewRows.length > 0 && !selectedSeatingPlan && (
+              <div className="tutorial-seating-review-summary">
+                <strong>{seatingReviewRows.length} alumne/s marcats per revisar</strong>
+                <p>
+                  En clicar “Canviar proposta”, el programa intentarà recol·locar sobretot aquests alumnes,
+                  respectant els llocs bloquejats i els criteris de relacions, mig grup i ajuda acadèmica.
+                </p>
+                <div>
+                  {seatingReviewRows.map((placement) => (
+                    <span key={placement.studentId}>{placement.student.student.name}</span>
                   ))}
                 </div>
               </div>
@@ -4577,6 +4803,39 @@ export function TutoringView() {
               >
                 Tots
               </button>
+            </div>
+            <div className="tutorial-profile-scope-filters">
+              <label>
+                Àrea
+                <select
+                  onChange={(event) => {
+                    setProfileAreaFilter(event.target.value)
+                    setProfileSubjectFilter('all')
+                  }}
+                  value={profileAreaFilter}
+                >
+                  <option value="all">Totes les àrees</option>
+                  {SUBJECT_AREAS.filter((area) => area.id !== 'tutorial').map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Assignatura
+                <select
+                  onChange={(event) => setProfileSubjectFilter(event.target.value)}
+                  value={profileSubjectFilter}
+                >
+                  <option value="all">Totes les assignatures</option>
+                  {profileSubjectOptions.map((item) => (
+                    <option key={item.subject} value={item.subject}>
+                      {item.subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             {tutorialSummary.studentProfiles.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes per començar a preparar perfils tutorials.</div>

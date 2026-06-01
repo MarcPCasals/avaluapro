@@ -921,6 +921,38 @@ button.tutorial-stat-card {
   text-transform: none;
 }
 
+.tutorial-diagnosis-filter-bar,
+.tutorial-profile-scope-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.tutorial-diagnosis-filter-bar label,
+.tutorial-profile-scope-filters label {
+  display: grid;
+  gap: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-diagnosis-filter-bar select,
+.tutorial-profile-scope-filters select {
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #1f2937;
+  background: white;
+  font-weight: 850;
+}
+
 .tutorial-import-all-button {
   min-height: 42px;
   white-space: nowrap;
@@ -1783,6 +1815,7 @@ button.tutorial-record-pill {
   text-transform: uppercase;
 }
 
+.tutorial-seating-controls input,
 .tutorial-seating-controls select {
   min-height: 38px;
   border: 1px solid #fdba74;
@@ -1791,6 +1824,10 @@ button.tutorial-record-pill {
   background: white;
   color: #1f2937;
   font-weight: 900;
+}
+
+.tutorial-seating-controls label.wide {
+  min-width: 170px;
 }
 
 .tutorial-seating-controls .secondary-action,
@@ -1832,6 +1869,28 @@ button.tutorial-record-pill {
   line-height: 1.25;
 }
 
+.tutorial-seating-version-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tutorial-seating-version-presets button {
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #9a3412;
+  background: white;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.tutorial-seating-version-presets button.active {
+  border-color: #f97316;
+  background: #ffedd5;
+}
+
 .tutorial-seating-warning {
   display: flex;
   gap: 10px;
@@ -1857,6 +1916,43 @@ button.tutorial-record-pill {
   margin-top: 5px;
   color: #64748b;
   font-size: 13px;
+}
+
+.tutorial-seating-review-summary {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.tutorial-seating-review-summary strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.tutorial-seating-review-summary p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-seating-review-summary > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tutorial-seating-review-summary span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .tutorial-seating-saved-list {
@@ -2355,7 +2451,9 @@ button.tutorial-record-pill {
 
 .cooperative-member {
   display: grid;
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, auto);
+  gap: 8px;
+  align-items: center;
   border-left: 4px solid #cbd5e1;
   border-radius: 8px;
   padding: 8px 10px;
@@ -2387,6 +2485,26 @@ button.tutorial-record-pill {
   color: #64748b;
   font-size: 12px;
   font-weight: 850;
+}
+
+.cooperative-member label {
+  display: grid;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.cooperative-member select {
+  min-height: 30px;
+  border: 1px solid #e9d5ff;
+  border-radius: 7px;
+  padding: 4px 7px;
+  color: #4c1d95;
+  background: white;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .cooperative-group-badges {
@@ -3204,6 +3322,57 @@ button.tutorial-record-pill {
   color: #1f2937;
   font-weight: 900;
   line-height: 1.4;
+}
+
+.tutorial-meeting-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-meeting-dashboard article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.tutorial-meeting-dashboard article.ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.tutorial-meeting-dashboard article.warning,
+.tutorial-meeting-dashboard article.amber {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tutorial-meeting-dashboard article.risk {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tutorial-meeting-dashboard span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-meeting-dashboard strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.tutorial-meeting-dashboard small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
 }
 
 .tutorial-tutor-comment-section {
