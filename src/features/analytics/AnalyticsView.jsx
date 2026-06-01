@@ -112,7 +112,7 @@ const chartHelp = {
   utSummary:
     'Resumeix només la UT activa: mitjana, evidències, competències, criteris i constància.',
   utCompetencies:
-    'Mostra el comportament de cada competència dins la UT activa: mitjana, A/B/C/D i alumnes amb C/D.',
+    'Mostra el comportament de cada competència dins la UT activa: mitjana, A/B/C/D i percentatge d’alumnes amb D.',
   utCriteria:
     'Ordena els criteris de la UT per dificultat. Ajuda a decidir quin criteri convé reforçar primer.',
   utReinforcement:
@@ -267,6 +267,10 @@ function hasLowConsistency(profile) {
 
 function hasHighConsistency(profile) {
   return profile.tracking.hasTrackingData && profile.tracking.consistency >= 75
+}
+
+function hasEnoughConsistencyForInvisible(profile) {
+  return profile.tracking.hasTrackingData && profile.tracking.consistency >= 60
 }
 
 function HelpSectionHeading({ description, helpKey, icon: Icon, setInfo, title }) {
@@ -552,7 +556,7 @@ function buildUtCompetencyRows(state, students, competencies) {
         student,
         grade: getStudentCompetencyGrade(state, student.id, competency),
       }))
-      .filter((item) => ['C', 'D'].includes(item.grade))
+      .filter((item) => item.grade === 'D')
 
     return {
       ...competency,
@@ -650,7 +654,7 @@ function getGlobalDecision(profile) {
     }
   }
 
-  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasHighConsistency(profile)) {
+  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && hasEnoughConsistencyForInvisible(profile)) {
     return {
       label: 'Alumne invisible',
       text: 'Treballa de manera constant, però el rendiment és baix: cal mirar-lo perquè pot passar desapercebut.',
@@ -1736,7 +1740,7 @@ function UtCompetencyOverview({ competencies, setInfo }) {
             <div className="ut-competency-score">
               <b className={gradeClassName(averageGrade)}>{averageGrade || '-'}</b>
               <span>mitjana</span>
-              <em>{competency.total > 0 ? `${riskPercent}% no assoleix` : 'sense dades'}</em>
+              <em>{competency.total > 0 ? `${riskPercent}% amb D` : 'sense dades'}</em>
             </div>
             <div className="mini-grade-strip">
               {gradeOrder.map((grade) => (
@@ -1746,7 +1750,7 @@ function UtCompetencyOverview({ competencies, setInfo }) {
                 </span>
               ))}
             </div>
-            <small>{competency.riskStudents.length} alumnes amb C/D</small>
+            <small>{competency.riskStudents.length} alumnes amb D</small>
           </article>
         )
       })}
@@ -2320,7 +2324,7 @@ export function AnalyticsView() {
   const trackingInterventions = buildTrackingInterventions(students, state.taskRecords, currentTasks, activeBehaviorEvents)
   const atRisk = crossProfiles.filter((profile) => profile.riskScore >= 2)
   const hardworkingLowAchievement = crossProfiles.filter(
-    (profile) => hasHighConsistency(profile) && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
+    (profile) => hasEnoughConsistencyForInvisible(profile) && profile.evaluation.score > 0 && profile.evaluation.score <= 2,
   )
   const lowConsistencyGoodAchievement = crossProfiles.filter(
     (profile) => hasLowConsistency(profile) && profile.evaluation.score >= 3,
@@ -2367,7 +2371,7 @@ export function AnalyticsView() {
         onClose={() => setSelectedScatterProfile(null)}
         profile={selectedScatterProfile}
         state={state}
-        tasks={currentTasks}
+        tasks={dashboardScope === 'cross' ? classTasks : currentTasks}
       />
       <StudentEvolutionModal
         canonicalCompetencies={canonicalCompetencies}
@@ -2827,7 +2831,7 @@ export function AnalyticsView() {
 
           <ScatterCard
             onSelectProfile={setSelectedScatterProfile}
-            profiles={profiles}
+            profiles={crossProfiles}
             setInfo={setSelectedInfo}
           />
           <div className="analytics-two-column lower cross-followup-grid">

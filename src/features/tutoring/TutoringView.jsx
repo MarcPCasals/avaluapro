@@ -892,6 +892,12 @@ function getSeatZone(seat) {
   return 2
 }
 
+function getStableStudentNumber(value, variant = 0) {
+  return String(value || '')
+    .split('')
+    .reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 3 + Number(variant || 0)), Number(variant || 0) * 97)
+}
+
 function normalizeSeatingLayout(layout) {
   const validSeatIds = new Set()
   Array.from({ length: SEATING_GRID_ROWS }).forEach((_, y) => {
@@ -1109,7 +1115,12 @@ function buildCooperativeGroups({
 
 function isSeatAdjacent(seatA, seatB) {
   if (!seatA || !seatB) return false
-  return Math.abs((seatA.x ?? 0) - (seatB.x ?? 0)) + Math.abs((seatA.y ?? 0) - (seatB.y ?? 0)) <= 1
+  return getSeatDistance(seatA, seatB) <= 1
+}
+
+function getSeatDistance(seatA, seatB) {
+  if (!seatA || !seatB) return Number.POSITIVE_INFINITY
+  return Math.abs((seatA.x ?? 0) - (seatB.x ?? 0)) + Math.abs((seatA.y ?? 0) - (seatB.y ?? 0))
 }
 
 function buildTutorialSeatingPlan({
@@ -1144,6 +1155,7 @@ function buildTutorialSeatingPlan({
     })
   })
 
+  const variantOffset = Number(variant || 0)
   const studentsToPlace = students
     .map((student) => profilesByStudentId.get(student.id))
     .filter(Boolean)
@@ -1153,6 +1165,10 @@ function buildTutorialSeatingPlan({
       const problemB = problemSeatsByStudentId[b.student.id] ? 1 : 0
       if (problemB !== problemA) return problemB - problemA
       if ((b.priorityScore || 0) !== (a.priorityScore || 0)) return (b.priorityScore || 0) - (a.priorityScore || 0)
+      const variantTieBreak =
+        (getStableStudentNumber(a.student.id, variantOffset) % 37) -
+        (getStableStudentNumber(b.student.id, variantOffset) % 37)
+      if (variantTieBreak !== 0) return variantTieBreak
       return a.student.name.localeCompare(b.student.name, 'ca')
     })
 
@@ -1189,22 +1205,33 @@ function buildTutorialSeatingPlan({
     )
     const bestSeat = availableSeats
       .map((seat) => {
-        let score = Math.abs(seat.zone - ((studentIndex + variant) % 3)) * 2 + seat.y
+        let score =
+          Math.abs(seat.zone - ((studentIndex + variantOffset) % 3)) * 2 +
+          seat.y * 0.9 +
+          ((seat.x + variantOffset * 2) % 5) * 0.3
         if (problemSeatsByStudentId[student.student.id] === seat.id) score += 1500
         if (prioritizeHalfGroups) {
           score += seat.zone === halfGroupZone.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
         }
+        if (student.academicRisk && !student.isStar) score += seat.y * 1.1
+        if (student.isStar) score += Math.abs(seat.x - 4) * 0.55
         placed.forEach((placement) => {
-          const adjacent = isSeatAdjacent(seat, placement.seat)
+          const distance = getSeatDistance(seat, placement.seat)
+          const adjacent = distance <= 1
+          const near = distance <= 2
           const relation = relationBetween(relations, student.student.id, placement.student.student.id)
-          if (student.isConflict && placement.student.isConflict) score += 10000
-          if (!adjacent) return
-          if (relation?.type === 'avoid') score += 500
-          if (relation?.type === 'friendship') score += 8
-          if (relation?.type === 'positive') score -= 8
-          if (student.isStar && placement.student.academicRisk) score -= 14
-          if (placement.student.isStar && student.academicRisk) score -= 14
+          const isAcademicSupportPair =
+            (student.isStar && placement.student.academicRisk) ||
+            (placement.student.isStar && student.academicRisk)
+          if (student.isConflict && placement.student.isConflict && near) score += 10000
+          if (relation?.type === 'avoid') score += near ? 700 : 90
+          if (adjacent && relation?.type === 'friendship') score += 10
+          if (near && relation?.type === 'positive') {
+            score -= relation.isSynthetic ? (isAcademicSupportPair ? 32 : 0) : 12
+          }
+          if (isAcademicSupportPair) score -= adjacent ? 58 : near ? 28 : 8
         })
+        score += (getStableStudentNumber(`${student.student.id}_${seat.id}`, variantOffset) % 11) * 0.08
         return { score, seat }
       })
       .sort((a, b) => a.score - b.score || a.seat.y - b.seat.y || a.seat.x - b.seat.x)[0]?.seat
@@ -2869,6 +2896,15 @@ export function TutoringView() {
     setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
   }
 
+  const handleGenerateSeatingVariant = () => {
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId((current) =>
+      Object.fromEntries(Object.entries(current).filter(([studentId]) => seatingLockedStudentIds.includes(studentId))),
+    )
+    setSeatingUnseatedStudentIds([])
+    setSeatingVariant((current) => current + 1)
+  }
+
   const toggleSeatingGridSeat = (seat, placement) => {
     if (selectedSeatingPlan) return
     setSelectedSeatingPlanId('')
@@ -4033,10 +4069,7 @@ export function TutoringView() {
                 </label>
                 <button
                   className="secondary-action compact"
-                  onClick={() => {
-                    setSelectedSeatingPlanId('')
-                    setSeatingVariant((current) => current + 1)
-                  }}
+                  onClick={handleGenerateSeatingVariant}
                   type="button"
                 >
                   <Shuffle size={16} />

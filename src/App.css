@@ -6993,6 +6993,7 @@ button.tutorial-record-pill {
 
 .profile-table {
   min-width: 900px;
+  table-layout: fixed;
 }
 
 .profile-table th {
@@ -7004,6 +7005,8 @@ button.tutorial-record-pill {
 
 .profile-table td {
   padding: 14px;
+  height: 76px;
+  vertical-align: middle;
 }
 
 .profile-analysis-row {
