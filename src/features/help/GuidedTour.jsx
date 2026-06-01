@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, CheckCircle2, PlayCircle, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Maximize2, Minimize2, PlayCircle, X } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const tourSteps = [
@@ -45,8 +45,6 @@ const tourSteps = [
     text: 'La bombolla obre el resum per reunió: diagnòstics, notes de la UT, seguiment i entrades d’equip educatiu o tutoria. El nom de l’alumne queda reservat per al perfil personal.',
     action: 'Clica la bombolla del primer alumne per obrir el resum d’anotacions.',
     completeWhen: 'annotations-open',
-    helperAction: 'open-first-annotations',
-    helperLabel: 'Obrir fitxa demo',
     mode: 'evaluation',
   },
   {
@@ -55,8 +53,6 @@ const tourSteps = [
     text: 'Les entrades d’equip educatiu queden separades per data i marquen l’alumne en vermell perquè ho vegis durant la classe.',
     action: 'Escriu una entrada breu de prova i prem “+ Nova entrada”.',
     completeWhen: 'agenda-note-added',
-    helperAction: 'add-demo-team-note',
-    helperLabel: 'Afegir entrada demo',
     mode: 'evaluation',
   },
   {
@@ -80,8 +76,6 @@ const tourSteps = [
     text: 'Cada cel·la permet marcar feta, incompleta, no feta o exempt. També pots afegir notes i recordatoris.',
     action: 'Canvia l’estat d’una cel·la de tasca per veure com es desa el seguiment.',
     completeWhen: 'task-record-changed',
-    helperAction: 'simulate-task-record',
-    helperLabel: 'Simular canvi de tasca',
     mode: 'tracking',
     ensureTrackingTasks: true,
   },
@@ -94,12 +88,10 @@ const tourSteps = [
   },
   {
     target: 'tracking-student-actions',
-    title: '13. Simula una nota a l’agenda',
-    text: 'Aquesta simulació marca tres tasques no fetes al primer alumne visible i obre la mateixa nota a l’agenda que veuràs en ús real.',
-    action: 'Prem “Simular 3r negatiu” i observa com apareix la nota a l’agenda amb les tasques pendents.',
+    title: '13. Nota a l’agenda amb 3 negatius',
+    text: 'Quan un alumne arriba a tres tasques no fetes, Avaluapro et mostra la nota a l’agenda amb el motiu i les tasques que l’han generada.',
+    action: 'Marca una altra tasca com a no feta en un alumne que ja tingui punts vermells per veure com s’obre la nota a l’agenda.',
     completeWhen: 'agenda-warning-open',
-    helperAction: 'simulate-agenda-warning',
-    helperLabel: 'Simular 3r negatiu',
     mode: 'tracking',
     ensureTrackingTasks: true,
     placement: 'above',
@@ -127,9 +119,6 @@ const tourSteps = [
     text: 'Les pestanyes eviten que tot aparegui barrejat. Primer mires el resum i després entres a Avaluació, UT activa, Seguiment o Creuada.',
     action: 'Clica la pestanya “Avaluació” per veure només notes, evolució i criteris.',
     completeWhen: 'stats-evaluation-open',
-    helperAction: 'set-dashboard-scope',
-    helperLabel: 'Obrir Avaluació',
-    helperScope: 'evaluation',
     dashboardScope: 'executive',
     mode: 'analytics',
     insight: 'dashboard',
@@ -141,9 +130,6 @@ const tourSteps = [
     text: 'Aquí veus la comparativa de notes per UT, alumnes que pugen o baixen i la distribució per criteris sense barrejar-hi tasques.',
     action: 'Clica “UT activa” per passar al resum de la unitat que tens seleccionada.',
     completeWhen: 'stats-ut-open',
-    helperAction: 'set-dashboard-scope',
-    helperLabel: 'Obrir UT activa',
-    helperScope: 'ut',
     dashboardScope: 'evaluation',
     mode: 'analytics',
     insight: 'dashboard',
@@ -155,9 +141,6 @@ const tourSteps = [
     text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
     action: 'Clica “Seguiment” per veure només constància, punts i notes a l’agenda.',
     completeWhen: 'stats-tracking-open',
-    helperAction: 'set-dashboard-scope',
-    helperLabel: 'Obrir Seguiment',
-    helperScope: 'tracking',
     dashboardScope: 'ut',
     mode: 'analytics',
     insight: 'dashboard',
@@ -169,9 +152,6 @@ const tourSteps = [
     text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles notes a l’agenda.',
     action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
     completeWhen: 'stats-cross-open',
-    helperAction: 'set-dashboard-scope',
-    helperLabel: 'Obrir Creuada',
-    helperScope: 'cross',
     dashboardScope: 'tracking',
     mode: 'analytics',
     insight: 'dashboard',
@@ -191,8 +171,6 @@ const tourSteps = [
     text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
     action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
     completeWhen: 'data-menu-open',
-    helperAction: 'open-data-menu',
-    helperLabel: 'Obrir menú Dades',
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
@@ -215,8 +193,6 @@ const ownDataTourSteps = [
     text: 'El primer pas real és afegir alumnes. Enganxa una llista amb un alumne per línia en format “Cognom Cognom, Nom”.',
     action: 'Obre Gestió d’Alumnes per veure on s’afegeixen i s’organitzen els alumnes.',
     completeWhen: 'students-open',
-    helperAction: 'open-students',
-    helperLabel: 'Obrir Gestió d’Alumnes',
     mode: 'evaluation',
     placement: 'left',
   },
@@ -301,8 +277,6 @@ const ownDataTourSteps = [
     text: 'Aquest menú concentra còpies de seguretat, restauració, exportació, sessió de Google i estat de dades.',
     action: 'Obre el menú Dades i Compte.',
     completeWhen: 'data-menu-open',
-    helperAction: 'open-data-menu',
-    helperLabel: 'Obrir menú',
     mode: 'evaluation',
     placement: 'left',
   },
@@ -388,12 +362,65 @@ const waitingForStudentsStep = {
   text: 'La resta de la guia necessita alumnes per assenyalar la taula, els botons de seguiment i el perfil. Quan afegeixis alumnes, Avaluapro també tindrà una tasca inicial “Coneixements previs” perquè puguis veure el seguiment de seguida.',
   action: 'Obre Gestió d’Alumnes i enganxa el grup classe per desbloquejar els passos de seguiment i perfil.',
   completeWhen: 'class-students-loaded',
-  helperAction: 'open-students',
-  helperLabel: 'Obrir Gestió d’Alumnes',
   mode: 'evaluation',
   placement: 'left',
   final: true,
 }
+
+const tutoringTourSteps = [
+  {
+    target: 'tutoring-mode-button',
+    title: '1. Mode tutoria',
+    text: 'Aquest espai només apareix quan una classe s’ha marcat com a tutoria. Serveix per mirar el grup sencer, no només una assignatura.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-hero',
+    title: '2. Grup vinculat',
+    text: 'La tutoria queda connectada a una classe base: així aprofita alumnes, fotos i les notes que ja tens de la teva assignatura.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-panel-tabs',
+    title: '3. Quatre mirades de tutor',
+    text: 'Avaluació tutorial mira competències de totes les matèries; Seguiment tutorial recull agenda i incidències; Relacions prepara sociograma, grups i aula; Perfil i PDF genera resums individuals.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-group-diagnosis',
+    title: '4. Diagnòstic del grup',
+    text: 'Aquí veus el percentatge de competències no assolides, cobertura de dades, àrees de dificultat i alumnes que convé mirar primer.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-panel-tabs',
+    title: '5. Seguiment tutorial',
+    text: 'Obre aquesta pestanya per registrar notes a l’agenda, fulls d’incidència, expulsions d’aula o de centre. Són dades pròpies del tutor.',
+    action: 'Clica “Seguiment tutorial” quan vulguis veure aquest apartat.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-panel-tabs',
+    title: '6. Relacions i grups',
+    text: 'Des d’aquí es construeix el sociograma, els grups cooperatius i la disposició d’aula. Les fotos venen del perfil de l’alumne.',
+    action: 'Clica “Relacions i grups” per entrar a les eines socials del grup.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-panel-tabs',
+    title: '7. Perfil i PDF',
+    text: 'Aquest apartat prepara el perfil individual de l’alumne i el resum descarregable per reunions o seguiment tutorial.',
+    action: 'Clica “Perfil i PDF” quan vulguis revisar perfils individuals.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'guide-button',
+    title: '8. Recupera la guia quan calgui',
+    text: 'El botó Guia queda sempre visible. Si tanques aquesta ajuda, pots tornar-la a obrir sense reiniciar res.',
+    mode: 'tutoring',
+    final: true,
+  },
+]
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
@@ -510,6 +537,7 @@ function getCompletionState(step, baseline, current) {
 export function GuidedTour() {
   const { guideMode, guideOpen } = useAvaluaproStore((state) => state.onboarding)
   const setGuideOpen = useAvaluaproStore((state) => state.setGuideOpen)
+  const setTutoringGuideSeen = useAvaluaproStore((state) => state.setTutoringGuideSeen)
   const startOwnData = useAvaluaproStore((state) => state.startOwnData)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
@@ -530,9 +558,11 @@ export function GuidedTour() {
   }))
   const [targetRect, setTargetRect] = useState(null)
   const [domPulse, setDomPulse] = useState(0)
+  const [minimized, setMinimized] = useState(false)
   const { baseline, stepIndex } = tourState
   const activeSteps = useMemo(() => {
-    if (guideMode !== 'own') return tourSteps
+    if (guideMode === 'demo') return tourSteps
+    if (guideMode === 'tutoring') return tutoringTourSteps
     const hasClassStudents = activeClassStudentCount > 0
     const visibleSteps = ownDataTourSteps.filter((item) => !item.requiresClassStudents || hasClassStudents)
     return hasClassStudents ? visibleSteps : [...visibleSteps, waitingForStudentsStep]
@@ -587,13 +617,13 @@ export function GuidedTour() {
     if (!guideOpen || !step) return undefined
 
     let frameId = 0
-    const measure = () => {
+    const measure = (shouldScroll = false) => {
       const target = document.querySelector(`[data-tour="${step.target}"]`)
       if (!target) {
         setTargetRect(null)
         return
       }
-      target.scrollIntoView({ block: 'center', inline: 'center' })
+      if (shouldScroll) target.scrollIntoView({ block: 'center', inline: 'center' })
       const rect = target.getBoundingClientRect()
       setTargetRect({
         top: rect.top,
@@ -604,17 +634,18 @@ export function GuidedTour() {
         bottom: rect.bottom,
       })
     }
+    const measureOnly = () => measure(false)
 
     frameId = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(measure)
+      window.requestAnimationFrame(() => measure(true))
     })
-    window.addEventListener('resize', measure)
-    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measureOnly)
+    window.addEventListener('scroll', measureOnly, true)
 
     return () => {
       window.cancelAnimationFrame(frameId)
-      window.removeEventListener('resize', measure)
-      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measureOnly)
+      window.removeEventListener('scroll', measureOnly, true)
     }
   }, [guideOpen, step])
 
@@ -637,6 +668,7 @@ export function GuidedTour() {
 
   const closeTour = () => {
     setTourState({ baseline: getGuideSnapshot(), stepIndex: 0 })
+    if (guideMode === 'tutoring') setTutoringGuideSeen(true)
     setGuideOpen(false)
   }
 
@@ -645,46 +677,9 @@ export function GuidedTour() {
     if (started) closeTour()
   }
 
-  const handleHelperAction = () => {
-    if (step.helperAction === 'open-first-annotations') {
-      window.dispatchEvent(new CustomEvent('avaluapro-open-first-annotations'))
-      return
-    }
-
-    if (step.helperAction === 'add-demo-team-note') {
-      window.dispatchEvent(new CustomEvent('avaluapro-add-demo-team-note'))
-      return
-    }
-
-    if (step.helperAction === 'simulate-task-record') {
-      window.dispatchEvent(new CustomEvent('avaluapro-demo-task-record'))
-      return
-    }
-
-    if (step.helperAction === 'simulate-agenda-warning') {
-      window.dispatchEvent(new CustomEvent('avaluapro-demo-agenda-warning'))
-      return
-    }
-
-    if (step.helperAction === 'set-dashboard-scope' && step.helperScope) {
-      window.__avaluaproSetDashboardScope?.(step.helperScope)
-      return
-    }
-
-    if (step.helperAction === 'open-data-menu') {
-      document.querySelector('[data-tour="data-menu"] button')?.click()
-      return
-    }
-
-    if (step.helperAction === 'open-students') {
-      document.querySelector('[data-tour="manage-students-button"]')?.click()
-      document.querySelector('[data-tour="tracking-manage-students-button"]')?.click()
-    }
-  }
-
   return (
     <div className="guided-tour-layer" aria-live="polite">
-      {targetRect && (
+      {targetRect && !minimized && (
         <div
           className="guided-tour-highlight"
           style={{
@@ -695,66 +690,76 @@ export function GuidedTour() {
           }}
         />
       )}
-      <article className="guided-tour-card" style={cardStyle}>
+      <article className={`guided-tour-card ${minimized ? 'minimized' : ''}`} style={minimized ? undefined : cardStyle}>
         <header>
           <span>
             <PlayCircle size={17} />
             Guia interactiva
           </span>
-          <button onClick={closeTour} title="Tancar guia" type="button">
-            <X size={17} />
-          </button>
-        </header>
-        <strong>{step.title}</strong>
-        <p>{step.text}</p>
-        {step.action && (
-          <div className={`guided-tour-task ${stepComplete ? 'complete' : ''}`}>
-            <CheckCircle2 size={16} />
-            <span>{step.action}</span>
+          <div className="guided-tour-window-actions">
+            <button onClick={() => setMinimized((value) => !value)} title={minimized ? 'Restaurar guia' : 'Minimitzar guia'} type="button">
+              {minimized ? <Maximize2 size={17} /> : <Minimize2 size={17} />}
+            </button>
+            <button onClick={closeTour} title="Tancar guia" type="button">
+              <X size={17} />
+            </button>
           </div>
+        </header>
+        {minimized ? (
+          <>
+            <strong>{step.title}</strong>
+            <small>
+              Pas {safeStepIndex + 1}/{activeSteps.length}. La guia està minimitzada; pots seguir navegant i fer scroll lliurement.
+            </small>
+          </>
+        ) : (
+          <>
+            <strong>{step.title}</strong>
+            <p>{step.text}</p>
+            {step.action && (
+              <div className={`guided-tour-task ${stepComplete ? 'complete' : ''}`}>
+                <CheckCircle2 size={16} />
+                <span>{step.action}</span>
+              </div>
+            )}
+            <div className="guided-tour-progress">
+              <span style={{ width: `${((safeStepIndex + 1) / activeSteps.length) * 100}%` }} />
+            </div>
+            <footer>
+              <button className="ghost-action compact guided-tour-skip" onClick={closeTour} type="button">
+                Saltar guia
+              </button>
+              <button
+                className="secondary-action compact"
+                disabled={safeStepIndex === 0}
+                onClick={() => goToStep(safeStepIndex - 1)}
+                type="button"
+              >
+                <ArrowLeft size={15} />
+                Anterior
+              </button>
+              <small>
+                {safeStepIndex + 1}/{activeSteps.length}
+              </small>
+              {step.final ? (
+                <button className="primary-action compact" onClick={guideMode === 'demo' ? handleStartOwnData : closeTour} type="button">
+                  <CheckCircle2 size={15} />
+                  {guideMode === 'demo' ? 'Començar' : 'Tancar guia'}
+                </button>
+              ) : (
+                <button
+                  className="primary-action compact"
+                  disabled={!stepComplete}
+                  onClick={() => goToStep(safeStepIndex + 1)}
+                  type="button"
+                >
+                  {step.action ? 'Acció feta' : 'Següent'}
+                  <ArrowRight size={15} />
+                </button>
+              )}
+            </footer>
+          </>
         )}
-        {step.helperAction && (
-          <button className="primary-action compact guided-tour-helper" onClick={handleHelperAction} type="button">
-            <PlayCircle size={15} />
-            {step.helperLabel || 'Fer simulació'}
-          </button>
-        )}
-        <div className="guided-tour-progress">
-          <span style={{ width: `${((safeStepIndex + 1) / activeSteps.length) * 100}%` }} />
-        </div>
-        <footer>
-          <button className="ghost-action compact guided-tour-skip" onClick={closeTour} type="button">
-            Saltar guia
-          </button>
-          <button
-            className="secondary-action compact"
-            disabled={safeStepIndex === 0}
-            onClick={() => goToStep(safeStepIndex - 1)}
-            type="button"
-          >
-            <ArrowLeft size={15} />
-            Anterior
-          </button>
-          <small>
-            {safeStepIndex + 1}/{activeSteps.length}
-          </small>
-          {step.final ? (
-            <button className="primary-action compact" onClick={guideMode === 'demo' ? handleStartOwnData : closeTour} type="button">
-              <CheckCircle2 size={15} />
-              {guideMode === 'demo' ? 'Començar' : 'Tancar guia'}
-            </button>
-          ) : (
-            <button
-              className="primary-action compact"
-              disabled={!stepComplete}
-              onClick={() => goToStep(safeStepIndex + 1)}
-              type="button"
-            >
-              {step.action ? 'Acció feta' : 'Següent'}
-              <ArrowRight size={15} />
-            </button>
-          )}
-        </footer>
       </article>
     </div>
   )

@@ -3115,8 +3115,8 @@ export function TutoringView() {
   }
 
   return (
-    <section className="tutoring-view">
-      <header className="tutoring-hero">
+    <section className="tutoring-view" data-tour="tutoring-view">
+      <header className="tutoring-hero" data-tour="tutoring-hero">
         <div>
           <span className="section-kicker">
             <GraduationCap size={17} />
@@ -3135,7 +3135,7 @@ export function TutoringView() {
         </aside>
       </header>
 
-      <div className="tutoring-panel-tabs" aria-label="Vistes de tutoria">
+      <div className="tutoring-panel-tabs" aria-label="Vistes de tutoria" data-tour="tutoring-panel-tabs">
         <button
           className={activePanel === 'evaluation' ? 'active' : ''}
           onClick={() => setActivePanel('evaluation')}
@@ -3171,8 +3171,8 @@ export function TutoringView() {
       </div>
 
       {activePanel === 'evaluation' && (
-        <section className="tutorial-evaluation-panel">
-          <section className="tutorial-group-diagnosis">
+        <section className="tutorial-evaluation-panel" data-tour="tutoring-evaluation-panel">
+          <section className="tutorial-group-diagnosis" data-tour="tutoring-group-diagnosis">
             <header>
               <div>
                 <span className="section-kicker">
@@ -3518,7 +3518,7 @@ export function TutoringView() {
       )}
 
       {activePanel === 'tracking' && (
-        <section className="tutorial-tracking-panel">
+        <section className="tutorial-tracking-panel" data-tour="tutoring-tracking-panel">
           <div className="tutorial-record-summary">
             {TUTORING_RECORD_TYPES.map((type) => (
               <button
@@ -3664,7 +3664,7 @@ export function TutoringView() {
       )}
 
       {activePanel === 'relationships' && (
-        <section className="tutorial-relationships-panel">
+        <section className="tutorial-relationships-panel" data-tour="tutoring-relationships-panel">
           <section className="tutorial-relationships-hero">
             <div>
               <span className="section-kicker">
@@ -3700,7 +3700,7 @@ export function TutoringView() {
             </div>
           </section>
 
-          <section className="tutorial-tool-launch-grid">
+          <section className="tutorial-tool-launch-grid" data-tour="tutoring-relationship-tools">
             <button onClick={() => setActiveRelationshipTool('sociogram')} type="button">
               <Network size={25} />
               <strong>Sociograma</strong>
@@ -4538,7 +4538,7 @@ export function TutoringView() {
       )}
 
       {activePanel === 'profile' && (
-        <section className="tutorial-profile-panel">
+        <section className="tutorial-profile-panel" data-tour="tutoring-profile-panel">
           <article className="tutoring-card">
             <div>
               <UsersRound size={24} />

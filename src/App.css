@@ -548,6 +548,7 @@
 
 .mode-tab,
 .insight-tab,
+.guide-tab,
 .semester-tab,
 .ut-tab,
 .tool-button {
@@ -590,6 +591,18 @@
   color: #047857;
   border-color: #a7f3d0;
   background: #ecfdf5;
+}
+
+.guide-tab {
+  color: #7c2d12;
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.guide-tab:hover {
+  color: #ea580c;
+  border-color: #fdba74;
+  background: #ffedd5;
 }
 
 .urgent-tab {
@@ -3746,7 +3759,7 @@ button.tutorial-record-pill {
   position: fixed;
   border: 2px solid #f97316;
   border-radius: 9px;
-  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.2), 0 10px 30px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.12), 0 10px 30px rgba(15, 23, 42, 0.14);
   pointer-events: none;
 }
 
@@ -3763,6 +3776,18 @@ button.tutorial-record-pill {
   pointer-events: auto;
   max-height: calc(100vh - 32px);
   overflow: auto;
+}
+
+.guided-tour-card.minimized {
+  top: 82px;
+  right: 18px;
+  width: min(430px, calc(100vw - 36px));
+  max-height: none;
+  gap: 7px;
+  padding: 12px 14px;
+  border-color: #fdba74;
+  background: #fff7ed;
+  overflow: visible;
 }
 
 .guided-tour-card header,
@@ -3797,6 +3822,12 @@ button.tutorial-record-pill {
   border-radius: 7px;
   color: #64748b;
   background: #f8fafc;
+}
+
+.guided-tour-window-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .guided-tour-card strong {
@@ -3834,10 +3865,6 @@ button.tutorial-record-pill {
   color: #166534;
   border-color: #bbf7d0;
   background: #f0fdf4;
-}
-
-.guided-tour-helper {
-  width: fit-content;
 }
 
 .guided-tour-card small {

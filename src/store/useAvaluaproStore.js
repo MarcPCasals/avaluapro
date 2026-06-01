@@ -120,6 +120,7 @@ function getInitialOnboarding(hasStoredData) {
         ? Boolean(preferences.guideOpen)
         : demoMode,
     guideMode: preferences.guideMode || (demoMode ? 'demo' : 'own'),
+    tutoringGuideSeen: Boolean(preferences.tutoringGuideSeen),
   }
 }
 
@@ -554,6 +555,7 @@ export const useAvaluaproStore = create((set, get) => ({
     demoMode: false,
     guideOpen: false,
     guideMode: 'demo',
+    tutoringGuideSeen: false,
   },
   backupMeta: null,
   cloud: {
@@ -941,9 +943,9 @@ export const useAvaluaproStore = create((set, get) => ({
       tasks: [...state.tasks, ...newTasks],
       ui,
       profile,
-      onboarding: { demoMode: false, guideOpen: true, guideMode: 'own' },
+      onboarding: { demoMode: false, guideOpen: true, guideMode: 'own', tutoringGuideSeen: false },
     }))
-    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: false, guideOpen: true, guideMode: 'own' })
+    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: false, guideOpen: true, guideMode: 'own', tutoringGuideSeen: false })
     await persistCollections(set, get, ['classes', 'semesters', 'uts', 'competencies', 'criteria', 'tasks'])
     return true
   },
@@ -1009,9 +1011,18 @@ export const useAvaluaproStore = create((set, get) => ({
     set((state) => ({ onboarding: { ...state.onboarding, guideOpen } }))
     writePreferences({ ...readPreferences(), guideOpen })
   },
+  openGuide: (guideMode = null) => {
+    const nextGuideMode = guideMode || get().onboarding.guideMode || 'own'
+    set((state) => ({ onboarding: { ...state.onboarding, guideOpen: true, guideMode: nextGuideMode } }))
+    writePreferences({ ...readPreferences(), guideOpen: true, guideMode: nextGuideMode })
+  },
   setGuideMode: (guideMode) => {
     set((state) => ({ onboarding: { ...state.onboarding, guideMode } }))
     writePreferences({ ...readPreferences(), guideMode })
+  },
+  setTutoringGuideSeen: (tutoringGuideSeen = true) => {
+    set((state) => ({ onboarding: { ...state.onboarding, tutoringGuideSeen } }))
+    writePreferences({ ...readPreferences(), tutoringGuideSeen })
   },
   startOwnData: async () => {
     const shouldStart = window.confirm(
@@ -1037,8 +1048,8 @@ export const useAvaluaproStore = create((set, get) => ({
       activeInsight: 'dashboard',
     }
     const profile = { defaultSubject: '' }
-    const onboarding = { demoMode: false, guideOpen: false, guideMode: 'own' }
-    writePreferences({ ...ui, ...profile, demoMode: false, guideOpen: false, guideMode: 'own', backupMeta: null })
+    const onboarding = { demoMode: false, guideOpen: false, guideMode: 'own', tutoringGuideSeen: false }
+    writePreferences({ ...ui, ...profile, demoMode: false, guideOpen: false, guideMode: 'own', tutoringGuideSeen: false, backupMeta: null })
     set({
       ...EMPTY_DATASET,
       ui,
@@ -2227,8 +2238,8 @@ export const useAvaluaproStore = create((set, get) => ({
     await saveDataset(dataset)
     const ui = getInitialUi(dataset)
     const profile = { defaultSubject: DEMO_SUBJECT }
-    const onboarding = { demoMode: true, guideOpen: true, guideMode: 'demo' }
-    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: true, guideOpen: true, guideMode: 'demo', backupMeta: null })
+    const onboarding = { demoMode: true, guideOpen: true, guideMode: 'demo', tutoringGuideSeen: false }
+    writePreferences({ ...readPreferences(), ...ui, ...profile, demoMode: true, guideOpen: true, guideMode: 'demo', tutoringGuideSeen: false, backupMeta: null })
     set({ ...dataset, ui, profile, onboarding, backupMeta: null, status: 'ready', error: '' })
   },
 }))
