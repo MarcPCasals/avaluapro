@@ -11718,3 +11718,505 @@ button.profile-followup-card:focus-visible {
   border-left-color: #f97316;
   background: linear-gradient(90deg, rgba(249, 115, 22, 0.11), transparent 42%);
 }
+
+@media (min-width: 821px) and (max-width: 1180px) and (orientation: landscape) {
+  .top-bar {
+    min-height: 58px;
+    gap: 5px;
+    padding: 6px 8px;
+  }
+
+  .brand-card {
+    min-height: 42px;
+    max-width: 142px;
+    gap: 6px;
+    padding: 4px 7px;
+  }
+
+  .brand-card img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-card strong {
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .brand-card small {
+    max-width: 88px;
+    font-size: 7.5px;
+    line-height: 1.05;
+  }
+
+  .class-tabs {
+    flex: 1 1 350px;
+    min-width: 255px;
+    max-width: min(520px, 50vw);
+    padding: 5px;
+  }
+
+  .class-tab {
+    flex-basis: 52px;
+    max-width: 84px;
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+
+  .class-tabs.many .class-tab {
+    flex-basis: 42px;
+    max-width: 62px;
+    font-size: 12px;
+  }
+
+  .top-actions {
+    gap: 4px;
+  }
+
+  .top-actions .icon-button,
+  .avatar-button,
+  .top-menu-trigger {
+    min-width: 34px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .top-menu-trigger {
+    width: auto;
+    max-width: 150px;
+    padding: 5px 8px;
+  }
+
+  .top-menu-trigger span {
+    max-width: 104px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sync-pill {
+    min-height: 30px;
+    padding: 4px 7px;
+  }
+
+  .sync-pill strong {
+    font-size: 10px;
+  }
+
+  .sync-pill span {
+    font-size: 9px;
+  }
+
+  .top-divider {
+    height: 26px;
+    margin: 0 3px;
+  }
+
+  .demo-banner {
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+    padding: 9px 12px;
+  }
+
+  .demo-banner-copy {
+    gap: 9px;
+  }
+
+  .demo-banner-copy strong {
+    font-size: 13px;
+  }
+
+  .demo-banner-copy p {
+    max-width: 620px;
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+
+  .demo-pill {
+    min-height: 28px;
+    padding: 5px 8px;
+    font-size: 10.5px;
+  }
+
+  .demo-banner-actions {
+    gap: 7px;
+  }
+
+  .demo-banner-actions .primary-action,
+  .demo-banner-actions .secondary-action {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .main-navigation {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px 0;
+  }
+
+  .mode-tabs,
+  .semester-tabs,
+  .ut-tabs,
+  .insight-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .mode-tabs {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+
+  .insight-tabs {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .mode-tab,
+  .insight-tab,
+  .guide-tab,
+  .urgent-tab,
+  .semester-tab,
+  .ut-tab,
+  .tool-button {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .mode-tab {
+    min-width: 110px;
+  }
+
+  .urgent-tab {
+    padding-right: 18px;
+  }
+
+  .ut-tabs {
+    min-height: 48px;
+    padding: 7px 12px;
+  }
+
+  .toolbar {
+    gap: 7px;
+    padding: 10px 12px;
+  }
+
+  .toolbar .tool-button {
+    flex: 0 0 auto;
+  }
+
+  .grid-scroll {
+    overscroll-behavior: contain;
+  }
+
+  .evaluation-table {
+    min-width: 900px;
+  }
+
+  .tracking-table {
+    min-width: 980px;
+  }
+
+  .header-student,
+  .student-cell,
+  .tracking-student-header,
+  .tracking-student-cell {
+    width: 280px;
+    min-width: 280px;
+  }
+
+  .student-cell {
+    gap: 7px;
+    padding: 6px 8px;
+  }
+
+  .student-name {
+    max-width: 186px;
+    font-size: 13px;
+  }
+
+  .student-name small,
+  .tracking-student-cell small,
+  .profile-table small {
+    font-size: 10.5px;
+  }
+
+  .student-index {
+    flex-basis: 20px;
+    font-size: 12px;
+  }
+
+  .student-note-button {
+    width: 29px;
+    height: 29px;
+  }
+
+  .tracking-student-row {
+    grid-template-columns: minmax(0, 1fr) 66px;
+    gap: 6px;
+    min-height: 82px;
+    padding: 6px 8px;
+  }
+
+  .tracking-student-main {
+    gap: 7px;
+  }
+
+  .tracking-student-name strong {
+    max-width: 165px;
+    font-size: 11.5px;
+    line-height: 1.18;
+  }
+
+  .student-flags {
+    grid-template-columns: repeat(2, 30px);
+    gap: 4px;
+  }
+
+  .student-flags button,
+  .red-point-stack {
+    min-width: 28px;
+    width: 30px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .task-header {
+    min-width: 146px;
+    height: 42px;
+    padding: 6px 34px 16px 6px;
+  }
+
+  .task-title-button {
+    max-width: 104px;
+    font-size: 12px;
+  }
+
+  .task-completion-summary span {
+    min-height: 22px;
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+
+  .task-header-action,
+  .task-delete-button {
+    right: 4px;
+    width: 26px;
+    height: 26px;
+  }
+
+  .task-header-action.done-all {
+    top: 32px;
+  }
+
+  .task-header-action.reminder {
+    top: 58px;
+  }
+
+  .task-header-action.info {
+    top: 84px;
+  }
+
+  .task-cell {
+    height: 82px;
+  }
+
+  .status-group {
+    gap: 4px;
+  }
+
+  .status-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .tracking-summary {
+    min-width: 136px;
+    height: 82px;
+    padding: 8px;
+  }
+
+  .tracking-summary strong {
+    margin-top: 4px;
+    font-size: 15px;
+  }
+
+  .tracking-summary small {
+    font-size: 11px;
+  }
+
+  .analytics-view {
+    padding: 14px;
+  }
+
+  .analytics-hero,
+  .analytics-grid,
+  .diagnosis-grid,
+  .action-list-grid,
+  .tracking-action-grid,
+  .tutorial-group-diagnosis-grid,
+  .tutorial-meeting-dashboard {
+    gap: 10px;
+  }
+
+  .diagnosis-grid,
+  .analytics-grid,
+  .tutorial-group-diagnosis-grid,
+  .tutorial-meeting-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .action-list-grid,
+  .tracking-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card,
+  .action-card,
+  .tutorial-group-diagnosis-grid article,
+  .tutorial-meeting-dashboard article {
+    padding: 12px;
+  }
+
+  .tutorial-tool-launch-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .tutorial-tool-launch-grid button {
+    min-height: 122px;
+    padding: 14px;
+  }
+
+  .tutorial-tool-launch-grid strong {
+    font-size: 17px;
+  }
+
+  .relationship-tool-panel.active {
+    inset: 10px;
+    padding: 12px;
+  }
+
+  .tutorial-sociogram-visual-card,
+  .cooperative-generator-panel,
+  .tutorial-seating-planner-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .tutorial-sociogram-visual-card > header,
+  .tutorial-seating-planner-panel > header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tutorial-sociogram-visual-card h2,
+  .tutorial-seating-planner-panel h2 {
+    font-size: 18px;
+  }
+
+  .tutorial-sociogram-visual-card p,
+  .tutorial-seating-planner-panel p {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .tutorial-sociogram-actions,
+  .tutorial-sociogram-filter-tabs,
+  .tutorial-seating-version-presets,
+  .tutorial-seating-saved-list {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .tutorial-sociogram-canvas {
+    min-height: 440px;
+  }
+
+  .tutorial-sociogram-node {
+    width: 92px;
+    min-height: 66px;
+    padding: 6px;
+  }
+
+  .tutorial-sociogram-node strong {
+    font-size: 10.5px;
+  }
+
+  .tutorial-seating-controls {
+    grid-template-columns: repeat(4, minmax(92px, 1fr));
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .tutorial-seating-controls input,
+  .tutorial-seating-controls select {
+    min-height: 34px;
+    padding: 6px 8px;
+  }
+
+  .tutorial-seating-matrix-help.compact,
+  .tutorial-seating-review-summary,
+  .tutorial-seating-pending-list {
+    padding: 9px 10px;
+  }
+
+  .tutorial-seating-board-grid {
+    grid-template-columns: repeat(9, minmax(76px, 1fr));
+    gap: 6px;
+    min-height: min(60vh, 520px);
+    padding: 10px;
+  }
+
+  .tutorial-seat-card {
+    min-height: 78px;
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .tutorial-seat-student-media {
+    width: 32px;
+    height: 32px;
+  }
+
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .modal-panel {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .modal-panel.lg,
+  .modal-panel.xl {
+    width: min(96vw, 1120px);
+  }
+
+  .modal-header {
+    min-height: 54px;
+    padding: 12px 14px;
+  }
+
+  .modal-body {
+    padding: 14px;
+  }
+
+  .student-manager {
+    grid-template-columns: minmax(260px, 0.52fr) minmax(480px, 1.48fr);
+    gap: 12px;
+  }
+
+  .guided-tour-card {
+    max-width: min(420px, calc(100vw - 28px));
+  }
+}
