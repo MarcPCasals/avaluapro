@@ -301,7 +301,7 @@ function getClassUts(state, classId) {
 
 function getUtCompetencies(state, utId) {
   return state.competencies
-    .filter((competency) => competency.utId === utId)
+    .filter((competency) => competency.utId === utId && !competency.inactive)
     .sort((a, b) => a.order - b.order)
     .map((competency) => ({
       ...competency,

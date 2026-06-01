@@ -1718,27 +1718,17 @@ export const useAvaluaproStore = create((set, get) => ({
 
     if (!isActive) {
       disabledNames.add(competencyName)
-      const criterionIds = existingCompetency
-        ? state.criteria
-            .filter((criterion) => criterion.competencyId === existingCompetency.id)
-            .map((criterion) => criterion.id)
-        : []
-
       set((current) => ({
         uts: current.uts.map((item) =>
           item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
         ),
         competencies: existingCompetency
-          ? current.competencies.filter((competency) => competency.id !== existingCompetency.id)
+          ? current.competencies.map((competency) =>
+              competency.id === existingCompetency.id ? { ...competency, inactive: true } : competency,
+            )
           : current.competencies,
-        criteria: existingCompetency
-          ? current.criteria.filter((criterion) => criterion.competencyId !== existingCompetency.id)
-          : current.criteria,
-        marks: criterionIds.length > 0
-          ? current.marks.filter((mark) => !criterionIds.includes(mark.criterionId))
-          : current.marks,
       }))
-      await persistCollections(set, get, ['uts', 'competencies', 'criteria', 'marks'])
+      await persistCollections(set, get, ['uts', 'competencies'])
       return
     }
 
@@ -1748,8 +1738,11 @@ export const useAvaluaproStore = create((set, get) => ({
         uts: current.uts.map((item) =>
           item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
         ),
+        competencies: current.competencies.map((competency) =>
+          competency.id === existingCompetency.id ? { ...competency, inactive: false } : competency,
+        ),
       }))
-      await persistCollections(set, get, ['uts'])
+      await persistCollections(set, get, ['uts', 'competencies'])
       return
     }
 
@@ -1915,8 +1908,13 @@ export const useAvaluaproStore = create((set, get) => ({
           uts: state.uts.map((ut) =>
             ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
           ),
+          competencies: state.competencies.map((competency) =>
+            competency.utId === utId && requestedNames.has(competency.name)
+              ? { ...competency, inactive: false }
+              : competency,
+          ),
         }))
-        await persistCollections(set, get, ['uts'])
+        await persistCollections(set, get, ['uts', 'competencies'])
       }
       return
     }
@@ -1925,7 +1923,14 @@ export const useAvaluaproStore = create((set, get) => ({
       uts: state.uts.map((ut) =>
         ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
       ),
-      competencies: [...state.competencies, ...newCompetencies],
+      competencies: [
+        ...state.competencies.map((competency) =>
+          requestedNames && competency.utId === utId && requestedNames.has(competency.name)
+            ? { ...competency, inactive: false }
+            : competency,
+        ),
+        ...newCompetencies,
+      ],
       criteria: [...state.criteria, ...newCriteria],
     }))
     await persistCollections(set, get, ['uts', 'competencies', 'criteria'])

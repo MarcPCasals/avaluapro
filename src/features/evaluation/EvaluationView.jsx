@@ -25,7 +25,7 @@ function useEvaluationModel() {
       .filter((student) => student.classId === activeClassId)
       .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
     const competencies = allCompetencies
-      .filter((competency) => competency.utId === activeUtId)
+      .filter((competency) => competency.utId === activeUtId && !competency.inactive)
       .sort((a, b) => a.order - b.order)
       .map((competency) => {
         const criteria = allCriteria

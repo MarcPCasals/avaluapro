@@ -36,7 +36,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
   const activeClass = state.classes.find((classItem) => classItem.id === state.ui.activeClassId)
   const activeSubject = getSubjectOption(activeClass?.subject)
   const subjectStructure = getSubjectStructure(activeSubject?.name)
-  const activeCompetencies = useMemo(
+  const utCompetencies = useMemo(
     () =>
       state.competencies
         .filter((competency) => competency.utId === activeUtId)
@@ -48,6 +48,10 @@ export function EditStructureModal({ activeUtId, onClose }) {
             .sort((a, b) => a.order - b.order),
         })),
     [activeUtId, state.competencies, state.criteria],
+  )
+  const activeCompetencies = useMemo(
+    () => utCompetencies.filter((competency) => !competency.inactive),
+    [utCompetencies],
   )
 
   const targetUts = state.uts.filter((ut) =>

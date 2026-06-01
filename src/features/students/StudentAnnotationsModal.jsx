@@ -254,7 +254,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const activeCompetencies = useMemo(
     () =>
       competencies
-        .filter((competency) => competency.utId === activeUtId)
+        .filter((competency) => competency.utId === activeUtId && !competency.inactive)
         .sort((a, b) => a.order - b.order)
         .map((competency) => ({
           ...competency,
