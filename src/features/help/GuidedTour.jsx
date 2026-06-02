@@ -40,57 +40,34 @@ const tourSteps = [
     mode: 'evaluation',
   },
   {
-    target: 'student-comments',
-    title: '7. Anotacions i resum per reunió',
-    text: 'La bombolla obre el resum per reunió: diagnòstics, notes de la UT, seguiment i entrades d’equip educatiu o tutoria. El nom de l’alumne queda reservat per al perfil personal.',
-    action: 'Clica la bombolla del primer alumne per obrir el resum d’anotacions.',
-    completeWhen: 'annotations-open',
-    mode: 'evaluation',
-  },
-  {
-    target: 'annotation-team',
-    title: '8. Afegeix una entrada d’equip educatiu',
-    text: 'Les entrades d’equip educatiu queden separades per data i marquen l’alumne en vermell perquè ho vegis durant la classe.',
-    action: 'Escriu una entrada breu de prova i prem “+ Nova entrada”.',
-    completeWhen: 'agenda-note-added',
-    mode: 'evaluation',
-  },
-  {
-    target: 'modal-close',
-    title: '9. Torna a la taula',
-    text: 'Després de revisar una fitxa, pots tancar-la i continuar treballant a la taula sense perdre el context.',
-    action: 'Tanca la fitxa d’anotacions per continuar.',
-    completeWhen: 'annotations-closed',
-    mode: 'evaluation',
-  },
-  {
     target: 'tracking-toolbar',
-    title: '10. Seguiment de tasques',
+    title: '7. Seguiment de tasques',
     text: 'Crea tasques, filtra per mig grup, mostra tasques passades i obre la intervenció setmanal quan necessitis decidir prioritats.',
     mode: 'tracking',
     ensureTrackingTasks: true,
   },
   {
-    target: 'tracking-table',
-    title: '11. Marca hàbits de treball',
-    text: 'Cada cel·la permet marcar feta, incompleta, no feta o exempt. També pots afegir notes i recordatoris.',
-    action: 'Canvia l’estat d’una cel·la de tasca per veure com es desa el seguiment.',
-    completeWhen: 'task-record-changed',
+    target: 'demo-marti-missing-button',
+    title: '8. Marca una tasca no feta',
+    text: 'Ara farem un canvi real a la demo perquè vegis com una sola dada modifica la lectura de constància.',
+    action: 'A MARTÍ VILA, Arnau, marca la primera tasca com a no feta. Mira com la constància passa a intervenció prioritària.',
+    completeWhen: 'demo-marti-missing',
     mode: 'tracking',
     ensureTrackingTasks: true,
+    placement: 'above',
   },
   {
     target: 'tracking-student-actions',
-    title: '12. Punts vermells, negres i diari',
+    title: '9. Punts vermells, negres i diari',
     text: 'Els punts vermells venen de tasques no fetes. El triangle registra incidències i el llibre guarda observacions sense negatiu.',
     mode: 'tracking',
     ensureTrackingTasks: true,
   },
   {
-    target: 'tracking-student-actions',
-    title: '13. Nota a l’agenda amb 3 negatius',
+    target: 'demo-joel-missing-button',
+    title: '10. Nota a l’agenda amb 3 negatius',
     text: 'Quan un alumne arriba a tres tasques no fetes, Avaluapro et mostra la nota a l’agenda amb el motiu i les tasques que l’han generada.',
-    action: 'Marca una altra tasca com a no feta en un alumne que ja tingui punts vermells per veure com s’obre la nota a l’agenda.',
+    action: 'A CASALS ORRI, Joel, marca una tasca més com a no feta perquè s’obri la nota a l’agenda.',
     completeWhen: 'agenda-warning-open',
     mode: 'tracking',
     ensureTrackingTasks: true,
@@ -98,7 +75,7 @@ const tourSteps = [
   },
   {
     target: 'agenda-warning-modal',
-    title: '14. Registra la nota a l’agenda',
+    title: '11. Registra la nota a l’agenda',
     text: 'El programa recorda quines tasques han generat la nota. Pots copiar el text, donar una darrera oportunitat o registrar que ja has posat la nota.',
     action: 'Prem “Registrar nota a l’agenda” perquè quedi marcat a la fila de l’alumne.',
     completeWhen: 'agenda-note-added',
@@ -106,16 +83,16 @@ const tourSteps = [
     placement: 'left',
   },
   {
-    target: 'stats-global',
-    title: '15. Estadístiques globals',
-    text: 'Aquí és on es creuen rendiment, constància i comportament per trobar alumnes en risc, reforç conceptual i hàbits fràgils.',
-    dashboardScope: 'executive',
-    mode: 'analytics',
-    insight: 'dashboard',
+    target: 'main-navigation',
+    title: '12. Ves a Estadístiques',
+    text: 'Ara toca veure què fa el programa amb les dades que acabes de modificar.',
+    action: 'Clica “Estadístiques” a la navegació principal.',
+    completeWhen: 'analytics-open',
+    placement: 'below',
   },
   {
     target: 'stats-scope-tabs',
-    title: '16. Filtra les estadístiques per tema',
+    title: '13. Filtra les estadístiques per tema',
     text: 'Les pestanyes eviten que tot aparegui barrejat. Primer mires el resum i després entres a Avaluació, UT activa, Seguiment o Creuada.',
     action: 'Clica la pestanya “Avaluació” per veure només notes, evolució i criteris.',
     completeWhen: 'stats-evaluation-open',
@@ -126,7 +103,7 @@ const tourSteps = [
   },
   {
     target: 'stats-scope-tabs',
-    title: '17. Estadístiques d’avaluació',
+    title: '14. Estadístiques d’avaluació',
     text: 'Aquí veus la comparativa de notes per UT, alumnes que pugen o baixen i la distribució per criteris sense barrejar-hi tasques.',
     action: 'Clica “UT activa” per passar al resum de la unitat que tens seleccionada.',
     completeWhen: 'stats-ut-open',
@@ -137,7 +114,7 @@ const tourSteps = [
   },
   {
     target: 'stats-scope-tabs',
-    title: '18. Estadístiques de la UT activa',
+    title: '15. Estadístiques de la UT activa',
     text: 'Aquest bloc serveix per decidir què reforçar en una unitat concreta: criteris prioritaris, alumnes a revisar i tasques associades.',
     action: 'Clica “Seguiment” per veure només constància, punts i notes a l’agenda.',
     completeWhen: 'stats-tracking-open',
@@ -148,7 +125,7 @@ const tourSteps = [
   },
   {
     target: 'stats-scope-tabs',
-    title: '19. Estadístiques de seguiment',
+    title: '16. Estadístiques de seguiment',
     text: 'Aquí no hi ha notes: només hàbits, tasques incompletes, punts vermells, punts negres i possibles notes a l’agenda.',
     action: 'Clica “Creuada” per veure com es relacionen rendiment, constància i comportament.',
     completeWhen: 'stats-cross-open',
@@ -159,27 +136,49 @@ const tourSteps = [
   },
   {
     target: 'stats-cross',
-    title: '20. Anàlisi creuada',
+    title: '17. Anàlisi creuada',
     text: 'Aquesta vista és la més potent per detectar patrons: alumnes constants amb dificultat, alumnes bons però poc constants o risc combinat.',
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
   },
   {
-    target: 'data-menu',
-    title: '21. Dades, còpies i Firebase',
-    text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
-    action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
-    completeWhen: 'data-menu-open',
+    target: 'stats-performance-detail',
+    title: '18. Evolució individual des de la creuada',
+    text: 'El botó de detall del rendiment obre les notes, la trajectòria temporal i el gràfic inici-final de l’alumne.',
+    action: 'Clica el botó de gràfic d’un alumne per veure el detall de rendiment.',
+    completeWhen: 'student-evolution-open',
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',
     placement: 'left',
   },
   {
+    target: 'modal-close',
+    title: '19. Torna a les estadístiques',
+    text: 'Quan ja hagis vist les notes i la trajectòria de l’alumne, tanca el detall per continuar amb el menú de dades.',
+    action: 'Tanca el detall d’evolució individual.',
+    completeWhen: 'student-evolution-closed',
+    dashboardScope: 'cross',
+    mode: 'analytics',
+    insight: 'dashboard',
+    placement: 'left',
+  },
+  {
+    target: 'data-menu',
+    title: '20. Dades, còpies i Firebase',
+    text: 'El menú Dades concentra còpies de seguretat, importació, exportació i sincronització. És el lloc clau abans de fer canvis importants.',
+    action: 'Obre el menú “Dades i Compte” per veure on són les còpies i l’estat de sincronització.',
+    completeWhen: 'data-menu-open',
+    dashboardScope: 'cross',
+    mode: 'analytics',
+    insight: 'dashboard',
+    placement: 'far-left',
+  },
+  {
     target: 'start-own-data',
-    title: '22. Comença amb les teves dades',
-    text: 'Abans de començar, xafardeja una mica la demo i mira sobretot les estadístiques: amb dades reals trigaran uns dies o setmanes a mostrar aquests fruits. Quan estiguis llest, clica el botó per començar amb les teves dades.',
+    title: '21. Comença amb les teves dades',
+    text: 'Abans de començar, xafardeja una mica la demo i mira sobretot les estadístiques: amb dades reals trigaran uns dies o setmanes a mostrar aquests fruits. Quan estiguis llest, clica el botó per començar amb les teves dades. Ara pots minimitzar aquesta finestra i tornar-la a obrir quan estiguis llest, o tancar-la amb la creu i prémer després el botó “Començar amb les meves dades”.',
     mode: 'analytics',
     insight: 'dashboard',
     final: true,
@@ -190,16 +189,16 @@ const ownDataTourSteps = [
   {
     target: 'manage-students-button',
     title: '1. Afegeix la teva classe',
-    text: 'El primer pas real és afegir alumnes. Enganxa una llista amb un alumne per línia en format “Cognom Cognom, Nom”.',
-    action: 'Obre Gestió d’Alumnes per veure on s’afegeixen i s’organitzen els alumnes.',
-    completeWhen: 'students-open',
+    text: 'El primer pas real és afegir alumnes. Enganxa una llista amb un alumne per línia en format “Cognom Cognom, Nom”. Quan hagis pujat els noms, prem el botó “Acció feta”.',
+    action: 'Obre Gestió d’Alumnes, enganxa la llista i afegeix els alumnes.',
+    completeWhen: 'class-students-loaded',
     mode: 'evaluation',
     placement: 'left',
   },
   {
     target: 'student-manager-bulk',
     title: '2. Mitjos grups ràpids',
-    text: 'Selecciona diversos alumnes i aplica Grup A, Grup B o qualsevol mig grup que hagis configurat. Això evita editar-los un per un.',
+    text: 'Selecciona diversos alumnes i aplica Grup A, Grup B o qualsevol mig grup que hagis configurat. També pots afegir fotos des d’aquí; més endavant les podràs canviar des de Gestió d’Alumnes o des del perfil.',
     mode: 'evaluation',
     placement: 'left',
   },
@@ -340,17 +339,74 @@ const ownDataTourSteps = [
     requiresClassStudents: true,
   },
   {
-    target: 'evaluation-table',
+    target: 'student-name-open',
     title: '21. Perfil i anotacions',
-    text: 'Clicant el nom obres la fitxa personal amb diagnòstics i anotacions. Clicant la bombolla obres el resum de la UT i l’evolució de l’alumne.',
+    text: 'Quan passis el cursor per sobre d’un nom d’alumne, veuràs que es torna blau. Clicant-hi a sobre, obres el perfil: foto, diagnòstics i informació general.',
+    action: 'Clica el nom d’un alumne per obrir el seu perfil.',
+    completeWhen: 'student-profile-open',
+    mode: 'evaluation',
+    requiresClassStudents: true,
+    placement: 'right',
+  },
+  {
+    target: 'annotation-diagnosis',
+    title: '22. Diagnòstics i color de fila',
+    text: 'Els diagnòstics serveixen perquè la fila de l’alumne tingui un color visual. Si un alumne té més d’un diagnòstic, mana el que queda més a la dreta.',
+    mode: 'evaluation',
+    requiresClassStudents: true,
+    placement: 'left',
+  },
+  {
+    target: 'modal-close',
+    title: '23. Torna a la taula',
+    text: 'Tanca el perfil per veure ara la diferència entre perfil personal i resum d’anotacions.',
+    action: 'Tanca el perfil de l’alumne.',
+    completeWhen: 'student-profile-closed',
+    mode: 'evaluation',
+    requiresClassStudents: true,
+    placement: 'left',
+  },
+  {
+    target: 'student-comments',
+    title: '24. Bombolla d’anotacions',
+    text: 'La bombolla obre el resum per reunió: diagnòstics, nota de la UT, seguiment i entrades d’equip educatiu o tutoria.',
+    action: 'Clica la bombolla d’un alumne per obrir el resum d’anotacions.',
+    completeWhen: 'annotations-open',
     mode: 'evaluation',
     requiresClassStudents: true,
   },
   {
-    target: 'main-navigation',
-    title: '22. Ja pots començar',
-    text: 'Ara tens el mapa bàsic: alumnes, notes, seguiment, estadístiques, còpies i sync. Pots tancar aquesta guia i començar a treballar amb les teves dades.',
+    target: 'annotation-team',
+    title: '25. Entrada d’equip educatiu',
+    text: 'Quan escrius una entrada d’equip educatiu, la bombolla queda marcada en vermell. Això t’avisa durant la classe que hi ha informació important.',
+    action: 'Escriu una entrada breu i prem “+ Nova entrada”.',
+    completeWhen: 'agenda-note-added',
     mode: 'evaluation',
+    requiresClassStudents: true,
+    placement: 'above',
+  },
+  {
+    target: 'annotation-panel',
+    title: '26. Resum ràpid per reunió',
+    text: 'A dalt tens accessos ràpids a diagnòstics, equips educatius i comentaris de tutoria. Són dreceres per consultar i afegir informació sense perdre temps.',
+    mode: 'evaluation',
+    requiresClassStudents: true,
+    placement: 'left',
+  },
+  {
+    target: 'main-navigation',
+    title: '27. Ja pots començar',
+    text: 'Ara tens el mapa bàsic: alumnes, notes, seguiment, estadístiques, còpies i sync. Abans d’acabar, una pregunta: també ets tutor/a d’aquest grup?',
+    mode: 'evaluation',
+    tutorChoice: true,
+    requiresClassStudents: true,
+  },
+  {
+    target: 'class-settings',
+    title: '28. Activa la tutoria si et cal',
+    text: 'Si ets tutor/a, entra a la configuració de classe i marca el grup com a tutoria. Quan aparegui el botó “Mode tutoria”, s’activarà una guia específica només per aquesta part.',
+    mode: 'evaluation',
+    placement: 'left',
     final: true,
     requiresClassStudents: true,
   },
@@ -372,7 +428,9 @@ const tutoringTourSteps = [
     target: 'tutoring-mode-button',
     title: '1. Mode tutoria',
     text: 'Aquest espai només apareix quan una classe s’ha marcat com a tutoria. Serveix per mirar el grup sencer, no només una assignatura.',
-    mode: 'tutoring',
+    action: 'Clica el botó “Mode tutoria” per entrar-hi.',
+    completeWhen: 'tutoring-mode-open',
+    placement: 'below',
   },
   {
     target: 'tutoring-hero',
@@ -389,7 +447,7 @@ const tutoringTourSteps = [
   {
     target: 'tutoring-group-diagnosis',
     title: '4. Diagnòstic del grup',
-    text: 'Aquí veus el percentatge de competències no assolides, cobertura de dades, àrees de dificultat i alumnes que convé mirar primer.',
+    text: 'Aquí veus el percentatge de competències no assolides, cobertura de dades, àrees de dificultat i alumnes que convé mirar primer. Al principi pot haver-hi poca informació: les estadístiques apareixen a mesura que carregues notes.',
     mode: 'tutoring',
   },
   {
@@ -397,6 +455,7 @@ const tutoringTourSteps = [
     title: '5. Seguiment tutorial',
     text: 'Obre aquesta pestanya per registrar notes a l’agenda, fulls d’incidència, expulsions d’aula o de centre. Són dades pròpies del tutor.',
     action: 'Clica “Seguiment tutorial” quan vulguis veure aquest apartat.',
+    completeWhen: 'tutoring-tracking-open',
     mode: 'tutoring',
   },
   {
@@ -404,19 +463,39 @@ const tutoringTourSteps = [
     title: '6. Relacions i grups',
     text: 'Des d’aquí es construeix el sociograma, els grups cooperatius i la disposició d’aula. Les fotos venen del perfil de l’alumne.',
     action: 'Clica “Relacions i grups” per entrar a les eines socials del grup.',
+    completeWhen: 'tutoring-relationships-open',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-relationship-tools',
+    title: '7. Tres eines socials',
+    text: 'Les targetes obren el sociograma, els grups cooperatius i la disposició d’aula en gran. Així la pestanya queda neta i cada eina té espai per treballar.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-relation-form',
+    title: '8. Registra relacions',
+    text: 'Aquí pots escriure el nom d’un alumne i triar ràpidament la relació: afinitat, treballa bé o evitar. El cercador és més ràpid que recórrer tota la llista.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-relation-search',
+    title: '9. Consulta un alumne',
+    text: 'El cercador per alumne resumeix les relacions registrades i et dona accés ràpid al sociograma amb aquell alumne al centre.',
     mode: 'tutoring',
   },
   {
     target: 'tutoring-panel-tabs',
-    title: '7. Perfil i PDF',
+    title: '10. Perfil i PDF',
     text: 'Aquest apartat prepara el perfil individual de l’alumne i el resum descarregable per reunions o seguiment tutorial.',
     action: 'Clica “Perfil i PDF” quan vulguis revisar perfils individuals.',
+    completeWhen: 'tutoring-profile-open',
     mode: 'tutoring',
   },
   {
-    target: 'guide-button',
-    title: '8. Recupera la guia quan calgui',
-    text: 'El botó Guia queda sempre visible. Si tanques aquesta ajuda, pots tornar-la a obrir sense reiniciar res.',
+    target: 'tutoring-profile-panel',
+    title: '11. Final de la guia de tutoria',
+    text: 'Ja tens situades les tres peces: diagnòstic global, seguiment tutorial i mapa social del grup. Pots recuperar aquesta guia des del botó “?” quan calgui.',
     mode: 'tutoring',
     final: true,
   },
@@ -429,6 +508,12 @@ function clamp(value, min, max) {
 function getPosition(rect, placement = 'auto') {
   const cardWidth = Math.min(390, window.innerWidth - 32)
   const cardHeight = Math.min(330, window.innerHeight - 32)
+
+  if (placement === 'far-left') {
+    const left = clamp(rect.left - cardWidth - 96, 16, window.innerWidth - cardWidth - 16)
+    const top = clamp(rect.top + rect.height / 2 - cardHeight / 2, 16, window.innerHeight - cardHeight - 16)
+    return { left, top, width: cardWidth }
+  }
 
   if (placement === 'right' || placement === 'left') {
     const rightSide = rect.right + 14
@@ -478,12 +563,24 @@ function getGuideSnapshot() {
 function getCompletionState(step, baseline, current) {
   if (!step?.completeWhen) return true
 
+  if (step.completeWhen === 'analytics-open') {
+    return Boolean(document.querySelector('[data-tour="stats-scope-tabs"]'))
+  }
+
   if (step.completeWhen === 'annotations-open') {
-    return Boolean(document.querySelector('.annotations-panel'))
+    return Boolean(document.querySelector('.annotations-panel:not(.profile-personal-panel)'))
   }
 
   if (step.completeWhen === 'annotations-closed') {
-    return !document.querySelector('.annotations-panel')
+    return !document.querySelector('.annotations-panel:not(.profile-personal-panel)')
+  }
+
+  if (step.completeWhen === 'student-profile-open') {
+    return Boolean(document.querySelector('.profile-personal-panel'))
+  }
+
+  if (step.completeWhen === 'student-profile-closed') {
+    return !document.querySelector('.profile-personal-panel')
   }
 
   if (step.completeWhen === 'students-open') {
@@ -500,6 +597,21 @@ function getCompletionState(step, baseline, current) {
 
   if (step.completeWhen === 'agenda-warning-open') {
     return Boolean(document.querySelector('.agenda-warning-modal'))
+  }
+
+  if (step.completeWhen === 'demo-marti-missing') {
+    const state = useAvaluaproStore.getState()
+    return state.taskRecords.some(
+      (record) => record.studentId === 'student_6' && record.taskId === 'task_1' && record.status === 'MISSING',
+    )
+  }
+
+  if (step.completeWhen === 'student-evolution-open') {
+    return Boolean(document.querySelector('.student-evolution-detail'))
+  }
+
+  if (step.completeWhen === 'student-evolution-closed') {
+    return !document.querySelector('.student-evolution-detail')
   }
 
   if (step.completeWhen === 'task-record-changed') {
@@ -529,6 +641,22 @@ function getCompletionState(step, baseline, current) {
   if (step.completeWhen === 'class-students-loaded') {
     const state = useAvaluaproStore.getState()
     return state.students.some((student) => student.classId === state.ui.activeClassId)
+  }
+
+  if (step.completeWhen === 'tutoring-mode-open') {
+    return Boolean(document.querySelector('.tutoring-view'))
+  }
+
+  if (step.completeWhen === 'tutoring-tracking-open') {
+    return Boolean(document.querySelector('.tutorial-tracking-panel'))
+  }
+
+  if (step.completeWhen === 'tutoring-relationships-open') {
+    return Boolean(document.querySelector('.tutorial-relationships-panel'))
+  }
+
+  if (step.completeWhen === 'tutoring-profile-open') {
+    return Boolean(document.querySelector('.tutorial-profile-panel'))
   }
 
   return true
@@ -741,7 +869,17 @@ export function GuidedTour() {
               <small>
                 {safeStepIndex + 1}/{activeSteps.length}
               </small>
-              {step.final ? (
+              {step.tutorChoice ? (
+                <>
+                  <button className="secondary-action compact" onClick={closeTour} type="button">
+                    No soc tutor/a
+                  </button>
+                  <button className="primary-action compact" onClick={() => goToStep(safeStepIndex + 1)} type="button">
+                    Sí, soc tutor/a
+                    <ArrowRight size={15} />
+                  </button>
+                </>
+              ) : step.final ? (
                 <button className="primary-action compact" onClick={guideMode === 'demo' ? handleStartOwnData : closeTour} type="button">
                   <CheckCircle2 size={15} />
                   {guideMode === 'demo' ? 'Començar' : 'Tancar guia'}

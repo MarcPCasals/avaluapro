@@ -1141,9 +1141,15 @@ export function TrackingView() {
               const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
               const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
               const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
+              const isDemoMarti = student.id === 'student_6'
+              const isDemoJoel = student.id === 'student_12'
 
               return (
-                <tr className={getStudentRowClass(dominantDiagnosis)} key={student.id}>
+                <tr
+                  className={getStudentRowClass(dominantDiagnosis)}
+                  data-tour={isDemoMarti ? 'demo-marti-tracking-row' : isDemoJoel ? 'demo-joel-tracking-row' : undefined}
+                  key={student.id}
+                >
                   <td className="sticky-student tracking-student-cell">
                     <div className="tracking-student-row">
                       <div className="tracking-student-main">
@@ -1228,6 +1234,13 @@ export function TrackingView() {
                             return (
                               <button
                                 className={`status-button ${status.id.toLowerCase()} ${active ? 'active' : ''}`}
+                                data-tour={
+                                  status.id === 'MISSING' && isDemoMarti && task.id === 'task_1'
+                                    ? 'demo-marti-missing-button'
+                                    : status.id === 'MISSING' && isDemoJoel && task.id === 'task_4'
+                                      ? 'demo-joel-missing-button'
+                                      : undefined
+                                }
                                 key={status.id}
                                 onClick={() => handleTaskStatus(student, task.id, status.id)}
                                 title={status.label}

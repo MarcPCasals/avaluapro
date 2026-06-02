@@ -3883,17 +3883,17 @@ export function TutoringView() {
           </section>
 
           <section className="tutorial-tool-launch-grid" data-tour="tutoring-relationship-tools">
-            <button onClick={() => setActiveRelationshipTool('sociogram')} type="button">
+            <button data-tour="tutoring-tool-sociogram" onClick={() => setActiveRelationshipTool('sociogram')} type="button">
               <Network size={25} />
               <strong>Sociograma</strong>
               <span>Mapa visual de relacions reals del grup.</span>
             </button>
-            <button onClick={() => setActiveRelationshipTool('groups')} type="button">
+            <button data-tour="tutoring-tool-groups" onClick={() => setActiveRelationshipTool('groups')} type="button">
               <UsersRound size={25} />
               <strong>Grups cooperatius</strong>
               <span>Proposta automàtica amb rols, notes i relacions.</span>
             </button>
-            <button onClick={() => setActiveRelationshipTool('seating')} type="button">
+            <button data-tour="tutoring-tool-seating" onClick={() => setActiveRelationshipTool('seating')} type="button">
               <LayoutGrid size={25} />
               <strong>Disposició d’aula</strong>
               <span>Matriu flexible de taules i cadires.</span>
@@ -4511,7 +4511,7 @@ export function TutoringView() {
           </section>
 
           <div className="tutorial-relationships-grid">
-            <article className="tutoring-card tutorial-relation-form-card">
+            <article className="tutoring-card tutorial-relation-form-card" data-tour="tutoring-relation-form">
               <div>
                 <Plus size={24} />
                 <h2>Registrar relació</h2>
@@ -4695,7 +4695,7 @@ export function TutoringView() {
           </div>
 
           <div className="tutorial-relationships-grid detail">
-            <article className="tutoring-card tutorial-student-relation-search">
+            <article className="tutoring-card tutorial-student-relation-search" data-tour="tutoring-relation-search">
               <div>
                 <Search size={24} />
                 <h2>Cercador per alumne</h2>

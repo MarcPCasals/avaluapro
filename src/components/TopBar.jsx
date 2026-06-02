@@ -13,6 +13,7 @@ import {
   Plus,
   RotateCcw,
   RotateCw,
+  Send,
   Settings,
   Trash2,
   Upload,
@@ -22,6 +23,7 @@ import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
+import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
@@ -118,6 +120,7 @@ export function TopBar() {
   const [showNewClass, setShowNewClass] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showDataSafety, setShowDataSafety] = useState(false)
+  const [showTeacherPackages, setShowTeacherPackages] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [draggedClassId, setDraggedClassId] = useState('')
@@ -441,6 +444,16 @@ export function TopBar() {
                 <FileSpreadsheet size={18} />
                 Exportar notes UT
               </button>
+              <button
+                onClick={() => {
+                  setShowTeacherPackages(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Send size={18} />
+                Paquets de notes
+              </button>
               {cloud.user && (
                 <>
                   <span className="top-menu-separator" />
@@ -527,6 +540,7 @@ export function TopBar() {
         />
       )}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
+      {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
     </header>
   )
 }

@@ -2759,7 +2759,7 @@ export function AnalyticsView() {
               </tr>
             </thead>
             <tbody>
-              {visibleProfiles.map((profile) => {
+              {visibleProfiles.map((profile, index) => {
                 const decision = getGlobalDecision(profile)
                 const evidence = buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents)
                 return (
@@ -2786,6 +2786,7 @@ export function AnalyticsView() {
                         </span>
                         <button
                           className="mini-detail-button"
+                          data-tour={index === 0 ? 'stats-performance-detail' : undefined}
                           onClick={() => setSelectedEvolutionStudent(profile.student)}
                           title="Veure evolució individual"
                           type="button"

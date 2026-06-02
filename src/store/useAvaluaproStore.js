@@ -4,6 +4,11 @@ import { loadDataset, resetDatabase, saveCollections, saveDataset } from '../db/
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { getSubjectOption, getSubjectStructure } from '../data/subjects'
 import {
+  buildTeacherGradePackage,
+  getTutorialMarkUpdatesFromTeacherPackage,
+  previewTeacherGradePackage,
+} from '../lib/teacherGradePackages'
+import {
   listCloudBackups,
   loadCloudBackup,
   loadCloudDataset,
@@ -389,6 +394,25 @@ function getDatasetFromState(state) {
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] || [] }),
     {},
   )
+}
+
+function getTutoringRosterStudents(state, classId) {
+  const targetClass = state.classes.find((classItem) => classItem.id === classId)
+  const rosterClassId = targetClass?.tutorialLinkedClassId || classId
+
+  return state.students
+    .filter((student) => student.classId === rosterClassId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+}
+
+function getTeacherSender(state) {
+  const user = state.cloud.user
+
+  return {
+    email: user?.email || '',
+    name: user?.displayName || user?.email || '',
+    uid: user?.uid || '',
+  }
 }
 
 function parseBackupDataset(backup) {
@@ -1432,6 +1456,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const cleanUpdates = updates
       .map((update) => ({
         classId: update.classId,
+        source: update.source || null,
         studentId: update.studentId,
         subject: update.subject,
         competencyKey: update.competencyKey,
@@ -1463,6 +1488,7 @@ export const useAvaluaproStore = create((set, get) => ({
             subject: update.subject,
             competencyKey: update.competencyKey,
             criterionKey: null,
+            source: update.source || null,
             value: update.value,
             updatedAt: now,
           })),
@@ -1471,6 +1497,37 @@ export const useAvaluaproStore = create((set, get) => ({
       return { tutorialMarks }
     })
     await persistCollections(set, get, ['tutorialMarks'])
+  },
+
+  createTeacherGradePackage: (classId = get().ui.activeClassId) =>
+    buildTeacherGradePackage({
+      classId,
+      sender: getTeacherSender(get()),
+      state: get(),
+    }),
+
+  previewTeacherGradePackage: (packageData, classId = get().ui.activeClassId) =>
+    previewTeacherGradePackage({
+      packageData,
+      targetStudents: getTutoringRosterStudents(get(), classId),
+    }),
+
+  importTeacherGradePackage: async (packageData, classId = get().ui.activeClassId) => {
+    const state = get()
+    const targetStudents = getTutoringRosterStudents(state, classId)
+    const preview = previewTeacherGradePackage({ packageData, targetStudents })
+    const updates = getTutorialMarkUpdatesFromTeacherPackage({
+      packageData,
+      targetClassId: classId,
+      targetStudents,
+    })
+
+    await get().importTutorialMarks(updates)
+
+    return {
+      ...preview.summary,
+      importedGrades: updates.length,
+    }
   },
 
   addTutorialRecord: async ({ classId, studentId, type, date, note }) => {
