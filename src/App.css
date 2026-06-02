@@ -400,6 +400,27 @@
   text-align: left;
 }
 
+.top-menu-button-label {
+  flex: 1 1 auto;
+}
+
+.top-menu-badge {
+  min-width: 22px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #64748b;
+  background: #e2e8f0;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.top-menu-badge.active {
+  color: white;
+  background: #f97316;
+}
+
 .top-menu-account {
   display: grid;
   gap: 3px;
@@ -11164,6 +11185,12 @@ button.profile-followup-card:focus-visible {
   background: #fef2f2;
   border-color: #fecaca;
   color: #991b1b;
+}
+
+.teacher-package-message.warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
 }
 
 .teacher-package-actions {

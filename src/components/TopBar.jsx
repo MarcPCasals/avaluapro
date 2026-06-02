@@ -146,8 +146,13 @@ export function TopBar() {
   const pushAllToCloud = useAvaluaproStore((state) => state.pushAllToCloud)
   const pullFromCloud = useAvaluaproStore((state) => state.pullFromCloud)
   const createCloudBackup = useAvaluaproStore((state) => state.createCloudBackup)
+  const loadReceivedTeacherGradePackages = useAvaluaproStore((state) => state.loadReceivedTeacherGradePackages)
   const syncIndicator = getSyncIndicator(cloud)
   const SyncIcon = syncIndicator.icon
+  const pendingTeacherPackages = useMemo(
+    () => (cloud.teacherPackages || []).filter((packageItem) => packageItem.status !== 'imported').length,
+    [cloud.teacherPackages],
+  )
 
   useEffect(() => {
     if (!showDataMenu) return undefined
@@ -160,6 +165,12 @@ export function TopBar() {
     document.addEventListener('pointerdown', handleOutsidePointerDown)
     return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
   }, [showDataMenu])
+
+  useEffect(() => {
+    if (showDataMenu && cloud.user?.email) {
+      loadReceivedTeacherGradePackages()
+    }
+  }, [cloud.user?.email, loadReceivedTeacherGradePackages, showDataMenu])
 
   function handleDownloadBackup() {
     const backup = createBackup()
@@ -452,7 +463,10 @@ export function TopBar() {
                 type="button"
               >
                 <Send size={18} />
-                Paquets de notes
+                <span className="top-menu-button-label">Paquets de notes</span>
+                <em className={pendingTeacherPackages > 0 ? 'top-menu-badge active' : 'top-menu-badge'}>
+                  {pendingTeacherPackages}
+                </em>
               </button>
               {cloud.user && (
                 <>

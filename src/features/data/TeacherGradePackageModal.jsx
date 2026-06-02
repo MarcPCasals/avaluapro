@@ -418,12 +418,25 @@ function TeacherPackageReceivePanel({ activeClass }) {
             ))}
           </section>
 
+          {preview.summary.missingMatches > 0 && (
+            <div className="teacher-package-message warning">
+              <AlertTriangle size={18} />
+              {preview.summary.missingMatches} alumne/s no tenen una coincidència prou fiable i no s’importaran. Revisa
+              noms i cognoms abans de donar-ho per tancat.
+            </div>
+          )}
+
           <footer className="teacher-package-actions">
             <span>
-              Les coincidències parcials s’importen si el programa troba un alumne prou probable. En el següent bloc
-              hi afegirem revisió manual alumne per alumne abans de Firebase.
+              Les coincidències exactes i probables es poden importar directament. Les files marcades com “sense
+              coincidència” queden fora per evitar posar notes a un alumne equivocat.
             </span>
-            <button className="primary-action" onClick={handleImportPackage} type="button">
+            <button
+              className="primary-action"
+              disabled={preview.summary.importableGrades === 0}
+              onClick={handleImportPackage}
+              type="button"
+            >
               <CheckCircle2 size={18} />
               Importar notes
             </button>
