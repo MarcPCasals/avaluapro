@@ -19,6 +19,7 @@ export const COLLECTIONS = [
   'tutorialStudentRoles',
   'tutorialSeatingPlans',
   'seatingCharts',
+  'studentAntecedents',
 ]
 
 export const EMPTY_DATASET = COLLECTIONS.reduce(
@@ -487,4 +488,5 @@ export const seedDataset = {
   tutorialStudentRoles: [],
   tutorialSeatingPlans: [],
   seatingCharts: [],
+  studentAntecedents: [],
 }

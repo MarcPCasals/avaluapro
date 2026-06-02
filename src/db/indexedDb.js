@@ -1,7 +1,7 @@
 import { COLLECTIONS, EMPTY_DATASET } from '../data/seedData'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 9
+const DB_VERSION = 10
 
 const INDEXES = {
   students: ['classId'],
@@ -21,6 +21,7 @@ const INDEXES = {
   tutorialStudentRoles: ['classId', 'studentId', 'role'],
   tutorialSeatingPlans: ['classId'],
   seatingCharts: ['classId', 'halfGroup'],
+  studentAntecedents: ['studentId', 'classId'],
 }
 
 function ensureStore(db, collection) {

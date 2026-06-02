@@ -435,7 +435,8 @@ function parseBackupDataset(backup) {
           collection === 'tutorialGroupSets' ||
           collection === 'tutorialSociogramLayouts' ||
           collection === 'tutorialStudentRoles' ||
-          collection === 'tutorialSeatingPlans') &&
+          collection === 'tutorialSeatingPlans' ||
+          collection === 'studentAntecedents') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -1381,6 +1382,9 @@ export const useAvaluaproStore = create((set, get) => ({
       ),
       tutorialSeatingPlans: (state.tutorialSeatingPlans || []).filter((plan) => plan.classId !== classId),
       seatingCharts: state.seatingCharts.filter((chart) => chart.classId !== classId),
+      studentAntecedents: state.studentAntecedents.filter(
+        (antecedent) => antecedent.classId !== classId && !studentIds.has(antecedent.studentId),
+      ),
       ui,
     })
     writePreferences({ ...readPreferences(), ...ui })
@@ -2315,6 +2319,45 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['students'])
   },
 
+  upsertStudentAntecedent: async (studentId, patch) => {
+    const student = get().students.find((item) => item.id === studentId)
+    if (!student) return
+
+    const updatedAt = new Date().toISOString()
+
+    set((state) => {
+      const existing = state.studentAntecedents.find((antecedent) => antecedent.studentId === studentId)
+      const nextAntecedent = {
+        id: existing?.id || createId('ant'),
+        studentId,
+        classId: student.classId,
+        courseLabel: patch.courseLabel ?? existing?.courseLabel ?? '',
+        lastLookGrade: patch.lastLookGrade ?? existing?.lastLookGrade ?? '',
+        profile: patch.profile ?? existing?.profile ?? '',
+        qualitativeNotes: patch.qualitativeNotes ?? existing?.qualitativeNotes ?? '',
+        diagnosisSnapshot: patch.diagnosisSnapshot ?? existing?.diagnosisSnapshot ?? [],
+        createdAt: existing?.createdAt || updatedAt,
+        updatedAt,
+      }
+
+      return {
+        studentAntecedents: existing
+          ? state.studentAntecedents.map((antecedent) =>
+              antecedent.id === existing.id ? nextAntecedent : antecedent,
+            )
+          : [...state.studentAntecedents, nextAntecedent],
+      }
+    })
+    await persistCollections(set, get, ['studentAntecedents'])
+  },
+
+  deleteStudentAntecedent: async (studentId) => {
+    set((state) => ({
+      studentAntecedents: state.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
+    }))
+    await persistCollections(set, get, ['studentAntecedents'])
+  },
+
   deleteStudent: async (studentId) => {
     set((state) => ({
       students: state.students.filter((student) => student.id !== studentId),
@@ -2322,6 +2365,7 @@ export const useAvaluaproStore = create((set, get) => ({
       taskRecords: state.taskRecords.filter((record) => record.studentId !== studentId),
       behaviorEvents: state.behaviorEvents.filter((event) => event.studentId !== studentId),
       agendaNotes: state.agendaNotes.filter((note) => note.studentId !== studentId),
+      studentAntecedents: state.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
       tutorialGroupSets: (state.tutorialGroupSets || []).map((groupSet) => ({
         ...groupSet,
         groups: (groupSet.groups || []).map((group) => ({
@@ -2340,6 +2384,7 @@ export const useAvaluaproStore = create((set, get) => ({
       'taskRecords',
       'behaviorEvents',
       'agendaNotes',
+      'studentAntecedents',
       'tutorialGroupSets',
       'tutorialSociogramLayouts',
     ])

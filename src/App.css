@@ -7955,6 +7955,17 @@ button.tutorial-record-pill {
   gap: 8px;
 }
 
+.profile-section-title > div {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-section-title span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .profile-copy-state {
   margin: -2px 0 2px;
   color: #15803d;
@@ -7970,6 +7981,148 @@ button.tutorial-record-pill {
   background: #f8fafc;
   font-size: 12px;
   font-weight: 900;
+}
+
+.student-antecedents-section {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.antecedent-save-state {
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.antecedent-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 12px;
+}
+
+.antecedent-form-grid label,
+.antecedent-notes-field {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.antecedent-form-grid input,
+.antecedent-form-grid select,
+.antecedent-notes-field textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: #1f2937;
+  background: white;
+  font-size: 14px;
+  font-weight: 800;
+  outline: none;
+  text-transform: none;
+}
+
+.antecedent-form-grid input:focus,
+.antecedent-form-grid select:focus,
+.antecedent-notes-field textarea:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px #ffedd5;
+}
+
+.antecedent-notes-field textarea {
+  min-height: 98px;
+  resize: vertical;
+}
+
+.antecedent-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.antecedent-profile-button {
+  display: grid;
+  gap: 5px;
+  min-height: 92px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+  text-align: left;
+}
+
+.antecedent-profile-button strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.antecedent-profile-button span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.antecedent-profile-button.active.invisible {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.antecedent-profile-button.active.priority {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.antecedent-profile-button.active.ordinary {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.antecedent-profile-button.active.stable {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.antecedent-diagnosis-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.antecedent-diagnosis-row > div {
+  display: grid;
+  gap: 4px;
+}
+
+.antecedent-diagnosis-row strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.antecedent-diagnosis-row span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.antecedent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .profile-alert-grid {
@@ -10553,8 +10706,15 @@ button.profile-followup-card:focus-visible {
   .student-profile-summary,
   .profile-competency-grid,
   .profile-followup-grid,
-  .profile-alert-grid {
+  .profile-alert-grid,
+  .antecedent-form-grid,
+  .antecedent-profile-grid {
     grid-template-columns: 1fr;
+  }
+
+  .antecedent-diagnosis-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
