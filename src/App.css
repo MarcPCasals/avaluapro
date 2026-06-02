@@ -8043,6 +8043,69 @@ button.tutorial-record-pill {
   resize: vertical;
 }
 
+.antecedent-competencies-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.antecedent-competencies-card > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.antecedent-competencies-card strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.antecedent-competencies-card span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.antecedent-competency-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.antecedent-competency-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.antecedent-competency-row span {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.antecedent-competency-row select {
+  min-height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #1f2937;
+  background: white;
+  font-weight: 950;
+}
+
+.antecedent-competency-row select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px #ffedd5;
+  outline: none;
+}
+
 .antecedent-profile-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -10715,6 +10778,10 @@ button.profile-followup-card:focus-visible {
   .antecedent-diagnosis-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .antecedent-competency-row {
+    grid-template-columns: 1fr;
   }
 }
 

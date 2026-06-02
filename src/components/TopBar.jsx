@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Cloud,
   Download,
+  FileArchive,
   FileSpreadsheet,
   HelpCircle,
   LogIn,
@@ -121,6 +122,7 @@ export function TopBar() {
   const [showNewClass, setShowNewClass] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showDataSafety, setShowDataSafety] = useState(false)
+  const [dataSafetyInitialSection, setDataSafetyInitialSection] = useState('')
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
@@ -425,6 +427,7 @@ export function TopBar() {
               <span className="top-menu-separator" />
               <button
                 onClick={() => {
+                  setDataSafetyInitialSection('')
                   setShowDataSafety(true)
                   setShowDataMenu(false)
                 }}
@@ -432,6 +435,17 @@ export function TopBar() {
               >
                 <Cloud size={18} />
                 Còpies i estat
+              </button>
+              <button
+                onClick={() => {
+                  setDataSafetyInitialSection('antecedents')
+                  setShowDataSafety(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <FileArchive size={18} />
+                Antecedents curs vinent
               </button>
               <button
                 onClick={() => {
@@ -552,7 +566,12 @@ export function TopBar() {
         <ClassSettingsModal classId={activeClassId} onClose={() => setShowSettings(false)} />
       )}
       {showNewClass && <NewClassModal onClose={() => setShowNewClass(false)} />}
-      {showDataSafety && <DataSafetyModal onClose={() => setShowDataSafety(false)} />}
+      {showDataSafety && (
+        <DataSafetyModal
+          initialSection={dataSafetyInitialSection}
+          onClose={() => setShowDataSafety(false)}
+        />
+      )}
       {showHelp && (
         <HelpCenterModal
           onClose={() => setShowHelp(false)}

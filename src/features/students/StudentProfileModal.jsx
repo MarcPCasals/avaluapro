@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
+import { getSubjectStructure } from '../../data/subjects'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
@@ -31,6 +32,7 @@ function createAntecedentDraft(antecedent) {
   return {
     courseLabel: antecedent?.courseLabel || '',
     lastLookGrade: antecedent?.lastLookGrade || '',
+    competencyGrades: antecedent?.competencyGrades || {},
     profile: antecedent?.profile || '',
     qualitativeNotes: antecedent?.qualitativeNotes || '',
     diagnosisSnapshot: antecedent?.diagnosisSnapshot || [],
@@ -42,6 +44,9 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const { activeClassId } = state.ui
   const student = state.students.find((item) => item.id === studentId)
   const antecedent = state.studentAntecedents.find((item) => item.studentId === studentId)
+  const studentClass = state.classes.find((classItem) => classItem.id === student?.classId) ||
+    state.classes.find((classItem) => classItem.id === activeClassId)
+  const subjectCompetencies = getSubjectStructure(studentClass?.subject || state.profile.defaultSubject) || []
   const agendaNotes = state.agendaNotes
     .filter((note) => note.classId === activeClassId && note.studentId === studentId)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -77,6 +82,15 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
 
   const captureCurrentDiagnoses = () => {
     updateAntecedentDraft({ diagnosisSnapshot: diagnoses })
+  }
+
+  const updateAntecedentCompetencyGrade = (competencyName, grade) => {
+    updateAntecedentDraft({
+      competencyGrades: {
+        ...(antecedentDraft.competencyGrades || {}),
+        [competencyName]: grade,
+      },
+    })
   }
 
   const toggleDiagnosis = (diagnosisId) => {
@@ -233,7 +247,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
               />
             </label>
             <label>
-              Última mirada del curs anterior
+              Resum global del curs anterior
               <select
                 onChange={(event) => updateAntecedentDraft({ lastLookGrade: event.target.value })}
                 value={antecedentDraft.lastLookGrade}
@@ -245,6 +259,36 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="antecedent-competencies-card">
+            <div>
+              <strong>Última mirada per competències</strong>
+              <span>
+                {subjectCompetencies.length > 0
+                  ? `Matèria: ${studentClass?.subject || state.profile.defaultSubject || 'sense matèria'}`
+                  : 'Aquesta matèria encara no té competències preconfigurades.'}
+              </span>
+            </div>
+            {subjectCompetencies.length > 0 && (
+              <div className="antecedent-competency-grid">
+                {subjectCompetencies.map((competency) => (
+                  <label className="antecedent-competency-row" key={competency.name}>
+                    <span>{competency.name}</span>
+                    <select
+                      onChange={(event) => updateAntecedentCompetencyGrade(competency.name, event.target.value)}
+                      value={antecedentDraft.competencyGrades?.[competency.name] || ''}
+                    >
+                      {gradeOptions.map((grade) => (
+                        <option key={`${competency.name}-${grade || 'empty'}`} value={grade}>
+                          {grade || '-'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="antecedent-profile-grid">

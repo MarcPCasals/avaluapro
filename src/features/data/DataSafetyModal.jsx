@@ -117,6 +117,7 @@ function buildAntecedentsExport({ classItem, students, antecedents }) {
         antecedent: {
           courseLabel: antecedent.courseLabel || '',
           lastLookGrade: antecedent.lastLookGrade || '',
+          competencyGrades: antecedent.competencyGrades || {},
           profile: antecedent.profile || '',
           qualitativeNotes: antecedent.qualitativeNotes || '',
           diagnosisSnapshot: antecedent.diagnosisSnapshot || [],
@@ -145,9 +146,10 @@ function parseAntecedentsExport(payload) {
   }))
 }
 
-export function DataSafetyModal({ onClose }) {
+export function DataSafetyModal({ initialSection = '', onClose }) {
   const fileInputRef = useRef(null)
   const antecedentFileInputRef = useRef(null)
+  const antecedentSectionRef = useRef(null)
   const state = useAvaluaproStore()
   const createBackup = useAvaluaproStore((store) => store.createBackup)
   const restoreBackup = useAvaluaproStore((store) => store.restoreBackup)
@@ -206,6 +208,13 @@ export function DataSafetyModal({ onClose }) {
       cancelled = true
     }
   }, [loadCloudBackups, state.cloud.user])
+
+  useEffect(() => {
+    if (initialSection !== 'antecedents') return
+    window.setTimeout(() => {
+      antecedentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [initialSection])
 
   const handleDownloadBackup = () => {
     downloadJson(createBackup(), getBackupFilename(state))
@@ -307,6 +316,10 @@ export function DataSafetyModal({ onClose }) {
           studentId: student.id,
           courseLabel: row.antecedent.courseLabel || '',
           lastLookGrade: row.antecedent.lastLookGrade || '',
+          competencyGrades:
+            row.antecedent.competencyGrades && typeof row.antecedent.competencyGrades === 'object'
+              ? row.antecedent.competencyGrades
+              : {},
           profile: row.antecedent.profile || '',
           qualitativeNotes: row.antecedent.qualitativeNotes || '',
           diagnosisSnapshot: Array.isArray(row.antecedent.diagnosisSnapshot)
@@ -527,7 +540,7 @@ export function DataSafetyModal({ onClose }) {
           </section>
         )}
 
-        <section className="antecedent-transfer-card">
+        <section className="antecedent-transfer-card" ref={antecedentSectionRef}>
           <div>
             <FileArchive size={20} />
             <div>
