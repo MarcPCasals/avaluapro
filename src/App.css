@@ -370,47 +370,6 @@
   font-size: 13px;
 }
 
-.top-share-button {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  padding: 7px 9px;
-  color: #fed7aa;
-  background: rgba(251, 146, 60, 0.08);
-  font-weight: 950;
-}
-
-.top-share-button:hover {
-  border-color: #fb923c;
-  color: white;
-  background: rgba(249, 115, 22, 0.2);
-}
-
-.top-share-button span {
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.top-share-button em {
-  min-width: 22px;
-  border-radius: 999px;
-  padding: 3px 7px;
-  color: #94a3b8;
-  background: #1e293b;
-  font-style: normal;
-  font-size: 12px;
-  font-weight: 950;
-  text-align: center;
-}
-
-.top-share-button em.active {
-  color: white;
-  background: #f97316;
-}
-
 .top-menu-panel {
   min-width: 275px;
   display: grid;
@@ -8601,6 +8560,7 @@ button.profile-followup-card:focus-visible {
 
 .modal-header h2 {
   margin: 0;
+  color: #1f2937;
   font-size: 20px;
 }
 
@@ -10858,6 +10818,93 @@ button.profile-followup-card:focus-visible {
 .teacher-package-panel {
   display: grid;
   gap: 18px;
+  color: #1f2937;
+}
+
+.teacher-package-shell {
+  display: grid;
+  gap: 16px;
+  color: #1f2937;
+}
+
+.teacher-package-intro {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.teacher-package-intro strong {
+  color: #1f2937;
+  font-size: 1.08rem;
+  font-weight: 950;
+}
+
+.teacher-package-intro p {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.4;
+  margin: 4px 0 0;
+  max-width: 880px;
+}
+
+.teacher-package-mode-switch {
+  display: inline-flex;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 5px;
+  background: white;
+}
+
+.teacher-package-mode-switch button {
+  align-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #64748b;
+  display: inline-flex;
+  gap: 7px;
+  padding: 9px 13px;
+  background: transparent;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.teacher-package-mode-switch button.active {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.teacher-package-class-picker {
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff7ed;
+}
+
+.teacher-package-class-picker label {
+  align-items: center;
+  color: #9a3412;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  font-weight: 950;
+}
+
+.teacher-package-class-picker select {
+  min-height: 42px;
+  min-width: min(360px, 100%);
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  color: #1f2937;
+  background: white;
+  font: inherit;
+  font-weight: 850;
+  padding: 8px 10px;
 }
 
 .teacher-package-hero {
@@ -10891,7 +10938,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-hero strong {
-  color: var(--ink);
+  color: #1f2937;
   font-size: clamp(1.25rem, 2vw, 1.7rem);
 }
 
@@ -10921,7 +10968,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-recipient label {
-  color: var(--ink);
+  color: #1f2937;
   display: grid;
   font-weight: 950;
   gap: 4px;
@@ -10947,7 +10994,7 @@ button.profile-followup-card:focus-visible {
   background: white;
   border: 1px solid #fdba74;
   border-radius: 12px;
-  color: var(--ink);
+  color: #1f2937;
   font: inherit;
   font-weight: 850;
   min-height: 44px;
@@ -10987,7 +11034,7 @@ button.profile-followup-card:focus-visible {
 
 .teacher-package-inbox header div {
   align-items: center;
-  color: var(--ink);
+  color: #1f2937;
   display: inline-flex;
   gap: 8px;
   font-weight: 950;
@@ -11039,7 +11086,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-inbox-list strong {
-  color: var(--ink);
+  color: #1f2937;
   font-weight: 950;
 }
 
@@ -11092,7 +11139,7 @@ button.profile-followup-card:focus-visible {
 
 .teacher-package-sent-log header div {
   align-items: center;
-  color: var(--ink);
+  color: #1f2937;
   display: inline-flex;
   gap: 8px;
   font-weight: 950;
@@ -11135,7 +11182,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-log-list strong {
-  color: var(--ink);
+  color: #1f2937;
   font-weight: 950;
 }
 
@@ -11175,7 +11222,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-summary-grid strong {
-  color: var(--ink);
+  color: #1f2937;
   font-size: 1.55rem;
   line-height: 1;
 }
@@ -11215,7 +11262,7 @@ button.profile-followup-card:focus-visible {
 
 .teacher-package-preview-list strong,
 .teacher-package-match-list strong {
-  color: var(--ink);
+  color: #1f2937;
 }
 
 .teacher-package-preview-list small,
@@ -11291,7 +11338,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .teacher-package-empty strong {
-  color: var(--ink);
+  color: #1f2937;
   font-size: 1.2rem;
 }
 

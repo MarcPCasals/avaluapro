@@ -56,6 +56,10 @@ function formatSentPackageStatus(status) {
   return 'En procés'
 }
 
+function isTutoringClassItem(classItem) {
+  return Boolean(classItem?.isTutoringGroup || classItem?.subject === 'Tutoria')
+}
+
 function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) {
   const cloud = useAvaluaproStore((state) => state.cloud)
   const createTeacherGradePackage = useAvaluaproStore((state) => state.createTeacherGradePackage)
@@ -528,35 +532,115 @@ export function TeacherGradePackageModal({ onClose }) {
   const state = useAvaluaproStore()
   const activeClass = state.classes.find((classItem) => classItem.id === state.ui.activeClassId)
   const createTeacherGradePackage = useAvaluaproStore((store) => store.createTeacherGradePackage)
-  const isTutoringClass = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
+  const sendClasses = useMemo(() => state.classes.filter((classItem) => !isTutoringClassItem(classItem)), [state.classes])
+  const receiveClasses = useMemo(() => state.classes.filter((classItem) => isTutoringClassItem(classItem)), [state.classes])
+  const [mode, setMode] = useState(isTutoringClassItem(activeClass) ? 'receive' : 'send')
+  const [sendClassId, setSendClassId] = useState(
+    !isTutoringClassItem(activeClass) ? activeClass?.id || '' : sendClasses[0]?.id || '',
+  )
+  const [receiveClassId, setReceiveClassId] = useState(
+    isTutoringClassItem(activeClass) ? activeClass?.id || '' : receiveClasses[0]?.id || activeClass?.id || '',
+  )
+  const sendClass = sendClasses.find((classItem) => classItem.id === sendClassId) || sendClasses[0]
+  const receiveClass =
+    receiveClasses.find((classItem) => classItem.id === receiveClassId) ||
+    (isTutoringClassItem(activeClass) ? activeClass : receiveClasses[0] || activeClass)
+
   const packagePreview = useMemo(() => {
-    if (!activeClass || isTutoringClass) return { error: '', packageData: null }
+    if (!sendClass) return { error: '', packageData: null }
     try {
-      return { error: '', packageData: createTeacherGradePackage(activeClass.id) }
+      return { error: '', packageData: createTeacherGradePackage(sendClass.id) }
     } catch (error) {
       return { error: error.message || 'No s’ha pogut preparar el paquet.', packageData: null }
     }
-  }, [activeClass, createTeacherGradePackage, isTutoringClass])
+  }, [createTeacherGradePackage, sendClass])
 
   return (
     <Modal onClose={onClose} size="xl" title="Compartir notes entre docents">
-      {activeClass ? (
-        isTutoringClass ? (
-          <TeacherPackageReceivePanel activeClass={activeClass} />
-        ) : (
+      <div className="teacher-package-shell">
+        <section className="teacher-package-intro">
+          <div>
+            <strong>Enviar i rebre notes de competències</strong>
+            <p>
+              Els professors d’assignatura envien només les notes finals de competència. El tutor les rep a la seva
+              classe de tutoria i el programa intenta encaixar els alumnes pel nom.
+            </p>
+          </div>
+          <div className="teacher-package-mode-switch">
+            <button className={mode === 'send' ? 'active' : ''} onClick={() => setMode('send')} type="button">
+              <Send size={17} />
+              Enviar notes
+            </button>
+            <button className={mode === 'receive' ? 'active' : ''} onClick={() => setMode('receive')} type="button">
+              <Inbox size={17} />
+              Rebre notes
+            </button>
+          </div>
+        </section>
+
+        {mode === 'send' && (
+          <section className="teacher-package-class-picker">
+            <label htmlFor="teacher-package-send-class">
+              Classe que envia les notes
+              <select
+                id="teacher-package-send-class"
+                onChange={(event) => setSendClassId(event.target.value)}
+                value={sendClass?.id || ''}
+              >
+                {sendClasses.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name} · {classItem.subject || 'Sense assignatura'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+        )}
+
+        {mode === 'receive' && receiveClasses.length > 0 && (
+          <section className="teacher-package-class-picker">
+            <label htmlFor="teacher-package-receive-class">
+              Tutoria que rep les notes
+              <select
+                id="teacher-package-receive-class"
+                onChange={(event) => setReceiveClassId(event.target.value)}
+                value={receiveClass?.id || ''}
+              >
+                {receiveClasses.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+        )}
+
+        {mode === 'send' ? (
+          sendClass ? (
           <TeacherPackageSendPanel
-            activeClass={activeClass}
+            activeClass={sendClass}
             packageError={packagePreview.error}
             packagePreview={{ packageData: packagePreview.packageData }}
           />
+          ) : (
+            <div className="teacher-package-empty">
+              <AlertTriangle size={28} />
+              <strong>No hi ha cap classe d’assignatura per enviar.</strong>
+              <p>Crea o selecciona una classe que no sigui de tutoria abans d’enviar notes a un tutor.</p>
+            </div>
+          )
+        ) : receiveClass ? (
+          <TeacherPackageReceivePanel activeClass={receiveClass} />
+        ) : (
+          <div className="teacher-package-empty">
+            <AlertTriangle size={28} />
+            <strong>No hi ha cap classe de tutoria per rebre notes.</strong>
+            <p>Marca una classe com a tutoria a la configuració de classe per importar-hi notes d’altres docents.</p>
+          </div>
         )
-      ) : (
-        <div className="teacher-package-empty">
-          <AlertTriangle size={28} />
-          <strong>No hi ha cap classe activa.</strong>
-          <p>Selecciona una classe abans de preparar o rebre notes.</p>
-        </div>
-      )}
+        }
+      </div>
     </Modal>
   )
 }

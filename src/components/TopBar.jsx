@@ -373,17 +373,6 @@ export function TopBar() {
         >
           <HelpCircle size={22} />
         </button>
-        <button
-          className="top-share-button"
-          data-tour="teacher-package-button"
-          onClick={() => setShowTeacherPackages(true)}
-          title="Compartir notes amb tutoria"
-          type="button"
-        >
-          <Send size={18} />
-          <span>Compartir notes</span>
-          <em className={pendingTeacherPackages > 0 ? 'active' : ''}>{pendingTeacherPackages}</em>
-        </button>
         <span className="top-divider" />
         {cloud.user && (
           <div className={`top-sync-status ${syncIndicator.className}`} data-tour="sync-status">
@@ -476,6 +465,20 @@ export function TopBar() {
               >
                 <FileSpreadsheet size={18} />
                 Exportar notes UT
+              </button>
+              <button
+                data-tour="teacher-package-button"
+                onClick={() => {
+                  setShowTeacherPackages(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Send size={18} />
+                <span className="top-menu-button-label">Compartir notes</span>
+                <em className={pendingTeacherPackages > 0 ? 'top-menu-badge active' : 'top-menu-badge'}>
+                  {pendingTeacherPackages}
+                </em>
               </button>
               {cloud.user && (
                 <>
