@@ -11,6 +11,10 @@ export function ClassFormFields({ value, onChange }) {
           placeholder="Ex: 2n B"
           value={value.name}
         />
+        <span className="field-hint">
+          Escriu el curs i el grup amb espai, per exemple “2n B”. Això ajuda a compartir notes amb altres docents sense
+          confusions.
+        </span>
       </label>
       <label className="field-label">
         Assignatura de la classe

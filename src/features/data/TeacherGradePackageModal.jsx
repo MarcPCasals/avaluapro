@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileJson, Inbox, RefreshCw, Send, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileJson, History, Inbox, RefreshCw, Send, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { gradeClassName } from '../../lib/grades'
@@ -50,15 +50,28 @@ function formatPackageDate(value = '') {
   }
 }
 
+function formatSentPackageStatus(status) {
+  if (status === 'imported') return 'Importat pel tutor'
+  if (status === 'sent') return 'Enviat'
+  return 'En procés'
+}
+
 function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) {
   const cloud = useAvaluaproStore((state) => state.cloud)
   const createTeacherGradePackage = useAvaluaproStore((state) => state.createTeacherGradePackage)
   const sendTeacherGradePackageToTutor = useAvaluaproStore((state) => state.sendTeacherGradePackageToTutor)
+  const loadSentTeacherGradePackages = useAvaluaproStore((state) => state.loadSentTeacherGradePackages)
   const [recipientInput, setRecipientInput] = useState('')
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
 
   const finalRecipientEmail = normalizeRecipientEmail(recipientInput)
+
+  useEffect(() => {
+    if (cloud.user?.uid) {
+      loadSentTeacherGradePackages()
+    }
+  }, [cloud.user?.uid, loadSentTeacherGradePackages])
 
   const handleDownloadPackage = () => {
     const packageData = createTeacherGradePackage(activeClass.id)
@@ -79,9 +92,13 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
         recipientEmail: finalRecipientEmail,
       })
       setRecipientInput('')
-      setStatus(`Paquet enviat a ${sentPackage.recipientEmailLower}.`)
+      setStatus(`Notes enviades correctament a ${sentPackage.recipientEmailLower}.`)
     } catch (sendError) {
-      setError(sendError.message || 'No s’ha pogut enviar el paquet.')
+      setError(
+        `No s’han pogut enviar les notes de ${activeClass.name}. ${
+          sendError.message || 'Revisa el correu destinatari i la connexió.'
+        }`,
+      )
     }
   }
 
@@ -103,7 +120,7 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
         <div>
           <span>
             <Send size={17} />
-            Enviar a tutoria
+            Compartir notes amb tutoria
           </span>
           <strong>
             {packageData.source.subject} · {packageData.source.className}
@@ -155,7 +172,7 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
         </div>
       )}
       {status && (
-        <div className="teacher-package-message ok">
+        <div className="teacher-package-toast ok">
           <CheckCircle2 size={18} />
           {status}
         </div>
@@ -198,6 +215,47 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
             </div>
           </article>
         ))}
+      </section>
+
+      <section className="teacher-package-sent-log">
+        <header>
+          <div>
+            <History size={18} />
+            <strong>Registre d’enviaments</strong>
+          </div>
+          <span>{cloud.sentTeacherPackages?.length || 0} últims</span>
+        </header>
+        {cloud.user ? (
+          cloud.sentTeacherPackages?.length > 0 ? (
+            <div className="teacher-package-log-list">
+              {cloud.sentTeacherPackages.map((sentPackage) => (
+                <article key={sentPackage.id}>
+                  <div>
+                    <strong>
+                      {sentPackage.packageData?.source?.subject || 'Matèria desconeguda'} ·{' '}
+                      {sentPackage.packageData?.source?.className || 'Classe desconeguda'}
+                    </strong>
+                    <small>
+                      A {sentPackage.recipientEmailLower || 'correu desconegut'} ·{' '}
+                      {formatPackageDate(sentPackage.createdAt)}
+                    </small>
+                  </div>
+                  <span className={sentPackage.status === 'imported' ? 'imported' : ''}>
+                    {formatSentPackageStatus(sentPackage.status)}
+                  </span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="teacher-package-inbox-empty">
+              Encara no has enviat cap paquet des d’aquest compte.
+            </p>
+          )
+        ) : (
+          <p className="teacher-package-inbox-empty">
+            Inicia sessió amb Google per veure l’historial d’enviaments al núvol.
+          </p>
+        )}
       </section>
     </div>
   )
@@ -268,13 +326,30 @@ function TeacherPackageReceivePanel({ activeClass }) {
       const result = selectedCloudPackageId
         ? await importReceivedTeacherGradePackage({ classId: activeClass.id, packageId: selectedCloudPackageId })
         : await importTeacherGradePackage(packageData, activeClass.id)
-      setStatus(`${result.importedGrades} notes importades a la tutoria.`)
+      const missingMessage =
+        result.missingMatches > 0
+          ? ` ${result.missingMatches} alumne/s han quedat fora perquè no tenien coincidència prou fiable.`
+          : ''
+      setStatus(`${result.importedGrades} notes importades correctament a la tutoria.${missingMessage}`)
       setError('')
     } catch (importError) {
-      setError(importError.message || 'No s’han pogut importar les notes.')
+      setError(
+        `No s’han pogut importar les notes a ${activeClass.name}. ${
+          importError.message || 'Revisa la classe de destí i els noms dels alumnes.'
+        }`,
+      )
       setStatus('')
     }
   }
+
+  const missingMatchNames = useMemo(
+    () =>
+      preview?.rows
+        ?.filter((row) => !row.targetStudent)
+        .map((row) => row.sourceStudent.name)
+        .slice(0, 6) || [],
+    [preview],
+  )
 
   return (
     <div className="teacher-package-panel">
@@ -362,7 +437,7 @@ function TeacherPackageReceivePanel({ activeClass }) {
         </div>
       )}
       {status && (
-        <div className="teacher-package-message ok">
+        <div className="teacher-package-toast ok">
           <CheckCircle2 size={18} />
           {status}
         </div>
@@ -421,8 +496,10 @@ function TeacherPackageReceivePanel({ activeClass }) {
           {preview.summary.missingMatches > 0 && (
             <div className="teacher-package-message warning">
               <AlertTriangle size={18} />
-              {preview.summary.missingMatches} alumne/s no tenen una coincidència prou fiable i no s’importaran. Revisa
-              noms i cognoms abans de donar-ho per tancat.
+              {preview.summary.missingMatches} alumne/s no tenen una coincidència prou fiable i no s’importaran:{' '}
+              {missingMatchNames.join(', ')}
+              {preview.summary.missingMatches > missingMatchNames.length ? '…' : ''}. Revisa noms i cognoms abans de
+              donar-ho per tancat.
             </div>
           )}
 
@@ -462,7 +539,7 @@ export function TeacherGradePackageModal({ onClose }) {
   }, [activeClass, createTeacherGradePackage, isTutoringClass])
 
   return (
-    <Modal onClose={onClose} size="xl" title="Paquets de notes entre docents">
+    <Modal onClose={onClose} size="xl" title="Compartir notes entre docents">
       {activeClass ? (
         isTutoringClass ? (
           <TeacherPackageReceivePanel activeClass={activeClass} />

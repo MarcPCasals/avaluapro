@@ -338,6 +338,18 @@ export async function listReceivedTeacherGradePackages(userEmail, maxItems = 20)
     .slice(0, maxItems)
 }
 
+export async function listSentTeacherGradePackages(uid, maxItems = 20) {
+  if (!uid) return []
+
+  const packagesQuery = query(getTeacherGradePackageCollectionRef(), where('senderUid', '==', uid))
+  const snapshot = await getDocs(packagesQuery)
+
+  return snapshot.docs
+    .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, maxItems)
+}
+
 export async function markTeacherGradePackageImported({ packageId, userEmail }) {
   const cleanEmail = String(userEmail || '').trim().toLowerCase()
   if (!packageId || !cleanEmail) return

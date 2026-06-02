@@ -10,6 +10,7 @@ import {
 } from '../lib/teacherGradePackages'
 import {
   listReceivedTeacherGradePackages,
+  listSentTeacherGradePackages,
   listCloudBackups,
   loadCloudBackup,
   loadCloudDataset,
@@ -614,6 +615,7 @@ export const useAvaluaproStore = create((set, get) => ({
     recentBackups: [],
     pendingCollections: [],
     teacherPackages: [],
+    sentTeacherPackages: [],
     teacherPackagesError: '',
     teacherPackagesStatus: 'idle',
   },
@@ -649,6 +651,7 @@ export const useAvaluaproStore = create((set, get) => ({
             get().maybeCreateDailyCloudBackup()
             get().loadCloudBackups()
             get().loadReceivedTeacherGradePackages()
+            get().loadSentTeacherGradePackages()
           }, 0)
         }
       })
@@ -698,6 +701,7 @@ export const useAvaluaproStore = create((set, get) => ({
           error: '',
           lastSyncedAt: '',
           teacherPackages: [],
+          sentTeacherPackages: [],
           teacherPackagesError: '',
           teacherPackagesStatus: 'idle',
         },
@@ -1569,6 +1573,7 @@ export const useAvaluaproStore = create((set, get) => ({
           teacherPackagesStatus: 'sent',
         },
       }))
+      get().loadSentTeacherGradePackages()
 
       return sentPackage
     } catch (error) {
@@ -1607,6 +1612,37 @@ export const useAvaluaproStore = create((set, get) => ({
         cloud: {
           ...current.cloud,
           teacherPackagesError: error.message || 'No s’han pogut carregar els paquets rebuts.',
+          teacherPackagesStatus: 'error',
+        },
+      }))
+      return []
+    }
+  },
+
+  loadSentTeacherGradePackages: async () => {
+    const state = get()
+    if (!state.cloud.user?.uid) return []
+
+    set((current) => ({
+      cloud: { ...current.cloud, teacherPackagesError: '', teacherPackagesStatus: 'loading' },
+    }))
+
+    try {
+      const sentTeacherPackages = await listSentTeacherGradePackages(state.cloud.user.uid, 20)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sentTeacherPackages,
+          teacherPackagesError: '',
+          teacherPackagesStatus: 'loaded',
+        },
+      }))
+      return sentTeacherPackages
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          teacherPackagesError: error.message || 'No s’han pogut carregar els paquets enviats.',
           teacherPackagesStatus: 'error',
         },
       }))
