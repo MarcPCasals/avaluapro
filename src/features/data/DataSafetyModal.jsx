@@ -20,6 +20,8 @@ import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const CONTACT_EMAIL = 'mperezc@educand.ad'
+const ANTECEDENTS_EXPORT_APP_ID = 'avaluapro-student-antecedents'
+const ANTECEDENTS_EXPORT_VERSION = 1
 
 function formatBytes(bytes = 0) {
   if (!bytes) return '0 MB'
@@ -34,6 +36,16 @@ function slugify(value = '') {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function normalizeNameForMatch(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
     .toLowerCase()
 }
 
@@ -89,19 +101,81 @@ function buildCollectionSummary(state) {
   }))
 }
 
+function buildAntecedentsFilename(classItem) {
+  return `avaluapro-antecedents-${slugify(classItem?.name || 'classe')}-${getTodaySlug()}.json`
+}
+
+function buildAntecedentsExport({ classItem, students, antecedents }) {
+  const antecedentsByStudentId = new Map(antecedents.map((antecedent) => [antecedent.studentId, antecedent]))
+  const rows = students
+    .map((student) => {
+      const antecedent = antecedentsByStudentId.get(student.id)
+      if (!antecedent) return null
+      return {
+        studentName: student.name,
+        previousStudentId: student.id,
+        antecedent: {
+          courseLabel: antecedent.courseLabel || '',
+          lastLookGrade: antecedent.lastLookGrade || '',
+          profile: antecedent.profile || '',
+          qualitativeNotes: antecedent.qualitativeNotes || '',
+          diagnosisSnapshot: antecedent.diagnosisSnapshot || [],
+        },
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    app: ANTECEDENTS_EXPORT_APP_ID,
+    version: ANTECEDENTS_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    className: classItem?.name || '',
+    students: rows,
+  }
+}
+
+function parseAntecedentsExport(payload) {
+  if (payload?.app !== ANTECEDENTS_EXPORT_APP_ID || !Array.isArray(payload.students)) {
+    throw new Error('Aquest fitxer no sembla un export d’antecedents acadèmics d’Avaluapro.')
+  }
+
+  return payload.students.map((row) => ({
+    studentName: row.studentName || '',
+    antecedent: row.antecedent || {},
+  }))
+}
+
 export function DataSafetyModal({ onClose }) {
   const fileInputRef = useRef(null)
+  const antecedentFileInputRef = useRef(null)
   const state = useAvaluaproStore()
   const createBackup = useAvaluaproStore((store) => store.createBackup)
   const restoreBackup = useAvaluaproStore((store) => store.restoreBackup)
+  const bulkUpsertStudentAntecedents = useAvaluaproStore((store) => store.bulkUpsertStudentAntecedents)
   const createCloudBackup = useAvaluaproStore((store) => store.createCloudBackup)
   const loadCloudBackups = useAvaluaproStore((store) => store.loadCloudBackups)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
   const [storageEstimate, setStorageEstimate] = useState(null)
   const [restoreStatus, setRestoreStatus] = useState('')
   const [lastImportSummary, setLastImportSummary] = useState(null)
+  const [antecedentClassId, setAntecedentClassId] = useState(
+    () => state.ui.activeClassId || state.classes[0]?.id || '',
+  )
+  const [antecedentStatus, setAntecedentStatus] = useState('')
 
   const collectionSummary = useMemo(() => buildCollectionSummary(state), [state])
+  const antecedentClass = state.classes.find((classItem) => classItem.id === antecedentClassId) || state.classes[0]
+  const antecedentStudents = useMemo(
+    () =>
+      state.students
+        .filter((student) => student.classId === antecedentClass?.id)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ca')),
+    [antecedentClass?.id, state.students],
+  )
+  const antecedentsForClass = useMemo(() => {
+    const classStudentIds = new Set(antecedentStudents.map((student) => student.id))
+    return state.studentAntecedents.filter((antecedent) => classStudentIds.has(antecedent.studentId))
+  }, [antecedentStudents, state.studentAntecedents])
   const photoBytes = useMemo(
     () =>
       state.students.reduce((total, student) => total + estimateDataUrlBytes(student.photoUrl), 0) +
@@ -186,6 +260,90 @@ export function DataSafetyModal({ onClose }) {
     } catch (error) {
       setRestoreStatus(error.message || 'No s’ha pogut restaurar aquesta còpia.')
       setLastImportSummary(null)
+    }
+  }
+
+  const handleDownloadAntecedents = () => {
+    if (!antecedentClass) {
+      setAntecedentStatus('No hi ha cap classe seleccionada.')
+      return
+    }
+    if (antecedentsForClass.length === 0) {
+      setAntecedentStatus('Aquesta classe encara no té antecedents acadèmics per exportar.')
+      return
+    }
+
+    const payload = buildAntecedentsExport({
+      classItem: antecedentClass,
+      students: antecedentStudents,
+      antecedents: antecedentsForClass,
+    })
+    downloadJson(payload, buildAntecedentsFilename(antecedentClass))
+    setAntecedentStatus(`Exportats ${payload.students.length} antecedents de ${antecedentClass.name}.`)
+  }
+
+  const handleImportAntecedents = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      if (!antecedentClass) throw new Error('Selecciona una classe abans d’importar antecedents.')
+      const payload = JSON.parse(await file.text())
+      const rows = parseAntecedentsExport(payload)
+      const studentsByName = new Map(
+        antecedentStudents.map((student) => [normalizeNameForMatch(student.name), student]),
+      )
+      const matched = []
+      const unmatched = []
+
+      rows.forEach((row) => {
+        const student = studentsByName.get(normalizeNameForMatch(row.studentName))
+        if (!student) {
+          unmatched.push(row.studentName || 'Sense nom')
+          return
+        }
+        matched.push({
+          studentId: student.id,
+          courseLabel: row.antecedent.courseLabel || '',
+          lastLookGrade: row.antecedent.lastLookGrade || '',
+          profile: row.antecedent.profile || '',
+          qualitativeNotes: row.antecedent.qualitativeNotes || '',
+          diagnosisSnapshot: Array.isArray(row.antecedent.diagnosisSnapshot)
+            ? row.antecedent.diagnosisSnapshot
+            : [],
+        })
+      })
+
+      if (matched.length === 0) {
+        throw new Error(
+          `No s’ha pogut associar cap alumne del fitxer amb la classe ${antecedentClass.name}. Revisa que els noms coincideixin.`,
+        )
+      }
+
+      const shouldImport = window.confirm(
+        [
+          `S’importaran ${matched.length} antecedents a la classe ${antecedentClass.name}.`,
+          unmatched.length > 0 ? `${unmatched.length} alumnes no coincideixen i s’ignoraran.` : '',
+          '',
+          'Vols continuar?',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+      if (!shouldImport) return
+
+      await bulkUpsertStudentAntecedents(matched)
+      setAntecedentStatus(
+        [
+          `Antecedents importats: ${matched.length}.`,
+          unmatched.length > 0 ? `No trobats: ${unmatched.slice(0, 6).join(', ')}${unmatched.length > 6 ? '...' : ''}` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
+    } catch (error) {
+      setAntecedentStatus(error.message || 'No s’han pogut importar els antecedents acadèmics.')
     }
   }
 
@@ -368,6 +526,54 @@ export function DataSafetyModal({ onClose }) {
             </div>
           </section>
         )}
+
+        <section className="antecedent-transfer-card">
+          <div>
+            <FileArchive size={20} />
+            <div>
+              <h3>Antecedents per al curs vinent</h3>
+              <p>
+                Exporta només el perfil inicial dels alumnes: última mirada, perfil de constància, valoració qualitativa i
+                diagnòstics capturats. Quan el curs vinent tinguis una nova classe, carrega aquest JSON i Avaluapro
+                l’associarà als alumnes pel nom.
+              </p>
+            </div>
+          </div>
+          <div className="antecedent-transfer-controls">
+            <label>
+              Classe
+              <select onChange={(event) => setAntecedentClassId(event.target.value)} value={antecedentClass?.id || ''}>
+                {state.classes
+                  .slice()
+                  .sort((a, b) => (a.order || 0) - (b.order || 0))
+                  .map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <span>
+              {antecedentsForClass.length} antecedents guardats · {antecedentStudents.length} alumnes a la classe
+            </span>
+            <button className="secondary-action compact" onClick={handleDownloadAntecedents} type="button">
+              <Download size={16} />
+              Exportar antecedents
+            </button>
+            <button className="secondary-action compact" onClick={() => antecedentFileInputRef.current?.click()} type="button">
+              <Upload size={16} />
+              Importar antecedents
+            </button>
+            <input
+              ref={antecedentFileInputRef}
+              accept="application/json,.json"
+              className="sr-only"
+              onChange={handleImportAntecedents}
+              type="file"
+            />
+          </div>
+          {antecedentStatus && <strong>{antecedentStatus}</strong>}
+        </section>
 
         <section className="data-safety-actions">
           <div>

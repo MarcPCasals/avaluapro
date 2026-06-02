@@ -2351,6 +2351,41 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['studentAntecedents'])
   },
 
+  bulkUpsertStudentAntecedents: async (entries = []) => {
+    const cleanEntries = entries.filter((entry) => entry.studentId)
+    if (cleanEntries.length === 0) return
+    const updatedAt = new Date().toISOString()
+
+    set((state) => {
+      const studentsById = new Map(state.students.map((student) => [student.id, student]))
+      const existingByStudentId = new Map(
+        state.studentAntecedents.map((antecedent) => [antecedent.studentId, antecedent]),
+      )
+      const nextByStudentId = new Map(existingByStudentId)
+
+      cleanEntries.forEach((entry) => {
+        const student = studentsById.get(entry.studentId)
+        if (!student) return
+        const existing = existingByStudentId.get(entry.studentId)
+        nextByStudentId.set(entry.studentId, {
+          id: existing?.id || createId('ant'),
+          studentId: entry.studentId,
+          classId: student.classId,
+          courseLabel: entry.courseLabel ?? existing?.courseLabel ?? '',
+          lastLookGrade: entry.lastLookGrade ?? existing?.lastLookGrade ?? '',
+          profile: entry.profile ?? existing?.profile ?? '',
+          qualitativeNotes: entry.qualitativeNotes ?? existing?.qualitativeNotes ?? '',
+          diagnosisSnapshot: entry.diagnosisSnapshot ?? existing?.diagnosisSnapshot ?? [],
+          createdAt: existing?.createdAt || updatedAt,
+          updatedAt,
+        })
+      })
+
+      return { studentAntecedents: Array.from(nextByStudentId.values()) }
+    })
+    await persistCollections(set, get, ['studentAntecedents'])
+  },
+
   deleteStudentAntecedent: async (studentId) => {
     set((state) => ({
       studentAntecedents: state.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),

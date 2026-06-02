@@ -11665,6 +11665,7 @@ button.profile-followup-card:focus-visible {
 .backup-loaded-card,
 .backup-diagnosis-card,
 .collection-summary,
+.antecedent-transfer-card,
 .storage-advice {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -11815,6 +11816,80 @@ button.profile-followup-card:focus-visible {
 
 .data-safety-actions > div > strong {
   color: #166534;
+}
+
+.antecedent-transfer-card {
+  display: grid;
+  gap: 13px;
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.antecedent-transfer-card > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.antecedent-transfer-card > div:first-child > svg {
+  flex: 0 0 auto;
+  color: #f97316;
+}
+
+.antecedent-transfer-card h3,
+.antecedent-transfer-card p {
+  margin: 0;
+}
+
+.antecedent-transfer-card h3 {
+  color: #1f2937;
+}
+
+.antecedent-transfer-card p {
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.antecedent-transfer-card > strong {
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #9a3412;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.antecedent-transfer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+
+.antecedent-transfer-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.antecedent-transfer-controls select {
+  min-height: 38px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: white;
+  font-weight: 850;
+}
+
+.antecedent-transfer-controls > span {
+  align-self: center;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .collection-summary {
