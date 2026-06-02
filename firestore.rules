@@ -10,6 +10,25 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    match /teacherGradePackages/{packageId} {
+      allow create: if signedIn()
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.recipientEmailLower is string
+        && request.resource.data.packageData.schema == "avaluapro.teacher-grade-package";
+
+      allow read: if signedIn()
+        && (
+          resource.data.senderUid == request.auth.uid
+          || resource.data.recipientEmailLower == request.auth.token.email
+        );
+
+      allow update, delete: if signedIn()
+        && (
+          resource.data.senderUid == request.auth.uid
+          || resource.data.recipientEmailLower == request.auth.token.email
+        );
+    }
+
     match /users/{userId} {
       allow read, create, update, delete: if ownsUserDocument(userId);
 

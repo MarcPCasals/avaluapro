@@ -9,12 +9,15 @@ import {
   previewTeacherGradePackage,
 } from '../lib/teacherGradePackages'
 import {
+  listReceivedTeacherGradePackages,
   listCloudBackups,
   loadCloudBackup,
   loadCloudDataset,
+  markTeacherGradePackageImported,
   observeFirebaseUser,
   saveCloudBackup,
   saveCloudCollections,
+  sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
 } from '../lib/firebase'
@@ -610,6 +613,9 @@ export const useAvaluaproStore = create((set, get) => ({
     backupError: '',
     recentBackups: [],
     pendingCollections: [],
+    teacherPackages: [],
+    teacherPackagesError: '',
+    teacherPackagesStatus: 'idle',
   },
   status: 'idle',
   error: '',
@@ -642,6 +648,7 @@ export const useAvaluaproStore = create((set, get) => ({
           setTimeout(() => {
             get().maybeCreateDailyCloudBackup()
             get().loadCloudBackups()
+            get().loadReceivedTeacherGradePackages()
           }, 0)
         }
       })
@@ -684,7 +691,16 @@ export const useAvaluaproStore = create((set, get) => ({
     try {
       await signOutFromGoogle()
       set((state) => ({
-        cloud: { ...state.cloud, user: null, status: 'signed-out', error: '', lastSyncedAt: '' },
+        cloud: {
+          ...state.cloud,
+          user: null,
+          status: 'signed-out',
+          error: '',
+          lastSyncedAt: '',
+          teacherPackages: [],
+          teacherPackagesError: '',
+          teacherPackagesStatus: 'idle',
+        },
       }))
     } catch (error) {
       set((state) => ({
@@ -1528,6 +1544,87 @@ export const useAvaluaproStore = create((set, get) => ({
       ...preview.summary,
       importedGrades: updates.length,
     }
+  },
+
+  sendTeacherGradePackageToTutor: async ({ classId = get().ui.activeClassId, recipientEmail }) => {
+    const state = get()
+    if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans d’enviar el paquet al núvol.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, teacherPackagesError: '', teacherPackagesStatus: 'sending' },
+    }))
+
+    try {
+      const packageData = get().createTeacherGradePackage(classId)
+      const sentPackage = await sendTeacherGradePackage({
+        packageData,
+        recipientEmail,
+        user: state.cloud.user,
+      })
+
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          teacherPackagesError: '',
+          teacherPackagesStatus: 'sent',
+        },
+      }))
+
+      return sentPackage
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          teacherPackagesError: error.message || 'No s’ha pogut enviar el paquet de notes.',
+          teacherPackagesStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
+  loadReceivedTeacherGradePackages: async () => {
+    const state = get()
+    if (!state.cloud.user?.email) return []
+
+    set((current) => ({
+      cloud: { ...current.cloud, teacherPackagesError: '', teacherPackagesStatus: 'loading' },
+    }))
+
+    try {
+      const teacherPackages = await listReceivedTeacherGradePackages(state.cloud.user.email, 20)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          teacherPackages,
+          teacherPackagesError: '',
+          teacherPackagesStatus: 'loaded',
+        },
+      }))
+      return teacherPackages
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          teacherPackagesError: error.message || 'No s’han pogut carregar els paquets rebuts.',
+          teacherPackagesStatus: 'error',
+        },
+      }))
+      return []
+    }
+  },
+
+  importReceivedTeacherGradePackage: async ({ classId = get().ui.activeClassId, packageId }) => {
+    const state = get()
+    if (!state.cloud.user?.email) throw new Error('Cal iniciar sessió amb Google abans d’importar paquets rebuts.')
+    const receivedPackage = state.cloud.teacherPackages.find((packageItem) => packageItem.id === packageId)
+    if (!receivedPackage?.packageData) throw new Error('No s’ha trobat aquest paquet rebut.')
+
+    const result = await get().importTeacherGradePackage(receivedPackage.packageData, classId)
+    await markTeacherGradePackageImported({ packageId, userEmail: state.cloud.user.email })
+    await get().loadReceivedTeacherGradePackages()
+
+    return result
   },
 
   addTutorialRecord: async ({ classId, studentId, type, date, note }) => {

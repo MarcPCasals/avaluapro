@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileJson, Send, Upload } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Download, FileJson, Inbox, RefreshCw, Send, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { gradeClassName } from '../../lib/grades'
@@ -28,8 +28,37 @@ function getMatchClassName(status) {
   return 'risk'
 }
 
+function normalizeRecipientEmail(value = '') {
+  const cleanValue = String(value).trim().toLowerCase()
+  if (!cleanValue) return ''
+  if (cleanValue.includes('@')) return cleanValue
+  return `${cleanValue}@educand.ad`
+}
+
+function formatPackageDate(value = '') {
+  if (!value) return 'Sense data'
+  try {
+    return new Intl.DateTimeFormat('ca-AD', {
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date(value))
+  } catch {
+    return value
+  }
+}
+
 function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) {
+  const cloud = useAvaluaproStore((state) => state.cloud)
   const createTeacherGradePackage = useAvaluaproStore((state) => state.createTeacherGradePackage)
+  const sendTeacherGradePackageToTutor = useAvaluaproStore((state) => state.sendTeacherGradePackageToTutor)
+  const [recipientInput, setRecipientInput] = useState('')
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+
+  const finalRecipientEmail = normalizeRecipientEmail(recipientInput)
 
   const handleDownloadPackage = () => {
     const packageData = createTeacherGradePackage(activeClass.id)
@@ -37,6 +66,23 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
       packageData,
       `avaluapro-paquet-notes-${slugify(activeClass.name)}-${slugify(activeClass.subject)}-${getTodaySlug()}.json`,
     )
+  }
+
+  const handleSendPackage = async () => {
+    setStatus('')
+    setError('')
+
+    try {
+      if (!finalRecipientEmail) throw new Error('Escriu el correu del tutor destinatari.')
+      const sentPackage = await sendTeacherGradePackageToTutor({
+        classId: activeClass.id,
+        recipientEmail: finalRecipientEmail,
+      })
+      setRecipientInput('')
+      setStatus(`Paquet enviat a ${sentPackage.recipientEmailLower}.`)
+    } catch (sendError) {
+      setError(sendError.message || 'No s’ha pogut enviar el paquet.')
+    }
   }
 
   if (packageError) {
@@ -67,11 +113,53 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
             per alumne i competència. Els criteris i les notes internes no viatgen al tutor.
           </p>
         </div>
-        <button className="primary-action" onClick={handleDownloadPackage} type="button">
-          <Download size={18} />
-          Descarregar paquet
-        </button>
+        <div className="teacher-package-hero-actions">
+          <button className="primary-action" disabled={!cloud.user} onClick={handleSendPackage} type="button">
+            <Send size={18} />
+            Enviar al tutor
+          </button>
+          <button className="secondary-action" onClick={handleDownloadPackage} type="button">
+            <Download size={18} />
+            Descarregar JSON
+          </button>
+        </div>
       </section>
+
+      <section className="teacher-package-recipient">
+        <label htmlFor="teacher-package-recipient">
+          Correu del tutor destinatari
+          <span>Si escrius només el nom, afegirem @educand.ad automàticament.</span>
+        </label>
+        <div>
+          <input
+            id="teacher-package-recipient"
+            onChange={(event) => setRecipientInput(event.target.value)}
+            placeholder="mperezc"
+            type="text"
+            value={recipientInput}
+          />
+          <strong>{finalRecipientEmail || '@educand.ad'}</strong>
+        </div>
+        {!cloud.user && (
+          <p>
+            Per enviar directament al núvol cal iniciar sessió amb Google. El JSON manual continua disponible com a
+            alternativa.
+          </p>
+        )}
+      </section>
+
+      {(error || cloud.teacherPackagesError) && (
+        <div className="teacher-package-message risk">
+          <AlertTriangle size={18} />
+          {error || cloud.teacherPackagesError}
+        </div>
+      )}
+      {status && (
+        <div className="teacher-package-message ok">
+          <CheckCircle2 size={18} />
+          {status}
+        </div>
+      )}
 
       <div className="teacher-package-summary-grid">
         <article>
@@ -117,12 +205,39 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
 
 function TeacherPackageReceivePanel({ activeClass }) {
   const fileInputRef = useRef(null)
+  const cloud = useAvaluaproStore((state) => state.cloud)
+  const loadReceivedTeacherGradePackages = useAvaluaproStore((state) => state.loadReceivedTeacherGradePackages)
   const previewTeacherGradePackage = useAvaluaproStore((state) => state.previewTeacherGradePackage)
   const importTeacherGradePackage = useAvaluaproStore((state) => state.importTeacherGradePackage)
+  const importReceivedTeacherGradePackage = useAvaluaproStore((state) => state.importReceivedTeacherGradePackage)
   const [packageData, setPackageData] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [selectedCloudPackageId, setSelectedCloudPackageId] = useState('')
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (cloud.user?.email) {
+      loadReceivedTeacherGradePackages()
+    }
+  }, [cloud.user?.email, loadReceivedTeacherGradePackages])
+
+  const handleSelectCloudPackage = (receivedPackage) => {
+    try {
+      const nextPreview = previewTeacherGradePackage(receivedPackage.packageData, activeClass.id)
+      setSelectedCloudPackageId(receivedPackage.id)
+      setPackageData(receivedPackage.packageData)
+      setPreview(nextPreview)
+      setStatus('')
+      setError('')
+    } catch (previewError) {
+      setSelectedCloudPackageId('')
+      setPackageData(null)
+      setPreview(null)
+      setStatus('')
+      setError(previewError.message || 'No s’ha pogut revisar aquest paquet.')
+    }
+  }
 
   const handleLoadPackage = async (event) => {
     const file = event.target.files?.[0]
@@ -133,6 +248,7 @@ function TeacherPackageReceivePanel({ activeClass }) {
       const text = await file.text()
       const nextPackage = JSON.parse(text)
       const nextPreview = previewTeacherGradePackage(nextPackage, activeClass.id)
+      setSelectedCloudPackageId('')
       setPackageData(nextPackage)
       setPreview(nextPreview)
       setStatus('')
@@ -149,7 +265,9 @@ function TeacherPackageReceivePanel({ activeClass }) {
     if (!packageData) return
 
     try {
-      const result = await importTeacherGradePackage(packageData, activeClass.id)
+      const result = selectedCloudPackageId
+        ? await importReceivedTeacherGradePackage({ classId: activeClass.id, packageId: selectedCloudPackageId })
+        : await importTeacherGradePackage(packageData, activeClass.id)
       setStatus(`${result.importedGrades} notes importades a la tutoria.`)
       setError('')
     } catch (importError) {
@@ -172,10 +290,16 @@ function TeacherPackageReceivePanel({ activeClass }) {
             finals de competència a la pantalla de tutoria.
           </p>
         </div>
-        <button className="primary-action" onClick={() => fileInputRef.current?.click()} type="button">
-          <FileJson size={18} />
-          Carregar paquet
-        </button>
+        <div className="teacher-package-hero-actions">
+          <button className="primary-action" onClick={loadReceivedTeacherGradePackages} type="button">
+            <RefreshCw size={18} />
+            Actualitzar safata
+          </button>
+          <button className="secondary-action" onClick={() => fileInputRef.current?.click()} type="button">
+            <FileJson size={18} />
+            Carregar JSON
+          </button>
+        </div>
         <input
           ref={fileInputRef}
           accept="application/json,.json"
@@ -185,10 +309,56 @@ function TeacherPackageReceivePanel({ activeClass }) {
         />
       </section>
 
-      {error && (
+      {cloud.user?.email ? (
+        <section className="teacher-package-inbox">
+          <header>
+            <div>
+              <Inbox size={18} />
+              <strong>Safata de paquets rebuts</strong>
+            </div>
+            <span>{cloud.user.email}</span>
+          </header>
+          {cloud.teacherPackages.length > 0 ? (
+            <div className="teacher-package-inbox-list">
+              {cloud.teacherPackages.map((receivedPackage) => (
+                <button
+                  className={receivedPackage.id === selectedCloudPackageId ? 'selected' : ''}
+                  key={receivedPackage.id}
+                  onClick={() => handleSelectCloudPackage(receivedPackage)}
+                  type="button"
+                >
+                  <div>
+                    <strong>
+                      {receivedPackage.packageData?.source?.subject || 'Matèria desconeguda'} ·{' '}
+                      {receivedPackage.packageData?.source?.className || 'Classe desconeguda'}
+                    </strong>
+                    <small>
+                      {receivedPackage.senderEmail || 'Docent desconegut'} · {formatPackageDate(receivedPackage.createdAt)}
+                    </small>
+                  </div>
+                  <span className={receivedPackage.status === 'imported' ? 'imported' : ''}>
+                    {receivedPackage.status === 'imported' ? 'Importat' : 'Nou'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="teacher-package-inbox-empty">
+              Encara no hi ha cap paquet enviat al teu correu. També pots carregar un JSON manual.
+            </p>
+          )}
+        </section>
+      ) : (
         <div className="teacher-package-message risk">
           <AlertTriangle size={18} />
-          {error}
+          Inicia sessió amb Google per veure els paquets enviats al núvol.
+        </div>
+      )}
+
+      {(error || cloud.teacherPackagesError) && (
+        <div className="teacher-package-message risk">
+          <AlertTriangle size={18} />
+          {error || cloud.teacherPackagesError}
         </div>
       )}
       {status && (

@@ -18,6 +18,7 @@ import {
   orderBy,
   query,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore'
 import { COLLECTIONS } from '../data/seedData'
@@ -66,6 +67,14 @@ function getCloudBackupCollectionRef(uid) {
 
 function getCloudBackupDocRef(uid, backupId) {
   return doc(db, 'users', uid, 'cloudBackups', backupId)
+}
+
+function getTeacherGradePackageCollectionRef() {
+  return collection(db, 'teacherGradePackages')
+}
+
+function getTeacherGradePackageDocRef(packageId) {
+  return doc(db, 'teacherGradePackages', packageId)
 }
 
 function getSafeDocId(row, fallbackPrefix, index) {
@@ -279,6 +288,78 @@ export async function loadCloudBackup(uid, backupId) {
     preferences: meta.preferences || {},
     collections: entries.reduce((dataset, [collectionName, rows]) => ({ ...dataset, [collectionName]: rows }), {}),
   }
+}
+
+export async function sendTeacherGradePackage({ packageData, recipientEmail, user }) {
+  if (!user?.uid) throw new Error('Cal iniciar sessió amb Google abans d’enviar notes al tutor.')
+
+  const cleanRecipientEmail = String(recipientEmail || '').trim().toLowerCase()
+  if (!cleanRecipientEmail || !cleanRecipientEmail.includes('@')) {
+    throw new Error('Cal indicar el correu complet del tutor destinatari.')
+  }
+
+  const cleanPackageData = cleanForFirestore(packageData)
+  const packageId = String(packageData?.id || `teacher_package_${Date.now()}`).replaceAll('/', '_')
+  const createdAt = new Date().toISOString()
+  const value = cleanForFirestore({
+    id: packageId,
+    createdAt,
+    importedAt: '',
+    packageData: cleanPackageData,
+    recipientEmailLower: cleanRecipientEmail,
+    senderEmail: user.email || '',
+    senderName: user.displayName || '',
+    senderUid: user.uid,
+    status: 'sent',
+    updatedAt: createdAt,
+  })
+
+  assertFirestoreDocumentSize('teacherGradePackages', packageId, value)
+  await setDoc(getTeacherGradePackageDocRef(packageId), value)
+
+  return {
+    createdAt,
+    id: packageId,
+    recipientEmailLower: cleanRecipientEmail,
+    status: 'sent',
+  }
+}
+
+export async function listReceivedTeacherGradePackages(userEmail, maxItems = 20) {
+  const cleanEmail = String(userEmail || '').trim().toLowerCase()
+  if (!cleanEmail) return []
+
+  const packagesQuery = query(getTeacherGradePackageCollectionRef(), where('recipientEmailLower', '==', cleanEmail))
+  const snapshot = await getDocs(packagesQuery)
+
+  return snapshot.docs
+    .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, maxItems)
+}
+
+export async function markTeacherGradePackageImported({ packageId, userEmail }) {
+  const cleanEmail = String(userEmail || '').trim().toLowerCase()
+  if (!packageId || !cleanEmail) return
+
+  const packageRef = getTeacherGradePackageDocRef(packageId)
+  const packageSnapshot = await getDoc(packageRef)
+  if (!packageSnapshot.exists()) throw new Error('No s’ha trobat aquest paquet de notes.')
+  const packageMeta = packageSnapshot.data()
+  if (packageMeta.recipientEmailLower !== cleanEmail) {
+    throw new Error('Aquest paquet de notes no està adreçat al teu compte.')
+  }
+
+  const now = new Date().toISOString()
+  await setDoc(
+    packageRef,
+    cleanForFirestore({
+      importedAt: now,
+      status: 'imported',
+      updatedAt: now,
+    }),
+    { merge: true },
+  )
 }
 
 export async function deleteCloudCollection(uid, collectionName) {
