@@ -8436,6 +8436,64 @@ button.profile-followup-card:focus-visible {
   line-height: 1.45;
 }
 
+.agenda-direct-note-field textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  color: #111827;
+  background: white;
+  font: inherit;
+  font-weight: 750;
+  resize: vertical;
+  outline: none;
+}
+
+.agenda-direct-note-field textarea:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px #ffedd5;
+}
+
+.reset-course-modal {
+  display: grid;
+  gap: 16px;
+  color: #1f2937;
+}
+
+.reset-course-warning {
+  display: flex;
+  gap: 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 14px;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.reset-course-warning > div {
+  display: grid;
+  gap: 6px;
+}
+
+.reset-course-warning strong {
+  color: #111827;
+  font-size: 18px;
+}
+
+.reset-course-warning p {
+  margin: 0;
+  color: #4b5563;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.modal-actions.split {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+}
+
 .tracking-history-list {
   display: grid;
   gap: 8px;

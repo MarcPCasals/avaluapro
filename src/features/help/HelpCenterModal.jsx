@@ -92,8 +92,25 @@ const guideLaunchers = [
 
 export function HelpCenterModal({ onClose, onOpenGuide }) {
   const openGuide = useAvaluaproStore((state) => state.openGuide)
+  const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
 
-  const openGuidedTour = (guideMode = 'demo') => {
+  const openGuidedTour = async (guideMode = 'demo') => {
+    if (guideMode === 'demo') {
+      const shouldReset = window.confirm(
+        [
+          'La guia inicial demo tornarà a carregar les dades fictícies inicials.',
+          '',
+          'Això eliminarà les dades actuals del dispositiu. Descarrega abans una còpia de seguretat si vols conservar-les.',
+          '',
+          'Vols continuar?',
+        ].join('\n'),
+      )
+      if (!shouldReset) return
+      onClose()
+      await resetToSeed()
+      return
+    }
+
     if (onOpenGuide) {
       onOpenGuide(guideMode)
       return

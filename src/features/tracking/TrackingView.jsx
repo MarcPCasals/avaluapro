@@ -262,7 +262,10 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
   )
 }
 
-function AgendaNotesModal({ notes, onClose, student }) {
+function AgendaNotesModal({ notes, onClose, onSave, student }) {
+  const [text, setText] = useState('')
+  const sortedNotes = [...notes].sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))
+
   return (
     <div className="modal-backdrop">
       <div className="modal-panel lg">
@@ -277,13 +280,16 @@ function AgendaNotesModal({ notes, onClose, student }) {
             <Skull size={26} />
             <div>
               <strong>{notes.length} nota/es registrades</strong>
-              <span>Historial de motius i tasques que van activar la nota.</span>
+              <span>Historial de notes per acumulació de negatius i notes directes.</span>
             </div>
           </div>
           <div className="agenda-task-list agenda-note-history">
-            {notes.map((note) => (
+            {sortedNotes.map((note) => (
               <div key={note.id}>
-                <strong>{new Date(note.date).toLocaleDateString('ca-ES')}</strong>
+                <strong>
+                  {new Date(note.date).toLocaleDateString('ca-ES')}
+                  {note.source === 'direct' ? ' · Nota directa' : ' · Acumulació'}
+                </strong>
                 {Number.isFinite(note.redPointCount) && (
                   <small>
                     {note.redPointCount} punts vermells · {note.blackPointCount || 0} punts negres
@@ -294,7 +300,26 @@ function AgendaNotesModal({ notes, onClose, student }) {
             ))}
             {notes.length === 0 && <p className="empty-list">Aquest alumne encara no té notes a l’agenda.</p>}
           </div>
+          <label className="field-label agenda-direct-note-field">
+            Nova nota directa a l’agenda
+            <textarea
+              onChange={(event) => setText(event.target.value)}
+              placeholder="Ex: nota directa a l’agenda per material, actitud o acord de seguiment..."
+              value={text}
+            />
+          </label>
           <div className="modal-actions">
+            <button
+              className="secondary-action"
+              disabled={!text.trim()}
+              onClick={async () => {
+                await onSave(text)
+                setText('')
+              }}
+              type="button"
+            >
+              Registrar nota directa
+            </button>
             <button className="primary-action" onClick={onClose} type="button">
               Tancar
             </button>
@@ -931,6 +956,14 @@ export function TrackingView() {
         <AgendaNotesModal
           notes={agendaDetailNotes}
           onClose={() => setAgendaDetailStudentId(null)}
+          onSave={(text) =>
+            addAgendaNote(agendaDetailStudent.id, 'tracking', text, {
+              blackPointCount: 0,
+              redPointCount: 0,
+              source: 'direct',
+              taskIds: [],
+            })
+          }
           student={agendaDetailStudent}
         />
       )}
@@ -1203,9 +1236,12 @@ export function TrackingView() {
                         </button>
                         <button
                           className={`agenda-note-chip ${trackingAgendaNotes.length > 0 ? 'active' : ''}`}
-                          disabled={trackingAgendaNotes.length === 0}
                           onClick={() => setAgendaDetailStudentId(student.id)}
-                          title={trackingAgendaNotes.length > 0 ? 'Nota a l’agenda registrada' : 'Sense nota a l’agenda registrada'}
+                          title={
+                            trackingAgendaNotes.length > 0
+                              ? 'Veure o afegir notes a l’agenda'
+                              : 'Afegir nota directa a l’agenda'
+                          }
                           type="button"
                         >
                           <Skull size={13} />

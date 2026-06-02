@@ -19,6 +19,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Modal } from './Modal'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
@@ -121,6 +122,7 @@ export function TopBar() {
   const [showProfile, setShowProfile] = useState(false)
   const [showDataSafety, setShowDataSafety] = useState(false)
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [draggedClassId, setDraggedClassId] = useState('')
@@ -298,17 +300,12 @@ export function TopBar() {
   }
 
   async function handleResetToSeed() {
-    const answer = window.prompt(
-      [
-        'Això esborrarà les dades actuals del dispositiu i tornarà a carregar les dades demo inicials.',
-        '',
-        'Descarrega una còpia de seguretat abans si vols conservar el que tens ara.',
-        '',
-        'Per confirmar, escriu ESBORRA.',
-      ].join('\n'),
-    )
-    if (answer !== 'ESBORRA') return
+    setShowResetConfirm(true)
+  }
+
+  async function confirmResetToSeed() {
     await resetToSeed()
+    setShowResetConfirm(false)
   }
 
   return (
@@ -567,6 +564,35 @@ export function TopBar() {
       )}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
+      {showResetConfirm && (
+        <Modal onClose={() => setShowResetConfirm(false)} size="lg" title="Reiniciar el curs">
+          <div className="reset-course-modal">
+            <div className="reset-course-warning">
+              <Trash2 size={24} />
+              <div>
+                <strong>Aquesta acció està pensada per reiniciar el curs.</strong>
+                <p>
+                  Esborrarà les dades actuals del dispositiu i tornarà a carregar la demo inicial. Si vols conservar
+                  les dades del curs que estàs tancant, descarrega abans una còpia de seguretat.
+                </p>
+              </div>
+            </div>
+            <div className="modal-actions split">
+              <button className="secondary-action" onClick={handleDownloadBackup} type="button">
+                <Download size={17} />
+                Descarregar còpia abans
+              </button>
+              <span />
+              <button className="secondary-action" onClick={() => setShowResetConfirm(false)} type="button">
+                Cancel·lar
+              </button>
+              <button className="danger-action" onClick={confirmResetToSeed} type="button">
+                Esborrar i començar de nou
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </header>
   )
 }
