@@ -638,24 +638,39 @@ export const useAvaluaproStore = create((set, get) => ({
       }
       const dataset = normalizeDataset(hasData ? storedDataset : seedDataset)
       await saveDataset(dataset)
-      observeFirebaseUser((user) => {
-        set((state) => ({
-          cloud: {
-            ...state.cloud,
-            user,
-            status: user ? 'signed-in' : 'signed-out',
-            error: '',
-          },
-        }))
-        if (user) {
-          setTimeout(() => {
-            get().maybeCreateDailyCloudBackup()
-            get().loadCloudBackups()
-            get().loadReceivedTeacherGradePackages()
-            get().loadSentTeacherGradePackages()
-          }, 0)
-        }
-      })
+      observeFirebaseUser(
+        (user) => {
+          set((state) => {
+            const keepLoginError = !user && state.cloud.status === 'error' && state.cloud.error
+            return {
+              cloud: {
+                ...state.cloud,
+                user,
+                status: user ? 'signed-in' : keepLoginError ? 'error' : 'signed-out',
+                error: user ? '' : keepLoginError ? state.cloud.error : '',
+              },
+            }
+          })
+          if (user) {
+            setTimeout(() => {
+              get().maybeCreateDailyCloudBackup()
+              get().loadCloudBackups()
+              get().loadReceivedTeacherGradePackages()
+              get().loadSentTeacherGradePackages()
+            }, 0)
+          }
+        },
+        (error) => {
+          set((state) => ({
+            cloud: {
+              ...state.cloud,
+              user: null,
+              status: 'error',
+              error: error.message || 'No s’ha pogut completar l’inici de sessió amb Google.',
+            },
+          }))
+        },
+      )
       set({
         ...dataset,
         ui: getInitialUi(dataset),
@@ -678,7 +693,12 @@ export const useAvaluaproStore = create((set, get) => ({
     try {
       const user = await signInWithGoogle()
       set((state) => ({
-        cloud: { ...state.cloud, user: user || state.cloud.user, status: user ? 'signed-in' : 'signing-in', error: '' },
+        cloud: {
+          ...state.cloud,
+          user: user || state.cloud.user,
+          status: user ? 'signed-in' : 'signed-out',
+          error: '',
+        },
       }))
     } catch (error) {
       set((state) => ({

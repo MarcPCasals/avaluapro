@@ -39,6 +39,25 @@ const db = getFirestore(app)
 const googleProvider = new GoogleAuthProvider()
 const FIRESTORE_DOCUMENT_SOFT_LIMIT = 900_000
 
+function getFirebaseAuthErrorMessage(error) {
+  const message = String(error?.message || '')
+  const code = String(error?.code || '')
+
+  if (
+    code.includes('unauthorized-domain') ||
+    message.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
+    message.includes('Requests from referer') ||
+    message.includes('app domain is authorized')
+  ) {
+    return [
+      'Google ha bloquejat l’inici de sessió perquè falta autoritzar un domini del projecte Firebase.',
+      'A Google Cloud cal afegir també https://avaluapro.firebaseapp.com/* a les restriccions HTTP de la clau API.',
+    ].join(' ')
+  }
+
+  return message || 'No s’ha pogut completar l’inici de sessió amb Google.'
+}
+
 function cleanForFirestore(value) {
   if (Array.isArray(value)) return value.map(cleanForFirestore)
   if (!value || typeof value !== 'object') return value ?? null
@@ -155,15 +174,20 @@ export function toCloudUser(user) {
   }
 }
 
-export function observeFirebaseUser(callback) {
+export function observeFirebaseUser(callback, onError) {
   getRedirectResult(auth).catch((error) => {
     console.warn('No s’ha pogut completar el retorn del login de Google.', error)
+    onError?.(new Error(getFirebaseAuthErrorMessage(error), { cause: error }))
   })
   return onAuthStateChanged(auth, (user) => callback(toCloudUser(user)))
 }
 
 export async function signInWithGoogle() {
-  await signInWithRedirect(auth, googleProvider)
+  try {
+    await signInWithRedirect(auth, googleProvider)
+  } catch (error) {
+    throw new Error(getFirebaseAuthErrorMessage(error), { cause: error })
+  }
   return null
 }
 
