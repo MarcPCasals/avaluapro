@@ -7,7 +7,7 @@ import { ClassFormFields } from './ClassFormFields'
 export function NewClassModal({ onClose }) {
   const addClass = useAvaluaproStore((state) => state.addClass)
   const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
-  const [form, setForm] = useState({ name: '', subject: defaultSubject, color: 'blue' })
+  const [form, setForm] = useState({ name: '', subject: defaultSubject, color: 'blue', tutors: '' })
 
   const updateForm = (patch) => setForm((current) => ({ ...current, ...patch }))
 

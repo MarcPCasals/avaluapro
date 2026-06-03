@@ -30,6 +30,7 @@ export function ClassSettingsModal({ classId, onClose }) {
             name: currentClass.name,
             subject: currentClass.subject || '',
             color: currentClass.color || 'blue',
+            tutors: currentClass.tutors || '',
           }}
         />
       </div>

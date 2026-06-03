@@ -39,6 +39,17 @@ const TUTORING_RECORD_TYPES = [
   { id: 'incident', label: 'Fulls d’incidents', tone: 'red' },
   { id: 'classroom-expulsion', label: 'Expulsions d’aula', tone: 'violet' },
   { id: 'center-expulsion', label: 'Expulsions de centre', tone: 'slate' },
+  { id: 'doip', label: 'DOIPs equip educatiu', tone: 'blue' },
+]
+const MULTIPLE_INTELLIGENCE_OPTIONS = [
+  { id: 'linguistic', label: 'Lingüística' },
+  { id: 'logical', label: 'Logicomatemàtica' },
+  { id: 'spatial', label: 'Visual-espacial' },
+  { id: 'bodily', label: 'Corporal-cinestèsica' },
+  { id: 'musical', label: 'Musical' },
+  { id: 'interpersonal', label: 'Interpersonal' },
+  { id: 'intrapersonal', label: 'Intrapersonal' },
+  { id: 'naturalistic', label: 'Naturalista' },
 ]
 const TUTORING_RELATION_TYPES = [
   { id: 'positive', label: 'Treballa bé amb', shortLabel: 'Positiva', tone: 'green' },
@@ -270,10 +281,18 @@ function getTutorialCompetencyGradeSource({
   classId,
   competency,
   evaluationContext,
+  student,
   studentId,
   subject,
   tutorialMarks,
 }) {
+  if (student?.tutorialExemptSubjects?.includes(subject)) {
+    return { source: 'exempt', value: '' }
+  }
+  if (student?.tutorialModifiedCompetencies?.includes(competency.key)) {
+    return { source: 'modified', value: 'D', modified: true }
+  }
+
   const storedGrade = getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency)
   if (storedGrade) return { source: 'manual', value: storedGrade }
 
@@ -287,6 +306,7 @@ function getTutorialCompetencyGrade({
   classId,
   competency,
   evaluationContext,
+  student,
   studentId,
   subject,
   tutorialMarks,
@@ -295,6 +315,7 @@ function getTutorialCompetencyGrade({
     classId,
     competency,
     evaluationContext,
+    student,
     studentId,
     subject,
     tutorialMarks,
@@ -353,6 +374,7 @@ function summarizeTutorialData({
           classId,
           competency,
           evaluationContext,
+          student,
           studentId: student.id,
           subject: subjectOption.subject,
           tutorialMarks,
@@ -511,6 +533,7 @@ function summarizeTutorialRecords({ students, records }) {
         incident: countByType(studentRecords, 'incident'),
         classroomExpulsion: countByType(studentRecords, 'classroom-expulsion'),
         centerExpulsion: countByType(studentRecords, 'center-expulsion'),
+        doip: countByType(studentRecords, 'doip'),
       }
     })
     .sort((a, b) => b.total - a.total || a.student.name.localeCompare(b.student.name, 'ca'))
@@ -531,6 +554,7 @@ function summarizeTutorialRecords({ students, records }) {
   return {
     studentRows,
     recentRecords,
+    studentsWithoutDoip: studentRows.filter((row) => row.doip === 0),
     studentsWithRecords: studentRows.filter((row) => row.total > 0),
   }
 }
@@ -1571,6 +1595,7 @@ function createTutorialImportMatrix({ classId, columns, evaluationContext, stude
         classId,
         competency: column.competency,
         evaluationContext,
+        student,
         studentId: student.id,
         subject: column.subject,
         tutorialMarks,
@@ -1644,6 +1669,7 @@ function buildTutorialTemplateText({ classId, columns, evaluationContext, studen
         classId,
         competency: column.competency,
         evaluationContext,
+        student,
         studentId: student.id,
         subject: column.subject,
         tutorialMarks,
@@ -2553,6 +2579,7 @@ export function TutoringView() {
   const tutorialStudentRoles = useAvaluaproStore((state) => state.tutorialStudentRoles)
   const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
+  const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
@@ -2652,6 +2679,14 @@ export function TutoringView() {
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
   const selectedSubjectArea = getSubjectArea(selectedSubject)
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
+  const intelligenceSummary = useMemo(
+    () =>
+      MULTIPLE_INTELLIGENCE_OPTIONS.map((option) => ({
+        ...option,
+        count: classStudents.filter((student) => student.multipleIntelligences?.includes(option.id)).length,
+      })).filter((option) => option.count > 0),
+    [classStudents],
+  )
   const evaluationContext = useMemo(
     () => ({
       criteria,
@@ -2666,6 +2701,13 @@ export function TutoringView() {
   )
 
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
+  const toggleStudentArrayValue = async (student, field, value) => {
+    const currentValues = Array.isArray(student[field]) ? student[field] : []
+    const nextValues = currentValues.includes(value)
+      ? currentValues.filter((item) => item !== value)
+      : [...currentValues, value]
+    await updateStudent(student.id, { [field]: nextValues })
+  }
   const linkedGradeCount = useMemo(() => {
     if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
 
@@ -2677,6 +2719,7 @@ export function TutoringView() {
             classId: activeClassId,
             competency,
             evaluationContext,
+            student,
             studentId: student.id,
             subject: selectedSubject,
             tutorialMarks,
@@ -2719,8 +2762,11 @@ export function TutoringView() {
   const subjectCompletion = useMemo(() => {
     const entries = subjectOptions.map((item) => {
       const subjectCompetencies = buildTutorialCompetencies(item.subject)
-      const total = classStudents.length * subjectCompetencies.length
-      const completed = classStudents.reduce(
+      const eligibleStudents = classStudents.filter(
+        (student) => !student.tutorialExemptSubjects?.includes(item.subject),
+      )
+      const total = eligibleStudents.length * subjectCompetencies.length
+      const completed = eligibleStudents.reduce(
         (studentTotal, student) =>
           studentTotal +
           subjectCompetencies.filter((competency) =>
@@ -2728,6 +2774,7 @@ export function TutoringView() {
               classId: activeClassId,
               competency,
               evaluationContext,
+              student,
               studentId: student.id,
               subject: item.subject,
               tutorialMarks,
@@ -3596,6 +3643,7 @@ export function TutoringView() {
                           classId: activeClassId,
                           competency,
                           evaluationContext,
+                          student,
                           studentId: student.id,
                           subject: selectedSubject,
                           tutorialMarks,
@@ -3620,6 +3668,7 @@ export function TutoringView() {
                               classId: activeClassId,
                               competency,
                               evaluationContext,
+                              student,
                               studentId: student.id,
                               subject: selectedSubject,
                               tutorialMarks,
@@ -3630,9 +3679,13 @@ export function TutoringView() {
                                 <select
                                   className={`${gradeTextClassName(value)} ${
                                     gradeSource.source === 'linked' ? 'linked-grade-select' : ''
+                                  } ${gradeSource.source === 'modified' ? 'modified-grade-select' : ''} ${
+                                    gradeSource.source === 'exempt' ? 'exempt-grade-select' : ''
                                   }`}
                                   data-tutorial-grade-select="true"
+                                  disabled={gradeSource.source === 'modified' || gradeSource.source === 'exempt'}
                                   onKeyDown={(event) => {
+                                    if (gradeSource.source === 'modified' || gradeSource.source === 'exempt') return
                                     const key = event.key.toUpperCase()
                                     const nextValue = key === 'N' ? 'NA' : key
                                     if (['A', 'B', 'C', 'D', 'NA'].includes(nextValue)) {
@@ -3667,7 +3720,11 @@ export function TutoringView() {
                                     })
                                   }
                                   title={
-                                    gradeSource.source === 'linked'
+                                    gradeSource.source === 'modified'
+                                      ? 'Competència modificada: compta com a D en el balanç estàndard.'
+                                      : gradeSource.source === 'exempt'
+                                        ? 'Matèria exempta per a aquest alumne.'
+                                        : gradeSource.source === 'linked'
                                       ? `Nota llegida de ${linkedClass?.name || 'la classe vinculada'} (${gradeSource.utName || 'última mirada'}). Pots sobreescriure-la.`
                                       : 'Nota tutorial pròpia'
                                   }
@@ -3682,6 +3739,20 @@ export function TutoringView() {
                                 {gradeSource.source === 'linked' && (
                                   <small className="tutorial-linked-ut">{gradeSource.utName || 'Última mirada'}</small>
                                 )}
+                                <div className="tutorial-grade-tools">
+                                  <button
+                                    className={
+                                      student.tutorialModifiedCompetencies?.includes(competency.key) ? 'active' : ''
+                                    }
+                                    onClick={() =>
+                                      toggleStudentArrayValue(student, 'tutorialModifiedCompetencies', competency.key)
+                                    }
+                                    title="Marcar competència modificada"
+                                    type="button"
+                                  >
+                                    M
+                                  </button>
+                                </div>
                               </td>
                             )
                           })}
@@ -3810,6 +3881,133 @@ export function TutoringView() {
               )}
             </article>
           </div>
+
+          <section className="tutorial-student-profile-tools">
+            <article className="tutoring-card tutorial-doip-card">
+              <div>
+                <ClipboardList size={24} />
+                <h2>DOIPs pendents</h2>
+              </div>
+              <p>
+                Marca les respostes de l’equip educatiu quan demanis informació curta sobre un alumne. Així veus qui
+                encara no té cap DOIP registrat.
+              </p>
+              {tutorialRecordSummary.studentsWithoutDoip.length === 0 ? (
+                <div className="empty-state compact">Tots els alumnes visibles tenen almenys un DOIP registrat.</div>
+              ) : (
+                <div className="tutorial-doip-list">
+                  {tutorialRecordSummary.studentsWithoutDoip.slice(0, 12).map((row) => (
+                    <button
+                      key={row.student.id}
+                      onClick={() =>
+                        setRecordForm((current) => ({
+                          ...current,
+                          date: getTodayDateInput(),
+                          note: '',
+                          studentId: row.student.id,
+                          type: 'doip',
+                        }))
+                      }
+                      type="button"
+                    >
+                      <span>{row.student.name}</span>
+                      <small>Afegir resposta DOIP</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </article>
+
+            <article className="tutoring-card tutorial-intelligences-card">
+              <div>
+                <Star size={24} />
+                <h2>Intel·ligències múltiples</h2>
+              </div>
+              <p>Assigna perfils predominants per tenir una lectura ràpida del grup i preparar activitats variades.</p>
+              {intelligenceSummary.length > 0 && (
+                <div className="tutorial-intelligence-summary">
+                  {intelligenceSummary.map((item) => (
+                    <span key={item.id}>
+                      {item.label}: <strong>{item.count}</strong>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="tutorial-intelligence-list">
+                {classStudents.slice(0, 14).map((student) => {
+                  const selectedIntelligences = student.multipleIntelligences || []
+                  return (
+                    <div className="tutorial-intelligence-row" key={student.id}>
+                      <strong>{student.name}</strong>
+                      <select
+                        onChange={(event) => {
+                          if (!event.target.value) return
+                          toggleStudentArrayValue(student, 'multipleIntelligences', event.target.value)
+                          event.target.value = ''
+                        }}
+                        value=""
+                      >
+                        <option value="">Afegir perfil...</option>
+                        {MULTIPLE_INTELLIGENCE_OPTIONS.filter(
+                          (option) => !selectedIntelligences.includes(option.id),
+                        ).map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="tutorial-chip-list">
+                        {selectedIntelligences.length === 0 ? (
+                          <small>Sense perfil</small>
+                        ) : (
+                          selectedIntelligences.map((id) => {
+                            const option = MULTIPLE_INTELLIGENCE_OPTIONS.find((item) => item.id === id)
+                            return (
+                              <button
+                                key={id}
+                                onClick={() => toggleStudentArrayValue(student, 'multipleIntelligences', id)}
+                                type="button"
+                              >
+                                {option?.label || id}
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </article>
+
+            <article className="tutoring-card tutorial-exemptions-card">
+              <div>
+                <ShieldAlert size={24} />
+                <h2>Exempcions i balanç modificat</h2>
+              </div>
+              <p>
+                Per a la matèria seleccionada ({selectedSubject || 'cap'}), marca alumnes exempts. La taula tutorial
+                ignorarà aquestes notes.
+              </p>
+              <div className="tutorial-exemption-list">
+                {classStudents.map((student) => {
+                  const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
+                  return (
+                    <button
+                      className={isExempt ? 'active' : ''}
+                      disabled={!selectedSubject}
+                      key={student.id}
+                      onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
+                      type="button"
+                    >
+                      <span>{student.name}</span>
+                      <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
+                    </button>
+                  )
+                })}
+              </div>
+            </article>
+          </section>
 
           <article className="tutoring-card compact">
             <div>

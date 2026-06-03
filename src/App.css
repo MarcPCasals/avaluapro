@@ -423,11 +423,19 @@
 
 .top-menu-account {
   display: grid;
-  gap: 3px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 10px 11px;
   background: #f8fafc;
+}
+
+.top-menu-account > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
 
 .top-menu-account strong {
@@ -444,6 +452,20 @@
   color: #64748b;
   font-size: 11px;
   font-weight: 850;
+}
+
+.top-menu-panel .top-account-signout {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  justify-content: center;
+  color: #64748b;
+  background: white;
+}
+
+.top-menu-panel .top-account-signout:hover {
+  color: #dc2626;
+  background: #fee2e2;
 }
 
 .top-menu-panel button:hover {
@@ -1169,6 +1191,19 @@ button.tutorial-stat-card {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
 }
 
+.tutorial-mark-table select.modified-grade-select {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background-color: #fee2e2;
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.12);
+}
+
+.tutorial-mark-table select.exempt-grade-select {
+  border-color: #e5e7eb;
+  color: #94a3b8;
+  background-color: #f8fafc;
+}
+
 .tutorial-mark-table select:focus-visible {
   outline: 3px solid rgba(249, 115, 22, 0.28);
   outline-offset: 2px;
@@ -1228,7 +1263,7 @@ button.tutorial-stat-card {
 
 .tutorial-record-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1280,6 +1315,11 @@ button.tutorial-record-pill {
   background: #f8fafc;
 }
 
+.tutorial-record-pill.blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
 .tutorial-tracking-panel {
   display: grid;
   gap: 14px;
@@ -1290,6 +1330,127 @@ button.tutorial-record-pill {
   grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
   gap: 14px;
   align-items: start;
+}
+
+.tutorial-student-profile-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.tutorial-doip-list,
+.tutorial-intelligence-list,
+.tutorial-exemption-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tutorial-doip-list button,
+.tutorial-exemption-list button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: #f8fafc;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tutorial-doip-list button:hover,
+.tutorial-exemption-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.tutorial-doip-list small,
+.tutorial-intelligence-row small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.tutorial-intelligence-summary,
+.tutorial-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tutorial-intelligence-summary span,
+.tutorial-chip-list button {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tutorial-intelligence-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(150px, 0.75fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px;
+  background: white;
+}
+
+.tutorial-intelligence-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorial-intelligence-row select {
+  min-height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: #1f2937;
+  background: #f8fafc;
+  font-weight: 850;
+}
+
+.tutorial-intelligence-row .tutorial-chip-list {
+  grid-column: 1 / -1;
+}
+
+.tutorial-chip-list button {
+  cursor: pointer;
+}
+
+.tutorial-exemption-list button.active {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.tutorial-exemption-list strong {
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #64748b;
+  background: white;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tutorial-exemption-list button.active strong {
+  color: #c2410c;
+  background: #ffedd5;
 }
 
 .tutorial-record-form-card {
@@ -1355,6 +1516,11 @@ button.tutorial-record-pill {
 .tutorial-record-type-select.slate {
   border-color: #cbd5e1;
   background: #f8fafc;
+}
+
+.tutorial-record-type-select.blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .tutorial-relationships-panel {
@@ -2773,6 +2939,32 @@ button.tutorial-record-pill {
   font-weight: 950;
 }
 
+.tutorial-grade-tools {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.tutorial-grade-tools button {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  color: #b91c1c;
+  background: #fff1f2;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.tutorial-grade-tools button.active {
+  border-color: #ef4444;
+  color: #991b1b;
+  background: #fee2e2;
+}
+
 .tutorial-relation-pill,
 .tutorial-relation-entry {
   display: grid;
@@ -2899,6 +3091,11 @@ button.tutorial-record-pill {
 .tutorial-record-entry.violet {
   border-color: #ddd6fe;
   background: #f5f3ff;
+}
+
+.tutorial-record-entry.blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .tutorial-record-entry strong {
@@ -3775,6 +3972,7 @@ button.tutorial-record-pill {
   .tutorial-profile-panel,
   .tutorial-insight-grid,
   .tutorial-profile-insight-grid,
+  .tutorial-student-profile-tools,
   .tutorial-tracking-grid,
   .tutorial-print-options {
     grid-template-columns: 1fr;
@@ -4415,6 +4613,8 @@ button.tutorial-record-pill {
 .student-diagnosis-red .tracking-student-cell { background: #fee2e2; }
 .student-diagnosis-purple .student-cell,
 .student-diagnosis-purple .tracking-student-cell { background: #f3e8ff; }
+.student-diagnosis-orange .student-cell,
+.student-diagnosis-orange .tracking-student-cell { background: #ffedd5; }
 
 .student-diagnosis-blue .student-profile-trigger,
 .student-diagnosis-blue .tracking-student-name { color: #1e40af; }
@@ -4426,6 +4626,8 @@ button.tutorial-record-pill {
 .student-diagnosis-red .tracking-student-name { color: #991b1b; }
 .student-diagnosis-purple .student-profile-trigger,
 .student-diagnosis-purple .tracking-student-name { color: #6b21a8; }
+.student-diagnosis-orange .student-profile-trigger,
+.student-diagnosis-orange .tracking-student-name { color: #9a3412; }
 
 .student-attention-team .student-cell,
 .student-attention-team .tracking-student-cell {
@@ -4492,6 +4694,7 @@ button.tutorial-record-pill {
 }
 
 .aggregate-cell.final {
+  position: relative;
   background: #f3f4f6;
 }
 
@@ -4532,6 +4735,40 @@ button.tutorial-record-pill {
   border-radius: 8px;
   min-width: 48px;
   min-height: 36px;
+}
+
+.modified-competency-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  color: #b91c1c;
+  background: #fff1f2;
+  font-size: 10px;
+  font-weight: 950;
+  opacity: 0.62;
+}
+
+.modified-competency-toggle:hover,
+.modified-competency-toggle.active {
+  border-color: #f87171;
+  color: #991b1b;
+  background: #fee2e2;
+  opacity: 1;
+}
+
+.modified-competency-cell .grade {
+  border-color: #fca5a5;
+  border-radius: 999px;
+  color: #991b1b;
+  background: #fee2e2;
 }
 
 .grade-A { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
@@ -10095,6 +10332,7 @@ button.profile-followup-card:focus-visible {
 .diagnosis-chip.yellow.active { color: #92400e; background: #fef3c7; border-color: #facc15; }
 .diagnosis-chip.red.active { color: #991b1b; background: #fee2e2; border-color: #f87171; }
 .diagnosis-chip.purple.active { color: #6b21a8; background: #f3e8ff; border-color: #c084fc; }
+.diagnosis-chip.orange.active { color: #9a3412; background: #ffedd5; border-color: #fb923c; }
 
 .annotation-section-title {
   display: flex;
@@ -11462,8 +11700,11 @@ button.profile-followup-card:focus-visible {
   line-height: 1.45;
 }
 
-.cloud-backup-heading .primary-action {
+.cloud-backup-actions {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-self: start;
 }
 

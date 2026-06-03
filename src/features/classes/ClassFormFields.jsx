@@ -34,6 +34,17 @@ export function ClassFormFields({ value, onChange }) {
           ))}
         </select>
       </label>
+      <label className="field-label">
+        Tutor/a o tutors
+        <input
+          onChange={(event) => onChange({ tutors: event.target.value })}
+          placeholder="Ex: Marta Vila i Marc Pérez"
+          value={value.tutors || ''}
+        />
+        <span className="field-hint">
+          És només un recordatori intern per saber qui acompanya el grup, especialment si hi ha cotutoria.
+        </span>
+      </label>
       <div className="field-label">
         Color de la classe
         <div className="class-color-picker">

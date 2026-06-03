@@ -398,8 +398,21 @@ export function TopBar() {
             <div className="top-menu-panel">
               {cloud.user ? (
                 <div className="top-menu-account">
-                  <strong title={cloud.user.email}>{cloud.user.email}</strong>
-                  <small>Compte connectat</small>
+                  <div>
+                    <strong title={cloud.user.email}>{cloud.user.email}</strong>
+                    <small>Compte connectat</small>
+                  </div>
+                  <button
+                    className="top-account-signout"
+                    onClick={() => {
+                      signOutFromGoogle()
+                      setShowDataMenu(false)
+                    }}
+                    title="Tancar sessió"
+                    type="button"
+                  >
+                    <LogOut size={16} />
+                  </button>
                 </div>
               ) : (
                 <button
@@ -445,38 +458,9 @@ export function TopBar() {
                 type="button"
               >
                 <FileArchive size={18} />
-                Antecedents curs vinent
+                Antecedents acadèmics
               </button>
-              <button
-                onClick={() => {
-                  handleDownloadBackup()
-                  setShowDataMenu(false)
-                }}
-                type="button"
-              >
-                <Download size={18} />
-                Còpia manual al dispositiu
-              </button>
-              <button
-                onClick={() => {
-                  fileInputRef.current?.click()
-                  setShowDataMenu(false)
-                }}
-                type="button"
-              >
-                <Upload size={18} />
-                Importar còpia manual
-              </button>
-              <button
-                onClick={() => {
-                  handleExportActiveUtExcel()
-                  setShowDataMenu(false)
-                }}
-                type="button"
-              >
-                <FileSpreadsheet size={18} />
-                Exportar notes UT
-              </button>
+              <span className="top-menu-separator" />
               <button
                 data-tour="teacher-package-button"
                 onClick={() => {
@@ -491,55 +475,6 @@ export function TopBar() {
                   {pendingTeacherPackages}
                 </em>
               </button>
-              {cloud.user && (
-                <>
-                  <span className="top-menu-separator" />
-                  <button
-                    onClick={async () => {
-                      try {
-                        await createCloudBackup('manual')
-                      } catch (error) {
-                        window.alert(error.message || 'No s’ha pogut crear la còpia al núvol.')
-                      }
-                      setShowDataMenu(false)
-                    }}
-                    type="button"
-                  >
-                    <Cloud size={18} />
-                    Crear còpia al núvol
-                  </button>
-                  <button
-                    onClick={() => {
-                      pushAllToCloud()
-                      setShowDataMenu(false)
-                    }}
-                    type="button"
-                  >
-                    <Upload size={18} />
-                    Sincronitzar ara
-                  </button>
-                  <button
-                    onClick={() => {
-                      handlePullFromCloud()
-                      setShowDataMenu(false)
-                    }}
-                    type="button"
-                  >
-                    <Download size={18} />
-                    Recuperar estat del núvol
-                  </button>
-                  <button
-                    onClick={() => {
-                      signOutFromGoogle()
-                      setShowDataMenu(false)
-                    }}
-                    type="button"
-                  >
-                    <LogOut size={18} />
-                    Tancar sessió
-                  </button>
-                </>
-              )}
             </div>
           )}
         </div>

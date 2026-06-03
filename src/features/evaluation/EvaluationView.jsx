@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
+import { BookOpen, Download, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
+import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
@@ -43,8 +44,26 @@ function getCriterionMark(marks, studentId, criterionId) {
 }
 
 function getCompetencyGrade(marks, studentId, competency) {
+  if (isCompetencyModified(marks, studentId, competency.id)) return 'D'
   const grades = competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id))
   return calculateGrade(grades)
+}
+
+function isCompetencyModified(marks, studentId, competencyId) {
+  return marks.some(
+    (mark) =>
+      mark.type === 'competency-modification' &&
+      mark.studentId === studentId &&
+      mark.competencyId === competencyId,
+  )
+}
+
+function escapeCell(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
 }
 
 function getEmptyStateCopy(activeClass, subjectStructure) {
@@ -84,8 +103,10 @@ export function EvaluationView() {
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
+  const activeUt = useAvaluaproStore((state) => state.uts.find((ut) => ut.id === state.ui.activeUtId))
   const updateMark = useAvaluaproStore((state) => state.updateMark)
   const updateMarksBulk = useAvaluaproStore((state) => state.updateMarksBulk)
+  const toggleCompetencyModification = useAvaluaproStore((state) => state.toggleCompetencyModification)
   const seatingCharts = useAvaluaproStore((state) => state.seatingCharts)
   const upsertSeatingChart = useAvaluaproStore((state) => state.upsertSeatingChart)
   const deleteSeatingChart = useAvaluaproStore((state) => state.deleteSeatingChart)
@@ -130,6 +151,64 @@ export function EvaluationView() {
       `[data-evaluation-select="${nextStudent.id}_${nextCriterion.id}"]`,
     )
     nextSelect?.focus()
+  }
+
+  const handleExportActiveUtExcel = () => {
+    if (!activeClass || !activeUt || competencies.length === 0) {
+      window.alert('Aquesta UT encara no té competències actives per exportar.')
+      return
+    }
+
+    const headerCells = [
+      '<th>Alumne</th>',
+      '<th>Mig grup</th>',
+      ...competencies.flatMap((competency) => [
+        ...competency.criteria.map((criterion) => `<th>${escapeCell(competency.name)} · ${escapeCell(criterion.name)}</th>`),
+        `<th>${escapeCell(competency.name)} · Nota competència</th>`,
+      ]),
+    ].join('')
+
+    const bodyRows = filteredStudents
+      .map((student) => {
+        const cells = [
+          `<td>${escapeCell(student.name)}</td>`,
+          `<td>${escapeCell(student.halfGroup || '')}</td>`,
+          ...competencies.flatMap((competency) => {
+            const criterionGrades = competency.criteria.map((criterion) =>
+              getCriterionMark(marks, student.id, criterion.id),
+            )
+            const competencyGrade = getCompetencyGrade(marks, student.id, competency)
+            return [
+              ...criterionGrades.map((grade) => `<td>${escapeCell(grade || '-')}</td>`),
+              `<td><strong>${escapeCell(competencyGrade || '-')}</strong></td>`,
+            ]
+          }),
+        ].join('')
+        return `<tr>${cells}</tr>`
+      })
+      .join('')
+
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Arial, sans-serif; }
+            th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: center; }
+            th { background: #f3f4f6; font-weight: 700; }
+            td:first-child, th:first-child { text-align: left; min-width: 240px; }
+          </style>
+        </head>
+        <body>
+          <h2>${escapeCell(activeClass.name)} · ${escapeCell(activeUt.name)}</h2>
+          <table>
+            <thead><tr>${headerCells}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </body>
+      </html>`
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
+    downloadBlob(blob, `avaluapro-${activeClass.name}-${activeUt.name}-${getTodaySlug()}.xls`)
   }
 
   useEffect(() => {
@@ -180,6 +259,10 @@ export function EvaluationView() {
         <button className="tool-button" data-tour="import-excel-button" onClick={() => setShowImportModal(true)} type="button">
           <FileSpreadsheet size={18} />
           Importar Excel
+        </button>
+        <button className="tool-button" onClick={handleExportActiveUtExcel} type="button">
+          <Download size={18} />
+          Exportar notes UT
         </button>
         <button className="tool-button dark" data-tour="manage-students-button" onClick={() => setShowStudentsModal(true)} type="button">
           <Users size={18} />
@@ -348,7 +431,22 @@ export function EvaluationView() {
                       </td>
                     )
                   }),
-                  <td className="aggregate-cell final" key={`${student.id}_${competency.id}_grade`}>
+                  <td
+                    className={`aggregate-cell final ${
+                      isCompetencyModified(marks, student.id, competency.id) ? 'modified-competency-cell' : ''
+                    }`}
+                    key={`${student.id}_${competency.id}_grade`}
+                  >
+                    <button
+                      className={`modified-competency-toggle ${
+                        isCompetencyModified(marks, student.id, competency.id) ? 'active' : ''
+                      }`}
+                      onClick={() => toggleCompetencyModification(student.id, competency.id)}
+                      title="Marcar competència modificada: el balanç estàndard comptarà com a D"
+                      type="button"
+                    >
+                      M
+                    </button>
                     <span className={gradeClassName(getCompetencyGrade(marks, student.id, competency))}>
                       {getCompetencyGrade(marks, student.id, competency) || '-'}
                     </span>

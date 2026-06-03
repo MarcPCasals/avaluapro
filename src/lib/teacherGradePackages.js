@@ -128,6 +128,24 @@ export function getLatestEvaluationCompetencyGrade({ classId, competencyName, st
     .sort((a, b) => (utOrderById.get(b.utId) || 0) - (utOrderById.get(a.utId) || 0))
 
   for (const competency of matchingCompetencies) {
+    const modifiedMark = state.marks.find(
+      (mark) =>
+        mark.type === 'competency-modification' &&
+        mark.studentId === studentId &&
+        mark.competencyId === competency.id,
+    )
+    if (modifiedMark) {
+      const sourceUt = utsById.get(competency.utId)
+      return {
+        competencyId: competency.id,
+        grade: 'D',
+        modified: true,
+        sourceUtId: sourceUt?.id || competency.utId,
+        sourceUtName: sourceUt?.name || 'UT anterior',
+        sourceUtOrder: utOrderById.get(competency.utId) ?? 0,
+      }
+    }
+
     const competencyCriteria = state.criteria.filter((criterion) => criterion.competencyId === competency.id)
     const criterionGrades = competencyCriteria
       .map((criterion) =>
@@ -181,6 +199,7 @@ export function buildTeacherGradePackage({ classId, sender = {}, state }) {
         competencyKey: buildTutorialCompetencyKey(subject, competencyIndex),
         competencyName: competency.name,
         grade: latestGrade?.grade || '',
+        modified: Boolean(latestGrade?.modified),
         sourceCompetencyId: latestGrade?.competencyId || null,
         sourceUtId: latestGrade?.sourceUtId || null,
         sourceUtName: latestGrade?.sourceUtName || '',

@@ -187,6 +187,15 @@ const tourSteps = [
 
 const ownDataTourSteps = [
   {
+    target: 'data-menu',
+    title: 'Abans de començar: inicia sessió',
+    text: 'Abans d’afegir alumnes o notes reals, inicia sessió amb Google. Així les dades que comencis a crear ja quedaran preparades per sincronitzar-se al núvol.',
+    action: 'Obre “Dades i Compte” i prem “Inicia sessió amb Google”.',
+    completeWhen: 'google-signed-in',
+    mode: 'evaluation',
+    placement: 'far-left',
+  },
+  {
     target: 'manage-students-button',
     title: '1. Afegeix la teva classe',
     text: 'El primer pas real és afegir alumnes. Enganxa una llista amb un alumne per línia en format “Cognom Cognom, Nom”. Quan hagis pujat els noms, prem el botó “Acció feta”.',
@@ -620,6 +629,10 @@ function getCompletionState(step, baseline, current) {
 
   if (step.completeWhen === 'data-menu-open') {
     return Boolean(document.querySelector('.top-menu-panel'))
+  }
+
+  if (step.completeWhen === 'google-signed-in') {
+    return Boolean(useAvaluaproStore.getState().cloud.user)
   }
 
   if (step.completeWhen === 'stats-evaluation-open') {

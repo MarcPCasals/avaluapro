@@ -156,6 +156,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const bulkUpsertStudentAntecedents = useAvaluaproStore((store) => store.bulkUpsertStudentAntecedents)
   const createCloudBackup = useAvaluaproStore((store) => store.createCloudBackup)
   const loadCloudBackups = useAvaluaproStore((store) => store.loadCloudBackups)
+  const pushAllToCloud = useAvaluaproStore((store) => store.pushAllToCloud)
+  const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
   const [storageEstimate, setStorageEstimate] = useState(null)
   const [restoreStatus, setRestoreStatus] = useState('')
@@ -226,6 +228,35 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
       setRestoreStatus('Còpia de seguretat creada al núvol correctament.')
     } catch (error) {
       setRestoreStatus(error.message || 'No s’ha pogut crear la còpia al núvol.')
+    }
+  }
+
+  const handlePushToCloud = async () => {
+    try {
+      await pushAllToCloud()
+      setRestoreStatus('Dades sincronitzades amb el núvol correctament.')
+    } catch (error) {
+      setRestoreStatus(error.message || 'No s’han pogut sincronitzar les dades amb el núvol.')
+    }
+  }
+
+  const handlePullFromCloud = async () => {
+    const shouldPull = window.confirm(
+      [
+        'Aquesta acció substituirà les dades locals actuals per les dades guardades a Firebase.',
+        '',
+        'Abans de continuar, és recomanable descarregar una còpia manual de l’estat actual.',
+        '',
+        'Vols continuar?',
+      ].join('\n'),
+    )
+    if (!shouldPull) return
+
+    try {
+      await pullFromCloud()
+      setRestoreStatus('Estat recuperat del núvol correctament.')
+    } catch (error) {
+      setRestoreStatus(error.message || 'No s’ha pogut recuperar l’estat del núvol.')
     }
   }
 
@@ -434,15 +465,35 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 les seves còpies.
               </p>
             </div>
-            <button
-              className="primary-action compact"
-              disabled={!state.cloud.user || state.cloud.backupStatus === 'saving'}
-              onClick={handleCreateCloudBackup}
-              type="button"
-            >
-              {state.cloud.backupStatus === 'saving' ? <Loader2 size={17} className="spin-icon" /> : <Cloud size={17} />}
-              Crear còpia al núvol
-            </button>
+            <div className="cloud-backup-actions">
+              <button
+                className="primary-action compact"
+                disabled={!state.cloud.user || state.cloud.backupStatus === 'saving'}
+                onClick={handleCreateCloudBackup}
+                type="button"
+              >
+                {state.cloud.backupStatus === 'saving' ? <Loader2 size={17} className="spin-icon" /> : <Cloud size={17} />}
+                Crear còpia al núvol
+              </button>
+              <button
+                className="secondary-action compact"
+                disabled={!state.cloud.user || state.cloud.status === 'syncing'}
+                onClick={handlePushToCloud}
+                type="button"
+              >
+                <Upload size={16} />
+                Sincronitzar ara
+              </button>
+              <button
+                className="secondary-action compact"
+                disabled={!state.cloud.user || state.cloud.status === 'syncing'}
+                onClick={handlePullFromCloud}
+                type="button"
+              >
+                <Download size={16} />
+                Recuperar estat
+              </button>
+            </div>
           </div>
           <div className="cloud-backup-meta">
             <span>

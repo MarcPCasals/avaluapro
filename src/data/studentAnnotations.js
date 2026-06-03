@@ -24,6 +24,11 @@ export const DIAGNOSIS_OPTIONS = [
     label: 'Alumne de progrés',
     color: 'purple',
   },
+  {
+    id: 'high-capacity',
+    label: 'Altes capacitats',
+    color: 'orange',
+  },
 ]
 
 export function getDominantDiagnosis(diagnoses = []) {

@@ -180,6 +180,7 @@ function normalizeDataset(dataset) {
     ...normalizedDataset,
     classes: normalizedDataset.classes.map((classItem) => ({
       ...classItem,
+      tutors: classItem.tutors || '',
       isTutoringGroup: Boolean(classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
       tutorialLinkedClassId: classItem.tutorialLinkedClassId || classItem.id,
       halfGroups:
@@ -209,6 +210,17 @@ function normalizeDataset(dataset) {
   const marks = []
 
   normalizedDataset.marks.forEach((mark) => {
+    if (mark.type === 'competency-modification' && mark.studentId && mark.competencyId) {
+      marks.push({
+        id: mark.id || createId('mod'),
+        studentId: mark.studentId,
+        competencyId: mark.competencyId,
+        type: 'competency-modification',
+        value: 'modified',
+      })
+      return
+    }
+
     const criterionId = mark.criterionId || indicatorsById.get(mark.indicatorId)?.criterionId
     if (!criterionId) return
     const key = `${mark.studentId}_${criterionId}`
@@ -1234,7 +1246,7 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  addClass: async ({ name, subject, color = 'blue' } = {}) => {
+  addClass: async ({ name, subject, color = 'blue', tutors = '' } = {}) => {
     const id = createId('class')
     const classSubject = subject || get().profile.defaultSubject
     const timeline = createCourseTimeline(id)
@@ -1264,6 +1276,7 @@ export const useAvaluaproStore = create((set, get) => ({
           name: name?.trim() || `Grup ${state.classes.length + 1}`,
           subject: classSubject,
           color,
+          tutors: tutors?.trim() || '',
           halfGroups: DEFAULT_HALF_GROUPS,
           order: getNextClassOrder(state.classes),
           utModelReady: true,
@@ -1446,6 +1459,35 @@ export const useAvaluaproStore = create((set, get) => ({
         )
 
       return { marks }
+    })
+    await persistCollections(set, get, ['marks'])
+  },
+
+  toggleCompetencyModification: async (studentId, competencyId) => {
+    if (!studentId || !competencyId) return
+
+    set((state) => {
+      const existing = state.marks.find(
+        (mark) =>
+          mark.type === 'competency-modification' &&
+          mark.studentId === studentId &&
+          mark.competencyId === competencyId,
+      )
+
+      return {
+        marks: existing
+          ? state.marks.filter((mark) => mark.id !== existing.id)
+          : [
+              ...state.marks,
+              {
+                id: createId('mod'),
+                studentId,
+                competencyId,
+                type: 'competency-modification',
+                value: 'modified',
+              },
+            ],
+      }
     })
     await persistCollections(set, get, ['marks'])
   },
