@@ -5984,7 +5984,13 @@ button.tutorial-record-pill {
 
 .antecedent-evolution-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.35fr) repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.antecedent-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1fr) minmax(420px, 1.35fr);
   gap: 12px;
 }
 
@@ -6004,6 +6010,200 @@ button.tutorial-record-pill {
 .antecedent-evolution-card {
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.antecedent-evolution-summary-card.chart-summary {
+  min-height: 100%;
+  border-color: #fed7aa;
+  background: linear-gradient(135deg, #fff7ed, #ffffff 72%);
+}
+
+.antecedent-chart-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: white;
+}
+
+.antecedent-chart-card header {
+  display: grid;
+  gap: 3px;
+}
+
+.antecedent-chart-card header span {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.antecedent-chart-card header small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.antecedent-change-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.antecedent-change-bars button {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.9fr) minmax(120px, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.antecedent-change-bars button:hover,
+.antecedent-change-bars button:focus-visible {
+  outline: 2px solid #fed7aa;
+}
+
+.antecedent-change-bars span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.antecedent-change-bars div {
+  height: 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.antecedent-change-bars b {
+  display: block;
+  min-width: 3px;
+  height: 100%;
+  border-radius: inherit;
+  background: #94a3b8;
+}
+
+.antecedent-change-bars strong {
+  color: #111827;
+  font-size: 18px;
+  text-align: right;
+}
+
+.antecedent-change-bars .stable b {
+  background: #22c55e;
+}
+
+.antecedent-change-bars .danger b {
+  background: #ef4444;
+}
+
+.antecedent-change-bars .warning b {
+  background: #eab308;
+}
+
+.antecedent-change-bars .student-invisible b {
+  background: #f97316;
+}
+
+.antecedent-slope-axis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.antecedent-slope-axis span:nth-child(2),
+.antecedent-slope-axis span:nth-child(3) {
+  text-align: center;
+}
+
+.antecedent-slope-axis span:last-child {
+  text-align: right;
+}
+
+.antecedent-slope-list {
+  display: grid;
+  gap: 9px;
+}
+
+.antecedent-slope-list > p {
+  margin: 0;
+  color: #64748b;
+  font-weight: 850;
+}
+
+.antecedent-slope-list button {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.antecedent-slope-list button:hover,
+.antecedent-slope-list button:focus-visible {
+  border-color: #f97316;
+  outline: none;
+}
+
+.antecedent-slope-list button.stable {
+  background: #f0fdf4;
+}
+
+.antecedent-slope-list button.danger {
+  background: #fff1f2;
+}
+
+.antecedent-slope-list button.warning {
+  background: #fffbeb;
+}
+
+.antecedent-slope-list button.student-invisible {
+  background: #fff7ed;
+}
+
+.antecedent-slope-list button > strong {
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.antecedent-slope-line {
+  position: relative;
+  height: 32px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent 0 32%, #e5e7eb 32% 33%, transparent 33% 65%, #e5e7eb 65% 66%, transparent 66%),
+    #f1f5f9;
+}
+
+.antecedent-slope-line i {
+  position: absolute;
+  top: 14px;
+  height: 4px;
+  border-radius: 999px;
+  background: #f97316;
+}
+
+.antecedent-slope-line b {
+  position: absolute;
+  top: 50%;
+  min-width: 28px;
+  transform: translate(-50%, -50%);
+  text-align: center;
 }
 
 .antecedent-evolution-card:hover,
@@ -12710,6 +12910,10 @@ button.profile-followup-card:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .antecedent-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .antecedent-evolution-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -12743,16 +12947,21 @@ button.profile-followup-card:focus-visible {
   .data-safety-hero,
   .data-safety-grid,
   .backup-diagnosis-grid,
-    .collection-summary > div,
-    .antecedent-comparison-card,
-    .antecedent-evolution-grid,
-    .antecedent-evolution-preview,
-    .global-action-strip,
-    .help-guide-picker,
+  .collection-summary > div,
+  .antecedent-comparison-card,
+  .antecedent-chart-grid,
+  .antecedent-evolution-grid,
+  .antecedent-evolution-preview,
+  .global-action-strip,
+  .help-guide-picker,
   .help-grid,
   .help-reference > div,
   .security-status-grid,
   .setup-benefits {
+    grid-template-columns: 1fr;
+  }
+
+  .antecedent-slope-list button {
     grid-template-columns: 1fr;
   }
 

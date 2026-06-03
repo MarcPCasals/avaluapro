@@ -682,6 +682,11 @@ function getAntecedentTone(row) {
   return 'neutral'
 }
 
+function getScorePercent(score) {
+  if (!score) return 0
+  return Math.max(0, Math.min(100, ((score - 1) / 3) * 100))
+}
+
 function buildTrackingEvidence(profile, state, tasks, behaviorEvents) {
   const redRows = tasks
     .map((task) => {
@@ -1845,6 +1850,21 @@ function AntecedentEvolutionPanel({ groups, onSelectGroup, rows, setInfo }) {
     },
   ]
 
+  const maxCardValue = Math.max(1, ...cards.map((card) => card.value))
+  const comparisonRows = rows
+    .filter((row) => row.previousScore > 0 && row.currentScore > 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.student.name.localeCompare(b.student.name))
+    .slice(0, 9)
+
+  const openCard = (card) =>
+    onSelectGroup({
+      title: card.title,
+      description: card.description,
+      rows: card.rows,
+      tone: card.tone,
+      icon: card.icon,
+    })
+
   return (
     <section className="antecedent-evolution-panel full-width-analysis" data-tour="stats-antecedents">
       <HelpSectionHeading
@@ -1854,8 +1874,8 @@ function AntecedentEvolutionPanel({ groups, onSelectGroup, rows, setInfo }) {
         setInfo={setInfo}
         title="Evolució respecte als antecedents"
       />
-      <div className="antecedent-evolution-grid">
-        <article className="antecedent-evolution-summary-card">
+      <div className="antecedent-chart-grid">
+        <article className="antecedent-evolution-summary-card chart-summary">
           <span>Comparatiu curs anterior → última mirada actual</span>
           <strong>{summaryLabel}</strong>
           <small>
@@ -1864,19 +1884,80 @@ function AntecedentEvolutionPanel({ groups, onSelectGroup, rows, setInfo }) {
               : `${rows.length} alumnes amb antecedents · variació mitjana ${averageDelta > 0 ? '+' : ''}${averageDelta}.`}
           </small>
         </article>
+        <article className="antecedent-chart-card change-bars">
+          <header>
+            <span>Mapa de canvis</span>
+            <small>Volum d’alumnes per lectura pedagògica.</small>
+          </header>
+          <div className="antecedent-change-bars">
+            {cards.map((card) => (
+              <button className={card.tone} key={card.id} onClick={() => openCard(card)} type="button">
+                <span>{card.title}</span>
+                <div>
+                  <b style={{ width: `${(card.value / maxCardValue) * 100}%` }} />
+                </div>
+                <strong>{card.value}</strong>
+              </button>
+            ))}
+          </div>
+        </article>
+        <article className="antecedent-chart-card slope">
+          <header>
+            <span>Curs anterior → actual</span>
+            <small>Els canvis més marcats en nota global.</small>
+          </header>
+          <div className="antecedent-slope-axis">
+            {['D', 'C', 'B', 'A'].map((grade) => (
+              <span key={grade}>{grade}</span>
+            ))}
+          </div>
+          <div className="antecedent-slope-list">
+            {comparisonRows.length === 0 ? (
+              <p>Encara no hi ha prou dades actuals per dibuixar el comparatiu.</p>
+            ) : (
+              comparisonRows.map((row) => {
+                const from = getScorePercent(row.previousScore)
+                const to = getScorePercent(row.currentScore)
+                const left = Math.min(from, to)
+                const width = Math.max(2, Math.abs(to - from))
+                return (
+                  <button
+                    className={getAntecedentTone(row)}
+                    key={row.student.id}
+                    onClick={() =>
+                      onSelectGroup({
+                        title: `Evolució de ${row.student.name}`,
+                        description: 'Comparativa individual entre antecedent i mirada actual.',
+                        rows: [row],
+                        tone: getAntecedentTone(row),
+                        icon: FileClock,
+                      })
+                    }
+                    type="button"
+                  >
+                    <strong>{row.student.name}</strong>
+                    <div className="antecedent-slope-line">
+                      <i style={{ left: `${left}%`, width: `${width}%` }} />
+                      <b className={gradeClassName(row.previousGrade)} style={{ left: `${from}%` }}>
+                        {row.previousGrade}
+                      </b>
+                      <b className={gradeClassName(row.currentGrade)} style={{ left: `${to}%` }}>
+                        {row.currentGrade}
+                      </b>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </article>
+      </div>
+      <div className="antecedent-evolution-grid">
         {cards.map((card) => (
           <button
             className={`antecedent-evolution-card ${card.tone}`}
             key={card.id}
-            onClick={() =>
-              onSelectGroup({
-                title: card.title,
-                description: card.description,
-                rows: card.rows,
-                tone: card.tone,
-                icon: card.icon,
-              })
-            }
+            onClick={() => openCard(card)}
             type="button"
           >
             <span>{card.title}</span>
@@ -2780,13 +2861,6 @@ export function AnalyticsView() {
         </button>
           </section>
 
-          <AntecedentEvolutionPanel
-            groups={antecedentEvolutionGroups}
-            onSelectGroup={setSelectedAntecedentInsight}
-            rows={antecedentEvolutionRows}
-            setInfo={setSelectedInfo}
-          />
-
           <div className="pedagogical-panel full-width-analysis" data-tour="stats-pedagogical">
           <HelpSectionHeading
             description="Conclusions i recomanacions accionables."
@@ -3133,6 +3207,13 @@ export function AnalyticsView() {
               />
             </div>
           </div>
+
+          <AntecedentEvolutionPanel
+            groups={antecedentEvolutionGroups}
+            onSelectGroup={setSelectedAntecedentInsight}
+            rows={antecedentEvolutionRows}
+            setInfo={setSelectedInfo}
+          />
         </>
       )}
     </section>
