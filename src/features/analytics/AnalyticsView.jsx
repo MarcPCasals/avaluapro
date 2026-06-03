@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CheckCircle2,
   CircleHelp,
+  FileClock,
   Layers,
   ListFilter,
   LineChart,
@@ -107,6 +108,8 @@ const chartHelp = {
     'Situa cada alumne segons constància i rendiment. Els extrems ajuden a veure perfils: treballa però no assoleix, assoleix però no és constant, o risc combinat.',
   actionLists:
     'Llistes accionables per començar a intervenir sense haver de llegir tota la taula.',
+  antecedentsEvolution:
+    'Compara els antecedents acadèmics carregats amb la mirada actual. Només apareix si hi ha alumnes amb antecedents i ajuda a veure qui millora, empitjora o manté risc.',
   criterionDistribution:
     'Mostra la distribució A/B/C/D per criteri. És útil per detectar criteris amb molts suspesos o amb poca evidència.',
   utSummary:
@@ -595,6 +598,88 @@ function buildStudentChangeRows(state, students, uts) {
       return { student, first, last, delta, validScores }
     })
     .filter((row) => row.validScores.length >= 2 && row.delta !== 0)
+}
+
+const antecedentProfileLabels = {
+  invisible: 'Alumne invisible',
+  priority: 'Intervenció prioritària',
+  ordinary: 'Seguiment ordinari',
+  stable: 'Hàbit estable',
+}
+
+function getAntecedentGrade(antecedent) {
+  const competencyGrades = Object.values(antecedent?.competencyGrades || {}).filter(Boolean)
+  const grades = competencyGrades.length > 0 ? competencyGrades : [antecedent?.lastLookGrade].filter(Boolean)
+  return calculateGrade(grades)
+}
+
+function getLatestStudentLook(state, studentId, uts) {
+  const validScores = uts
+    .map((ut) => ({ ut, ...getStudentUtGrade(state, studentId, ut.id) }))
+    .filter((item) => item.score > 0)
+
+  return validScores.at(-1) || { grade: '', score: 0, ut: null }
+}
+
+function buildAntecedentEvolutionRows(state, students, uts, profiles) {
+  const antecedentsByStudentId = new Map(state.studentAntecedents.map((antecedent) => [antecedent.studentId, antecedent]))
+  const profilesByStudentId = new Map(profiles.map((profile) => [profile.student.id, profile]))
+
+  return students
+    .map((student) => {
+      const antecedent = antecedentsByStudentId.get(student.id)
+      if (!antecedent) return null
+
+      const previousGrade = getAntecedentGrade(antecedent)
+      const previousScore = getNumericFromGrade(previousGrade)
+      const latestLook = getLatestStudentLook(state, student.id, uts)
+      const profile = profilesByStudentId.get(student.id)
+      const currentGrade = latestLook.score > 0 ? latestLook.grade : profile?.evaluation.grade || ''
+      const currentScore = latestLook.score > 0 ? latestLook.score : profile?.evaluation.score || 0
+      const currentDecision = profile ? getGlobalDecision(profile) : { label: 'Sense dades', tone: 'neutral', text: '' }
+      const previousRisk =
+        ['invisible', 'priority'].includes(antecedent.profile) || (previousScore > 0 && previousScore <= 2)
+      const currentRisk =
+        ['danger', 'warning', 'invisible'].includes(currentDecision.tone) || (currentScore > 0 && currentScore <= 2)
+      const wasInvisible = antecedent.profile === 'invisible'
+      const isInvisible = currentDecision.tone === 'invisible'
+      const delta = previousScore > 0 && currentScore > 0 ? Number((currentScore - previousScore).toFixed(2)) : 0
+
+      return {
+        student,
+        antecedent,
+        profile,
+        previousGrade,
+        previousScore,
+        currentGrade,
+        currentScore,
+        currentLookUt: latestLook.ut,
+        currentDecision,
+        previousRisk,
+        currentRisk,
+        wasInvisible,
+        isInvisible,
+        delta,
+      }
+    })
+    .filter(Boolean)
+}
+
+function buildAntecedentEvolutionGroups(rows) {
+  return {
+    improved: rows.filter((row) => row.delta > 0).sort((a, b) => b.delta - a.delta),
+    declined: rows.filter((row) => row.delta < 0).sort((a, b) => a.delta - b.delta),
+    maintainedRisk: rows.filter((row) => row.previousRisk && row.currentRisk),
+    invisibilityShift: rows.filter((row) => row.wasInvisible !== row.isInvisible),
+  }
+}
+
+function getAntecedentTone(row) {
+  if (row.delta > 0) return 'stable'
+  if (row.delta < 0) return 'danger'
+  if (row.currentDecision.tone === 'invisible') return 'student-invisible'
+  if (row.currentRisk) return 'warning'
+  return 'neutral'
 }
 
 function buildTrackingEvidence(profile, state, tasks, behaviorEvents) {
@@ -1633,6 +1718,189 @@ function StudentInsightModal({ insight, onClose }) {
   )
 }
 
+function AntecedentEvolutionModal({ insight, onClose }) {
+  if (!insight) return null
+  const Icon = insight.icon || FileClock
+
+  return (
+    <Modal onClose={onClose} size="lg" title={insight.title}>
+      <div className="student-insight-modal antecedent-insight-modal">
+        <section className={`insight-modal-intro ${getToneClassName(insight.tone || 'neutral')}`}>
+          <Icon size={24} />
+          <div>
+            <strong>{insight.rows.length} alumnes</strong>
+            <p>{insight.description}</p>
+          </div>
+        </section>
+        <div className="insight-student-list">
+          {insight.rows.length === 0 ? (
+            <p className="empty-list">Ara mateix no hi ha alumnes en aquesta situació.</p>
+          ) : (
+            insight.rows.map((row) => (
+              <article className="insight-student-card antecedent-row-card" key={row.student.id}>
+                <div>
+                  <strong>{row.student.name}</strong>
+                  <span>
+                    {row.currentLookUt
+                      ? `Última mirada actual: ${row.currentLookUt.name}`
+                      : 'Encara sense UT actual amb prou dades.'}
+                  </span>
+                </div>
+                <div className="antecedent-row-metrics">
+                  <span>
+                    Rendiment
+                    <b>
+                      <em className={gradeClassName(row.previousGrade)}>{row.previousGrade || '-'}</em>
+                      →
+                      <em className={gradeClassName(row.currentGrade)}>{row.currentGrade || '-'}</em>
+                    </b>
+                  </span>
+                  <span>
+                    Perfil
+                    <b>
+                      {antecedentProfileLabels[row.antecedent.profile] || 'Sense perfil'} → {row.currentDecision.label}
+                    </b>
+                  </span>
+                </div>
+                <p className="insight-evidence">
+                  {row.delta > 0
+                    ? 'Ha millorat respecte als antecedents.'
+                    : row.delta < 0
+                      ? 'Ha empitjorat respecte als antecedents.'
+                      : 'Manté un resultat similar als antecedents.'}{' '}
+                  {row.previousRisk && row.currentRisk
+                    ? 'Manté senyals de risc i convé fer seguiment.'
+                    : row.wasInvisible && !row.isInvisible
+                      ? 'Ha deixat de mostrar perfil d’alumne invisible.'
+                      : !row.wasInvisible && row.isInvisible
+                        ? 'Ara apareix com a alumne invisible.'
+                        : row.currentDecision.text}
+                </p>
+              </article>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function AntecedentEvolutionPanel({ groups, onSelectGroup, rows, setInfo }) {
+  if (rows.length === 0) return null
+
+  const averageDeltaRows = rows.filter((row) => row.previousScore > 0 && row.currentScore > 0)
+  const averageDelta =
+    averageDeltaRows.length === 0
+      ? null
+      : Number((averageDeltaRows.reduce((sum, row) => sum + row.delta, 0) / averageDeltaRows.length).toFixed(2))
+  const summaryLabel =
+    averageDelta === null
+      ? 'Amb dades parcials'
+      : averageDelta > 0
+        ? 'Millora global'
+        : averageDelta < 0
+          ? 'Baixada global'
+          : 'Estable'
+
+  const cards = [
+    {
+      id: 'improved',
+      title: 'Alumnes que milloren',
+      value: groups.improved.length,
+      helper: 'Respecte al curs anterior.',
+      tone: 'stable',
+      icon: TrendingUp,
+      rows: groups.improved,
+      description: 'Alumnes amb una última mirada actual millor que l’antecedent del curs anterior.',
+    },
+    {
+      id: 'declined',
+      title: 'Alumnes que empitjoren',
+      value: groups.declined.length,
+      helper: 'Han baixat de mirada.',
+      tone: 'danger',
+      icon: AlertTriangle,
+      rows: groups.declined,
+      description: 'Alumnes amb una última mirada actual inferior a l’antecedent del curs anterior.',
+    },
+    {
+      id: 'maintainedRisk',
+      title: 'Mantenen risc',
+      value: groups.maintainedRisk.length,
+      helper: 'Risc anterior i actual.',
+      tone: 'warning',
+      icon: Target,
+      rows: groups.maintainedRisk,
+      description: 'Alumnes que ja venien amb risc i encara mostren senyals que convé seguir.',
+    },
+    {
+      id: 'invisibilityShift',
+      title: 'Canvis invisibles',
+      value: groups.invisibilityShift.length,
+      helper: 'Entren o surten del perfil.',
+      tone: 'student-invisible',
+      icon: Brain,
+      rows: groups.invisibilityShift,
+      description: 'Alumnes que deixen de ser invisibles o passen a ser-ho respecte al curs anterior.',
+    },
+  ]
+
+  return (
+    <section className="antecedent-evolution-panel full-width-analysis" data-tour="stats-antecedents">
+      <HelpSectionHeading
+        description="Només apareix si hi ha antecedents carregats. Compara el curs anterior amb la mirada actual."
+        helpKey="antecedentsEvolution"
+        icon={FileClock}
+        setInfo={setInfo}
+        title="Evolució respecte als antecedents"
+      />
+      <div className="antecedent-evolution-grid">
+        <article className="antecedent-evolution-summary-card">
+          <span>Comparatiu curs anterior → última mirada actual</span>
+          <strong>{summaryLabel}</strong>
+          <small>
+            {averageDelta === null
+              ? `${rows.length} alumnes amb antecedents carregats.`
+              : `${rows.length} alumnes amb antecedents · variació mitjana ${averageDelta > 0 ? '+' : ''}${averageDelta}.`}
+          </small>
+        </article>
+        {cards.map((card) => (
+          <button
+            className={`antecedent-evolution-card ${card.tone}`}
+            key={card.id}
+            onClick={() =>
+              onSelectGroup({
+                title: card.title,
+                description: card.description,
+                rows: card.rows,
+                tone: card.tone,
+                icon: card.icon,
+              })
+            }
+            type="button"
+          >
+            <span>{card.title}</span>
+            <strong>{card.value}</strong>
+            <small>{card.helper}</small>
+            <em className="stat-card-hint">Consultar</em>
+          </button>
+        ))}
+      </div>
+      <div className="antecedent-evolution-preview">
+        {rows.slice(0, 5).map((row) => (
+          <article className={getAntecedentTone(row)} key={row.student.id}>
+            <strong>{row.student.name}</strong>
+            <span>
+              {row.previousGrade || '-'} → {row.currentGrade || '-'}
+            </span>
+            <small>{row.currentDecision.label}</small>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function TrackingEvidenceModal({ evidence, onClose }) {
   if (!evidence) return null
 
@@ -2284,6 +2552,7 @@ export function AnalyticsView() {
   const [selectedScatterProfile, setSelectedScatterProfile] = useState(null)
   const [selectedEvolutionStudent, setSelectedEvolutionStudent] = useState(null)
   const [selectedTrackingEvidence, setSelectedTrackingEvidence] = useState(null)
+  const [selectedAntecedentInsight, setSelectedAntecedentInsight] = useState(null)
   const [profileSortMode, setProfileSortMode] = useState('intervention')
   const [dashboardScope, setDashboardScope] = useState(() =>
     state.ui.activeInsight === 'utStats'
@@ -2360,6 +2629,8 @@ export function AnalyticsView() {
   const changeRows = buildStudentChangeRows(state, students, classUts)
   const improvedRows = [...changeRows].filter((row) => row.delta > 0).sort((a, b) => b.delta - a.delta)
   const declinedRows = [...changeRows].filter((row) => row.delta < 0).sort((a, b) => a.delta - b.delta)
+  const antecedentEvolutionRows = buildAntecedentEvolutionRows(state, students, classUts, crossProfiles)
+  const antecedentEvolutionGroups = buildAntecedentEvolutionGroups(antecedentEvolutionRows)
   const pedagogicalSummary = buildPedagogicalSummary({
     atRisk,
     balance,
@@ -2369,6 +2640,10 @@ export function AnalyticsView() {
   return (
     <section className="analytics-view">
       <StudentInsightModal insight={selectedInsight} onClose={() => setSelectedInsight(null)} />
+      <AntecedentEvolutionModal
+        insight={selectedAntecedentInsight}
+        onClose={() => setSelectedAntecedentInsight(null)}
+      />
       <InfoModal info={selectedInfo} onClose={() => setSelectedInfo(null)} />
       <TrackingEvidenceModal evidence={selectedTrackingEvidence} onClose={() => setSelectedTrackingEvidence(null)} />
       <ScatterStudentModal
@@ -2503,7 +2778,14 @@ export function AnalyticsView() {
           <small>Alumnes que assoleixen però no consoliden constància.</small>
           <em className="stat-card-hint">Consultar</em>
         </button>
-      </section>
+          </section>
+
+          <AntecedentEvolutionPanel
+            groups={antecedentEvolutionGroups}
+            onSelectGroup={setSelectedAntecedentInsight}
+            rows={antecedentEvolutionRows}
+            setInfo={setSelectedInfo}
+          />
 
           <div className="pedagogical-panel full-width-analysis" data-tour="stats-pedagogical">
           <HelpSectionHeading

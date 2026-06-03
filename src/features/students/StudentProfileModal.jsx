@@ -12,6 +12,12 @@ import { useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
+import {
+  getStudentEvaluationScore,
+  getStudentRedPointCount,
+  getStudentTrackingStats,
+} from '../../lib/analytics'
+import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
@@ -27,6 +33,84 @@ const antecedentProfiles = [
 ]
 
 const gradeOptions = ['', 'A', 'B', 'C', 'D', 'NA']
+
+const antecedentProfileLabels = {
+  invisible: 'Alumne invisible',
+  priority: 'Intervenció prioritària',
+  ordinary: 'Seguiment ordinari',
+  stable: 'Hàbit estable',
+}
+
+function getAntecedentGrade(antecedent) {
+  const competencyGrades = Object.values(antecedent?.competencyGrades || {}).filter(Boolean)
+  const grades = competencyGrades.length > 0 ? competencyGrades : [antecedent?.lastLookGrade].filter(Boolean)
+  return calculateGrade(grades)
+}
+
+function getCurrentProfileSnapshot({ evaluation, incidents, redPointCount, tracking }) {
+  const riskScore =
+    (evaluation.score > 0 && evaluation.score <= 2 ? 1 : 0) +
+    (tracking.hasTrackingData && tracking.consistency < 60 ? 1 : 0) +
+    (incidents >= 2 || redPointCount >= 3 ? 1 : 0)
+
+  if (evaluation.score > 0 && evaluation.score <= 2 && tracking.hasTrackingData && tracking.consistency >= 60) {
+    return {
+      id: 'invisible',
+      label: 'Alumne invisible',
+      text: 'Treballa de manera constant, però el rendiment continua baix.',
+      tone: 'student-invisible',
+    }
+  }
+
+  if (riskScore >= 2) {
+    return {
+      id: 'priority',
+      label: 'Intervenció prioritària',
+      text: 'Acumula senyals combinades de risc.',
+      tone: 'danger',
+    }
+  }
+
+  if (tracking.hasTrackingData && tracking.consistency >= 75) {
+    return {
+      id: 'stable',
+      label: 'Hàbit estable',
+      text: 'Manté un patró de treball estable.',
+      tone: 'stable',
+    }
+  }
+
+  return {
+    id: 'ordinary',
+    label: 'Seguiment ordinari',
+    text: 'Sense senyals combinades importants.',
+    tone: 'neutral',
+  }
+}
+
+function getAntecedentReading({ currentGrade, currentProfile, previousGrade, previousProfile }) {
+  const previousScore = getNumericFromGrade(previousGrade)
+  const currentScore = getNumericFromGrade(currentGrade)
+  const gradeText =
+    previousGrade && currentGrade
+      ? currentScore > previousScore
+        ? `Venia amb ${previousGrade} i ara està en ${currentGrade}: ha millorat.`
+        : currentScore < previousScore
+          ? `Venia amb ${previousGrade} i ara està en ${currentGrade}: cal mirar què ha passat.`
+          : `Venia amb ${previousGrade} i continua en ${currentGrade}.`
+      : previousGrade
+        ? `Venia amb ${previousGrade}; encara falta prou informació actual per comparar.`
+        : 'Encara no hi ha nota anterior per comparar.'
+
+  const profileText =
+    previousProfile && currentProfile
+      ? previousProfile === currentProfile.id
+        ? `Venia com ${antecedentProfileLabels[previousProfile]} i continua amb el mateix perfil.`
+        : `Venia com ${antecedentProfileLabels[previousProfile]} i ara apareix com ${currentProfile.label}.`
+      : ''
+
+  return [gradeText, profileText].filter(Boolean).join(' ')
+}
 
 function createAntecedentDraft(antecedent) {
   return {
@@ -47,6 +131,35 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const studentClass = state.classes.find((classItem) => classItem.id === student?.classId) ||
     state.classes.find((classItem) => classItem.id === activeClassId)
   const subjectCompetencies = getSubjectStructure(studentClass?.subject || state.profile.defaultSubject) || []
+  const classTasks = state.tasks.filter((task) => task.classId === student?.classId)
+  const classBehaviorEvents = state.behaviorEvents.filter((event) => event.classId === student?.classId)
+  const currentEvaluation = student
+    ? getStudentEvaluationScore(student.id, state)
+    : { grade: '', score: 0 }
+  const currentTracking = student
+    ? getStudentTrackingStats(student.id, state.taskRecords, classTasks)
+    : { hasTrackingData: false, consistency: 0, total: 0 }
+  const currentRedPointCount = student
+    ? getStudentRedPointCount(student, currentTracking)
+    : 0
+  const currentIncidents = student
+    ? classBehaviorEvents.filter((event) => event.studentId === student.id && event.type === 'incident').length
+    : 0
+  const previousGrade = getAntecedentGrade(antecedent)
+  const currentProfileSnapshot = getCurrentProfileSnapshot({
+    evaluation: currentEvaluation,
+    tracking: currentTracking,
+    redPointCount: currentRedPointCount,
+    incidents: currentIncidents,
+  })
+  const antecedentReading = antecedent
+    ? getAntecedentReading({
+        previousGrade,
+        currentGrade: currentEvaluation.grade,
+        previousProfile: antecedent.profile,
+        currentProfile: currentProfileSnapshot,
+      })
+    : ''
   const agendaNotes = state.agendaNotes
     .filter((note) => note.classId === activeClassId && note.studentId === studentId)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -260,6 +373,28 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
               </select>
             </label>
           </div>
+
+          {antecedent && (
+            <div className="antecedent-comparison-card">
+              <div>
+                <span>Rendiment</span>
+                <strong>
+                  <b className={gradeClassName(previousGrade)}>{previousGrade || '-'}</b>
+                  <em>→</em>
+                  <b className={gradeClassName(currentEvaluation.grade)}>{currentEvaluation.grade || '-'}</b>
+                </strong>
+              </div>
+              <div>
+                <span>Perfil</span>
+                <strong>
+                  <b>{antecedentProfileLabels[antecedent.profile] || 'Sense perfil'}</b>
+                  <em>→</em>
+                  <b className={`profile-tone ${currentProfileSnapshot.tone}`}>{currentProfileSnapshot.label}</b>
+                </strong>
+              </div>
+              <p>{antecedentReading}</p>
+            </div>
+          )}
 
           <div className="antecedent-competencies-card">
             <div>
