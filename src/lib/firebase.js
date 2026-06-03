@@ -1,9 +1,12 @@
 import { initializeApp } from 'firebase/app'
 import {
   GoogleAuthProvider,
+  browserLocalPersistence,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
 } from 'firebase/auth'
@@ -37,6 +40,9 @@ const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
 const googleProvider = new GoogleAuthProvider()
+const authReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('No s’ha pogut fixar la persistència local de Firebase Auth.', error)
+})
 const FIRESTORE_DOCUMENT_SOFT_LIMIT = 900_000
 
 function getFirebaseAuthErrorMessage(error) {
@@ -175,20 +181,53 @@ export function toCloudUser(user) {
 }
 
 export function observeFirebaseUser(callback, onError) {
-  getRedirectResult(auth).catch((error) => {
-    console.warn('No s’ha pogut completar el retorn del login de Google.', error)
-    onError?.(new Error(getFirebaseAuthErrorMessage(error), { cause: error }))
-  })
-  return onAuthStateChanged(auth, (user) => callback(toCloudUser(user)))
+  let unsubscribe = () => {}
+
+  authReady
+    .then(async () => {
+      try {
+        const redirectResult = await getRedirectResult(auth)
+        if (redirectResult?.user) {
+          callback(toCloudUser(redirectResult.user))
+        }
+      } catch (error) {
+        console.warn('No s’ha pogut completar el retorn del login de Google.', error)
+        onError?.(new Error(getFirebaseAuthErrorMessage(error), { cause: error }))
+      }
+
+      unsubscribe = onAuthStateChanged(auth, (user) => callback(toCloudUser(user)))
+    })
+    .catch((error) => {
+      onError?.(new Error(getFirebaseAuthErrorMessage(error), { cause: error }))
+    })
+
+  return () => unsubscribe()
 }
 
 export async function signInWithGoogle() {
   try {
-    await signInWithRedirect(auth, googleProvider)
+    await authReady
+    const credential = await signInWithPopup(auth, googleProvider)
+    return toCloudUser(credential.user)
   } catch (error) {
+    const code = String(error?.code || '')
+    const shouldTryRedirect = [
+      'auth/popup-blocked',
+      'auth/cancelled-popup-request',
+      'auth/operation-not-supported-in-this-environment',
+    ].some((expectedCode) => code.includes(expectedCode))
+
+    if (shouldTryRedirect) {
+      try {
+        await signInWithRedirect(auth, googleProvider)
+        return null
+      } catch (redirectError) {
+        throw new Error(getFirebaseAuthErrorMessage(redirectError), { cause: redirectError })
+      }
+    }
+
     throw new Error(getFirebaseAuthErrorMessage(error), { cause: error })
   }
-  return null
 }
 
 export async function signOutFromGoogle() {

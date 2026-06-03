@@ -708,7 +708,7 @@ export const useAvaluaproStore = create((set, get) => ({
         cloud: {
           ...state.cloud,
           user: user || state.cloud.user,
-          status: user ? 'signed-in' : 'signed-out',
+          status: user ? 'signed-in' : 'signing-in',
           error: '',
         },
       }))
