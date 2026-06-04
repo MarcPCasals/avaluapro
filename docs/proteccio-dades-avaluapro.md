@@ -5,6 +5,8 @@ Estat: document tecnic breu per a direccio, centre o Ministeri
 
 Aquest document resumeix com Avaluapro tracta i protegeix les dades educatives. No substitueix una revisio juridica ni el contracte d'encarrec de tractament que correspongui en un us institucional, pero explica les mesures tecniques i pedagogiques previstes en l'aplicacio.
 
+Per a una presentacio breu a direccio o Ministeri, es pot fer servir la fitxa resum `docs/fitxa-tecnica-direccio-ministeri.md`.
+
 ## 1. Que es Avaluapro
 
 Avaluapro es una eina docent per registrar avaluacio competencial, seguiment de tasques, comportament, tutoria i estadistiques pedagogiques. Esta pensada com un quadern docent digital: ajuda el professorat a prendre decisions educatives mes informades i a preparar millor les reunions d'equip educatiu o tutoria.
