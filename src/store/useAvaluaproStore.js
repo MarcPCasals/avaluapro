@@ -194,6 +194,10 @@ function normalizeDataset(dataset) {
           ? classItem.halfGroups
           : DEFAULT_HALF_GROUPS,
     })),
+    students: normalizedDataset.students.map((student) => ({
+      ...student,
+      name: formatStudentNameForDisplay(student.name),
+    })),
     uts: normalizedDataset.uts.filter((ut) => ut.name !== 'Transversals' || usedUtIds.has(ut.id)),
   }
 
@@ -1584,6 +1588,7 @@ export const useAvaluaproStore = create((set, get) => ({
         studentId: update.studentId,
         subject: update.subject,
         competencyKey: update.competencyKey,
+        modified: Boolean(update.modified),
         value: update.value || '',
       }))
       .filter((update) => update.classId && update.studentId && update.subject && update.competencyKey)
@@ -1613,6 +1618,7 @@ export const useAvaluaproStore = create((set, get) => ({
             competencyKey: update.competencyKey,
             criterionKey: null,
             source: update.source || null,
+            modified: Boolean(update.modified),
             value: update.value,
             updatedAt: now,
           })),

@@ -22,6 +22,7 @@ import {
   Search,
   ShieldAlert,
   Shuffle,
+  SlidersHorizontal,
   Star,
   Trash2,
   TrendingDown,
@@ -207,15 +208,19 @@ function buildTutorialCompetencies(subject) {
   }))
 }
 
-function getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency) {
-  const directGrade = tutorialMarks.find(
+function getStoredTutorialCompetencyGradeSource(tutorialMarks, classId, studentId, subject, competency) {
+  const directMark = tutorialMarks.find(
     (mark) =>
       mark.classId === classId &&
       mark.studentId === studentId &&
       mark.subject === subject &&
       mark.competencyKey === competency.key,
-  )?.value
-  if (directGrade) return directGrade
+  )
+  if (directMark?.value) {
+    return directMark.modified || directMark.source?.modified
+      ? { source: 'modified', value: 'D', modified: true }
+      : { source: 'manual', value: directMark.value }
+  }
 
   const legacyCriterionGrades = competency.criteria
     .map(
@@ -230,7 +235,8 @@ function getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, sub
     )
     .filter(Boolean)
 
-  return calculateGrade(legacyCriterionGrades)
+  const legacyGrade = calculateGrade(legacyCriterionGrades)
+  return legacyGrade ? { source: 'manual', value: legacyGrade } : null
 }
 
 function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContext, studentId, subject }) {
@@ -255,6 +261,23 @@ function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContex
     .sort((a, b) => (utOrderById.get(b.utId) || 0) - (utOrderById.get(a.utId) || 0))
 
   for (const item of matchingCompetencies) {
+    const modifiedMark = evaluationContext.marks.find(
+      (mark) =>
+        mark.type === 'competency-modification' &&
+        mark.studentId === studentId &&
+        mark.competencyId === item.id,
+    )
+    if (modifiedMark) {
+      const sourceUt = utsById.get(item.utId)
+      return {
+        modified: true,
+        source: 'modified',
+        utName: sourceUt?.name || 'UT anterior',
+        utOrder: utOrderById.get(item.utId) ?? 0,
+        value: 'D',
+      }
+    }
+
     const competencyCriteria = evaluationContext.criteria.filter((criterion) => criterion.competencyId === item.id)
     const criterionGrades = competencyCriteria
       .map(
@@ -295,8 +318,8 @@ function getTutorialCompetencyGradeSource({
     return { source: 'modified', value: 'D', modified: true }
   }
 
-  const storedGrade = getStoredTutorialCompetencyGrade(tutorialMarks, classId, studentId, subject, competency)
-  if (storedGrade) return { source: 'manual', value: storedGrade }
+  const storedGrade = getStoredTutorialCompetencyGradeSource(tutorialMarks, classId, studentId, subject, competency)
+  if (storedGrade) return storedGrade
 
   const linkedGrade = getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContext, studentId, subject })
   if (linkedGrade) return linkedGrade
@@ -322,6 +345,60 @@ function getTutorialCompetencyGrade({
     subject,
     tutorialMarks,
   }).value
+}
+
+function getTutorialModifiedCompetencyRows({ allSubjectOptions, classId, evaluationContext, students, tutorialMarks }) {
+  const totalCompetencies = allSubjectOptions.reduce(
+    (total, item) => total + buildTutorialCompetencies(item.subject).length,
+    0,
+  )
+
+  return students
+    .map((student) => {
+      const subjects = allSubjectOptions
+        .map((item) => {
+          const competencies = buildTutorialCompetencies(item.subject)
+            .map((competency, index) => {
+              const gradeSource = getTutorialCompetencyGradeSource({
+                classId,
+                competency,
+                evaluationContext,
+                student,
+                studentId: student.id,
+                subject: item.subject,
+                tutorialMarks,
+              })
+              return gradeSource.modified
+                ? {
+                    code: `C${index + 1}`,
+                    key: competency.key,
+                    name: competency.name,
+                  }
+                : null
+            })
+            .filter(Boolean)
+
+          return competencies.length > 0
+            ? {
+                areaName: item.areaName,
+                competencies,
+                subject: item.subject,
+              }
+            : null
+        })
+        .filter(Boolean)
+      const modifiedCount = subjects.reduce((total, subject) => total + subject.competencies.length, 0)
+
+      return {
+        modifiedCount,
+        percentage: totalCompetencies > 0 ? Math.round((modifiedCount / totalCompetencies) * 100) : 0,
+        student,
+        subjectCount: subjects.length,
+        subjects,
+      }
+    })
+    .filter((row) => row.modifiedCount > 0)
+    .sort((a, b) => b.modifiedCount - a.modifiedCount || a.student.name.localeCompare(b.student.name, 'ca'))
 }
 
 function formatPercent(value) {
@@ -2530,6 +2607,9 @@ export function TutoringView() {
   const [subjectFilter, setSubjectFilter] = useState('auto')
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const [selectedTutorialRecordStudentId, setSelectedTutorialRecordStudentId] = useState('')
+  const [selectedModifiedStudentId, setSelectedModifiedStudentId] = useState('')
+  const [showModifiedCompetencyConfig, setShowModifiedCompetencyConfig] = useState(false)
+  const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
     studentId: '',
     type: 'agenda',
@@ -2702,6 +2782,26 @@ export function TutoringView() {
     }),
     [criteria, competencies, linkedClass?.subject, linkedClassId, marks, semesters, uts],
   )
+  const modifiedCompetencyRows = useMemo(
+    () =>
+      getTutorialModifiedCompetencyRows({
+        allSubjectOptions,
+        classId: activeClassId,
+        evaluationContext,
+        students: classStudents,
+        tutorialMarks,
+      }),
+    [activeClassId, allSubjectOptions, classStudents, evaluationContext, tutorialMarks],
+  )
+  const selectedModifiedRow = modifiedCompetencyRows.find((row) => row.student.id === selectedModifiedStudentId)
+  const modifiedConfigStudent =
+    classStudents.find((student) => student.id === modifiedCompetencyForm.studentId) || classStudents[0]
+  const modifiedConfigSubject =
+    modifiedCompetencyForm.subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || ''
+  const modifiedConfigCompetencies = useMemo(
+    () => buildTutorialCompetencies(modifiedConfigSubject),
+    [modifiedConfigSubject],
+  )
 
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
   const toggleStudentArrayValue = async (student, field, value) => {
@@ -2710,6 +2810,13 @@ export function TutoringView() {
       ? currentValues.filter((item) => item !== value)
       : [...currentValues, value]
     await updateStudent(student.id, { [field]: nextValues })
+  }
+  const openModifiedCompetencyConfig = (studentId = '', subject = '') => {
+    setModifiedCompetencyForm({
+      studentId: studentId || classStudents[0]?.id || '',
+      subject: subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || '',
+    })
+    setShowModifiedCompetencyConfig(true)
   }
   const linkedGradeCount = useMemo(() => {
     if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
@@ -3742,20 +3849,16 @@ export function TutoringView() {
                                 {gradeSource.source === 'linked' && (
                                   <small className="tutorial-linked-ut">{gradeSource.utName || 'Última mirada'}</small>
                                 )}
-                                <div className="tutorial-grade-tools">
-                                  <button
-                                    className={
-                                      student.tutorialModifiedCompetencies?.includes(competency.key) ? 'active' : ''
-                                    }
-                                    onClick={() =>
-                                      toggleStudentArrayValue(student, 'tutorialModifiedCompetencies', competency.key)
-                                    }
-                                    title="Marcar competència modificada"
-                                    type="button"
-                                  >
-                                    M
-                                  </button>
-                                </div>
+                                {gradeSource.modified && (
+                                  <div className="tutorial-grade-tools">
+                                    <span
+                                      className="tutorial-modified-indicator"
+                                      title="Competència modificada: es compta com a D en el balanç estàndard."
+                                    >
+                                      M
+                                    </span>
+                                  </div>
+                                )}
                               </td>
                             )
                           })}
@@ -3922,6 +4025,112 @@ export function TutoringView() {
               )}
             </article>
 
+            <article className="tutoring-card tutorial-modified-card">
+              <div>
+                <SlidersHorizontal size={24} />
+                <h2>Competències modificades</h2>
+                <button
+                  className="secondary-action compact"
+                  onClick={() => openModifiedCompetencyConfig()}
+                  type="button"
+                >
+                  Configurar
+                </button>
+              </div>
+              <p>
+                Mostra només alumnes amb alguna competència modificada, tant si s’ha marcat manualment com si arriba de
+                les notes tutorials.
+              </p>
+              {modifiedCompetencyRows.length === 0 ? (
+                <div className="empty-state compact">Encara no hi ha competències modificades registrades.</div>
+              ) : (
+                <div className="tutorial-modified-list">
+                  {modifiedCompetencyRows.slice(0, 12).map((row) => (
+                    <article className="tutorial-modified-row" key={row.student.id}>
+                      <div>
+                        <strong>{row.student.name}</strong>
+                        <small>{row.student.halfGroup || 'Sense mig grup'}</small>
+                      </div>
+                      <button
+                        onClick={() => setSelectedModifiedStudentId(row.student.id)}
+                        title="Veure assignatures i competències modificades"
+                        type="button"
+                      >
+                        {row.subjectCount}
+                        <span>assign.</span>
+                      </button>
+                      <div className="tutorial-modified-total">
+                        <small>{row.percentage}%</small>
+                        <strong>{row.modifiedCount}</strong>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </article>
+
+            <article className="tutoring-card tutorial-exemptions-card">
+              <div>
+                <ShieldAlert size={24} />
+                <h2>Exempcions i balanç modificat</h2>
+              </div>
+              <p>
+                Per a la matèria seleccionada ({selectedSubject || 'cap'}), marca alumnes exempts. La taula tutorial
+                ignorarà aquestes notes.
+              </p>
+              <div className="tutorial-exemption-list">
+                {classStudents.map((student) => {
+                  const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
+                  return (
+                    <button
+                      className={isExempt ? 'active' : ''}
+                      disabled={!selectedSubject}
+                      key={student.id}
+                      onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
+                      type="button"
+                    >
+                      <span>{student.name}</span>
+                      <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
+                    </button>
+                  )
+                })}
+              </div>
+            </article>
+          </section>
+
+          <section className="tutorial-tracking-lower-grid">
+            <article className="tutoring-card compact">
+              <div>
+                <CalendarDays size={22} />
+                <h2>Historial recent</h2>
+              </div>
+              {tutorialRecordSummary.recentRecords.length === 0 ? (
+                <div className="empty-state compact">Quan afegeixis registres, apareixeran aquí ordenats per data.</div>
+              ) : (
+                <div className="tutorial-record-history compact">
+                  {tutorialRecordSummary.recentRecords.map((record) => (
+                    <article className={`tutorial-record-entry ${record.typeMeta.tone}`} key={record.id}>
+                      <div>
+                        <strong>{record.student?.name || 'Alumne no trobat'}</strong>
+                        <span>
+                          {record.typeMeta.label} · {formatShortDate(record.date)}
+                        </span>
+                        <p>{record.note || 'Sense comentari afegit.'}</p>
+                      </div>
+                      <button
+                        className="icon-button danger subtle"
+                        onClick={() => deleteTutorialRecord(record.id)}
+                        title="Eliminar registre"
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </article>
+
             <article className="tutoring-card tutorial-intelligences-card">
               <div>
                 <Star size={24} />
@@ -3983,67 +4192,7 @@ export function TutoringView() {
                 })}
               </div>
             </article>
-
-            <article className="tutoring-card tutorial-exemptions-card">
-              <div>
-                <ShieldAlert size={24} />
-                <h2>Exempcions i balanç modificat</h2>
-              </div>
-              <p>
-                Per a la matèria seleccionada ({selectedSubject || 'cap'}), marca alumnes exempts. La taula tutorial
-                ignorarà aquestes notes.
-              </p>
-              <div className="tutorial-exemption-list">
-                {classStudents.map((student) => {
-                  const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
-                  return (
-                    <button
-                      className={isExempt ? 'active' : ''}
-                      disabled={!selectedSubject}
-                      key={student.id}
-                      onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
-                      type="button"
-                    >
-                      <span>{student.name}</span>
-                      <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
-                    </button>
-                  )
-                })}
-              </div>
-            </article>
           </section>
-
-          <article className="tutoring-card compact">
-            <div>
-              <CalendarDays size={22} />
-              <h2>Historial recent</h2>
-            </div>
-            {tutorialRecordSummary.recentRecords.length === 0 ? (
-              <div className="empty-state compact">Quan afegeixis registres, apareixeran aquí ordenats per data.</div>
-            ) : (
-              <div className="tutorial-record-history compact">
-                {tutorialRecordSummary.recentRecords.map((record) => (
-                  <article className={`tutorial-record-entry ${record.typeMeta.tone}`} key={record.id}>
-                    <div>
-                      <strong>{record.student?.name || 'Alumne no trobat'}</strong>
-                      <span>
-                        {record.typeMeta.label} · {formatShortDate(record.date)}
-                      </span>
-                      <p>{record.note || 'Sense comentari afegit.'}</p>
-                    </div>
-                    <button
-                      className="icon-button danger subtle"
-                      onClick={() => deleteTutorialRecord(record.id)}
-                      title="Eliminar registre"
-                      type="button"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </article>
         </section>
       )}
 
@@ -5153,6 +5302,98 @@ export function TutoringView() {
           onDelete={deleteTutorialRecord}
           row={selectedTutorialRecordRow}
         />
+      )}
+      {selectedModifiedRow && (
+        <Modal
+          onClose={() => setSelectedModifiedStudentId('')}
+          size="lg"
+          title={`Competències modificades: ${selectedModifiedRow.student.name}`}
+        >
+          <div className="tutorial-modified-detail">
+            {selectedModifiedRow.subjects.map((subject) => (
+              <article key={subject.subject}>
+                <div>
+                  <strong>{subject.subject}</strong>
+                  <small>{subject.areaName}</small>
+                </div>
+                <div>
+                  {subject.competencies.map((competency) => (
+                    <span key={competency.key} title={competency.name}>
+                      {competency.code}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </Modal>
+      )}
+      {showModifiedCompetencyConfig && (
+        <Modal
+          onClose={() => setShowModifiedCompetencyConfig(false)}
+          size="lg"
+          title="Configurar competències modificades"
+        >
+          <div className="tutorial-modified-config">
+            <div className="tutorial-modified-config-fields">
+              <label>
+                Alumne
+                <select
+                  onChange={(event) =>
+                    setModifiedCompetencyForm((current) => ({ ...current, studentId: event.target.value }))
+                  }
+                  value={modifiedConfigStudent?.id || ''}
+                >
+                  {classStudents.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Assignatura
+                <select
+                  onChange={(event) =>
+                    setModifiedCompetencyForm((current) => ({ ...current, subject: event.target.value }))
+                  }
+                  value={modifiedConfigSubject}
+                >
+                  {allSubjectOptions.map((item) => (
+                    <option key={item.subject} value={item.subject}>
+                      {item.subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {!modifiedConfigStudent ? (
+              <div className="empty-state compact">Afegeix alumnes abans de configurar competències modificades.</div>
+            ) : modifiedConfigCompetencies.length === 0 ? (
+              <div className="empty-state compact">Aquesta assignatura encara no té competències configurades.</div>
+            ) : (
+              <div className="tutorial-modified-config-grid">
+                {modifiedConfigCompetencies.map((competency, index) => {
+                  const isActive = modifiedConfigStudent.tutorialModifiedCompetencies?.includes(competency.key)
+                  return (
+                    <button
+                      className={isActive ? 'active' : ''}
+                      key={competency.key}
+                      onClick={() =>
+                        toggleStudentArrayValue(modifiedConfigStudent, 'tutorialModifiedCompetencies', competency.key)
+                      }
+                      type="button"
+                    >
+                      <b>C{index + 1}</b>
+                      <span>{competency.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
       {showBulkImport && (
         <TutoringBulkImportModal

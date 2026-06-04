@@ -57,6 +57,10 @@ function isCompetencyModified(marks, studentId, competencyId) {
   )
 }
 
+function hasStudentModifiedCompetencies(marks, studentId) {
+  return marks.some((mark) => mark.type === 'competency-modification' && mark.studentId === studentId)
+}
+
 function escapeCell(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -436,16 +440,18 @@ export function EvaluationView() {
                     }`}
                     key={`${student.id}_${competency.id}_grade`}
                   >
-                    <button
-                      className={`modified-competency-toggle ${
-                        isCompetencyModified(marks, student.id, competency.id) ? 'active' : ''
-                      }`}
-                      onClick={() => toggleCompetencyModification(student.id, competency.id)}
-                      title="Marcar competència modificada: el balanç estàndard comptarà com a D"
-                      type="button"
-                    >
-                      M
-                    </button>
+                    {hasStudentModifiedCompetencies(marks, student.id) && (
+                      <button
+                        className={`modified-competency-toggle ${
+                          isCompetencyModified(marks, student.id, competency.id) ? 'active' : ''
+                        }`}
+                        onClick={() => toggleCompetencyModification(student.id, competency.id)}
+                        title="Marcar competència modificada: el balanç estàndard comptarà com a D"
+                        type="button"
+                      >
+                        M
+                      </button>
+                    )}
                     <span className={gradeClassName(getCompetencyGrade(marks, student.id, competency))}>
                       {getCompetencyGrade(marks, student.id, competency) || '-'}
                     </span>

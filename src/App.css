@@ -1339,6 +1339,13 @@ button.tutorial-record-pill {
   align-items: stretch;
 }
 
+.tutorial-tracking-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
 .tutorial-doip-list,
 .tutorial-intelligence-list,
 .tutorial-exemption-list {
@@ -2945,7 +2952,7 @@ button.tutorial-record-pill {
   margin-top: 4px;
 }
 
-.tutorial-grade-tools button {
+.tutorial-modified-indicator {
   display: inline-flex;
   width: 22px;
   height: 22px;
@@ -2957,12 +2964,6 @@ button.tutorial-record-pill {
   background: #fff1f2;
   font-size: 10px;
   font-weight: 950;
-}
-
-.tutorial-grade-tools button.active {
-  border-color: #ef4444;
-  color: #991b1b;
-  background: #fee2e2;
 }
 
 .tutorial-relation-pill,
@@ -4502,8 +4503,8 @@ button.tutorial-record-pill {
 
 .header-student,
 .tracking-student-header {
-  min-width: 360px;
-  width: 360px;
+  min-width: 340px;
+  width: 340px;
   padding: 16px 18px;
   text-align: left;
   vertical-align: middle;
@@ -4587,8 +4588,8 @@ button.tutorial-record-pill {
 }
 
 .student-cell {
-  min-width: 360px;
-  width: 360px;
+  min-width: 340px;
+  width: 340px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4810,8 +4811,8 @@ button.tutorial-record-pill {
 .grade-text-empty { color: #cbd5e1; }
 
 .tracking-student-cell {
-  min-width: 360px;
-  width: 360px;
+  min-width: 340px;
+  width: 340px;
   padding: 0;
   vertical-align: middle;
 }
@@ -10068,15 +10069,50 @@ button.profile-followup-card:focus-visible {
   font-weight: 750;
 }
 
+.annotation-photo-card .photo-upload-target {
+  width: auto;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.annotation-photo-card .photo-upload-target:hover .photo-placeholder,
+.annotation-photo-card .photo-upload-target:focus-within .photo-placeholder {
+  border-color: #f97316;
+  color: #f97316;
+  background: #fff7ed;
+}
+
+.annotation-photo-card .photo-upload-target input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .photo-placeholder {
   width: 96px;
   height: 96px;
   display: grid;
   place-items: center;
+  gap: 2px;
   border: 2px dashed #cbd5e1;
   border-radius: 999px;
   color: #9ca3af;
   background: #f8fafc;
+  text-align: center;
+}
+
+.photo-placeholder span {
+  max-width: 62px;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1.1;
 }
 
 .annotation-photo-card span,
@@ -10391,6 +10427,30 @@ button.profile-followup-card:focus-visible {
   background: #2563eb;
 }
 
+.diagnosis-modification-entry {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-left: 8px;
+  padding: 8px 12px;
+  color: #991b1b;
+  background: #fff7f7;
+  font-weight: 950;
+}
+
+.diagnosis-modification-entry.active {
+  border-color: #ef4444;
+  background: #fee2e2;
+}
+
+.diagnosis-modification-entry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .modified-competency-profile-panel {
   display: grid;
   gap: 12px;
@@ -10470,6 +10530,199 @@ button.profile-followup-card:focus-visible {
 .modified-competency-profile-chip:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.tutorial-modified-card > div:first-child {
+  align-items: center;
+}
+
+.tutorial-modified-card > div:first-child .secondary-action {
+  justify-self: end;
+}
+
+.tutorial-modified-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tutorial-modified-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff7f7;
+}
+
+.tutorial-modified-row strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorial-modified-row small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.tutorial-modified-row > button {
+  display: inline-flex;
+  min-width: 66px;
+  min-height: 42px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fb923c;
+  border-radius: 10px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-weight: 950;
+}
+
+.tutorial-modified-row > button span {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.tutorial-modified-total {
+  min-width: 54px;
+  text-align: right;
+}
+
+.tutorial-modified-total small {
+  display: block;
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.tutorial-modified-total strong {
+  display: block;
+  color: #991b1b;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.tutorial-modified-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.tutorial-modified-detail article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff7f7;
+}
+
+.tutorial-modified-detail strong,
+.tutorial-modified-detail small {
+  display: block;
+}
+
+.tutorial-modified-detail small {
+  color: #64748b;
+  font-weight: 850;
+}
+
+.tutorial-modified-detail article > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tutorial-modified-detail span,
+.tutorial-modified-config-grid button b {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #991b1b;
+  background: #fee2e2;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.tutorial-modified-config {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorial-modified-config-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tutorial-modified-config-fields label {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-modified-config-fields select {
+  min-height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #1f2937;
+  background: white;
+  font-weight: 900;
+}
+
+.tutorial-modified-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.tutorial-modified-config-grid button {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  color: #475569;
+  background: white;
+  text-align: left;
+}
+
+.tutorial-modified-config-grid button span {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tutorial-modified-config-grid button.active {
+  border-color: #f87171;
+  color: #991b1b;
+  background: #fff1f2;
+}
+
+.tutorial-modified-config-grid button.active b {
+  color: white;
+  background: #ef4444;
 }
 
 .diagnosis-info-modal {
@@ -11401,8 +11654,8 @@ button.profile-followup-card:focus-visible {
 
   .header-student,
   .student-cell {
-    width: 300px;
-    min-width: 300px;
+    width: 288px;
+    min-width: 288px;
   }
 
   .student-cell {

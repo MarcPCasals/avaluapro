@@ -299,6 +299,7 @@ export function getTutorialMarkUpdatesFromTeacherPackage({ packageData, targetCl
     return row.gradedCompetencies.map((competency) => ({
       classId: targetClassId,
       competencyKey: competency.competencyKey,
+      modified: Boolean(competency.modified),
       source: {
         packageId: preview.packageData.id,
         sourceClassId: preview.packageData.source.classId,
@@ -306,6 +307,7 @@ export function getTutorialMarkUpdatesFromTeacherPackage({ packageData, targetCl
         sourceStudentId: row.sourceStudent.sourceStudentId,
         sourceUtId: competency.sourceUtId,
         sourceUtName: competency.sourceUtName,
+        modified: Boolean(competency.modified),
       },
       studentId: row.targetStudent.id,
       subject,

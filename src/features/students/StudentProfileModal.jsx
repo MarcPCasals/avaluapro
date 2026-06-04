@@ -4,6 +4,7 @@ import {
   MessageCircle,
   MessageSquareText,
   Save,
+  SlidersHorizontal,
   Trash2,
   UserRound,
   X,
@@ -210,8 +211,10 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   })
   const hasModificationTriggerDiagnosis = diagnoses.some((diagnosisId) => modificationTriggerDiagnoses.has(diagnosisId))
   const hasModifiedCompetencies = subjectModifiedCompetencies.some((competency) => competency.modified)
+  const [showManualModificationPanel, setShowManualModificationPanel] = useState(false)
   const showModifiedCompetenciesPanel =
-    subjectModifiedCompetencies.length > 0 && (hasModificationTriggerDiagnosis || hasModifiedCompetencies)
+    subjectModifiedCompetencies.length > 0 &&
+    (hasModificationTriggerDiagnosis || hasModifiedCompetencies || showManualModificationPanel)
   const updateStudent = state.updateStudent
   const setCompetencyModification = state.setCompetencyModification
   const upsertStudentAntecedent = state.upsertStudentAntecedent
@@ -309,13 +312,21 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
       <div className="annotations-panel profile-personal-panel" data-tour="annotation-panel">
         <section className="annotation-hero">
           <div className="annotation-photo-card">
-            {student.photoUrl ? (
-              <img alt={student.name} src={student.photoUrl} />
-            ) : (
-              <div className="photo-placeholder">
-                <Camera size={34} />
-              </div>
-            )}
+            <label className="photo-upload-target" title="Clica per carregar una foto">
+              {student.photoUrl ? (
+                <img alt={student.name} src={student.photoUrl} />
+              ) : (
+                <div className="photo-placeholder">
+                  <Camera size={34} />
+                  <span>Afegir foto</span>
+                </div>
+              )}
+              <input
+                accept="image/*"
+                onChange={(event) => handlePhotoUpload(event.target.files?.[0])}
+                type="file"
+              />
+            </label>
             <label>
               Foto de l’alumne
               <input
@@ -368,11 +379,12 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
           <div className="diagnosis-chip-list">
             {DIAGNOSIS_OPTIONS.map((diagnosis) => {
               const libraryEntry = DIAGNOSIS_LIBRARY[diagnosis.id]
-              const hasInfoAction = libraryEntry || diagnosis.id === 'progress'
+              const diagnosisIsActive = diagnoses.includes(diagnosis.id)
+              const hasInfoAction = diagnosisIsActive && (libraryEntry || diagnosis.id === 'progress')
               return (
                 <div
                   className={`diagnosis-chip-shell ${diagnosis.color} ${
-                    diagnoses.includes(diagnosis.id) ? 'active' : ''
+                    diagnosisIsActive ? 'active' : ''
                   }`}
                   key={diagnosis.id}
                 >
@@ -402,6 +414,16 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                 </div>
               )
             })}
+            <button
+              className={`diagnosis-modification-entry ${showModifiedCompetenciesPanel ? 'active' : ''}`}
+              disabled={subjectModifiedCompetencies.length === 0}
+              onClick={() => setShowManualModificationPanel((current) => !current)}
+              title="Configurar competències modificades"
+              type="button"
+            >
+              <SlidersHorizontal size={16} />
+              Competències modificades
+            </button>
           </div>
           {showModifiedCompetenciesPanel && (
             <div className="modified-competency-profile-panel">
