@@ -24,7 +24,9 @@ export function DiagnosisLibraryModal({ diagnosisId = 'dyslexia', onClose }) {
           </div>
           {DIAGNOSIS_LIBRARY_ITEMS.map((diagnosis) => (
             <button
-              className={`diagnosis-library-tab ${diagnosis.id === activeDiagnosis.id ? 'active' : ''}`}
+              className={`diagnosis-library-tab accent-${diagnosis.accent} ${
+                diagnosis.id === activeDiagnosis.id ? 'active' : ''
+              }`}
               key={diagnosis.id}
               onClick={() => setActiveDiagnosisId(diagnosis.id)}
               type="button"

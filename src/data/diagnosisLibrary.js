@@ -232,6 +232,63 @@ const teaSections = [
   },
 ]
 
+const qiTdlSections = [
+  {
+    title: 'QI límit · Descripció',
+    tone: 'blue',
+    items: [
+      'Fa referència a un funcionament cognitiu situat en una zona límit, que pot fer que l’alumne/a necessiti més temps, més estructura i més suport per consolidar aprenentatges.',
+      'Pot afectar el raonament abstracte, la planificació, la resolució de problemes, la comprensió d’idees complexes i la transferència d’allò après a situacions noves.',
+      'Les necessitats no depenen només de la capacitat individual: també depenen de les demandes de l’entorn, les rutines, els suports i la manera com es presenten les tasques.',
+      'És important observar també habilitats adaptatives: autonomia, organització, participació, relació amb iguals i capacitat de seguir normes o rutines.',
+    ],
+  },
+  {
+    title: 'TDL · Descripció',
+    tone: 'blue',
+    items: [
+      'El trastorn del desenvolupament del llenguatge pot dificultar la comunicació i l’aprenentatge de manera persistent.',
+      'Pot afectar la comprensió oral, l’expressió, l’accés al vocabulari, l’organització sintàctica, la coherència del discurs i la comprensió lectora.',
+      'Pot aparèixer amb dificultats d’atenció, funcions executives, conducta adaptativa o aprenentatges instrumentals.',
+      'A l’aula pot fer que l’alumne/a sembli menys autònom del que realment és si les instruccions, els textos o les preguntes són massa llargues o poc estructurades.',
+    ],
+  },
+  {
+    title: 'Àmbit d’intervenció personal',
+    tone: 'amber',
+    items: [
+      'Comprovar la comprensió abans de donar per iniciada una tasca.',
+      'Donar temps de resposta i evitar pressionar perquè contesti ràpidament davant del grup.',
+      'Reduir la càrrega oral simultània: poques instruccions, clares i seqüenciades.',
+      'Reforçar l’autonomia amb rutines estables, materials visibles i models de resposta.',
+      'Validar l’esforç i separar dificultat de manca de voluntat.',
+    ],
+  },
+  {
+    title: 'Estratègies metodològiques',
+    tone: 'green',
+    items: [
+      'Fraccionar les tasques en passos curts i visibles.',
+      'Combinar explicacions orals amb suports visuals: esquemes, exemples, vocabulari clau i models de resposta.',
+      'Anticipar paraules noves o conceptes complexos abans de començar una activitat.',
+      'Fer servir preguntes més concretes i reduir enunciats massa llargs.',
+      'Repetir i reformular instruccions sense infantilitzar.',
+      'Permetre respostes orals, visuals, guiades o amb plantilles quan l’objectiu no sigui avaluar expressió escrita.',
+    ],
+  },
+  {
+    title: 'Adaptacions específiques',
+    tone: 'purple',
+    items: [
+      'Utilitzar frases curtes, estructura clara i vocabulari accessible.',
+      'Destacar paraules clau i separar visualment passos, dades i exemples.',
+      'Donar exemples resolts o mig resolts abans de demanar autonomia completa.',
+      'Permetre més temps i reduir volum quan la càrrega lingüística o cognitiva no sigui l’objectiu principal.',
+      'Prioritzar criteris essencials i, si escau, marcar competències modificades al perfil de l’alumne.',
+    ],
+  },
+]
+
 const highCapacitySections = [
   {
     title: 'Altes capacitats · Descripció',
@@ -309,7 +366,7 @@ export const DIAGNOSIS_LIBRARY = {
     title: 'Discalcúlia',
     shortTitle: 'Discalcúlia',
     tag: 'Raonament numèric',
-    accent: 'cyan',
+    accent: 'blue',
     summary: [
       'Simplificar enunciats matemàtics: curts, clars i sense dades irrellevants.',
       'Oferir exemples resolts abans de la resolució autònoma.',
@@ -343,7 +400,7 @@ export const DIAGNOSIS_LIBRARY = {
     title: 'TEA',
     shortTitle: 'TEA',
     tag: 'Comunicació i estructura',
-    accent: 'violet',
+    accent: 'yellow',
     summary: [
       'Donar consignes curtes, literals i concretes.',
       'Anticipar canvis de rutina, espai o activitat.',
@@ -354,6 +411,23 @@ export const DIAGNOSIS_LIBRARY = {
     description:
       'El TEA és un trastorn del neurodesenvolupament que pot afectar la comunicació, la interacció social, la flexibilitat i la manera de processar la informació.',
     sections: teaSections,
+  },
+  'qi-tdl': {
+    id: 'qi-tdl',
+    title: 'QI límit o TDL',
+    shortTitle: 'QI límit / TDL',
+    tag: 'Raonament i llenguatge',
+    accent: 'red',
+    summary: [
+      'Donar instruccions curtes, seqüenciades i amb suport visual.',
+      'Comprovar comprensió abans de començar la tasca.',
+      'Fraccionar activitats complexes en passos petits.',
+      'Reduir la càrrega lingüística quan no sigui l’objectiu d’avaluació.',
+      'Prioritzar els objectius essencials i marcar competències modificades quan calgui.',
+    ],
+    description:
+      'Agrupa dues necessitats diferents però sovint relacionades en el seguiment docent: dificultats de raonament/aprenentatge en zona límit i dificultats persistents de llenguatge que poden afectar comunicació, comprensió i aprenentatges.',
+    sections: qiTdlSections,
   },
   'high-capacity': {
     id: 'high-capacity',

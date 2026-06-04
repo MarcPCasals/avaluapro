@@ -219,6 +219,8 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const [antecedentDraft, setAntecedentDraft] = useState(() => createAntecedentDraft(antecedent))
   const [antecedentState, setAntecedentState] = useState('idle')
   const [diagnosisInfoId, setDiagnosisInfoId] = useState(null)
+  const [showPtiLinkModal, setShowPtiLinkModal] = useState(false)
+  const [ptiLinkDraft, setPtiLinkDraft] = useState(student?.ptiUrl || '')
 
   if (!student) return null
 
@@ -258,6 +260,28 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
       ? diagnoses.filter((id) => id !== diagnosisId)
       : [...diagnoses, diagnosisId]
     updateStudent(studentId, { diagnoses: nextDiagnoses })
+  }
+
+  const handleDiagnosisInfoClick = (diagnosisId) => {
+    if (diagnosisId === 'progress') {
+      if (student.ptiUrl) {
+        window.open(student.ptiUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+      setPtiLinkDraft('')
+      setShowPtiLinkModal(true)
+      return
+    }
+
+    setDiagnosisInfoId(diagnosisId)
+  }
+
+  const savePtiLink = async () => {
+    const trimmedLink = ptiLinkDraft.trim()
+    if (!trimmedLink) return
+    const normalizedLink = /^https?:\/\//i.test(trimmedLink) ? trimmedLink : `https://${trimmedLink}`
+    await updateStudent(studentId, { ptiUrl: normalizedLink })
+    setShowPtiLinkModal(false)
   }
 
   const toggleSubjectCompetencyModification = async (competencyOption) => {
@@ -344,6 +368,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
           <div className="diagnosis-chip-list">
             {DIAGNOSIS_OPTIONS.map((diagnosis) => {
               const libraryEntry = DIAGNOSIS_LIBRARY[diagnosis.id]
+              const hasInfoAction = libraryEntry || diagnosis.id === 'progress'
               return (
                 <div
                   className={`diagnosis-chip-shell ${diagnosis.color} ${
@@ -358,11 +383,17 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                   >
                     {diagnosis.label}
                   </button>
-                  {libraryEntry && (
+                  {hasInfoAction && (
                     <button
                       className="diagnosis-chip-info"
-                      onClick={() => setDiagnosisInfoId(diagnosis.id)}
-                      title={`Veure resum de ${diagnosis.label}`}
+                      onClick={() => handleDiagnosisInfoClick(diagnosis.id)}
+                      title={
+                        diagnosis.id === 'progress'
+                          ? student.ptiUrl
+                            ? 'Obrir document PTI'
+                            : 'Configurar enllaç PTI'
+                          : `Veure resum de ${diagnosis.label}`
+                      }
                       type="button"
                     >
                       i
@@ -419,6 +450,34 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            </div>
+          </Modal>
+        )}
+        {showPtiLinkModal && (
+          <Modal onClose={() => setShowPtiLinkModal(false)} size="md" title="Enllaç del PTI">
+            <div className="pti-link-modal">
+              <p>
+                Aquest botó serveix per desar l’enllaç directe al document de Google del PTI d’aquest alumne. Un cop
+                guardat, quan cliquis la <strong>i</strong> d’“Alumne de progrés” s’obrirà directament el document.
+              </p>
+              <label>
+                Enllaç del document PTI
+                <input
+                  autoFocus
+                  onChange={(event) => setPtiLinkDraft(event.target.value)}
+                  placeholder="https://docs.google.com/..."
+                  type="url"
+                  value={ptiLinkDraft}
+                />
+              </label>
+              <div className="pti-link-actions">
+                <button className="secondary-action" onClick={() => setShowPtiLinkModal(false)} type="button">
+                  Cancel·lar
+                </button>
+                <button className="primary-action" disabled={!ptiLinkDraft.trim()} onClick={savePtiLink} type="button">
+                  Guardar enllaç
+                </button>
+              </div>
             </div>
           </Modal>
         )}

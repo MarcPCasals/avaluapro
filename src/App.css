@@ -4101,6 +4101,8 @@ button.tutorial-record-pill {
 }
 
 .diagnosis-library-trigger {
+  margin-left: auto;
+  flex: 0 0 auto;
   width: 44px;
   height: 44px;
   display: inline-flex;
@@ -10490,6 +10492,43 @@ button.profile-followup-card:focus-visible {
   font-weight: 750;
 }
 
+.pti-link-modal {
+  display: grid;
+  gap: 16px;
+}
+
+.pti-link-modal p {
+  margin: 0;
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.pti-link-modal label {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-weight: 900;
+}
+
+.pti-link-modal input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 750;
+}
+
+.pti-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
 .diagnosis-library {
   display: grid;
   grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
@@ -10548,6 +10587,12 @@ button.profile-followup-card:focus-visible {
   cursor: pointer;
 }
 
+.diagnosis-library-tab.accent-blue { border-left: 5px solid #60a5fa; }
+.diagnosis-library-tab.accent-green { border-left: 5px solid #4ade80; }
+.diagnosis-library-tab.accent-yellow { border-left: 5px solid #facc15; }
+.diagnosis-library-tab.accent-red { border-left: 5px solid #f87171; }
+.diagnosis-library-tab.accent-orange { border-left: 5px solid #fb923c; }
+
 .diagnosis-library-tab span {
   font-size: 16px;
 }
@@ -10575,6 +10620,46 @@ button.profile-followup-card:focus-visible {
 .diagnosis-library-tab.active small {
   color: #1e40af;
 }
+
+.diagnosis-library-tab.accent-blue.active {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.diagnosis-library-tab.accent-blue.active small { color: #1e40af; }
+
+.diagnosis-library-tab.accent-green.active {
+  color: #166534;
+  border-color: #86efac;
+  background: #dcfce7;
+}
+
+.diagnosis-library-tab.accent-green.active small { color: #166534; }
+
+.diagnosis-library-tab.accent-yellow.active {
+  color: #92400e;
+  border-color: #fde047;
+  background: #fef9c3;
+}
+
+.diagnosis-library-tab.accent-yellow.active small { color: #92400e; }
+
+.diagnosis-library-tab.accent-red.active {
+  color: #991b1b;
+  border-color: #fca5a5;
+  background: #fee2e2;
+}
+
+.diagnosis-library-tab.accent-red.active small { color: #991b1b; }
+
+.diagnosis-library-tab.accent-orange.active {
+  color: #9a3412;
+  border-color: #fdba74;
+  background: #ffedd5;
+}
+
+.diagnosis-library-tab.accent-orange.active small { color: #9a3412; }
 
 .diagnosis-library-content {
   display: grid;
@@ -10606,9 +10691,14 @@ button.profile-followup-card:focus-visible {
   background: #f0fdf4;
 }
 
-.diagnosis-library-content.accent-violet .diagnosis-library-hero {
-  border-color: #ddd6fe;
-  background: #f5f3ff;
+.diagnosis-library-content.accent-yellow .diagnosis-library-hero {
+  border-color: #fde047;
+  background: #fefce8;
+}
+
+.diagnosis-library-content.accent-red .diagnosis-library-hero {
+  border-color: #fca5a5;
+  background: #fff1f2;
 }
 
 .diagnosis-library-content.accent-orange .diagnosis-library-hero {
@@ -10634,8 +10724,12 @@ button.profile-followup-card:focus-visible {
   color: #16a34a;
 }
 
-.diagnosis-library-content.accent-violet .diagnosis-library-kicker {
-  color: #7c3aed;
+.diagnosis-library-content.accent-yellow .diagnosis-library-kicker {
+  color: #ca8a04;
+}
+
+.diagnosis-library-content.accent-red .diagnosis-library-kicker {
+  color: #dc2626;
 }
 
 .diagnosis-library-content.accent-orange .diagnosis-library-kicker {
