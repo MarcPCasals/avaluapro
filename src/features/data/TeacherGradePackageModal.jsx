@@ -56,6 +56,11 @@ function formatSentPackageStatus(status) {
   return 'En procés'
 }
 
+function formatSentPackageReceipt(packageItem) {
+  if (packageItem.status !== 'imported') return 'Pendent de confirmació de rebuda'
+  return `Rebut i importat${packageItem.importedAt ? ` · ${formatPackageDate(packageItem.importedAt)}` : ''}`
+}
+
 function isTutoringClassItem(classItem) {
   return Boolean(classItem?.isTutoringGroup || classItem?.subject === 'Tutoria')
 }
@@ -133,6 +138,9 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
             Aquest paquet conté només les notes finals de competència, sempre amb la darrera mirada disponible
             per alumne i competència. Els criteris i les notes internes no viatgen al tutor.
           </p>
+          <small className="teacher-package-policy-note">
+            Política: només s’envien dades voluntàriament i només al correu destinatari indicat.
+          </small>
         </div>
         <div className="teacher-package-hero-actions">
           <button className="primary-action" disabled={!cloud.user} onClick={handleSendPackage} type="button">
@@ -239,11 +247,12 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
                       {sentPackage.packageData?.source?.subject || 'Matèria desconeguda'} ·{' '}
                       {sentPackage.packageData?.source?.className || 'Classe desconeguda'}
                     </strong>
-                    <small>
-                      A {sentPackage.recipientEmailLower || 'correu desconegut'} ·{' '}
+                  <small>
+                    A {sentPackage.recipientEmailLower || 'correu desconegut'} ·{' '}
                       {formatPackageDate(sentPackage.createdAt)}
-                    </small>
-                  </div>
+                  </small>
+                  <small>{formatSentPackageReceipt(sentPackage)}</small>
+                </div>
                   <span className={sentPackage.status === 'imported' ? 'imported' : ''}>
                     {formatSentPackageStatus(sentPackage.status)}
                   </span>

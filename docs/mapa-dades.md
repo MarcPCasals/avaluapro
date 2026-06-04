@@ -152,7 +152,7 @@ Les rules de Firestore separen tres espais principals:
 | `users/{uid}/cloudBackups/...` | Mateixa separacio per usuari | Correcte. Les copies al nuvol no son globals. |
 | `teacherGradePackages/{packageId}` | Emissor i destinatari poden llegir el paquet | Correcte, pero es l'espai mes delicat perque es compartit entre docents. |
 
-Canvi aplicat el 4 de juny de 2026: les rules dels paquets entre docents s'han fet mes estrictes. El destinatari ja no pot modificar el contingut del paquet, l'emissor ni el destinatari; nomes pot marcar el paquet com a importat. L'emissor pot crear i esborrar el paquet que ha enviat.
+Canvi aplicat el 4 de juny de 2026: les rules dels paquets entre docents s'han fet mes estrictes. El destinatari ja no pot modificar el contingut del paquet, l'emissor ni el destinatari; nomes pot marcar el paquet com a importat i deixar constancia de data, correu i uid d'importacio. L'emissor pot crear i esborrar el paquet que ha enviat.
 
 ### Separacio per usuari
 
@@ -172,6 +172,7 @@ Els paquets de notes son una excepcio controlada:
 - inclouen emissor, destinatari i dades de notes finals de competència;
 - el tutor destinatari pot llegir-los si el seu correu coincideix;
 - el tutor destinatari pot marcar-los com a importats;
+- l'emissor pot veure la confirmacio d'importacio;
 - el contingut del paquet no hauria de poder ser alterat pel destinatari.
 
 Punts d'atencio:

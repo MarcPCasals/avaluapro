@@ -429,6 +429,8 @@ export async function markTeacherGradePackageImported({ packageId, userEmail }) 
   await setDoc(
     packageRef,
     cleanForFirestore({
+      importedByEmail: auth.currentUser?.email || cleanEmail,
+      importedByUid: auth.currentUser?.uid || '',
       importedAt: now,
       status: 'imported',
       updatedAt: now,

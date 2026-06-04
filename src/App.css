@@ -11918,6 +11918,18 @@ button.profile-followup-card:focus-visible {
   max-width: 850px;
 }
 
+.teacher-package-policy-note {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 999px;
+  color: #1e40af;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 900;
+  padding: 7px 11px;
+  width: fit-content;
+}
+
 .teacher-package-hero-actions {
   align-items: stretch;
   display: flex;

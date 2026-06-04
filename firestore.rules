@@ -45,11 +45,15 @@ service cloud.firestore {
     function validTeacherGradePackageImportUpdate() {
       return isPackageRecipient()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'importedByEmail',
+          'importedByUid',
           'importedAt',
           'status',
           'updatedAt'
         ])
         && request.resource.data.status == 'imported'
+        && request.resource.data.importedByEmail == request.auth.token.email
+        && request.resource.data.importedByUid == request.auth.uid
         && request.resource.data.importedAt is string
         && request.resource.data.updatedAt is string;
     }

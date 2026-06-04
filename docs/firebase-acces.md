@@ -70,7 +70,8 @@ Serveix per enviar notes d'un professor a un tutor. Aquesta ruta no ha de conten
 - materia;
 - alumnes;
 - notes finals de competencies;
-- estat d'importacio.
+- estat d'importacio;
+- data i usuari de confirmacio quan el tutor importa el paquet.
 
 No hauria d'incloure:
 
@@ -84,6 +85,8 @@ No hauria d'incloure:
 - observacions obertes.
 
 Conclusio: la ruta compartida te sentit, pero s'ha de mantenir molt limitada.
+
+La politica completa queda definida a `docs/comparticio-docents.md`.
 
 ## 4. Comprovacio d'aillament entre usuaris
 
