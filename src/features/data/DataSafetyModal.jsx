@@ -452,6 +452,40 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 <code>users/&lt;uid&gt;/cloudBackups</code>
               </div>
             </article>
+            <article className="security-status-card ok">
+              <CheckCircle2 size={18} />
+              <div>
+                <strong>Paquets entre docents</strong>
+                <span>
+                  Només l’emissor i el tutor destinatari poden veure el paquet. El destinatari només pot marcar-lo com a
+                  importat.
+                </span>
+                <code>teacherGradePackages</code>
+              </div>
+            </article>
+            <article className="security-status-card warning">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Fotos i imatges</strong>
+                <span>
+                  Ara es desen comprimides dins les dades. Quan l’ús creixi, convé migrar-les a Firebase Storage amb
+                  regles pròpies.
+                </span>
+                <code>proper bloc</code>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="responsible-use-card">
+          <ShieldCheck size={20} />
+          <div>
+            <strong>Ús responsable dels camps oberts</strong>
+            <p>
+              Escriu observacions pedagògiques, concretes i necessàries. Evita informació mèdica, familiar o personal que
+              no sigui imprescindible per a la funció docent. Diagnòstics, DOIPs, tutoria, equip educatiu i incidències són
+              dades especialment sensibles.
+            </p>
           </div>
         </section>
 

@@ -10,23 +10,62 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
-    match /teacherGradePackages/{packageId} {
-      allow create: if signedIn()
+    function isPackageSender() {
+      return signedIn() && resource.data.senderUid == request.auth.uid;
+    }
+
+    function isPackageRecipient() {
+      return signedIn()
+        && request.auth.token.email is string
+        && resource.data.recipientEmailLower == request.auth.token.email;
+    }
+
+    function validTeacherGradePackageCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'createdAt',
+          'id',
+          'importedAt',
+          'packageData',
+          'recipientEmailLower',
+          'senderEmail',
+          'senderName',
+          'senderUid',
+          'status',
+          'updatedAt'
+        ])
         && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email
         && request.resource.data.recipientEmailLower is string
-        && request.resource.data.packageData.schema == "avaluapro.teacher-grade-package";
+        && request.resource.data.status == 'sent'
+        && request.resource.data.packageData.schema == "avaluapro.teacher-grade-package"
+        && request.resource.data.packageData.sender.uid == request.auth.uid;
+    }
+
+    function validTeacherGradePackageImportUpdate() {
+      return isPackageRecipient()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'importedAt',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.status == 'imported'
+        && request.resource.data.importedAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    match /teacherGradePackages/{packageId} {
+      allow create: if validTeacherGradePackageCreate();
 
       allow read: if signedIn()
         && (
-          resource.data.senderUid == request.auth.uid
-          || resource.data.recipientEmailLower == request.auth.token.email
+          isPackageSender()
+          || isPackageRecipient()
         );
 
-      allow update, delete: if signedIn()
-        && (
-          resource.data.senderUid == request.auth.uid
-          || resource.data.recipientEmailLower == request.auth.token.email
-        );
+      allow update: if validTeacherGradePackageImportUpdate();
+
+      allow delete: if isPackageSender();
     }
 
     match /users/{userId} {

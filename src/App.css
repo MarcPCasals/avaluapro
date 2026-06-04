@@ -12416,6 +12416,7 @@ button.profile-followup-card:focus-visible {
 .backup-diagnosis-card,
 .collection-summary,
 .antecedent-transfer-card,
+.responsible-use-card,
 .storage-advice {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -12677,6 +12678,45 @@ button.profile-followup-card:focus-visible {
   align-items: flex-start;
   border-color: #fed7aa;
   background: #fff7ed;
+}
+
+.responsible-use-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.responsible-use-card svg {
+  flex: 0 0 auto;
+  color: #7c3aed;
+}
+
+.responsible-use-card strong {
+  display: block;
+  color: #4c1d95;
+  margin-bottom: 4px;
+}
+
+.responsible-use-card p {
+  margin: 0;
+  color: #5b21b6;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.sensitive-field-hint {
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  padding: 7px 9px;
+  margin: 8px 0 0;
+  color: #92400e;
+  background: #fffbeb;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
 }
 
 .storage-advice svg {

@@ -572,6 +572,9 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             ref={teamTextRef}
             value={teamText}
           />
+          <p className="sensitive-field-hint">
+            Escriu acords i observacions pedagògiques. Evita dades mèdiques, familiars o personals si no són imprescindibles.
+          </p>
           {expandedSections.team && (
             <NoteEntryList label="Equip educatiu" notes={teamNotes} onDelete={deleteAgendaNote} />
           )}
@@ -599,6 +602,9 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             ref={tutoringTextRef}
             value={tutoringText}
           />
+          <p className="sensitive-field-hint">
+            Les entrades de tutoria poden ser sensibles: prioritza fets observables, decisions i seguiment docent.
+          </p>
           {expandedSections.tutoring && (
             <NoteEntryList label="Tutoria" notes={tutoringNotes} onDelete={deleteAgendaNote} />
           )}

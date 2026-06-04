@@ -168,6 +168,9 @@ function BehaviorEventModal({ events = [], student, type, onClose, onSave }) {
             placeholder={isIncident ? 'Ex: interromp repetidament la sessió...' : 'Ex: ajuda el grup, mostra bona actitud...'}
             value={text}
           />
+          <p className="sensitive-field-hint">
+            Registra fets concrets i observables. Evita judicis personals o informació familiar que no sigui necessària.
+          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">
               Cancel·lar
@@ -470,6 +473,9 @@ function TaskNoteModal({ draft, onClose, onSave }) {
               : 'Anota informació general de la tasca per recordar instruccions, adaptacions o incidències de classe.'}
           </p>
           <textarea autoFocus onChange={(event) => setText(event.target.value)} value={text} />
+          <p className="sensitive-field-hint">
+            Aquesta nota queda associada a una tasca: escriu només informació útil per al seguiment docent.
+          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>
             <button
@@ -520,6 +526,9 @@ function TaskReminderModal({ draft, onClose, onSave }) {
             placeholder="Ex: revisar si ha entregat la tasca pendent..."
             value={reminderText}
           />
+          <p className="sensitive-field-hint">
+            El recordatori ha de ser pràctic i breu. Evita dades sensibles si només cal recordar una acció.
+          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>
             <button

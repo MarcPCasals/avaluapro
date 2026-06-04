@@ -140,15 +140,124 @@ Sempre que sigui possible, aquestes dades s'haurien de calcular a partir de regi
 
 Guardar menys dades duplicades redueix risc, errors i mida de Firestore/backups.
 
-## Seguent pas del Bloc 1
+## Revisio Firebase
 
-El Bloc 1 queda preparat amb mapa de dades, sensibilitat inicial i revisio de necessitat. El seguent pas natural es el Bloc 2: revisar Firebase i acces:
+### Rules actuals
 
-- comprovar rules de Firestore;
-- comprovar espais compartits com `teacherGradePackages`;
-- revisar backups al nuvol;
-- preparar criteris per a Firebase Storage en fotos;
-- valorar App Check mes endavant.
+Les rules de Firestore separen tres espais principals:
+
+| Espai | Regla principal | Valoracio |
+| --- | --- | --- |
+| `users/{uid}/...` | Nomes `request.auth.uid == uid` pot llegir, crear, editar o esborrar | Correcte per a un model de quadern docent personal. |
+| `users/{uid}/cloudBackups/...` | Mateixa separacio per usuari | Correcte. Les copies al nuvol no son globals. |
+| `teacherGradePackages/{packageId}` | Emissor i destinatari poden llegir el paquet | Correcte, pero es l'espai mes delicat perque es compartit entre docents. |
+
+Canvi aplicat el 4 de juny de 2026: les rules dels paquets entre docents s'han fet mes estrictes. El destinatari ja no pot modificar el contingut del paquet, l'emissor ni el destinatari; nomes pot marcar el paquet com a importat. L'emissor pot crear i esborrar el paquet que ha enviat.
+
+### Separacio per usuari
+
+La separacio tecnica principal es aquesta:
+
+- cada docent autenticat te el seu espai `users/{uid}`;
+- les dades de classes, alumnes, notes, seguiment, tutoria i backups viuen dins aquest espai;
+- un altre usuari no pot llegir aquest espai si les rules estan publicades correctament a Firebase.
+
+Aixo reforca l'escenari actual: Avaluapro com a eina personal del docent.
+
+### Paquets compartits entre docents
+
+Els paquets de notes son una excepcio controlada:
+
+- es creen a `teacherGradePackages`;
+- inclouen emissor, destinatari i dades de notes finals de competència;
+- el tutor destinatari pot llegir-los si el seu correu coincideix;
+- el tutor destinatari pot marcar-los com a importats;
+- el contingut del paquet no hauria de poder ser alterat pel destinatari.
+
+Punts d'atencio:
+
+- cal validar be el correu destinatari;
+- cal mostrar errors quan no coincideixen alumnes/classes;
+- cal registrar enviaments i imports correctes;
+- cal evitar enviar criteris interns o comentaris: nomes notes finals de competència.
+
+### Copies al nuvol
+
+Les copies al nuvol viuen a:
+
+`users/{uid}/cloudBackups/{backupId}`
+
+Cada copia guarda metadades i subcol.leccions amb les dades. A l'app ja es mostra:
+
+- ultima copia al nuvol;
+- estat de sincronitzacio;
+- darreres 5 copies;
+- opcio de restaurar;
+- mida aproximada de la copia completa.
+
+Punt pendent: definir una politica de conservacio. Per exemple, conservar nomes les darreres copies necessaries o separar copies de final de curs.
+
+### Storage per fotos
+
+Firebase Storage encara no s'utilitza. Ara les fotos i imatges poden quedar dins les dades de Firestore/backups com a dades comprimides.
+
+Recomanacio:
+
+- mantenir-ho temporalment mentre l'us sigui petit;
+- migrar fotos d'alumne i imatges grans a Firebase Storage quan es consolidi l'us amb mes docents;
+- crear rules de Storage per usuari;
+- guardar a Firestore nomes la referencia o URL de la imatge.
+
+### App Check
+
+App Check no es imprescindible per al primer pilot, pero pot ser una capa addicional quan Avaluapro creixi:
+
+- ajuda a reduir l'us abusiu de Firebase des de clients no autoritzats;
+- no substitueix les rules de Firestore;
+- pot requerir configuracio addicional per web, domini i desplegament.
+
+Recomanacio: valorar-lo mes endavant, quan el flux de Firebase Hosting i domini estigui estabilitzat.
+
+## Proteccions dins l'app
+
+Avaluapro ja inclou diverses proteccions i avisos:
+
+| Proteccio | Estat | Observacio |
+| --- | --- | --- |
+| Pantalla de copies i estat | Implementada | Mostra sincronitzacio, copies al nuvol, mida de dades, restauracio i diagnosi de copia. |
+| Botó de copia manual | Implementat | Permet descarregar JSON al dispositiu. Cal recordar que la custodia passa al docent. |
+| Copies al nuvol | Implementades | Manual i automatica diaria quan hi ha sessio iniciada. |
+| Ultima copia al nuvol | Implementada | Visible dins la pantalla de copies i estat. |
+| Darreres 5 copies | Implementades | Es poden revisar i restaurar. |
+| Separacio de copies al nuvol | Implementada | Ruta `users/{uid}/cloudBackups`. |
+| Avisos en camps sensibles | En millora | S'han afegit avisos a diagnostics, informacio personal, equip educatiu, tutoria, antecedents, incidencies, notes de tasques i recordatoris. |
+| Missatges d'errors en backups | Implementats | Informa si no es pot crear/restaurar/sincronitzar. |
+| Paquets entre docents | Implementats | Inclou enviament, recepcio, estat i errors de coincidencia. |
+
+Text de criteri que hauria de guiar els avisos interns:
+
+> Escriu observacions pedagogiques, concretes i necessaries. Evita informacio medica, familiar o personal que no sigui imprescindible per a la funcio docent.
+
+Proteccions pendents o futures:
+
+- avisos mes fins en DOIPs i perfil tutorial;
+- migracio de fotos a Storage;
+- App Check;
+- politica de conservacio de copies;
+- fitxa tecnica per direccio/Ministeri;
+- possible registre mes detallat d'importacions/exportacions entre docents.
+
+## Estat del Bloc 1
+
+El Bloc 1 queda preparat amb:
+
+- mapa de dades;
+- sensibilitat inicial;
+- revisio de necessitat docent;
+- revisio de Firebase;
+- proteccions principals dins l'app.
+
+El seguent bloc natural es treballar mesures de minimitzacio i seguretat operativa: reduir text sensible, definir politica de copies, preparar documentacio per direccio i planificar Storage per fotos.
 
 ## Referencies utils
 
