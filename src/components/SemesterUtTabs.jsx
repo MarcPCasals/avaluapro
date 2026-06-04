@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Plus, Settings, Trash2 } from 'lucide-react'
+import { BookOpen, Plus, Settings, Trash2 } from 'lucide-react'
+import { DiagnosisLibraryModal } from '../features/students/DiagnosisLibraryModal'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 export function SemesterUtTabs() {
@@ -12,6 +13,7 @@ export function SemesterUtTabs() {
   const updateUt = useAvaluaproStore((state) => state.updateUt)
   const deleteUt = useAvaluaproStore((state) => state.deleteUt)
   const [manageUts, setManageUts] = useState(false)
+  const [showDiagnosisLibrary, setShowDiagnosisLibrary] = useState(false)
   const semesters = useMemo(
     () =>
       allSemesters
@@ -57,7 +59,16 @@ export function SemesterUtTabs() {
           <Settings size={16} />
           UTs
         </button>
+        <button
+          className="diagnosis-library-trigger"
+          onClick={() => setShowDiagnosisLibrary(true)}
+          title="Biblioteca de diagnòstics"
+          type="button"
+        >
+          <BookOpen size={17} />
+        </button>
       </div>
+      {showDiagnosisLibrary && <DiagnosisLibraryModal onClose={() => setShowDiagnosisLibrary(false)} />}
       {manageUts && (
         <div className="modal-backdrop">
           <div className="modal-panel">

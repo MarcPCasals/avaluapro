@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
+import { DIAGNOSIS_LIBRARY } from '../../data/diagnosisLibrary'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
 import {
@@ -39,6 +40,8 @@ const TEXT_LIMITS = {
   personalNotes: 700,
   antecedentNotes: 700,
 }
+
+const modificationTriggerDiagnoses = new Set(['qi-tdl', 'progress'])
 
 const antecedentProfileLabels = {
   invisible: 'Alumne invisible',
@@ -129,6 +132,20 @@ function createAntecedentDraft(antecedent) {
   }
 }
 
+function getCompetencyCode(name = '', fallback = '') {
+  const match = String(name).match(/\bC\d+\b/i)
+  return match ? match[0].toLocaleUpperCase('ca') : fallback
+}
+
+function isCompetencyModified(marks, studentId, competencyId) {
+  return marks.some(
+    (mark) =>
+      mark.type === 'competency-modification' &&
+      mark.studentId === studentId &&
+      mark.competencyId === competencyId,
+  )
+}
+
 export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, onOpenAnnotations }) {
   const state = useAvaluaproStore()
   const { activeClassId } = state.ui
@@ -173,11 +190,35 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const tutoringNote = agendaNotes.find((note) => note.type === 'tutoring')
   const diagnoses = student?.diagnoses || []
   const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id))
+  const classUtIds = new Set(state.uts.filter((ut) => ut.classId === student?.classId).map((ut) => ut.id))
+  const classCompetencies = state.competencies.filter((competency) => classUtIds.has(competency.utId))
+  const subjectModifiedCompetencies = subjectCompetencies.map((competency, index) => {
+    const code = getCompetencyCode(competency.name, `C${index + 1}`)
+    const matchingCompetencies = classCompetencies.filter((classCompetency) => {
+      const classCode = getCompetencyCode(classCompetency.name)
+      return classCode === code || classCompetency.name === competency.name
+    })
+    return {
+      code,
+      color: competency.color || 'blue',
+      matchingCompetencies,
+      name: competency.name,
+      modified: matchingCompetencies.some((classCompetency) =>
+        isCompetencyModified(state.marks, studentId, classCompetency.id),
+      ),
+    }
+  })
+  const hasModificationTriggerDiagnosis = diagnoses.some((diagnosisId) => modificationTriggerDiagnoses.has(diagnosisId))
+  const hasModifiedCompetencies = subjectModifiedCompetencies.some((competency) => competency.modified)
+  const showModifiedCompetenciesPanel =
+    subjectModifiedCompetencies.length > 0 && (hasModificationTriggerDiagnosis || hasModifiedCompetencies)
   const updateStudent = state.updateStudent
+  const setCompetencyModification = state.setCompetencyModification
   const upsertStudentAntecedent = state.upsertStudentAntecedent
   const deleteStudentAntecedent = state.deleteStudentAntecedent
   const [antecedentDraft, setAntecedentDraft] = useState(() => createAntecedentDraft(antecedent))
   const [antecedentState, setAntecedentState] = useState('idle')
+  const [diagnosisInfoId, setDiagnosisInfoId] = useState(null)
 
   if (!student) return null
 
@@ -217,6 +258,15 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
       ? diagnoses.filter((id) => id !== diagnosisId)
       : [...diagnoses, diagnosisId]
     updateStudent(studentId, { diagnoses: nextDiagnoses })
+  }
+
+  const toggleSubjectCompetencyModification = async (competencyOption) => {
+    const nextModified = !competencyOption.modified
+    await Promise.all(
+      competencyOption.matchingCompetencies.map((competency) =>
+        setCompetencyModification(studentId, competency.id, nextModified),
+      ),
+    )
   }
 
   const handlePhotoUpload = async (file) => {
@@ -292,17 +342,63 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             Diagnòstics
           </h3>
           <div className="diagnosis-chip-list">
-            {DIAGNOSIS_OPTIONS.map((diagnosis) => (
-              <button
-                className={`diagnosis-chip ${diagnosis.color} ${diagnoses.includes(diagnosis.id) ? 'active' : ''}`}
-                key={diagnosis.id}
-                onClick={() => toggleDiagnosis(diagnosis.id)}
-                type="button"
-              >
-                {diagnosis.label}
-              </button>
-            ))}
+            {DIAGNOSIS_OPTIONS.map((diagnosis) => {
+              const libraryEntry = DIAGNOSIS_LIBRARY[diagnosis.id]
+              return (
+                <div
+                  className={`diagnosis-chip-shell ${diagnosis.color} ${
+                    diagnoses.includes(diagnosis.id) ? 'active' : ''
+                  }`}
+                  key={diagnosis.id}
+                >
+                  <button
+                    className="diagnosis-chip"
+                    onClick={() => toggleDiagnosis(diagnosis.id)}
+                    type="button"
+                  >
+                    {diagnosis.label}
+                  </button>
+                  {libraryEntry && (
+                    <button
+                      className="diagnosis-chip-info"
+                      onClick={() => setDiagnosisInfoId(diagnosis.id)}
+                      title={`Veure resum de ${diagnosis.label}`}
+                      type="button"
+                    >
+                      i
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
+          {showModifiedCompetenciesPanel && (
+            <div className="modified-competency-profile-panel">
+              <div>
+                <strong>Competències modificades</strong>
+                <span>
+                  Marca les competències amb balanç de progrés. A la taula veuràs la nota calculada encerclada; quan
+                  s’enviï al tutor comptarà com a D en balanç estàndard.
+                </span>
+              </div>
+              <div className="modified-competency-profile-grid">
+                {subjectModifiedCompetencies.map((competency) => (
+                  <button
+                    className={`modified-competency-profile-chip ${competency.color} ${
+                      competency.modified ? 'active' : ''
+                    }`}
+                    disabled={competency.matchingCompetencies.length === 0}
+                    key={competency.name}
+                    onClick={() => toggleSubjectCompetencyModification(competency)}
+                    type="button"
+                  >
+                    <b>{competency.code}</b>
+                    <span>{competency.name.replace(`${competency.code}:`, '').trim()}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <textarea
             maxLength={TEXT_LIMITS.diagnosisNotes}
             onChange={(event) => updateStudent(studentId, { diagnosisNotes: event.target.value })}
@@ -314,6 +410,18 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             adaptar la feina docent. Màxim {TEXT_LIMITS.diagnosisNotes} caràcters.
           </p>
         </section>
+        {diagnosisInfoId && DIAGNOSIS_LIBRARY[diagnosisInfoId] && (
+          <Modal onClose={() => setDiagnosisInfoId(null)} size="md" title={DIAGNOSIS_LIBRARY[diagnosisInfoId].title}>
+            <div className="diagnosis-info-modal">
+              <strong>Necessitats específiques</strong>
+              <ul>
+                {DIAGNOSIS_LIBRARY[diagnosisInfoId].summary.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </Modal>
+        )}
 
         <section className="annotation-section compact">
           <h3>Informació general</h3>

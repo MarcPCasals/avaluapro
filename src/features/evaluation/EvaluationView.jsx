@@ -44,7 +44,6 @@ function getCriterionMark(marks, studentId, criterionId) {
 }
 
 function getCompetencyGrade(marks, studentId, competency) {
-  if (isCompetencyModified(marks, studentId, competency.id)) return 'D'
   const grades = competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id))
   return calculateGrade(grades)
 }

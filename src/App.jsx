@@ -62,7 +62,7 @@ function App() {
     return (
       <main className="loading-screen">
         <Loader2 size={42} />
-        <p>Carregant Avaluapro V2...</p>
+        <p>Carregant Avaluapro...</p>
       </main>
     )
   }

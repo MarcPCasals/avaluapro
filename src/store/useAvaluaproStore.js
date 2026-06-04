@@ -1498,6 +1498,38 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['marks'])
   },
 
+  setCompetencyModification: async (studentId, competencyId, modified) => {
+    if (!studentId || !competencyId) return
+
+    set((state) => {
+      const existing = state.marks.find(
+        (mark) =>
+          mark.type === 'competency-modification' &&
+          mark.studentId === studentId &&
+          mark.competencyId === competencyId,
+      )
+
+      if (modified && existing) return {}
+      if (!modified && !existing) return {}
+
+      return {
+        marks: modified
+          ? [
+              ...state.marks,
+              {
+                id: createId('mod'),
+                studentId,
+                competencyId,
+                type: 'competency-modification',
+                value: 'modified',
+              },
+            ]
+          : state.marks.filter((mark) => mark.id !== existing.id),
+      }
+    })
+    await persistCollections(set, get, ['marks'])
+  },
+
   updateTutorialMark: async ({ classId, studentId, subject, competencyKey, criterionKey, value }) => {
     const targetKey = competencyKey || criterionKey
     if (!classId || !studentId || !subject || !targetKey) return
