@@ -171,10 +171,6 @@ function BehaviorEventModal({ events = [], student, type, onClose, onSave }) {
             placeholder={isIncident ? 'Ex: interromp repetidament la sessió...' : 'Ex: ajuda el grup, mostra bona actitud...'}
             value={text}
           />
-          <p className="sensitive-field-hint">
-            Registra fets concrets i observables. Evita judicis personals o informació familiar que no sigui necessària.
-            Màxim {TRACKING_TEXT_LIMIT} caràcters.
-          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">
               Cancel·lar
@@ -316,10 +312,6 @@ function AgendaNotesModal({ notes, onClose, onSave, student }) {
               value={text}
             />
           </label>
-          <p className="sensitive-field-hint">
-            Escriu el motiu pedagògic necessari per justificar la nota. Evita informació mèdica, familiar o personal que
-            no calgui conservar. Màxim {TRACKING_TEXT_LIMIT} caràcters.
-          </p>
           <div className="modal-actions">
             <button
               className="secondary-action"
@@ -487,10 +479,6 @@ function TaskNoteModal({ draft, onClose, onSave }) {
             onChange={(event) => setText(event.target.value)}
             value={text}
           />
-          <p className="sensitive-field-hint">
-            Aquesta nota queda associada a una tasca: escriu només informació útil per al seguiment docent. Màxim{' '}
-            {TRACKING_TEXT_LIMIT} caràcters.
-          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>
             <button
@@ -542,10 +530,6 @@ function TaskReminderModal({ draft, onClose, onSave }) {
             placeholder="Ex: revisar si ha entregat la tasca pendent..."
             value={reminderText}
           />
-          <p className="sensitive-field-hint">
-            El recordatori ha de ser pràctic i breu. Evita dades sensibles si només cal recordar una acció. Màxim{' '}
-            {TRACKING_TEXT_LIMIT} caràcters.
-          </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>
             <button

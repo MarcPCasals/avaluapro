@@ -570,18 +570,6 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
         </section>
 
         <section className="responsible-use-card">
-          <ShieldCheck size={20} />
-          <div>
-            <strong>Ús responsable dels camps oberts</strong>
-            <p>
-              Escriu observacions pedagògiques, concretes i necessàries. Evita informació mèdica, familiar o personal que
-              no sigui imprescindible per a la funció docent. Diagnòstics, DOIPs, tutoria, equip educatiu i incidències són
-              dades especialment sensibles.
-            </p>
-          </div>
-        </section>
-
-        <section className="responsible-use-card">
           <Database size={20} />
           <div>
             <strong>Què es desa localment i què es desa al núvol?</strong>
@@ -831,10 +819,6 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 Exporta només el perfil inicial dels alumnes: última mirada, perfil de constància, valoració qualitativa i
                 diagnòstics capturats. Quan el curs vinent tinguis una nova classe, carrega aquest JSON i Avaluapro
                 l’associarà als alumnes pel nom.
-              </p>
-              <p className="sensitive-field-hint">
-                Aquest fitxer pot contenir diagnòstics i valoracions inicials. Conserva’l només si és necessari i no el
-                comparteixis fora del context docent autoritzat.
               </p>
             </div>
           </div>

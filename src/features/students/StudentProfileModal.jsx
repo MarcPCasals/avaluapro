@@ -436,10 +436,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             placeholder="Anotacions addicionals sobre diagnòstics..."
             value={student.diagnosisNotes || ''}
           />
-          <p className="sensitive-field-hint">
-            Dada sensible: prioritza etiquetes i evita detalls mèdics o familiars. Escriu només allò que ajuda a
-            adaptar la feina docent. Màxim {TEXT_LIMITS.diagnosisNotes} caràcters.
-          </p>
         </section>
         {diagnosisInfoId && DIAGNOSIS_LIBRARY[diagnosisInfoId] && (
           <Modal onClose={() => setDiagnosisInfoId(null)} size="md" title={DIAGNOSIS_LIBRARY[diagnosisInfoId].title}>
@@ -490,10 +486,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             placeholder="Informació personal rellevant per al seguiment docent..."
             value={student.personalNotes || ''}
           />
-          <p className="sensitive-field-hint">
-            Mantén aquesta informació curta, pedagògica i necessària. No hi escriguis dades personals que no aportin valor
-            docent. Màxim {TEXT_LIMITS.personalNotes} caràcters.
-          </p>
         </section>
 
         <section className="profile-section">
@@ -633,10 +625,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
               placeholder="Què convé saber abans de començar el curs? Fortaleses, dificultats, hàbits, recomanacions..."
               value={antecedentDraft.qualitativeNotes}
             />
-            <span className="sensitive-field-hint">
-              Resumeix només antecedents útils per començar el curs. Evita copiar informes complets si amb una síntesi
-              n’hi ha prou. Màxim {TEXT_LIMITS.antecedentNotes} caràcters.
-            </span>
           </label>
 
           <div className="antecedent-diagnosis-row">

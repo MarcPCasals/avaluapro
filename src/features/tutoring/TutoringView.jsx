@@ -2300,10 +2300,6 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
               placeholder="Escriu aquí la síntesi docent: què preocupa, què ha millorat, quin acord proposem o quin seguiment cal fer..."
               value={tutorComment}
             />
-            <p className="sensitive-field-hint">
-              Síntesi per reunió: fets observables, evolució i acords. Evita informació mèdica o familiar no necessària.
-              Màxim {TUTORING_TEXT_LIMIT} caràcters.
-            </p>
             <div className={`tutorial-tutor-comment-print ${tutorComment.trim() ? '' : 'empty'}`}>
               {tutorComment.trim() || 'Sense comentari del tutor afegit.'}
             </div>
@@ -3853,10 +3849,6 @@ export function TutoringView() {
                     value={recordForm.note}
                   />
                 </label>
-                <p className="sensitive-field-hint">
-                  Registra fets observables i acords de seguiment. Evita dades mèdiques, familiars o personals si no són
-                  imprescindibles per a la funció tutorial. Màxim {TUTORING_TEXT_LIMIT} caràcters.
-                </p>
 
                 <button className="primary-action" disabled={classStudents.length === 0} type="submit">
                   Afegir registre
@@ -3904,10 +3896,6 @@ export function TutoringView() {
                 Marca les respostes de l’equip educatiu quan demanis informació curta sobre un alumne. Així veus qui
                 encara no té cap DOIP registrat.
               </p>
-              <p className="sensitive-field-hint">
-                Escriu només el resum pedagògic necessari: demanda, resposta de l’equip i acció docent. Evita copiar
-                informes complets si una síntesi és suficient.
-              </p>
               {tutorialRecordSummary.studentsWithoutDoip.length === 0 ? (
                 <div className="empty-state compact">Tots els alumnes visibles tenen almenys un DOIP registrat.</div>
               ) : (
@@ -3940,10 +3928,6 @@ export function TutoringView() {
                 <h2>Intel·ligències múltiples</h2>
               </div>
               <p>Assigna perfils predominants per tenir una lectura ràpida del grup i preparar activitats variades.</p>
-              <p className="sensitive-field-hint">
-                Aquesta informació és opcional i s’ha d’utilitzar com a orientació pedagògica, no com a etiqueta fixa de
-                l’alumne.
-              </p>
               {intelligenceSummary.length > 0 && (
                 <div className="tutorial-intelligence-summary">
                   {intelligenceSummary.map((item) => (
@@ -4842,10 +4826,6 @@ export function TutoringView() {
                     value={relationForm.note}
                   />
                 </label>
-                <p className="sensitive-field-hint">
-                  Les relacions del grup són dades sensibles. Escriu criteris funcionals per organitzar el grup, no judicis
-                  personals ni detalls de conflictes que no cal conservar. Màxim {RELATION_NOTE_LIMIT} caràcters.
-                </p>
 
                 <button className="primary-action" disabled={classStudents.length < 2} type="submit">
                   Guardar relació

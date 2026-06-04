@@ -392,7 +392,6 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
         <section className="annotation-tools-row">
           <div>
             <span>L’historial de comentaris es desa localment i entra a la còpia de seguretat.</span>
-            <small>Usa aquest espai per acords pedagògics i seguiment, no per detalls mèdics o familiars.</small>
             {copyState && <small>{copyState}</small>}
           </div>
           <button className="secondary-action" onClick={handleCopyText} type="button">
@@ -576,10 +575,6 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             ref={teamTextRef}
             value={teamText}
           />
-          <p className="sensitive-field-hint">
-            Escriu acords i observacions pedagògiques. Evita dades mèdiques, familiars o personals si no són
-            imprescindibles. Màxim {ANNOTATION_TEXT_LIMIT} caràcters.
-          </p>
           {expandedSections.team && (
             <NoteEntryList label="Equip educatiu" notes={teamNotes} onDelete={deleteAgendaNote} />
           )}
@@ -608,10 +603,6 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             ref={tutoringTextRef}
             value={tutoringText}
           />
-          <p className="sensitive-field-hint">
-            Les entrades de tutoria poden ser sensibles: prioritza fets observables, decisions i seguiment docent.
-            Màxim {ANNOTATION_TEXT_LIMIT} caràcters.
-          </p>
           {expandedSections.tutoring && (
             <NoteEntryList label="Tutoria" notes={tutoringNotes} onDelete={deleteAgendaNote} />
           )}
