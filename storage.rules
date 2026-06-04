@@ -12,7 +12,7 @@ service firebase.storage {
 
     function isSafeImageUpload() {
       return request.resource != null
-        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.size < 2 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 

@@ -552,7 +552,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                   Ara es desen comprimides dins les dades. Quan l’ús creixi, convé migrar-les a Firebase Storage amb
                   regles pròpies.
                 </span>
-                <code>proper bloc</code>
+                <code>Storage preparat</code>
               </div>
             </article>
           </div>

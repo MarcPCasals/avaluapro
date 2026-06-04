@@ -195,11 +195,19 @@ Cada copia guarda metadades i subcol.leccions amb les dades. A l'app ja es mostr
 - opcio de restaurar;
 - mida aproximada de la copia completa.
 
-Punt pendent: definir una politica de conservacio. Per exemple, conservar nomes les darreres copies necessaries o separar copies de final de curs.
+La politica de conservacio queda definida a `docs/backups-conservacio.md`.
 
 ### Storage per fotos
 
 Firebase Storage encara no s'utilitza. Ara les fotos i imatges poden quedar dins les dades de Firestore/backups com a dades comprimides.
+
+Mesures actuals:
+
+- compressio local abans de guardar;
+- limit de mida per fotos d'alumnes;
+- limit de mida per imatges de llocs fixos;
+- avis si una imatge continua sent massa gran;
+- avis si un document es massa gran per Firestore.
 
 Recomanacio:
 

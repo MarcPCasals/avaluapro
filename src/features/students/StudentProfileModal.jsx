@@ -217,7 +217,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     if (!file) return
 
     try {
-      const photoUrl = await imageFileToCompressedDataUrl(file, { maxSize: 480 })
+      const photoUrl = await imageFileToCompressedDataUrl(file, { maxSize: 480, maxOutputBytes: 180 * 1024 })
       await updateStudent(studentId, { photoUrl })
     } catch (error) {
       window.alert(error.message)

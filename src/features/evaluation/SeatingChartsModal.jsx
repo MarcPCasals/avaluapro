@@ -13,7 +13,11 @@ export function SeatingChartsModal({ charts, classId, halfGroups, onClose, onDel
     if (!file) return
 
     try {
-      const imageData = await imageFileToCompressedDataUrl(file, { maxSize: 1600, quality: 0.9 })
+      const imageData = await imageFileToCompressedDataUrl(file, {
+        maxSize: 1400,
+        maxOutputBytes: 720 * 1024,
+        quality: 0.86,
+      })
       await onSave({
         classId,
         halfGroup,
