@@ -36,6 +36,8 @@ const interventionFilters = [
   { id: 'punctual', label: 'Puntual' },
 ]
 
+const TRACKING_TEXT_LIMIT = 500
+
 function useTrackingModel() {
   const { activeClassId, activeUtId } = useAvaluaproStore((state) => state.ui)
   const allStudents = useAvaluaproStore((state) => state.students)
@@ -164,12 +166,14 @@ function BehaviorEventModal({ events = [], student, type, onClose, onSave }) {
           </section>
           <textarea
             autoFocus
+            maxLength={TRACKING_TEXT_LIMIT}
             onChange={(event) => setText(event.target.value)}
             placeholder={isIncident ? 'Ex: interromp repetidament la sessió...' : 'Ex: ajuda el grup, mostra bona actitud...'}
             value={text}
           />
           <p className="sensitive-field-hint">
             Registra fets concrets i observables. Evita judicis personals o informació familiar que no sigui necessària.
+            Màxim {TRACKING_TEXT_LIMIT} caràcters.
           </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">
@@ -306,11 +310,16 @@ function AgendaNotesModal({ notes, onClose, onSave, student }) {
           <label className="field-label agenda-direct-note-field">
             Nova nota directa a l’agenda
             <textarea
+              maxLength={TRACKING_TEXT_LIMIT}
               onChange={(event) => setText(event.target.value)}
               placeholder="Ex: nota directa a l’agenda per material, actitud o acord de seguiment..."
               value={text}
             />
           </label>
+          <p className="sensitive-field-hint">
+            Escriu el motiu pedagògic necessari per justificar la nota. Evita informació mèdica, familiar o personal que
+            no calgui conservar. Màxim {TRACKING_TEXT_LIMIT} caràcters.
+          </p>
           <div className="modal-actions">
             <button
               className="secondary-action"
@@ -472,9 +481,15 @@ function TaskNoteModal({ draft, onClose, onSave }) {
               ? 'Anota informació útil d’aquesta tasca per a aquest alumne sense canviar-ne l’estat.'
               : 'Anota informació general de la tasca per recordar instruccions, adaptacions o incidències de classe.'}
           </p>
-          <textarea autoFocus onChange={(event) => setText(event.target.value)} value={text} />
+          <textarea
+            autoFocus
+            maxLength={TRACKING_TEXT_LIMIT}
+            onChange={(event) => setText(event.target.value)}
+            value={text}
+          />
           <p className="sensitive-field-hint">
-            Aquesta nota queda associada a una tasca: escriu només informació útil per al seguiment docent.
+            Aquesta nota queda associada a una tasca: escriu només informació útil per al seguiment docent. Màxim{' '}
+            {TRACKING_TEXT_LIMIT} caràcters.
           </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>
@@ -522,12 +537,14 @@ function TaskReminderModal({ draft, onClose, onSave }) {
           </label>
           <textarea
             autoFocus
+            maxLength={TRACKING_TEXT_LIMIT}
             onChange={(event) => setReminderText(event.target.value)}
             placeholder="Ex: revisar si ha entregat la tasca pendent..."
             value={reminderText}
           />
           <p className="sensitive-field-hint">
-            El recordatori ha de ser pràctic i breu. Evita dades sensibles si només cal recordar una acció.
+            El recordatori ha de ser pràctic i breu. Evita dades sensibles si només cal recordar una acció. Màxim{' '}
+            {TRACKING_TEXT_LIMIT} caràcters.
           </p>
           <div className="modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">Cancel·lar</button>

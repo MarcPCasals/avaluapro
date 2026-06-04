@@ -139,7 +139,8 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
             per alumne i competència. Els criteris i les notes internes no viatgen al tutor.
           </p>
           <small className="teacher-package-policy-note">
-            Política: només s’envien dades voluntàriament i només al correu destinatari indicat.
+            Exportació neta: no inclou comentaris, diagnòstics, DOIPs, fotos, sociograma ni registres de seguiment.
+            Només s’envien dades voluntàriament i només al correu destinatari indicat.
           </small>
         </div>
         <div className="teacher-package-hero-actions">

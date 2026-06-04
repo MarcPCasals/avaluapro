@@ -68,6 +68,8 @@ const SOCIOGRAM_FILTERS = [
 ]
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
+const TUTORING_TEXT_LIMIT = 700
+const RELATION_NOTE_LIMIT = 400
 const SEATING_GRID_COLUMNS = 9
 const SEATING_GRID_ROWS = 5
 const DEFAULT_SEATING_ACTIVE_SEATS = [
@@ -2293,10 +2295,15 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
             <h3 className="tutorial-profile-section-title">Comentari del tutor</h3>
             <textarea
               className="tutorial-tutor-comment-editor"
+              maxLength={TUTORING_TEXT_LIMIT}
               onChange={(event) => setTutorComment(event.target.value)}
               placeholder="Escriu aquí la síntesi docent: què preocupa, què ha millorat, quin acord proposem o quin seguiment cal fer..."
               value={tutorComment}
             />
+            <p className="sensitive-field-hint">
+              Síntesi per reunió: fets observables, evolució i acords. Evita informació mèdica o familiar no necessària.
+              Màxim {TUTORING_TEXT_LIMIT} caràcters.
+            </p>
             <div className={`tutorial-tutor-comment-print ${tutorComment.trim() ? '' : 'empty'}`}>
               {tutorComment.trim() || 'Sense comentari del tutor afegit.'}
             </div>
@@ -3840,6 +3847,7 @@ export function TutoringView() {
                 <label className="full">
                   Motiu o observació
                   <textarea
+                    maxLength={TUTORING_TEXT_LIMIT}
                     onChange={(event) => setRecordForm((current) => ({ ...current, note: event.target.value }))}
                     placeholder="Ex: nota a l’agenda per acumulació de tasques no fetes, incident al passadís, expulsió puntual..."
                     value={recordForm.note}
@@ -3847,7 +3855,7 @@ export function TutoringView() {
                 </label>
                 <p className="sensitive-field-hint">
                   Registra fets observables i acords de seguiment. Evita dades mèdiques, familiars o personals si no són
-                  imprescindibles per a la funció tutorial.
+                  imprescindibles per a la funció tutorial. Màxim {TUTORING_TEXT_LIMIT} caràcters.
                 </p>
 
                 <button className="primary-action" disabled={classStudents.length === 0} type="submit">
@@ -4828,6 +4836,7 @@ export function TutoringView() {
                 <label className="full">
                   Nota breu
                   <textarea
+                    maxLength={RELATION_NOTE_LIMIT}
                     onChange={(event) => setRelationForm((current) => ({ ...current, note: event.target.value }))}
                     placeholder="Ex: treballen bé en tasques obertes, cal evitar-los en exàmens cooperatius..."
                     value={relationForm.note}
@@ -4835,7 +4844,7 @@ export function TutoringView() {
                 </label>
                 <p className="sensitive-field-hint">
                   Les relacions del grup són dades sensibles. Escriu criteris funcionals per organitzar el grup, no judicis
-                  personals ni detalls de conflictes que no cal conservar.
+                  personals ni detalls de conflictes que no cal conservar. Màxim {RELATION_NOTE_LIMIT} caràcters.
                 </p>
 
                 <button className="primary-action" disabled={classStudents.length < 2} type="submit">

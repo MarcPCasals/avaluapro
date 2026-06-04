@@ -832,6 +832,10 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 diagnòstics capturats. Quan el curs vinent tinguis una nova classe, carrega aquest JSON i Avaluapro
                 l’associarà als alumnes pel nom.
               </p>
+              <p className="sensitive-field-hint">
+                Aquest fitxer pot contenir diagnòstics i valoracions inicials. Conserva’l només si és necessari i no el
+                comparteixis fora del context docent autoritzat.
+              </p>
             </div>
           </div>
           <div className="antecedent-transfer-controls">

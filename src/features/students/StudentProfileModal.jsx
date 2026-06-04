@@ -34,6 +34,12 @@ const antecedentProfiles = [
 
 const gradeOptions = ['', 'A', 'B', 'C', 'D', 'NA']
 
+const TEXT_LIMITS = {
+  diagnosisNotes: 500,
+  personalNotes: 700,
+  antecedentNotes: 700,
+}
+
 const antecedentProfileLabels = {
   invisible: 'Alumne invisible',
   priority: 'Intervenció prioritària',
@@ -298,25 +304,28 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             ))}
           </div>
           <textarea
+            maxLength={TEXT_LIMITS.diagnosisNotes}
             onChange={(event) => updateStudent(studentId, { diagnosisNotes: event.target.value })}
             placeholder="Anotacions addicionals sobre diagnòstics..."
             value={student.diagnosisNotes || ''}
           />
           <p className="sensitive-field-hint">
-            Dada sensible: evita detalls mèdics o familiars. Escriu només allò que ajuda a adaptar la feina docent.
+            Dada sensible: prioritza etiquetes i evita detalls mèdics o familiars. Escriu només allò que ajuda a
+            adaptar la feina docent. Màxim {TEXT_LIMITS.diagnosisNotes} caràcters.
           </p>
         </section>
 
         <section className="annotation-section compact">
           <h3>Informació general</h3>
           <textarea
+            maxLength={TEXT_LIMITS.personalNotes}
             onChange={(event) => updateStudent(studentId, { personalNotes: event.target.value })}
             placeholder="Informació personal rellevant per al seguiment docent..."
             value={student.personalNotes || ''}
           />
           <p className="sensitive-field-hint">
             Mantén aquesta informació curta, pedagògica i necessària. No hi escriguis dades personals que no aportin valor
-            docent.
+            docent. Màxim {TEXT_LIMITS.personalNotes} caràcters.
           </p>
         </section>
 
@@ -452,12 +461,14 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
           <label className="antecedent-notes-field">
             Valoració qualitativa inicial
             <textarea
+              maxLength={TEXT_LIMITS.antecedentNotes}
               onChange={(event) => updateAntecedentDraft({ qualitativeNotes: event.target.value })}
               placeholder="Què convé saber abans de començar el curs? Fortaleses, dificultats, hàbits, recomanacions..."
               value={antecedentDraft.qualitativeNotes}
             />
             <span className="sensitive-field-hint">
-              Resumeix només antecedents útils per començar el curs. Evita copiar informes complets si amb una síntesi n’hi ha prou.
+              Resumeix només antecedents útils per començar el curs. Evita copiar informes complets si amb una síntesi
+              n’hi ha prou. Màxim {TEXT_LIMITS.antecedentNotes} caràcters.
             </span>
           </label>
 
