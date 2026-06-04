@@ -10492,64 +10492,131 @@ button.profile-followup-card:focus-visible {
 
 .diagnosis-library {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+  gap: 20px;
+  min-height: min(72vh, 760px);
 }
 
 .diagnosis-library-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 18px;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #f8fafc;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
-.diagnosis-library-sidebar > div {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #334155;
+.diagnosis-library-sidebar-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #1e293b;
+}
+
+.diagnosis-library-sidebar-heading h2,
+.diagnosis-library-sidebar-heading p {
+  margin: 0;
+}
+
+.diagnosis-library-sidebar-heading h2 {
+  font-size: 20px;
   font-weight: 950;
+}
+
+.diagnosis-library-sidebar-heading p {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
 }
 
 .diagnosis-library-tab {
-  min-height: 44px;
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  color: #475569;
-  background: white;
+  border-radius: 10px;
+  color: #334155;
+  background: #ffffff;
   font-weight: 950;
   text-align: left;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
 }
 
-.diagnosis-library-tab.active {
+.diagnosis-library-tab span {
+  font-size: 16px;
+}
+
+.diagnosis-library-tab small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.diagnosis-library-tab:hover,
+.diagnosis-library-tab:focus-visible {
   color: #1d4ed8;
   border-color: #bfdbfe;
   background: #eff6ff;
 }
 
+.diagnosis-library-tab.active {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12), 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+
+.diagnosis-library-tab.active small {
+  color: #1e40af;
+}
+
 .diagnosis-library-content {
   display: grid;
+  align-content: start;
   gap: 16px;
   min-width: 0;
+  max-height: min(72vh, 760px);
+  overflow: auto;
+  padding-right: 6px;
 }
 
-.diagnosis-library-content header {
+.diagnosis-library-hero {
   display: grid;
   gap: 8px;
-  padding: 18px;
-  border-radius: 12px;
+  padding: 20px;
+  border-radius: 14px;
   color: #1e293b;
-  background:
-    linear-gradient(white, white) padding-box,
-    linear-gradient(135deg, #bfdbfe, #bbf7d0, #fde68a, #fecaca, #ddd6fe) border-box;
-  border: 2px solid transparent;
+  border: 1px solid #bfdbfe;
+  background: #f8fbff;
 }
 
-.diagnosis-library-content header > span {
+.diagnosis-library-content.accent-cyan .diagnosis-library-hero {
+  border-color: #a5f3fc;
+  background: #ecfeff;
+}
+
+.diagnosis-library-content.accent-green .diagnosis-library-hero {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.diagnosis-library-content.accent-violet .diagnosis-library-hero {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.diagnosis-library-content.accent-orange .diagnosis-library-hero {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.diagnosis-library-kicker {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -10559,6 +10626,22 @@ button.profile-followup-card:focus-visible {
   text-transform: uppercase;
 }
 
+.diagnosis-library-content.accent-cyan .diagnosis-library-kicker {
+  color: #0891b2;
+}
+
+.diagnosis-library-content.accent-green .diagnosis-library-kicker {
+  color: #16a34a;
+}
+
+.diagnosis-library-content.accent-violet .diagnosis-library-kicker {
+  color: #7c3aed;
+}
+
+.diagnosis-library-content.accent-orange .diagnosis-library-kicker {
+  color: #ea580c;
+}
+
 .diagnosis-library-content h2,
 .diagnosis-library-content h3,
 .diagnosis-library-content p {
@@ -10566,26 +10649,30 @@ button.profile-followup-card:focus-visible {
 }
 
 .diagnosis-library-content h2 {
-  font-size: 30px;
+  color: #111827;
+  font-size: 32px;
   font-weight: 950;
 }
 
 .diagnosis-library-content p {
   color: #475569;
   font-weight: 750;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .diagnosis-summary-box {
   display: grid;
-  gap: 10px;
-  padding: 16px;
+  gap: 12px;
+  padding: 18px 20px;
   border: 1px solid #bfdbfe;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #eff6ff;
 }
 
 .diagnosis-summary-box strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #1e40af;
   font-weight: 950;
 }
@@ -10595,36 +10682,97 @@ button.profile-followup-card:focus-visible {
   display: grid;
   gap: 8px;
   margin: 0;
-  padding-left: 20px;
+  padding-left: 22px;
 }
 
 .diagnosis-library-sections {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .diagnosis-library-sections article {
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 16px;
+  gap: 12px;
+  padding: 18px 22px;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: white;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.diagnosis-library-sections article.tone-blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.diagnosis-library-sections article.tone-cyan {
+  border-color: #a5f3fc;
+  background: #ecfeff;
+}
+
+.diagnosis-library-sections article.tone-green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.diagnosis-library-sections article.tone-purple {
+  border-color: #e9d5ff;
+  background: #faf5ff;
+}
+
+.diagnosis-library-sections article.tone-amber {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.diagnosis-library-sections article.tone-rose {
+  border-color: #fecdd3;
+  background: #fff1f2;
 }
 
 .diagnosis-library-sections h3 {
-  color: #111827;
-  font-size: 16px;
+  color: #1d4ed8;
+  font-size: 20px;
   font-weight: 950;
+}
+
+.diagnosis-library-sections article.tone-green h3 {
+  color: #16a34a;
+}
+
+.diagnosis-library-sections article.tone-purple h3 {
+  color: #7c3aed;
+}
+
+.diagnosis-library-sections article.tone-amber h3 {
+  color: #b45309;
+}
+
+.diagnosis-library-sections article.tone-rose h3 {
+  color: #be123c;
 }
 
 .diagnosis-library-sections li,
 .diagnosis-summary-box li {
-  color: #475569;
-  font-weight: 750;
-  line-height: 1.45;
+  color: #1f2937;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+@media (max-width: 920px) {
+  .diagnosis-library {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .diagnosis-library-sidebar {
+    max-height: 240px;
+    overflow: auto;
+  }
+
+  .diagnosis-library-content {
+    max-height: 58vh;
+  }
 }
 
 .annotation-section-title {
