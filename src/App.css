@@ -12419,6 +12419,7 @@ button.profile-followup-card:focus-visible {
 .storage-meter-card,
 .data-safety-actions,
 .data-safety-delete-zone,
+.data-safety-cleanup-zone,
 .backup-loaded-card,
 .backup-diagnosis-card,
 .collection-summary,
@@ -12632,6 +12633,83 @@ button.profile-followup-card:focus-visible {
 
 .data-safety-delete-confirm strong {
   color: #991b1b;
+}
+
+.data-safety-cleanup-zone {
+  display: grid;
+  gap: 14px;
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.data-safety-cleanup-zone > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.data-safety-cleanup-zone > div:first-child > svg {
+  flex: 0 0 auto;
+  color: #f97316;
+}
+
+.data-safety-cleanup-zone h3,
+.data-safety-cleanup-zone p {
+  margin: 0;
+}
+
+.data-safety-cleanup-zone h3 {
+  color: #9a3412;
+}
+
+.data-safety-cleanup-zone p {
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.data-safety-cleanup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+
+.data-safety-cleanup-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.data-safety-cleanup-controls input,
+.data-safety-cleanup-controls select {
+  min-height: 38px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: white;
+  font: inherit;
+  font-weight: 850;
+}
+
+.data-safety-cleanup-controls > span {
+  border-radius: 999px;
+  padding: 10px 12px;
+  color: #9a3412;
+  background: rgba(255, 255, 255, 0.72);
+  font-weight: 950;
+}
+
+.data-safety-cleanup-zone > strong {
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #9a3412;
+  background: rgba(255, 255, 255, 0.76);
 }
 
 .antecedent-transfer-card {

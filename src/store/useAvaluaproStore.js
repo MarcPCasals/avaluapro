@@ -122,6 +122,12 @@ function getInitialProfile() {
   }
 }
 
+function buildCloudBackupLabel(state, reason = 'manual') {
+  const dateLabel = new Date().toLocaleDateString('ca-ES')
+  const typeLabel = reason === 'auto-daily' ? 'Còpia automàtica diària' : 'Còpia manual al núvol'
+  return `${typeLabel} · ${dateLabel} · ${state.classes.length} classes · ${state.students.length} alumnes`
+}
+
 function getInitialOnboarding(hasStoredData) {
   const preferences = readPreferences()
   const demoMode =
@@ -794,7 +800,7 @@ export const useAvaluaproStore = create((set, get) => ({
       const backup = get().createBackup()
       const savedBackup = await saveCloudBackup(state.cloud.user.uid, backup, {
         reason,
-        label: reason === 'auto-daily' ? 'Còpia automàtica diària' : 'Còpia manual al núvol',
+        label: buildCloudBackupLabel(state, reason),
       })
       const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
       const today = getTodayKey()
@@ -2582,6 +2588,30 @@ export const useAvaluaproStore = create((set, get) => ({
       taskRecords: state.taskRecords.filter((record) => record.taskId !== taskId),
     }))
     await persistCollections(set, get, ['tasks', 'taskRecords'])
+  },
+
+  deleteOldTrackingData: async ({ classId, beforeDate } = {}) => {
+    const cleanClassId = String(classId || '').trim()
+    const cleanBeforeDate = String(beforeDate || '').trim()
+    if (!cleanClassId || !cleanBeforeDate) {
+      throw new Error('Selecciona una classe i una data límit abans de netejar tasques antigues.')
+    }
+
+    const state = get()
+    const taskIdsToDelete = new Set(
+      state.tasks
+        .filter((task) => task.classId === cleanClassId && task.date && task.date < cleanBeforeDate)
+        .map((task) => task.id),
+    )
+    if (taskIdsToDelete.size === 0) return { tasks: 0, taskRecords: 0 }
+
+    const taskRecordCount = state.taskRecords.filter((record) => taskIdsToDelete.has(record.taskId)).length
+    set((current) => ({
+      tasks: current.tasks.filter((task) => !taskIdsToDelete.has(task.id)),
+      taskRecords: current.taskRecords.filter((record) => !taskIdsToDelete.has(record.taskId)),
+    }))
+    await persistCollections(set, get, ['tasks', 'taskRecords'])
+    return { tasks: taskIdsToDelete.size, taskRecords: taskRecordCount }
   },
 
   resetToSeed: async () => {

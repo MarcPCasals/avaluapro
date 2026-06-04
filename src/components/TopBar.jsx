@@ -75,7 +75,7 @@ function slugify(value = '') {
 
 function getBackupFilename(state) {
   const userLabel = state.cloud.user?.email?.split('@')[0] || 'local'
-  return `avaluapro-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
+  return `avaluapro-copia-manual-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
 }
 
 function formatSyncTime(value) {

@@ -52,7 +52,7 @@ function normalizeNameForMatch(value = '') {
 
 function getBackupFilename(state) {
   const userLabel = state.cloud.user?.email?.split('@')[0] || 'local'
-  return `avaluapro-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
+  return `avaluapro-copia-manual-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
 }
 
 function formatDateTime(value) {
@@ -114,7 +114,6 @@ function buildAntecedentsExport({ classItem, students, antecedents }) {
       if (!antecedent) return null
       return {
         studentName: student.name,
-        previousStudentId: student.id,
         antecedent: {
           courseLabel: antecedent.courseLabel || '',
           lastLookGrade: antecedent.lastLookGrade || '',
@@ -161,10 +160,14 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
   const resetToSeed = useAvaluaproStore((store) => store.resetToSeed)
+  const deleteOldTrackingData = useAvaluaproStore((store) => store.deleteOldTrackingData)
   const [storageEstimate, setStorageEstimate] = useState(null)
   const [restoreStatus, setRestoreStatus] = useState('')
   const [lastImportSummary, setLastImportSummary] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [cleanupClassId, setCleanupClassId] = useState(() => state.ui.activeClassId || state.classes[0]?.id || '')
+  const [cleanupBeforeDate, setCleanupBeforeDate] = useState('')
+  const [cleanupStatus, setCleanupStatus] = useState('')
   const [antecedentClassId, setAntecedentClassId] = useState(
     () => state.ui.activeClassId || state.classes[0]?.id || '',
   )
@@ -192,6 +195,23 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const totalRows = collectionSummary.reduce((total, item) => total + item.count, 0)
   const backupBytes = new Blob([JSON.stringify(createBackup())]).size
   const currentSummary = summarizeBackup(createBackup())
+  const cleanupClass = state.classes.find((classItem) => classItem.id === cleanupClassId) || state.classes[0]
+  const cleanupTaskIds = useMemo(
+    () =>
+      new Set(
+        state.tasks
+          .filter((task) => task.classId === cleanupClass?.id && cleanupBeforeDate && task.date && task.date < cleanupBeforeDate)
+          .map((task) => task.id),
+      ),
+    [cleanupBeforeDate, cleanupClass?.id, state.tasks],
+  )
+  const cleanupSummary = useMemo(
+    () => ({
+      tasks: cleanupTaskIds.size,
+      taskRecords: state.taskRecords.filter((record) => cleanupTaskIds.has(record.taskId)).length,
+    }),
+    [cleanupTaskIds, state.taskRecords],
+  )
   const usagePercent =
     storageEstimate?.quota && storageEstimate?.usage
       ? Math.min(100, Math.round((storageEstimate.usage / storageEstimate.quota) * 100))
@@ -229,6 +249,36 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     await resetToSeed()
     setShowDeleteConfirm(false)
     setRestoreStatus('Dades eliminades i demo inicial carregada correctament.')
+  }
+
+  const handleDeleteOldTrackingData = async () => {
+    if (!cleanupClass?.id || !cleanupBeforeDate) {
+      setCleanupStatus('Selecciona una classe i una data límit.')
+      return
+    }
+    if (cleanupSummary.tasks === 0) {
+      setCleanupStatus('No hi ha tasques antigues per eliminar amb aquests criteris.')
+      return
+    }
+
+    const shouldClean = window.confirm(
+      [
+        `S’eliminaran ${cleanupSummary.tasks} tasques antigues de ${cleanupClass.name} i ${cleanupSummary.taskRecords} registres associats.`,
+        '',
+        'No s’eliminaran notes, comentaris, diagnòstics, DOIPs, antecedents ni estadístiques de tutoria.',
+        'Abans de continuar, és recomanable descarregar una còpia manual.',
+        '',
+        'Vols continuar?',
+      ].join('\n'),
+    )
+    if (!shouldClean) return
+
+    try {
+      const result = await deleteOldTrackingData({ classId: cleanupClass.id, beforeDate: cleanupBeforeDate })
+      setCleanupStatus(`Neteja completada: ${result.tasks} tasques i ${result.taskRecords} registres eliminats.`)
+    } catch (error) {
+      setCleanupStatus(error.message || 'No s’ha pogut completar la neteja de tasques antigues.')
+    }
   }
 
   const handleCreateCloudBackup = async () => {
@@ -678,6 +728,58 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               </button>
             </div>
           )}
+        </section>
+
+        <section className="data-safety-cleanup-zone">
+          <div>
+            <Clock3 size={21} />
+            <div>
+              <h3>Eliminar tasques antigues</h3>
+              <p>
+                Neteja només tasques i registres de tasques anteriors a una data. És útil quan una classe acumula moltes
+                tasques i vols conservar notes, comentaris, diagnòstics, tutoria i antecedents intactes.
+              </p>
+            </div>
+          </div>
+          <div className="data-safety-cleanup-controls">
+            <label>
+              Classe
+              <select onChange={(event) => setCleanupClassId(event.target.value)} value={cleanupClass?.id || ''}>
+                {state.classes
+                  .slice()
+                  .sort((a, b) => (a.order || 0) - (b.order || 0))
+                  .map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Eliminar tasques abans de
+              <input
+                onChange={(event) => setCleanupBeforeDate(event.target.value)}
+                type="date"
+                value={cleanupBeforeDate}
+              />
+            </label>
+            <span>
+              {cleanupSummary.tasks} tasques · {cleanupSummary.taskRecords} registres
+            </span>
+            <button className="secondary-action compact" onClick={handleDownloadBackup} type="button">
+              <Download size={16} />
+              Còpia abans
+            </button>
+            <button
+              className="danger-action compact"
+              disabled={cleanupSummary.tasks === 0}
+              onClick={handleDeleteOldTrackingData}
+              type="button"
+            >
+              Eliminar antigues
+            </button>
+          </div>
+          {cleanupStatus && <strong>{cleanupStatus}</strong>}
         </section>
 
         {state.backupMeta && (
