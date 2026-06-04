@@ -12398,6 +12398,12 @@ button.profile-followup-card:focus-visible {
   color: #f97316;
 }
 
+.data-card.account strong {
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .data-card strong {
   color: #111827;
   font-size: 24px;
@@ -12412,6 +12418,7 @@ button.profile-followup-card:focus-visible {
 
 .storage-meter-card,
 .data-safety-actions,
+.data-safety-delete-zone,
 .backup-loaded-card,
 .backup-diagnosis-card,
 .collection-summary,
@@ -12567,6 +12574,64 @@ button.profile-followup-card:focus-visible {
 
 .data-safety-actions > div > strong {
   color: #166534;
+}
+
+.data-safety-delete-zone {
+  display: grid;
+  gap: 14px;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.data-safety-delete-zone > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.data-safety-delete-zone > div:first-child > svg {
+  flex: 0 0 auto;
+  color: #dc2626;
+}
+
+.data-safety-delete-zone h3,
+.data-safety-delete-zone p {
+  margin: 0;
+}
+
+.data-safety-delete-zone h3 {
+  color: #7f1d1d;
+}
+
+.data-safety-delete-zone p {
+  color: #64748b;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.data-safety-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.data-safety-delete-confirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.data-safety-delete-confirm > svg {
+  color: #dc2626;
+}
+
+.data-safety-delete-confirm strong {
+  color: #991b1b;
 }
 
 .antecedent-transfer-card {

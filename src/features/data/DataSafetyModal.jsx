@@ -11,6 +11,7 @@ import {
   Info,
   Loader2,
   ShieldCheck,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -159,9 +160,11 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const pushAllToCloud = useAvaluaproStore((store) => store.pushAllToCloud)
   const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
+  const resetToSeed = useAvaluaproStore((store) => store.resetToSeed)
   const [storageEstimate, setStorageEstimate] = useState(null)
   const [restoreStatus, setRestoreStatus] = useState('')
   const [lastImportSummary, setLastImportSummary] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [antecedentClassId, setAntecedentClassId] = useState(
     () => state.ui.activeClassId || state.classes[0]?.id || '',
   )
@@ -220,6 +223,12 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
 
   const handleDownloadBackup = () => {
     downloadJson(createBackup(), getBackupFilename(state))
+  }
+
+  const handleResetToSeed = async () => {
+    await resetToSeed()
+    setShowDeleteConfirm(false)
+    setRestoreStatus('Dades eliminades i demo inicial carregada correctament.')
   }
 
   const handleCreateCloudBackup = async () => {
@@ -392,25 +401,47 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title="Còpies de seguretat i estat de dades">
+    <Modal onClose={onClose} size="xl" title="Estat de dades i seguretat">
       <div className="data-safety-panel">
         <section className="data-safety-hero">
           <div>
             <span>
               <Database size={18} />
-              Dades locals
+              Estat de dades i seguretat
             </span>
-            <strong>Avaluapro desa les dades reals al dispositiu.</strong>
+            <strong>Consulta què es desa, on es desa i com protegir-ho.</strong>
             <p>
-              Classes, alumnes, fotos, llocs fixos, notes, tasques, comentaris, diagnòstics i rúbriques entren a la còpia
-              completa. Si inicies sessió amb Google, els canvis se sincronitzen amb Firebase i també pots guardar còpies
-              de seguretat històriques al núvol.
+              Les dades reals viuen primer al dispositiu, en col·leccions separades d’IndexedDB. Si inicies sessió amb
+              Google, Avaluapro també sincronitza aquestes dades amb Firebase dins del teu espai privat d’usuari.
             </p>
           </div>
           <button className="primary-action" onClick={handleDownloadBackup} type="button">
             <Download size={18} />
             Còpia manual al dispositiu
           </button>
+        </section>
+
+        <section className="data-safety-grid">
+          <article className="data-card important account">
+            <Cloud size={20} />
+            <strong>{state.cloud.user?.email || 'Sense sessió'}</strong>
+            <span>Usuari connectat amb Google</span>
+          </article>
+          <article className="data-card">
+            <Clock3 size={20} />
+            <strong>{state.cloud.lastSyncedAt ? formatDateTime(state.cloud.lastSyncedAt) : 'Encara cap'}</strong>
+            <span>Última sincronització amb Firebase</span>
+          </article>
+          <article className="data-card">
+            <FileArchive size={20} />
+            <strong>{state.cloud.lastCloudBackupAt ? formatDateTime(state.cloud.lastCloudBackupAt) : 'Encara cap'}</strong>
+            <span>Última còpia de seguretat al núvol</span>
+          </article>
+          <article className="data-card">
+            <HardDrive size={20} />
+            <strong>{storageEstimate ? formatBytes(storageEstimate.usage) : formatBytes(backupBytes)}</strong>
+            <span>Mida aproximada de dades locals</span>
+          </article>
         </section>
 
         <section className={`backup-loaded-card cloud-${state.cloud.status}`}>
@@ -485,6 +516,18 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               Escriu observacions pedagògiques, concretes i necessàries. Evita informació mèdica, familiar o personal que
               no sigui imprescindible per a la funció docent. Diagnòstics, DOIPs, tutoria, equip educatiu i incidències són
               dades especialment sensibles.
+            </p>
+          </div>
+        </section>
+
+        <section className="responsible-use-card">
+          <Database size={20} />
+          <div>
+            <strong>Què es desa localment i què es desa al núvol?</strong>
+            <p>
+              Localment es desa l’estat de treball complet perquè l’app pugui funcionar ràpid i conservar dades encara que
+              es recarregui la pàgina. Al núvol només s’hi envia quan hi ha sessió de Google: col·leccions separades,
+              còpies de seguretat i paquets de notes compartits amb docents destinataris.
             </p>
           </div>
         </section>
@@ -594,6 +637,47 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             <strong>{totalRows}</strong>
             <span>Registres repartits en col·leccions</span>
           </article>
+        </section>
+
+        <section className="data-safety-delete-zone">
+          <div>
+            <Trash2 size={21} />
+            <div>
+              <h3>Eliminar dades i reiniciar el curs</h3>
+              <p>
+                Aquesta acció està pensada per tancar un curs o començar de zero. Abans d’esborrar, descarrega una còpia
+                manual si vols conservar les dades actuals. Després es carregarà la demo inicial.
+              </p>
+            </div>
+          </div>
+          <div className="data-safety-delete-actions">
+            <button className="secondary-action compact" onClick={handleDownloadBackup} type="button">
+              <Download size={16} />
+              Descarregar còpia abans
+            </button>
+            <button className="danger-action compact" onClick={() => setShowDeleteConfirm(true)} type="button">
+              <Trash2 size={16} />
+              Eliminar dades
+            </button>
+          </div>
+          {showDeleteConfirm && (
+            <div className="data-safety-delete-confirm">
+              <AlertTriangle size={19} />
+              <div>
+                <strong>Confirmació abans d’esborrar</strong>
+                <p>
+                  S’eliminaran les dades locals actuals i es tornarà a carregar la demo. Si tens sessió iniciada, revisa
+                  després si vols sincronitzar el nou estat amb el núvol.
+                </p>
+              </div>
+              <button className="secondary-action compact" onClick={() => setShowDeleteConfirm(false)} type="button">
+                Cancel·lar
+              </button>
+              <button className="danger-action compact" onClick={handleResetToSeed} type="button">
+                Sí, eliminar dades
+              </button>
+            </div>
+          )}
         </section>
 
         {state.backupMeta && (
