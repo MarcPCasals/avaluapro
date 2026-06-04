@@ -225,7 +225,7 @@ App Check no es imprescindible per al primer pilot, pero pot ser una capa addici
 - no substitueix les rules de Firestore;
 - pot requerir configuracio addicional per web, domini i desplegament.
 
-Recomanacio: valorar-lo mes endavant, quan el flux de Firebase Hosting i domini estigui estabilitzat.
+Recomanacio actual: no activar-lo encara de manera obligatoria. La decisio i el protocol d'activacio queden definits a `docs/app-check-entorn-public.md`.
 
 ## Proteccions dins l'app
 

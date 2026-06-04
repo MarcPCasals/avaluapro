@@ -555,6 +555,17 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 <code>Storage preparat</code>
               </div>
             </article>
+            <article className="security-status-card warning">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>App Check</strong>
+                <span>
+                  Encara no està activat. Es recomana provar-lo amb iPad/Safari i domini estable abans de fer-lo
+                  obligatori.
+                </span>
+                <code>pendent controlat</code>
+              </div>
+            </article>
           </div>
         </section>
 

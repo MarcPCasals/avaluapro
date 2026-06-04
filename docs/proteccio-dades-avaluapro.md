@@ -135,6 +135,7 @@ Quan Avaluapro es desplegui per a un us mes ampli, es recomana valorar:
 - revisar les rules amb suport tecnic extern;
 - definir politica de conservacio de copies;
 - migrar fotos a Firebase Storage;
+- seguir el protocol definit a `docs/app-check-entorn-public.md` abans de fer App Check obligatori;
 - preparar documentacio formal per a direccio o Ministeri;
 - revisar si cal avaluacio d'impacte de proteccio de dades;
 - formalitzar el contracte d'encarrec de tractament si l'us passa a ser institucional.

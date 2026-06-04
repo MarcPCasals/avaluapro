@@ -144,7 +144,7 @@ La proposta nomes permet:
 
 - llegir/esborrar imatges del propi usuari;
 - pujar imatges si l'usuari es propietari de la ruta;
-- limitar el fitxer a menys de 5 MB;
+- limitar el fitxer a menys de 2 MB;
 - acceptar nomes `image/*`;
 - bloquejar tota la resta.
 
@@ -166,10 +166,14 @@ Valoracio per Avaluapro:
 - es mes recomanable quan Avaluapro estigui desplegat en Firebase Hosting o domini estable;
 - cal provar-ho be amb Safari/iPad abans de fer-ho obligatori.
 
-Recomanacio:
+Recomanacio actual:
 
-- deixar-ho com a millora de seguretat del Bloc posterior;
-- no activar-ho encara fins que el login i hosting estiguin estables amb diversos docents.
+- no activar-ho encara de manera obligatoria;
+- mantenir-ho documentat com a mesura futura controlada;
+- provar-ho amb Firebase Hosting, Safari, Chrome i iPad abans d'activar-ho;
+- activar-ho quan l'entorn public sigui estable i hi hagi diversos docents.
+
+La decisio completa queda definida a `docs/app-check-entorn-public.md`.
 
 ## Conclusio del Bloc 2
 
@@ -180,4 +184,4 @@ El model Firebase actual es coherent:
 - l'unica ruta compartida es `teacherGradePackages`;
 - les rules actuals bloquegen l'acces entre usuaris;
 - Storage encara no esta actiu, pero ja te proposta de rules futures;
-- App Check es recomanable mes endavant, no urgent per al pilot.
+- App Check esta documentat al Bloc 8, pero no s'activa encara per no bloquejar docents legitims.
