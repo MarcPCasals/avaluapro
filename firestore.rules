@@ -111,10 +111,12 @@ service cloud.firestore {
           'className',
           'createdAt',
           'id',
+          'lastSharedConflictAt',
           'memberEmails',
           'members',
           'ownerEmailLower',
           'ownerUid',
+          'sharedConflictSummary',
           'sharedSummary',
           'sourceClassId',
           'status',
@@ -134,8 +136,10 @@ service cloud.firestore {
         && isTutoringSpaceMemberAfterWrite()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'className',
+          'lastSharedConflictAt',
           'memberEmails',
           'members',
+          'sharedConflictSummary',
           'sharedSummary',
           'status',
           'updatedAt'

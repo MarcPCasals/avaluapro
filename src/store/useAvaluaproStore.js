@@ -350,7 +350,7 @@ async function syncSharedTutoringClassesForCollections(set, get, collections) {
   if (sharedClasses.length === 0) return
 
   try {
-    await Promise.all(
+    const syncedSpaces = await Promise.all(
       sharedClasses.map((classItem) =>
         saveTutoringSpace({
           classItem,
@@ -361,13 +361,20 @@ async function syncSharedTutoringClassesForCollections(set, get, collections) {
         }),
       ),
     )
+    const conflictCount = syncedSpaces.reduce(
+      (total, space) => total + (space.sharedConflictSummary?.count || 0),
+      0,
+    )
     const sharedTutoringSpaces = await listTutoringSpacesForUser(user.email, 20)
     set((current) => ({
       cloud: {
         ...current.cloud,
-        sharedTutoringError: '',
+        sharedTutoringError:
+          conflictCount > 0
+            ? `S’han conservat ${conflictCount} canvis remots recents. Sincronitza la tutoria abans de continuar editant.`
+            : '',
         sharedTutoringSpaces,
-        sharedTutoringStatus: 'synced',
+        sharedTutoringStatus: conflictCount > 0 ? 'conflict' : 'synced',
       },
     }))
   } catch (error) {
@@ -2054,8 +2061,11 @@ export const useAvaluaproStore = create((set, get) => ({
         ),
         cloud: {
           ...current.cloud,
-          sharedTutoringError: '',
-          sharedTutoringStatus: 'saved',
+          sharedTutoringError:
+            space.sharedConflictSummary?.count > 0
+              ? `S’han conservat ${space.sharedConflictSummary.count} canvis remots recents. Sincronitza la tutoria abans de continuar editant.`
+              : '',
+          sharedTutoringStatus: space.sharedConflictSummary?.count > 0 ? 'conflict' : 'saved',
         },
       }))
       await persistCollections(set, get, ['classes'])
@@ -2197,7 +2207,14 @@ export const useAvaluaproStore = create((set, get) => ({
       })
       await get().loadSharedTutoringSpaces()
       set((current) => ({
-        cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'synced' },
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError:
+            space.sharedConflictSummary?.count > 0
+              ? `S’han conservat ${space.sharedConflictSummary.count} canvis remots recents. Sincronitza la tutoria abans de continuar editant.`
+              : '',
+          sharedTutoringStatus: space.sharedConflictSummary?.count > 0 ? 'conflict' : 'synced',
+        },
       }))
       return space
     } catch (error) {

@@ -189,21 +189,57 @@ async function saveBackupRows(uid, backupId, collectionName, rows = []) {
   }
 }
 
-async function replaceTutoringSpaceCollection(spaceId, collectionName, rows = []) {
+function getLatestIsoTimestamp(...values) {
+  return values
+    .map((value) => String(value || ''))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || ''
+}
+
+function getTutoringRowVersion(row = {}) {
+  return getLatestIsoTimestamp(row.sharedUpdatedAt, row.updatedAt, row.createdAt)
+}
+
+function buildSharedEditMeta(row = {}, user, now) {
+  const rowVersion = getTutoringRowVersion(row)
+  return {
+    sharedUpdatedAt: rowVersion || now,
+    sharedUpdatedByEmail: normalizeEmail(user?.email),
+    sharedUpdatedByUid: user?.uid || '',
+  }
+}
+
+async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], { user, now } = {}) {
   const collectionRef = collection(db, 'tutoringSpaces', spaceId, collectionName)
   const existingSnapshot = await getDocs(collectionRef)
-  const nextIds = new Set(rows.map((row, index) => getSafeDocId(row, collectionName, index)))
+  const existingById = new Map(existingSnapshot.docs.map((snapshotDoc) => [snapshotDoc.id, snapshotDoc]))
   const operations = []
-
-  existingSnapshot.forEach((snapshotDoc) => {
-    if (!nextIds.has(snapshotDoc.id)) {
-      operations.push({ type: 'delete', ref: snapshotDoc.ref })
-    }
-  })
+  const conflicts = []
 
   rows.forEach((row, index) => {
     const docId = getSafeDocId(row, collectionName, index)
-    const value = cleanForFirestore({ ...row, id: docId })
+    const snapshotDoc = existingById.get(docId)
+    const existingValue = snapshotDoc?.data() || null
+    const sharedMeta = buildSharedEditMeta(row, user, now)
+    const value = cleanForFirestore({ ...row, id: docId, ...sharedMeta })
+    const localVersion = getTutoringRowVersion(value)
+    const remoteVersion = getTutoringRowVersion(existingValue || {})
+    const remoteEditedByOther =
+      existingValue?.sharedUpdatedByUid &&
+      user?.uid &&
+      existingValue.sharedUpdatedByUid !== user.uid
+
+    if (existingValue && remoteEditedByOther && remoteVersion && (!localVersion || remoteVersion > localVersion)) {
+      conflicts.push({
+        collectionName,
+        documentId: docId,
+        remoteUpdatedAt: remoteVersion,
+        remoteUpdatedByEmail: existingValue.sharedUpdatedByEmail || '',
+      })
+      return
+    }
+
     assertFirestoreDocumentSize(`tutoringSpaces/${spaceId}/${collectionName}`, docId, value)
     operations.push({
       type: 'set',
@@ -215,13 +251,16 @@ async function replaceTutoringSpaceCollection(spaceId, collectionName, rows = []
   for (let index = 0; index < operations.length; index += 450) {
     const batch = writeBatch(db)
     operations.slice(index, index + 450).forEach((operation) => {
-      if (operation.type === 'delete') {
-        batch.delete(operation.ref)
-      } else {
-        batch.set(operation.ref, operation.value)
-      }
+      batch.set(operation.ref, operation.value, { merge: true })
     })
     await batch.commit()
+  }
+
+  return {
+    collectionName,
+    conflictCount: conflicts.length,
+    conflicts,
+    writtenCount: operations.length,
   }
 }
 
@@ -587,10 +626,12 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
     className: classItem?.name || existing?.className || 'Tutoria compartida',
     createdAt: existing?.createdAt || now,
     id: spaceId,
+    lastSharedConflictAt: existing?.lastSharedConflictAt || '',
     memberEmails: cleanMembers,
     members: Array.from(membersByEmail.values()),
     ownerEmailLower: cleanOwnerEmail,
     ownerUid: existing?.ownerUid || user.uid,
+    sharedConflictSummary: existing?.sharedConflictSummary || { count: 0, examples: [] },
     sharedSummary: buildTutoringSpaceSummary(dataset),
     sourceClassId: existing?.sourceClassId || classItem?.id || '',
     status: 'active',
@@ -600,11 +641,40 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
   assertFirestoreDocumentSize('tutoringSpaces', spaceId, value)
   await setDoc(spaceRef, value, { merge: true })
 
+  const syncResults = []
   for (const collectionName of SHARED_TUTORING_COLLECTIONS) {
-    await replaceTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [])
+    syncResults.push(
+      await mergeTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [], {
+        now,
+        user,
+      }),
+    )
   }
 
-  return value
+  const conflicts = syncResults.flatMap((result) => result.conflicts || [])
+  const sharedConflictSummary = {
+    count: conflicts.length,
+    examples: conflicts.slice(0, 6),
+  }
+  const valueWithConflictSummary = {
+    ...value,
+    lastSharedConflictAt: conflicts.length > 0 ? now : '',
+    sharedConflictSummary,
+  }
+
+  if (conflicts.length > 0 || existing?.sharedConflictSummary?.count > 0) {
+    await setDoc(
+      spaceRef,
+      cleanForFirestore({
+        lastSharedConflictAt: valueWithConflictSummary.lastSharedConflictAt,
+        sharedConflictSummary,
+        updatedAt: now,
+      }),
+      { merge: true },
+    )
+  }
+
+  return valueWithConflictSummary
 }
 
 export async function loadTutoringSpace(spaceId) {

@@ -40,6 +40,7 @@ export function ClassSettingsModal({ classId, onClose }) {
     (space) => space.id === currentClass.sharedTutoringSpaceId,
   )
   const sharedSummary = currentSharedSpace?.sharedSummary || {}
+  const sharedConflictCount = currentSharedSpace?.sharedConflictSummary?.count || 0
   const cleanShareEmail = (value) => {
     const cleanValue = String(value || '').trim().toLowerCase()
     if (!cleanValue) return ''
@@ -55,9 +56,13 @@ export function ClassSettingsModal({ classId, onClose }) {
     }
     setSharedBusy('share')
     try {
-      await shareTutoringClass({ classId, recipientEmail })
+      const space = await shareTutoringClass({ classId, recipientEmail })
       setShareEmail('')
-      setSharedMessage(`Tutoria compartida amb ${recipientEmail}.`)
+      setSharedMessage(
+        space?.sharedConflictSummary?.count > 0
+          ? `Tutoria compartida, però s’han conservat ${space.sharedConflictSummary.count} canvis remots recents. Sincronitza abans de continuar.`
+          : `Tutoria compartida amb ${recipientEmail}.`,
+      )
     } catch (error) {
       setSharedMessage(error.message || 'No s’ha pogut compartir aquesta tutoria.')
     } finally {
@@ -82,8 +87,12 @@ export function ClassSettingsModal({ classId, onClose }) {
     setSharedMessage('')
     setSharedBusy('sync')
     try {
-      await syncSharedTutoringClass(classId)
-      setSharedMessage('Tutoria compartida sincronitzada.')
+      const space = await syncSharedTutoringClass(classId)
+      setSharedMessage(
+        space?.sharedConflictSummary?.count > 0
+          ? `Sincronització feta. S’han conservat ${space.sharedConflictSummary.count} canvis remots recents d’un altre tutor.`
+          : 'Tutoria compartida sincronitzada.',
+      )
     } catch (error) {
       setSharedMessage(error.message || 'No s’ha pogut sincronitzar aquesta tutoria.')
     } finally {
@@ -217,6 +226,12 @@ export function ClassSettingsModal({ classId, onClose }) {
                     )}
                     {sharedMembers.length > 0 && (
                       <small>Membres: {sharedMembers.join(', ')}</small>
+                    )}
+                    {sharedConflictCount > 0 && (
+                      <small className="shared-tutoring-conflict-note">
+                        Hi ha {sharedConflictCount} canvi(s) recent(s) d’un altre tutor que s’han conservat.
+                        Sincronitza abans de continuar editant.
+                      </small>
                     )}
                   </div>
                   {currentClass.sharedTutoringSpaceId && (

@@ -9705,6 +9705,14 @@ button.profile-followup-card:focus-visible {
   font-weight: 950;
 }
 
+.shared-tutoring-conflict-note {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #9a3412 !important;
+  background: #fff7ed;
+}
+
 .shared-tutoring-scope {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
