@@ -1,16 +1,37 @@
-# React + Vite
+# Avaluapro
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Avaluapro es una aplicacio educativa per avaluar competencies, fer seguiment d'habits de treball i comportament, i generar estadistiques docents a partir de dades d'avaluacio, constancia i tutoria.
 
-Currently, two official plugins are available:
+Aplicacio en produccio:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- https://avaluapro.web.app
 
-## React Compiler
+## Documentacio per a Direccio i Ministeri
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+El repositori inclou una guia de documents per presentar Avaluapro a Direccio, responsables de centre o Ministeri:
 
-## Expanding the ESLint configuration
+- `docs/guia-documents-direccio-ministeri.md`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Aquest document indica quins fitxers llegir, per que serveix cadascun i quina ruta cal seguir dins del repositori.
+
+Els documents principals son:
+
+- `docs/fitxa-tecnica-direccio-ministeri.md`
+- `docs/proteccio-dades-avaluapro.md`
+- `docs/mapa-dades.md`
+- `docs/firebase-acces.md`
+- `docs/comparticio-docents.md`
+- `docs/checklist-final-seguretat.md`
+
+## Desenvolupament
+
+Projecte creat amb Vite + React.
+
+Comandes habituals:
+
+```bash
+npm install
+npm run dev
+npm run lint
+npm run build
+```
