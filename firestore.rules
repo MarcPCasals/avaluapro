@@ -88,20 +88,44 @@ service cloud.firestore {
 
     function isTutoringSpaceMember() {
       return signedIn()
-        && request.auth.token.email is string
-        && request.auth.token.email in resource.data.memberEmails;
+        && (
+          (
+            request.auth.token.email is string
+            && request.auth.token.email in resource.data.memberEmails
+          )
+          || (
+            resource.data.memberUids is list
+            && request.auth.uid in resource.data.memberUids
+          )
+        );
     }
 
     function isTutoringSpaceMemberAfterWrite() {
       return signedIn()
-        && request.auth.token.email is string
-        && request.auth.token.email in request.resource.data.memberEmails;
+        && (
+          (
+            request.auth.token.email is string
+            && request.auth.token.email in request.resource.data.memberEmails
+          )
+          || (
+            request.resource.data.memberUids is list
+            && request.auth.uid in request.resource.data.memberUids
+          )
+        );
     }
 
     function canAccessTutoringSpace(spaceId) {
       return signedIn()
-        && request.auth.token.email is string
-        && request.auth.token.email in get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberEmails;
+        && (
+          (
+            request.auth.token.email is string
+            && request.auth.token.email in get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberEmails
+          )
+          || (
+            get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberUids is list
+            && request.auth.uid in get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberUids
+          )
+        );
     }
 
     function validTutoringSpaceCreate(spaceId) {
@@ -113,6 +137,7 @@ service cloud.firestore {
           'id',
           'lastSharedConflictAt',
           'memberEmails',
+          'memberUids',
           'members',
           'ownerEmailLower',
           'ownerUid',
@@ -126,7 +151,9 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerEmailLower == request.auth.token.email
         && request.resource.data.memberEmails is list
+        && request.resource.data.memberUids is list
         && request.auth.token.email in request.resource.data.memberEmails
+        && request.auth.uid in request.resource.data.memberUids
         && request.resource.data.members is list
         && request.resource.data.status == 'active';
     }
@@ -138,6 +165,7 @@ service cloud.firestore {
           'className',
           'lastSharedConflictAt',
           'memberEmails',
+          'memberUids',
           'members',
           'sharedConflictSummary',
           'sharedSummary',
@@ -145,6 +173,7 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.memberEmails is list
+        && request.resource.data.memberUids is list
         && request.resource.data.members is list;
     }
 

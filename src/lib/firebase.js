@@ -621,6 +621,13 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
       uid: email === normalizeEmail(user.email) ? user.uid : existingMember?.uid || '',
     })
   })
+  const memberUids = Array.from(
+    new Set([
+      ...(Array.isArray(existing?.memberUids) ? existing.memberUids : []),
+      user.uid,
+      ...Array.from(membersByEmail.values()).map((member) => member.uid || ''),
+    ]),
+  ).filter(Boolean)
 
   const value = cleanForFirestore({
     className: classItem?.name || existing?.className || 'Tutoria compartida',
@@ -628,6 +635,7 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
     id: spaceId,
     lastSharedConflictAt: existing?.lastSharedConflictAt || '',
     memberEmails: cleanMembers,
+    memberUids,
     members: Array.from(membersByEmail.values()),
     ownerEmailLower: cleanOwnerEmail,
     ownerUid: existing?.ownerUid || user.uid,
