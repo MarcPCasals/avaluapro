@@ -20,8 +20,9 @@ service cloud.firestore {
         && resource.data.recipientEmailLower == request.auth.token.email;
     }
 
-    function validTeacherGradePackageCreate() {
+    function validTeacherGradePackageCreate(transferId) {
       return signedIn()
+        && request.auth.token.email is string
         && request.resource.data.keys().hasOnly([
           'createdAt',
           'id',
@@ -34,12 +35,39 @@ service cloud.firestore {
           'status',
           'updatedAt'
         ])
+        && request.resource.data.id == transferId
         && request.resource.data.senderUid == request.auth.uid
         && request.resource.data.senderEmail == request.auth.token.email
         && request.resource.data.recipientEmailLower is string
         && request.resource.data.status == 'sent'
+        && request.resource.data.importedAt == ''
         && request.resource.data.packageData.schema == "avaluapro.teacher-grade-package"
-        && request.resource.data.packageData.sender.uid == request.auth.uid;
+        && request.resource.data.packageData.version == 1
+        && request.resource.data.packageData.keys().hasOnly([
+          'createdAt',
+          'id',
+          'schema',
+          'sender',
+          'source',
+          'students',
+          'summary',
+          'version'
+        ])
+        && request.resource.data.packageData.id == transferId
+        && request.resource.data.packageData.sender.keys().hasOnly(['email', 'name', 'uid'])
+        && request.resource.data.packageData.sender.uid == request.auth.uid
+        && request.resource.data.packageData.sender.email == request.auth.token.email
+        && request.resource.data.packageData.source.keys().hasOnly(['classId', 'className', 'subject'])
+        && request.resource.data.packageData.source.classId is string
+        && request.resource.data.packageData.source.className is string
+        && request.resource.data.packageData.source.subject is string
+        && request.resource.data.packageData.students is list
+        && request.resource.data.packageData.summary.keys().hasOnly([
+          'competencyCount',
+          'emptyCount',
+          'gradeCount',
+          'studentCount'
+        ]);
     }
 
     function validTeacherGradePackageImportUpdate() {
@@ -58,8 +86,8 @@ service cloud.firestore {
         && request.resource.data.updatedAt is string;
     }
 
-    match /teacherGradePackages/{packageId} {
-      allow create: if validTeacherGradePackageCreate();
+    match /teacherGradePackages/{transferId} {
+      allow create: if validTeacherGradePackageCreate(transferId);
 
       allow read: if signedIn()
         && (

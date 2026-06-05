@@ -3,6 +3,11 @@ import { AlertTriangle, CheckCircle2, Download, FileJson, History, Inbox, Refres
 import { Modal } from '../../components/Modal'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { gradeClassName } from '../../lib/grades'
+import {
+  TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES,
+  estimateTeacherGradePackageSize,
+  getDuplicateTargetStudentMatches,
+} from '../../lib/teacherGradePackages'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function slugify(value = '') {
@@ -15,16 +20,20 @@ function slugify(value = '') {
 }
 
 function formatMatchStatus(status) {
+  if (status === 'manual') return 'Assignat manualment'
   if (status === 'exact') return 'Coincidència exacta'
   if (status === 'strong') return 'Coincidència probable'
   if (status === 'partial') return 'Revisar coincidència'
+  if (status === 'skipped') return 'No s’importarà'
   return 'Sense coincidència'
 }
 
 function getMatchClassName(status) {
+  if (status === 'manual') return 'manual'
   if (status === 'exact') return 'ok'
   if (status === 'strong') return 'warning'
   if (status === 'partial') return 'warning'
+  if (status === 'skipped') return 'skipped'
   return 'risk'
 }
 
@@ -48,6 +57,12 @@ function formatPackageDate(value = '') {
   } catch {
     return value
   }
+}
+
+function formatPackageSize(bytes = 0) {
+  if (!bytes) return '0 KB'
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatSentPackageStatus(status) {
@@ -75,6 +90,10 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
   const [error, setError] = useState('')
 
   const finalRecipientEmail = normalizeRecipientEmail(recipientInput)
+  const packageData = packagePreview.packageData
+  const hasNoGrades = Boolean(packageData && packageData.summary.gradeCount === 0)
+  const packageSize = packageData ? estimateTeacherGradePackageSize(packageData) : 0
+  const packageNearLimit = packageSize > TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES
 
   useEffect(() => {
     if (cloud.user?.uid) {
@@ -121,8 +140,6 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
     )
   }
 
-  const packageData = packagePreview.packageData
-
   return (
     <div className="teacher-package-panel">
       <section className="teacher-package-hero">
@@ -144,16 +161,37 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
           </small>
         </div>
         <div className="teacher-package-hero-actions">
-          <button className="primary-action" disabled={!cloud.user} onClick={handleSendPackage} type="button">
+          <button
+            className="primary-action"
+            disabled={!cloud.user || hasNoGrades || packageNearLimit}
+            onClick={handleSendPackage}
+            type="button"
+          >
             <Send size={18} />
             Enviar al tutor
           </button>
-          <button className="secondary-action" onClick={handleDownloadPackage} type="button">
+          <button className="secondary-action" disabled={hasNoGrades} onClick={handleDownloadPackage} type="button">
             <Download size={18} />
             Descarregar JSON
           </button>
         </div>
       </section>
+
+      {hasNoGrades && (
+        <div className="teacher-package-message warning">
+          <AlertTriangle size={18} />
+          Aquesta classe encara no té cap nota final de competència per enviar. Omple alguna nota abans de compartir el
+          paquet amb el tutor.
+        </div>
+      )}
+
+      {packageNearLimit && (
+        <div className="teacher-package-message risk">
+          <AlertTriangle size={18} />
+          Aquest paquet pesa {formatPackageSize(packageSize)} i s’acosta massa al límit segur de Firebase. Descarrega’l
+          com a JSON o revisa que només contingui notes abans d’enviar-lo al núvol.
+        </div>
+      )}
 
       <section className="teacher-package-recipient">
         <label htmlFor="teacher-package-recipient">
@@ -207,6 +245,10 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
         <article>
           <strong>{packageData.summary.emptyCount}</strong>
           <span>Sense avaluar</span>
+        </article>
+        <article>
+          <strong>{formatPackageSize(packageSize)}</strong>
+          <span>Mida del paquet</span>
         </article>
       </div>
 
@@ -278,6 +320,9 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
 function TeacherPackageReceivePanel({ activeClass }) {
   const fileInputRef = useRef(null)
   const cloud = useAvaluaproStore((state) => state.cloud)
+  const classes = useAvaluaproStore((state) => state.classes)
+  const students = useAvaluaproStore((state) => state.students)
+  const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const loadReceivedTeacherGradePackages = useAvaluaproStore((state) => state.loadReceivedTeacherGradePackages)
   const previewTeacherGradePackage = useAvaluaproStore((state) => state.previewTeacherGradePackage)
   const importTeacherGradePackage = useAvaluaproStore((state) => state.importTeacherGradePackage)
@@ -285,8 +330,34 @@ function TeacherPackageReceivePanel({ activeClass }) {
   const [packageData, setPackageData] = useState(null)
   const [preview, setPreview] = useState(null)
   const [selectedCloudPackageId, setSelectedCloudPackageId] = useState('')
+  const [manualMatches, setManualMatches] = useState({})
+  const [allowReimport, setAllowReimport] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const targetClass = classes.find((classItem) => classItem.id === activeClass.id) || activeClass
+  const rosterClassId = targetClass?.tutorialLinkedClassId || activeClass.id
+  const targetStudents = useMemo(
+    () =>
+      students
+        .filter((student) => student.classId === rosterClassId)
+        .sort((firstStudent, secondStudent) => firstStudent.name.localeCompare(secondStudent.name, 'ca')),
+    [rosterClassId, students],
+  )
+  const selectedCloudPackage = useMemo(
+    () => cloud.teacherPackages.find((packageItem) => packageItem.id === selectedCloudPackageId),
+    [cloud.teacherPackages, selectedCloudPackageId],
+  )
+  const existingImportedMarks = useMemo(() => {
+    const packageId = packageData?.id
+    if (!packageId) return 0
+    return tutorialMarks.filter(
+      (mark) => mark.classId === activeClass.id && mark.source?.packageId === packageId,
+    ).length
+  }, [activeClass.id, packageData?.id, tutorialMarks])
+  const packageAlreadyImported = Boolean(selectedCloudPackage?.status === 'imported' || existingImportedMarks > 0)
+  const packageSize = packageData ? estimateTeacherGradePackageSize(packageData) : 0
+  const packageNearLimit = packageSize > TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES
+  const duplicateMatches = useMemo(() => getDuplicateTargetStudentMatches(preview?.rows || []), [preview])
 
   useEffect(() => {
     if (cloud.user?.email) {
@@ -296,10 +367,12 @@ function TeacherPackageReceivePanel({ activeClass }) {
 
   const handleSelectCloudPackage = (receivedPackage) => {
     try {
-      const nextPreview = previewTeacherGradePackage(receivedPackage.packageData, activeClass.id)
+      const nextPreview = previewTeacherGradePackage(receivedPackage.packageData, activeClass.id, {})
       setSelectedCloudPackageId(receivedPackage.id)
       setPackageData(receivedPackage.packageData)
       setPreview(nextPreview)
+      setManualMatches({})
+      setAllowReimport(false)
       setStatus('')
       setError('')
     } catch (previewError) {
@@ -319,10 +392,12 @@ function TeacherPackageReceivePanel({ activeClass }) {
     try {
       const text = await file.text()
       const nextPackage = JSON.parse(text)
-      const nextPreview = previewTeacherGradePackage(nextPackage, activeClass.id)
+      const nextPreview = previewTeacherGradePackage(nextPackage, activeClass.id, {})
       setSelectedCloudPackageId('')
       setPackageData(nextPackage)
       setPreview(nextPreview)
+      setManualMatches({})
+      setAllowReimport(false)
       setStatus('')
       setError('')
     } catch (loadError) {
@@ -338,14 +413,15 @@ function TeacherPackageReceivePanel({ activeClass }) {
 
     try {
       const result = selectedCloudPackageId
-        ? await importReceivedTeacherGradePackage({ classId: activeClass.id, packageId: selectedCloudPackageId })
-        : await importTeacherGradePackage(packageData, activeClass.id)
+        ? await importReceivedTeacherGradePackage({ classId: activeClass.id, manualMatches, packageId: selectedCloudPackageId })
+        : await importTeacherGradePackage(packageData, activeClass.id, manualMatches)
       const missingMessage =
         result.missingMatches > 0
           ? ` ${result.missingMatches} alumne/s han quedat fora perquè no tenien coincidència prou fiable.`
           : ''
       setStatus(`${result.importedGrades} notes importades correctament a la tutoria.${missingMessage}`)
       setError('')
+      setAllowReimport(false)
     } catch (importError) {
       setError(
         `No s’han pogut importar les notes a ${activeClass.name}. ${
@@ -356,6 +432,23 @@ function TeacherPackageReceivePanel({ activeClass }) {
     }
   }
 
+  const handleManualMatchChange = (sourceStudentId, targetStudentId) => {
+    const nextManualMatches = { ...manualMatches }
+    if (targetStudentId) nextManualMatches[sourceStudentId] = targetStudentId
+    else delete nextManualMatches[sourceStudentId]
+
+    setManualMatches(nextManualMatches)
+    if (packageData) {
+      try {
+        setPreview(previewTeacherGradePackage(packageData, activeClass.id, nextManualMatches))
+        setError('')
+      } catch (previewError) {
+        setPreview(null)
+        setError(previewError.message || 'No s’ha pogut actualitzar la revisió del paquet.')
+      }
+    }
+  }
+
   const missingMatchNames = useMemo(
     () =>
       preview?.rows
@@ -363,6 +456,13 @@ function TeacherPackageReceivePanel({ activeClass }) {
         .map((row) => row.sourceStudent.name)
         .slice(0, 6) || [],
     [preview],
+  )
+  const canImportPackage = Boolean(
+    preview &&
+      preview.summary.importableGrades > 0 &&
+      duplicateMatches.length === 0 &&
+      !packageNearLimit &&
+      (!packageAlreadyImported || allowReimport),
   )
 
   return (
@@ -424,6 +524,9 @@ function TeacherPackageReceivePanel({ activeClass }) {
                     <small>
                       {receivedPackage.senderEmail || 'Docent desconegut'} · {formatPackageDate(receivedPackage.createdAt)}
                     </small>
+                    {receivedPackage.status === 'imported' && receivedPackage.importedAt && (
+                      <small>Importat el {formatPackageDate(receivedPackage.importedAt)}</small>
+                    )}
                   </div>
                   <span className={receivedPackage.status === 'imported' ? 'imported' : ''}>
                     {receivedPackage.status === 'imported' ? 'Importat' : 'Nou'}
@@ -457,6 +560,14 @@ function TeacherPackageReceivePanel({ activeClass }) {
         </div>
       )}
 
+      {targetStudents.length === 0 && (
+        <div className="teacher-package-message warning">
+          <AlertTriangle size={18} />
+          Aquesta tutoria encara no té alumnes vinculats o carregats. Afegeix l’alumnat abans d’importar paquets de
+          notes, perquè el programa necessita comparar noms.
+        </div>
+      )}
+
       {!preview && !error && (
         <div className="teacher-package-empty">
           <FileJson size={30} />
@@ -467,6 +578,22 @@ function TeacherPackageReceivePanel({ activeClass }) {
 
       {preview && (
         <>
+          <section className="teacher-package-review-banner">
+            <div>
+              <CheckCircle2 size={20} />
+              <strong>
+                {duplicateMatches.length === 0 && preview.summary.missingMatches === 0
+                  ? 'Revisió preparada'
+                  : 'Revisió necessària'}
+              </strong>
+              <span>
+                {preview.summary.importableGrades} notes preparades · {preview.summary.missingMatches} alumnes sense
+                coincidència · {preview.summary.skippedMatches} alumnes marcats per no importar
+              </span>
+            </div>
+            <em>{canImportPackage ? 'Es pot importar' : 'Cal revisar abans d’importar'}</em>
+          </section>
+
           <div className="teacher-package-summary-grid">
             <article>
               <strong>{preview.packageData.source.subject}</strong>
@@ -484,7 +611,71 @@ function TeacherPackageReceivePanel({ activeClass }) {
               <strong>{preview.summary.importableGrades}</strong>
               <span>Notes importables</span>
             </article>
+            <article>
+              <strong>{preview.summary.missingMatches}</strong>
+              <span>Sense coincidència</span>
+            </article>
+            <article>
+              <strong>{preview.summary.manualMatches}</strong>
+              <span>Assignats a mà</span>
+            </article>
+            <article>
+              <strong>{preview.summary.skippedMatches}</strong>
+              <span>No importats</span>
+            </article>
+            <article>
+              <strong>{formatPackageSize(packageSize)}</strong>
+              <span>Mida del paquet</span>
+            </article>
           </div>
+
+          {packageAlreadyImported && (
+            <div className="teacher-package-message warning teacher-package-reimport-warning">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Aquest paquet ja consta com a importat.</strong>
+                <span>
+                  Reimportar-lo substituirà les notes rebudes d’aquest mateix paquet, matèria, alumne i competència.
+                  Fes-ho només si estàs corregint una revisió anterior.
+                </span>
+              </div>
+              <button
+                className={allowReimport ? 'secondary-action active' : 'secondary-action'}
+                onClick={() => setAllowReimport((value) => !value)}
+                type="button"
+              >
+                {allowReimport ? 'Reimportació activada' : 'Permetre reimportar'}
+              </button>
+            </div>
+          )}
+
+          {duplicateMatches.length > 0 && (
+            <div className="teacher-package-message risk">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Hi ha alumnes del paquet assignats al mateix alumne de tutoria.</strong>
+                <span>
+                  Revisa aquestes coincidències abans d’importar:{' '}
+                  {duplicateMatches
+                    .slice(0, 3)
+                    .map(
+                      (duplicate) =>
+                        `${duplicate.targetStudentName} rep ${duplicate.sourceStudentNames.join(' / ')}`,
+                    )
+                    .join('; ')}
+                  {duplicateMatches.length > 3 ? '…' : ''}.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {packageNearLimit && (
+            <div className="teacher-package-message risk">
+              <AlertTriangle size={18} />
+              Aquest paquet pesa {formatPackageSize(packageSize)} i no es considera segur per importar-lo directament.
+              Demana al docent emissor que generi un paquet nou només amb notes de competència.
+            </div>
+          )}
 
           <section className="teacher-package-match-list">
             {preview.rows.map((row) => (
@@ -495,7 +686,25 @@ function TeacherPackageReceivePanel({ activeClass }) {
                     {row.targetStudent ? `Entrarà com ${row.targetStudent.name}` : 'Cal revisar aquest alumne'}
                   </small>
                 </div>
-                <span>{formatMatchStatus(row.status)}</span>
+                <div className="teacher-package-match-control">
+                  <span>{formatMatchStatus(row.status)}</span>
+                  <select
+                    aria-label={`Assignar alumne per ${row.sourceStudent.name}`}
+                    onChange={(event) => handleManualMatchChange(row.sourceStudent.sourceStudentId, event.target.value)}
+                    value={manualMatches[row.sourceStudent.sourceStudentId] || ''}
+                    disabled={targetStudents.length === 0}
+                  >
+                    <option value="">
+                      {row.targetStudent ? `Automàtic: ${row.targetStudent.name}` : 'Tria alumne de la tutoria'}
+                    </option>
+                    <option value="__skip__">No importar aquest alumne</option>
+                    {targetStudents.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        {student.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="teacher-package-grade-strip">
                   {row.gradedCompetencies.map((competency) => (
                     <b className={gradeClassName(competency.grade)} key={competency.competencyKey}>
@@ -517,6 +726,14 @@ function TeacherPackageReceivePanel({ activeClass }) {
             </div>
           )}
 
+          {(preview.summary.manualMatches > 0 || preview.summary.skippedMatches > 0) && (
+            <div className="teacher-package-message ok">
+              <CheckCircle2 size={18} />
+              Revisió manual aplicada: {preview.summary.manualMatches} alumne/s assignats manualment
+              {preview.summary.skippedMatches > 0 ? ` i ${preview.summary.skippedMatches} alumne/s marcats per no importar` : ''}.
+            </div>
+          )}
+
           <footer className="teacher-package-actions">
             <span>
               Les coincidències exactes i probables es poden importar directament. Les files marcades com “sense
@@ -524,7 +741,7 @@ function TeacherPackageReceivePanel({ activeClass }) {
             </span>
             <button
               className="primary-action"
-              disabled={preview.summary.importableGrades === 0}
+              disabled={!canImportPackage}
               onClick={handleImportPackage}
               type="button"
             >
@@ -554,7 +771,7 @@ export function TeacherGradePackageModal({ onClose }) {
   const sendClass = sendClasses.find((classItem) => classItem.id === sendClassId) || sendClasses[0]
   const receiveClass =
     receiveClasses.find((classItem) => classItem.id === receiveClassId) ||
-    (isTutoringClassItem(activeClass) ? activeClass : receiveClasses[0] || activeClass)
+    (isTutoringClassItem(activeClass) ? activeClass : receiveClasses[0])
 
   const packagePreview = useMemo(() => {
     if (!sendClass) return { error: '', packageData: null }

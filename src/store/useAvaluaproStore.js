@@ -1636,21 +1636,28 @@ export const useAvaluaproStore = create((set, get) => ({
       state: get(),
     }),
 
-  previewTeacherGradePackage: (packageData, classId = get().ui.activeClassId) =>
+  previewTeacherGradePackage: (packageData, classId = get().ui.activeClassId, manualMatches = {}) =>
     previewTeacherGradePackage({
+      manualMatches,
       packageData,
       targetStudents: getTutoringRosterStudents(get(), classId),
     }),
 
-  importTeacherGradePackage: async (packageData, classId = get().ui.activeClassId) => {
+  importTeacherGradePackage: async (packageData, classId = get().ui.activeClassId, manualMatches = {}) => {
     const state = get()
     const targetStudents = getTutoringRosterStudents(state, classId)
-    const preview = previewTeacherGradePackage({ packageData, targetStudents })
+    const preview = previewTeacherGradePackage({ manualMatches, packageData, targetStudents })
     const updates = getTutorialMarkUpdatesFromTeacherPackage({
+      manualMatches,
       packageData,
       targetClassId: classId,
       targetStudents,
     })
+    if (updates.length === 0) {
+      throw new Error(
+        'Aquest paquet no té cap nota importable per a aquesta tutoria. Revisa coincidències d’alumnes i notes incloses.',
+      )
+    }
 
     await get().importTutorialMarks(updates)
 
@@ -1760,13 +1767,13 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  importReceivedTeacherGradePackage: async ({ classId = get().ui.activeClassId, packageId }) => {
+  importReceivedTeacherGradePackage: async ({ classId = get().ui.activeClassId, manualMatches = {}, packageId }) => {
     const state = get()
     if (!state.cloud.user?.email) throw new Error('Cal iniciar sessió amb Google abans d’importar paquets rebuts.')
     const receivedPackage = state.cloud.teacherPackages.find((packageItem) => packageItem.id === packageId)
     if (!receivedPackage?.packageData) throw new Error('No s’ha trobat aquest paquet rebut.')
 
-    const result = await get().importTeacherGradePackage(receivedPackage.packageData, classId)
+    const result = await get().importTeacherGradePackage(receivedPackage.packageData, classId, manualMatches)
     await markTeacherGradePackageImported({ packageId, userEmail: state.cloud.user.email })
     await get().loadReceivedTeacherGradePackages()
 

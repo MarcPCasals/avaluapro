@@ -3,6 +3,7 @@ import { calculateGrade } from './grades'
 
 export const TEACHER_GRADE_PACKAGE_SCHEMA = 'avaluapro.teacher-grade-package'
 export const TEACHER_GRADE_PACKAGE_VERSION = 1
+export const TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES = 750_000
 
 const MATCH_SCORE = {
   exact: 100,
@@ -67,6 +68,30 @@ function getStudentMatch(sourceStudent, targetStudent) {
   }
 
   return { reason: 'Sense coincidència fiable', score: 0, status: 'missing' }
+}
+
+function getManualStudentMatch(sourceStudent, targetStudents = [], manualMatches = {}) {
+  const manualTargetStudentId = manualMatches[sourceStudent.sourceStudentId]
+  if (manualTargetStudentId === '__skip__') {
+    return {
+      reason: 'El tutor ha decidit no importar aquest alumne.',
+      score: 0,
+      status: 'skipped',
+      targetStudent: null,
+    }
+  }
+
+  if (!manualTargetStudentId) return null
+
+  const targetStudent = targetStudents.find((student) => student.id === manualTargetStudentId)
+  if (!targetStudent) return null
+
+  return {
+    reason: 'Coincidència assignada manualment pel tutor.',
+    score: MATCH_SCORE.exact,
+    status: 'manual',
+    targetStudent,
+  }
 }
 
 export function findBestStudentMatch(sourceStudent, targetStudents = []) {
@@ -258,10 +283,10 @@ export function validateTeacherGradePackage(packageData) {
   return packageData
 }
 
-export function previewTeacherGradePackage({ packageData, targetStudents = [] }) {
+export function previewTeacherGradePackage({ manualMatches = {}, packageData, targetStudents = [] }) {
   const cleanPackage = validateTeacherGradePackage(packageData)
   const rows = cleanPackage.students.map((sourceStudent) => {
-    const match = findBestStudentMatch(sourceStudent, targetStudents)
+    const match = getManualStudentMatch(sourceStudent, targetStudents, manualMatches) || findBestStudentMatch(sourceStudent, targetStudents)
     const gradedCompetencies = sourceStudent.competencies.filter((competency) =>
       VALID_PACKAGE_GRADES.has(competency.grade),
     )
@@ -283,14 +308,38 @@ export function previewTeacherGradePackage({ packageData, targetStudents = [] })
       exactMatches: rows.filter((row) => row.status === 'exact').length,
       importableGrades: rows.reduce((total, row) => total + (row.targetStudent ? row.gradedCompetencies.length : 0), 0),
       missingMatches: rows.filter((row) => row.status === 'missing').length,
+      manualMatches: rows.filter((row) => row.status === 'manual').length,
       partialMatches: rows.filter((row) => row.status === 'partial' || row.status === 'strong').length,
+      skippedMatches: rows.filter((row) => row.status === 'skipped').length,
       studentCount: rows.length,
     },
   }
 }
 
-export function getTutorialMarkUpdatesFromTeacherPackage({ packageData, targetClassId, targetStudents = [] }) {
-  const preview = previewTeacherGradePackage({ packageData, targetStudents })
+export function estimateTeacherGradePackageSize(packageData) {
+  return new Blob([JSON.stringify(packageData || {})]).size
+}
+
+export function getDuplicateTargetStudentMatches(rows = []) {
+  const rowsByTargetStudentId = new Map()
+
+  rows.forEach((row) => {
+    if (!row.targetStudent?.id) return
+    const currentRows = rowsByTargetStudentId.get(row.targetStudent.id) || []
+    rowsByTargetStudentId.set(row.targetStudent.id, [...currentRows, row])
+  })
+
+  return [...rowsByTargetStudentId.entries()]
+    .filter(([, matchedRows]) => matchedRows.length > 1)
+    .map(([targetStudentId, matchedRows]) => ({
+      targetStudentId,
+      targetStudentName: matchedRows[0]?.targetStudent?.name || 'Alumne desconegut',
+      sourceStudentNames: matchedRows.map((row) => row.sourceStudent.name),
+    }))
+}
+
+export function getTutorialMarkUpdatesFromTeacherPackage({ manualMatches = {}, packageData, targetClassId, targetStudents = [] }) {
+  const preview = previewTeacherGradePackage({ manualMatches, packageData, targetStudents })
   const subject = preview.packageData.source.subject
 
   return preview.rows.flatMap((row) => {
