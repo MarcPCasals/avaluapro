@@ -239,6 +239,13 @@ function buildTutoringSpaceSummary(dataset = {}) {
   const students = Array.isArray(dataset.students) ? dataset.students : []
   const tutorialRecords = Array.isArray(dataset.tutorialRecords) ? dataset.tutorialRecords : []
   const tutorialMarks = Array.isArray(dataset.tutorialMarks) ? dataset.tutorialMarks : []
+  const tutorialRelations = Array.isArray(dataset.tutorialRelations) ? dataset.tutorialRelations : []
+  const tutorialGroupSets = Array.isArray(dataset.tutorialGroupSets) ? dataset.tutorialGroupSets : []
+  const tutorialSociogramLayouts = Array.isArray(dataset.tutorialSociogramLayouts)
+    ? dataset.tutorialSociogramLayouts
+    : []
+  const tutorialStudentRoles = Array.isArray(dataset.tutorialStudentRoles) ? dataset.tutorialStudentRoles : []
+  const tutorialSeatingPlans = Array.isArray(dataset.tutorialSeatingPlans) ? dataset.tutorialSeatingPlans : []
   const studentAntecedents = Array.isArray(dataset.studentAntecedents) ? dataset.studentAntecedents : []
   const studentsWithProfile = students.filter(
     (student) =>
@@ -252,9 +259,15 @@ function buildTutoringSpaceSummary(dataset = {}) {
 
   return {
     doipCount: tutorialRecords.filter((record) => record.type === 'doip').length,
+    relationCount: tutorialRelations.length,
+    seatingPlanCount: tutorialSeatingPlans.length,
     studentAntecedentCount: studentAntecedents.length,
+    studentRoleCount: tutorialStudentRoles.length,
     studentCount: students.length,
     studentsWithProfileCount: studentsWithProfile.length,
+    sociogramLayoutCount: tutorialSociogramLayouts.length,
+    tutorialLinkedMarkCount: tutorialMarks.filter((mark) => mark.source?.type === 'linked-evaluation').length,
+    tutorialGroupSetCount: tutorialGroupSets.length,
     tutorialMarkCount: tutorialMarks.length,
     tutorialRecordCount: tutorialRecords.length,
   }

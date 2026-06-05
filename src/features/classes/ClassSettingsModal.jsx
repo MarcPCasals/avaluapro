@@ -241,6 +241,26 @@ export function ClassSettingsModal({ classId, onClose }) {
                         <strong>{sharedSummary.tutorialMarkCount ?? 0}</strong>
                         <span>Notes tutoria</span>
                       </article>
+                      <article>
+                        <strong>{sharedSummary.tutorialLinkedMarkCount ?? 0}</strong>
+                        <span>Notes auto</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.relationCount ?? 0}</strong>
+                        <span>Relacions</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.studentRoleCount ?? 0}</strong>
+                        <span>Rols</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.tutorialGroupSetCount ?? 0}</strong>
+                        <span>Grups</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.seatingPlanCount ?? 0}</strong>
+                        <span>Aula</span>
+                      </article>
                     </div>
                   )}
                   <div className="shared-tutoring-actions">

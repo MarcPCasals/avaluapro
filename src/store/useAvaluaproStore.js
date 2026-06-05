@@ -492,18 +492,98 @@ function normalizeEmail(value = '') {
   return String(value).trim().toLowerCase()
 }
 
+function getTutorialMarkKey(mark) {
+  return [mark.classId, mark.studentId, mark.subject, mark.competencyKey || mark.criterionKey || ''].join('::')
+}
+
+function isAutoLinkedEvaluationTutorialMark(mark) {
+  return mark?.source?.type === 'linked-evaluation'
+}
+
+function buildLinkedEvaluationTutorialMarksForClass(state, classId) {
+  const targetClass = state.classes.find((classItem) => classItem.id === classId)
+  const linkedClassId = targetClass?.tutorialLinkedClassId || classId
+  const linkedClass = state.classes.find((classItem) => classItem.id === linkedClassId)
+  const linkedSubject = getSubjectOption(linkedClass?.subject)?.name || linkedClass?.subject
+
+  if (!targetClass || !linkedClass || !linkedSubject || !getSubjectStructure(linkedSubject)) return []
+
+  try {
+    const packageData = buildTeacherGradePackage({
+      classId: linkedClass.id,
+      sender: getTeacherSender(state),
+      state,
+    })
+    const targetStudents = getTutoringRosterStudents(state, classId)
+    const updates = getTutorialMarkUpdatesFromTeacherPackage({
+      packageData,
+      targetClassId: classId,
+      targetStudents,
+    })
+    const now = new Date().toISOString()
+
+    return updates
+      .filter((update) => update.value)
+      .map((update) => ({
+        id: `tmark_auto_${[classId, update.studentId, update.subject, update.competencyKey]
+          .join('_')
+          .replaceAll('/', '_')
+          .replace(/\s+/g, '_')}`,
+        classId,
+        competencyKey: update.competencyKey,
+        criterionKey: null,
+        modified: Boolean(update.modified),
+        source: {
+          ...(update.source || {}),
+          linkedClassId: linkedClass.id,
+          linkedClassName: linkedClass.name,
+          syncedAt: now,
+          type: 'linked-evaluation',
+        },
+        studentId: update.studentId,
+        subject: update.subject,
+        updatedAt: now,
+        value: update.value,
+      }))
+  } catch (error) {
+    console.warn('No s’han pogut preparar notes automàtiques de la classe vinculada.', error)
+    return []
+  }
+}
+
+function mergeSharedTutorialMarks(baseMarks = [], autoLinkedMarks = []) {
+  const marksByKey = new Map()
+
+  baseMarks.forEach((mark) => {
+    marksByKey.set(getTutorialMarkKey(mark), mark)
+  })
+
+  autoLinkedMarks.forEach((mark) => {
+    const current = marksByKey.get(getTutorialMarkKey(mark))
+    if (!current || isAutoLinkedEvaluationTutorialMark(current)) {
+      marksByKey.set(getTutorialMarkKey(mark), mark)
+    }
+  })
+
+  return Array.from(marksByKey.values())
+}
+
 function getSharedTutoringDatasetForClass(state, classId) {
   const targetClass = state.classes.find((classItem) => classItem.id === classId)
   const rosterClassId = targetClass?.tutorialLinkedClassId || classId
   const students = state.students.filter((student) => student.classId === rosterClassId)
   const studentIds = new Set(students.map((student) => student.id))
+  const storedTutorialMarks = state.tutorialMarks.filter(
+    (mark) => mark.classId === classId || studentIds.has(mark.studentId),
+  )
+  const linkedEvaluationTutorialMarks = buildLinkedEvaluationTutorialMarksForClass(state, classId)
 
   return {
     students,
     tutorialRecords: state.tutorialRecords.filter(
       (record) => record.classId === classId || studentIds.has(record.studentId),
     ),
-    tutorialMarks: state.tutorialMarks.filter((mark) => mark.classId === classId || studentIds.has(mark.studentId)),
+    tutorialMarks: mergeSharedTutorialMarks(storedTutorialMarks, linkedEvaluationTutorialMarks),
     tutorialRelations: state.tutorialRelations.filter(
       (relation) =>
         relation.classId === classId ||

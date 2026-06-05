@@ -9707,7 +9707,7 @@ button.profile-followup-card:focus-visible {
 
 .shared-tutoring-scope {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 8px;
 }
 
