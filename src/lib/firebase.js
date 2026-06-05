@@ -235,6 +235,31 @@ function mergeMemberEmails(...emailGroups) {
   )
 }
 
+function buildTutoringSpaceSummary(dataset = {}) {
+  const students = Array.isArray(dataset.students) ? dataset.students : []
+  const tutorialRecords = Array.isArray(dataset.tutorialRecords) ? dataset.tutorialRecords : []
+  const tutorialMarks = Array.isArray(dataset.tutorialMarks) ? dataset.tutorialMarks : []
+  const studentAntecedents = Array.isArray(dataset.studentAntecedents) ? dataset.studentAntecedents : []
+  const studentsWithProfile = students.filter(
+    (student) =>
+      student.photoUrl ||
+      student.personalNotes ||
+      student.diagnoses?.length > 0 ||
+      student.tutorialIntelligences?.length > 0 ||
+      student.tutorialModifiedCompetencies?.length > 0 ||
+      student.tutorialExemptSubjects?.length > 0,
+  )
+
+  return {
+    doipCount: tutorialRecords.filter((record) => record.type === 'doip').length,
+    studentAntecedentCount: studentAntecedents.length,
+    studentCount: students.length,
+    studentsWithProfileCount: studentsWithProfile.length,
+    tutorialMarkCount: tutorialMarks.length,
+    tutorialRecordCount: tutorialRecords.length,
+  }
+}
+
 export function toCloudUser(user) {
   if (!user) return null
 
@@ -553,6 +578,7 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
     members: Array.from(membersByEmail.values()),
     ownerEmailLower: cleanOwnerEmail,
     ownerUid: existing?.ownerUid || user.uid,
+    sharedSummary: buildTutoringSpaceSummary(dataset),
     sourceClassId: existing?.sourceClassId || classItem?.id || '',
     status: 'active',
     updatedAt: now,

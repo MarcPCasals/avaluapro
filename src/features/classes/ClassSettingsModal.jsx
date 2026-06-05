@@ -39,6 +39,7 @@ export function ClassSettingsModal({ classId, onClose }) {
   const currentSharedSpace = (cloud.sharedTutoringSpaces || []).find(
     (space) => space.id === currentClass.sharedTutoringSpaceId,
   )
+  const sharedSummary = currentSharedSpace?.sharedSummary || {}
   const cleanShareEmail = (value) => {
     const cleanValue = String(value || '').trim().toLowerCase()
     if (!cleanValue) return ''
@@ -218,6 +219,30 @@ export function ClassSettingsModal({ classId, onClose }) {
                       <small>Membres: {sharedMembers.join(', ')}</small>
                     )}
                   </div>
+                  {currentClass.sharedTutoringSpaceId && (
+                    <div className="shared-tutoring-scope">
+                      <article>
+                        <strong>{sharedSummary.studentCount ?? 0}</strong>
+                        <span>Alumnes</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.studentsWithProfileCount ?? 0}</strong>
+                        <span>Perfils tutorials</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.tutorialRecordCount ?? 0}</strong>
+                        <span>Registres</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.doipCount ?? 0}</strong>
+                        <span>DOIPs</span>
+                      </article>
+                      <article>
+                        <strong>{sharedSummary.tutorialMarkCount ?? 0}</strong>
+                        <span>Notes tutoria</span>
+                      </article>
+                    </div>
+                  )}
                   <div className="shared-tutoring-actions">
                     <label className="field-label">
                       Correu del cotutor

@@ -115,6 +115,7 @@ service cloud.firestore {
           'members',
           'ownerEmailLower',
           'ownerUid',
+          'sharedSummary',
           'sourceClassId',
           'status',
           'updatedAt'
@@ -135,6 +136,7 @@ service cloud.firestore {
           'className',
           'memberEmails',
           'members',
+          'sharedSummary',
           'status',
           'updatedAt'
         ])
