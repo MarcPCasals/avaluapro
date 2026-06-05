@@ -9653,6 +9653,113 @@ button.profile-followup-card:focus-visible {
   accent-color: #16a34a;
 }
 
+.shared-tutoring-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eff6ff;
+}
+
+.shared-tutoring-heading {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: #1d4ed8;
+}
+
+.shared-tutoring-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.shared-tutoring-heading strong {
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.shared-tutoring-heading span,
+.shared-tutoring-note,
+.shared-tutoring-current small,
+.shared-tutoring-space-row small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.shared-tutoring-current {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px;
+  background: white;
+}
+
+.shared-tutoring-current > span {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.shared-tutoring-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.shared-tutoring-list {
+  display: grid;
+  gap: 8px;
+}
+
+.shared-tutoring-list > strong {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.shared-tutoring-space-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 9px;
+  background: white;
+}
+
+.shared-tutoring-space-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shared-tutoring-space-row span {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.shared-tutoring-status {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #166534 !important;
+  background: #f0fdf4;
+}
+
+.shared-tutoring-status.error {
+  border-color: #fecaca;
+  color: #991b1b !important;
+  background: #fef2f2;
+}
+
 .tutorial-toggle-row span {
   display: grid;
   gap: 3px;

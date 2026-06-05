@@ -26,6 +26,18 @@ import {
 } from 'firebase/firestore'
 import { COLLECTIONS } from '../data/seedData'
 
+export const SHARED_TUTORING_COLLECTIONS = [
+  'students',
+  'tutorialRecords',
+  'tutorialMarks',
+  'tutorialRelations',
+  'tutorialGroupSets',
+  'tutorialSociogramLayouts',
+  'tutorialStudentRoles',
+  'tutorialSeatingPlans',
+  'studentAntecedents',
+]
+
 const firebaseConfig = {
   apiKey: 'AIzaSyDCwA7vxVpHQ3CST49xnNblj4JqNPs8sd4',
   authDomain: 'avaluapro.firebaseapp.com',
@@ -102,6 +114,14 @@ function getTeacherGradePackageDocRef(packageId) {
   return doc(db, 'teacherGradePackages', packageId)
 }
 
+function getTutoringSpaceCollectionRef() {
+  return collection(db, 'tutoringSpaces')
+}
+
+function getTutoringSpaceDocRef(spaceId) {
+  return doc(db, 'tutoringSpaces', spaceId)
+}
+
 function getSafeDocId(row, fallbackPrefix, index) {
   return String(row?.id || `${fallbackPrefix}_${index}`).replaceAll('/', '_')
 }
@@ -167,6 +187,52 @@ async function saveBackupRows(uid, backupId, collectionName, rows = []) {
     })
     await batch.commit()
   }
+}
+
+async function replaceTutoringSpaceCollection(spaceId, collectionName, rows = []) {
+  const collectionRef = collection(db, 'tutoringSpaces', spaceId, collectionName)
+  const existingSnapshot = await getDocs(collectionRef)
+  const nextIds = new Set(rows.map((row, index) => getSafeDocId(row, collectionName, index)))
+  const operations = []
+
+  existingSnapshot.forEach((snapshotDoc) => {
+    if (!nextIds.has(snapshotDoc.id)) {
+      operations.push({ type: 'delete', ref: snapshotDoc.ref })
+    }
+  })
+
+  rows.forEach((row, index) => {
+    const docId = getSafeDocId(row, collectionName, index)
+    const value = cleanForFirestore({ ...row, id: docId })
+    assertFirestoreDocumentSize(`tutoringSpaces/${spaceId}/${collectionName}`, docId, value)
+    operations.push({
+      type: 'set',
+      ref: doc(collectionRef, docId),
+      value,
+    })
+  })
+
+  for (let index = 0; index < operations.length; index += 450) {
+    const batch = writeBatch(db)
+    operations.slice(index, index + 450).forEach((operation) => {
+      if (operation.type === 'delete') {
+        batch.delete(operation.ref)
+      } else {
+        batch.set(operation.ref, operation.value)
+      }
+    })
+    await batch.commit()
+  }
+}
+
+function normalizeEmail(value = '') {
+  return String(value).trim().toLowerCase()
+}
+
+function mergeMemberEmails(...emailGroups) {
+  return Array.from(
+    new Set(emailGroups.flat().map(normalizeEmail).filter((email) => email && email.includes('@'))),
+  )
 }
 
 export function toCloudUser(user) {
@@ -437,6 +503,90 @@ export async function markTeacherGradePackageImported({ packageId, userEmail }) 
     }),
     { merge: true },
   )
+}
+
+export async function listTutoringSpacesForUser(userEmail, maxItems = 20) {
+  const cleanEmail = normalizeEmail(userEmail)
+  if (!cleanEmail) return []
+
+  const spacesQuery = query(getTutoringSpaceCollectionRef(), where('memberEmails', 'array-contains', cleanEmail))
+  const snapshot = await getDocs(spacesQuery)
+
+  return snapshot.docs
+    .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+    .slice(0, maxItems)
+}
+
+export async function saveTutoringSpace({ classItem, dataset, memberEmails = [], spaceId, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans de compartir una tutoria.')
+  }
+  if (!spaceId) throw new Error('No s’ha indicat cap espai de tutoria compartida.')
+
+  const spaceRef = getTutoringSpaceDocRef(spaceId)
+  const existingSnapshot = await getDoc(spaceRef)
+  const existing = existingSnapshot.exists() ? existingSnapshot.data() : null
+  const now = new Date().toISOString()
+  const cleanOwnerEmail = normalizeEmail(existing?.ownerEmailLower || user.email)
+  const cleanMembers = mergeMemberEmails(existing?.memberEmails || [], memberEmails, [user.email])
+  const membersByEmail = new Map()
+  ;(existing?.members || []).forEach((member) => {
+    const email = normalizeEmail(member.emailLower || member.email)
+    if (email) membersByEmail.set(email, { ...member, emailLower: email })
+  })
+  cleanMembers.forEach((email) => {
+    const existingMember = membersByEmail.get(email)
+    membersByEmail.set(email, {
+      emailLower: email,
+      invitedAt: existingMember?.invitedAt || now,
+      role: existingMember?.role || 'tutor',
+      uid: email === normalizeEmail(user.email) ? user.uid : existingMember?.uid || '',
+    })
+  })
+
+  const value = cleanForFirestore({
+    className: classItem?.name || existing?.className || 'Tutoria compartida',
+    createdAt: existing?.createdAt || now,
+    id: spaceId,
+    memberEmails: cleanMembers,
+    members: Array.from(membersByEmail.values()),
+    ownerEmailLower: cleanOwnerEmail,
+    ownerUid: existing?.ownerUid || user.uid,
+    sourceClassId: existing?.sourceClassId || classItem?.id || '',
+    status: 'active',
+    updatedAt: now,
+  })
+
+  assertFirestoreDocumentSize('tutoringSpaces', spaceId, value)
+  await setDoc(spaceRef, value, { merge: true })
+
+  for (const collectionName of SHARED_TUTORING_COLLECTIONS) {
+    await replaceTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [])
+  }
+
+  return value
+}
+
+export async function loadTutoringSpace(spaceId) {
+  if (!spaceId) throw new Error('No s’ha indicat quin espai de tutoria cal carregar.')
+  const spaceSnapshot = await getDoc(getTutoringSpaceDocRef(spaceId))
+  if (!spaceSnapshot.exists()) throw new Error('No s’ha trobat aquesta tutoria compartida.')
+  const space = { id: spaceSnapshot.id, ...spaceSnapshot.data() }
+  const entries = await Promise.all(
+    SHARED_TUTORING_COLLECTIONS.map(async (collectionName) => {
+      const snapshot = await getDocs(collection(db, 'tutoringSpaces', spaceId, collectionName))
+      return [
+        collectionName,
+        snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })),
+      ]
+    }),
+  )
+
+  return {
+    ...space,
+    collections: entries.reduce((dataset, [collectionName, rows]) => ({ ...dataset, [collectionName]: rows }), {}),
+  }
 }
 
 export async function deleteCloudCollection(uid, collectionName) {

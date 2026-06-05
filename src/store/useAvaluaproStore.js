@@ -9,15 +9,19 @@ import {
   previewTeacherGradePackage,
 } from '../lib/teacherGradePackages'
 import {
+  SHARED_TUTORING_COLLECTIONS,
   listReceivedTeacherGradePackages,
   listSentTeacherGradePackages,
   listCloudBackups,
+  listTutoringSpacesForUser,
   loadCloudBackup,
   loadCloudDataset,
+  loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
   saveCloudBackup,
   saveCloudCollections,
+  saveTutoringSpace,
   sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
@@ -31,6 +35,7 @@ const DAILY_CLOUD_BACKUP_KEY = 'lastCloudBackupDate'
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
+const SHARED_TUTORING_SYNC_COLLECTIONS = new Set([...SHARED_TUTORING_COLLECTIONS, 'classes'])
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
@@ -189,6 +194,10 @@ function normalizeDataset(dataset) {
       tutors: classItem.tutors || '',
       isTutoringGroup: Boolean(classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
       tutorialLinkedClassId: classItem.tutorialLinkedClassId || classItem.id,
+      sharedTutoringMemberEmails: Array.isArray(classItem.sharedTutoringMemberEmails)
+        ? classItem.sharedTutoringMemberEmails
+        : [],
+      sharedTutoringSpaceId: classItem.sharedTutoringSpaceId || '',
       halfGroups:
         Array.isArray(classItem.halfGroups) && classItem.halfGroups.length > 0
           ? classItem.halfGroups
@@ -305,6 +314,7 @@ async function persistCollections(set, get, collections) {
     await saveCollections(dataset, collections)
     if (state.cloud.user) {
       scheduleCloudSync(set, get, collections)
+      await syncSharedTutoringClassesForCollections(set, get, collections)
     } else {
       set({ error: '' })
     }
@@ -321,6 +331,53 @@ async function persistCollections(set, get, collections) {
     } else {
       set({ error: error.message || 'No s’han pogut guardar les dades locals.' })
     }
+  }
+}
+
+async function syncSharedTutoringClassesForCollections(set, get, collections) {
+  const shouldSyncSharedTutoring = collections.some((collection) => SHARED_TUTORING_SYNC_COLLECTIONS.has(collection))
+  if (!shouldSyncSharedTutoring) return
+
+  const state = get()
+  const user = state.cloud.user
+  if (!user?.uid || !user?.email) return
+
+  const sharedClasses = state.classes.filter(
+    (classItem) =>
+      classItem.sharedTutoringSpaceId &&
+      (classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
+  )
+  if (sharedClasses.length === 0) return
+
+  try {
+    await Promise.all(
+      sharedClasses.map((classItem) =>
+        saveTutoringSpace({
+          classItem,
+          dataset: getSharedTutoringDatasetForClass(get(), classItem.id),
+          memberEmails: classItem.sharedTutoringMemberEmails || [user.email],
+          spaceId: classItem.sharedTutoringSpaceId,
+          user,
+        }),
+      ),
+    )
+    const sharedTutoringSpaces = await listTutoringSpacesForUser(user.email, 20)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        sharedTutoringError: '',
+        sharedTutoringSpaces,
+        sharedTutoringStatus: 'synced',
+      },
+    }))
+  } catch (error) {
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        sharedTutoringError: error.message || 'No s’ha pogut sincronitzar la tutoria compartida.',
+        sharedTutoringStatus: 'error',
+      },
+    }))
   }
 }
 
@@ -429,6 +486,54 @@ function getTutoringRosterStudents(state, classId) {
   return state.students
     .filter((student) => student.classId === rosterClassId)
     .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+}
+
+function normalizeEmail(value = '') {
+  return String(value).trim().toLowerCase()
+}
+
+function getSharedTutoringDatasetForClass(state, classId) {
+  const targetClass = state.classes.find((classItem) => classItem.id === classId)
+  const rosterClassId = targetClass?.tutorialLinkedClassId || classId
+  const students = state.students.filter((student) => student.classId === rosterClassId)
+  const studentIds = new Set(students.map((student) => student.id))
+
+  return {
+    students,
+    tutorialRecords: state.tutorialRecords.filter(
+      (record) => record.classId === classId || studentIds.has(record.studentId),
+    ),
+    tutorialMarks: state.tutorialMarks.filter((mark) => mark.classId === classId || studentIds.has(mark.studentId)),
+    tutorialRelations: state.tutorialRelations.filter(
+      (relation) =>
+        relation.classId === classId ||
+        studentIds.has(relation.sourceStudentId) ||
+        studentIds.has(relation.targetStudentId),
+    ),
+    tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId === classId),
+    tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId === classId),
+    tutorialStudentRoles: (state.tutorialStudentRoles || []).filter(
+      (role) => role.classId === classId || studentIds.has(role.studentId),
+    ),
+    tutorialSeatingPlans: (state.tutorialSeatingPlans || []).filter((plan) => plan.classId === classId),
+    studentAntecedents: (state.studentAntecedents || []).filter(
+      (antecedent) => antecedent.classId === classId || studentIds.has(antecedent.studentId),
+    ),
+  }
+}
+
+function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, rosterClassId = classId) {
+  return {
+    students: (sharedCollections.students || []).map((student) => ({ ...student, classId: rosterClassId })),
+    tutorialRecords: (sharedCollections.tutorialRecords || []).map((record) => ({ ...record, classId })),
+    tutorialMarks: (sharedCollections.tutorialMarks || []).map((mark) => ({ ...mark, classId })),
+    tutorialRelations: (sharedCollections.tutorialRelations || []).map((relation) => ({ ...relation, classId })),
+    tutorialGroupSets: (sharedCollections.tutorialGroupSets || []).map((groupSet) => ({ ...groupSet, classId })),
+    tutorialSociogramLayouts: (sharedCollections.tutorialSociogramLayouts || []).map((layout) => ({ ...layout, classId })),
+    tutorialStudentRoles: (sharedCollections.tutorialStudentRoles || []).map((role) => ({ ...role, classId })),
+    tutorialSeatingPlans: (sharedCollections.tutorialSeatingPlans || []).map((plan) => ({ ...plan, classId })),
+    studentAntecedents: (sharedCollections.studentAntecedents || []).map((antecedent) => ({ ...antecedent, classId })),
+  }
 }
 
 function getTeacherSender(state) {
@@ -641,6 +746,9 @@ export const useAvaluaproStore = create((set, get) => ({
     sentTeacherPackages: [],
     teacherPackagesError: '',
     teacherPackagesStatus: 'idle',
+    sharedTutoringSpaces: [],
+    sharedTutoringError: '',
+    sharedTutoringStatus: 'idle',
   },
   status: 'idle',
   error: '',
@@ -679,6 +787,7 @@ export const useAvaluaproStore = create((set, get) => ({
               get().loadCloudBackups()
               get().loadReceivedTeacherGradePackages()
               get().loadSentTeacherGradePackages()
+              get().loadSharedTutoringSpaces()
             }, 0)
           }
         },
@@ -747,6 +856,9 @@ export const useAvaluaproStore = create((set, get) => ({
           sentTeacherPackages: [],
           teacherPackagesError: '',
           teacherPackagesStatus: 'idle',
+          sharedTutoringSpaces: [],
+          sharedTutoringError: '',
+          sharedTutoringStatus: 'idle',
         },
       }))
     } catch (error) {
@@ -1778,6 +1890,246 @@ export const useAvaluaproStore = create((set, get) => ({
     await get().loadReceivedTeacherGradePackages()
 
     return result
+  },
+
+  loadSharedTutoringSpaces: async () => {
+    const state = get()
+    if (!state.cloud.user?.email) return []
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'loading' },
+    }))
+
+    try {
+      const sharedTutoringSpaces = await listTutoringSpacesForUser(state.cloud.user.email, 20)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: '',
+          sharedTutoringSpaces,
+          sharedTutoringStatus: 'loaded',
+        },
+      }))
+      return sharedTutoringSpaces
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’han pogut carregar les tutories compartides.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      return []
+    }
+  },
+
+  shareTutoringClass: async ({ classId = get().ui.activeClassId, recipientEmail }) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió amb Google abans de compartir una tutoria.')
+    if (!classItem) throw new Error('No s’ha trobat aquesta classe.')
+    if (!classItem.isTutoringGroup && classItem.subject !== 'Tutoria') {
+      throw new Error('Abans de compartir-la, marca aquesta classe com a tutoria.')
+    }
+
+    const cleanRecipientEmail = normalizeEmail(recipientEmail)
+    if (!cleanRecipientEmail || !cleanRecipientEmail.includes('@')) {
+      throw new Error('Cal indicar un correu complet del cotutor.')
+    }
+
+    const spaceId = classItem.sharedTutoringSpaceId || createId('tutoring_space')
+    const memberEmails = Array.from(
+      new Set(
+        [user.email, ...(classItem.sharedTutoringMemberEmails || []), cleanRecipientEmail]
+          .map(normalizeEmail)
+          .filter(Boolean),
+      ),
+    )
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'saving' },
+    }))
+
+    try {
+      const space = await saveTutoringSpace({
+        classItem: { ...classItem, sharedTutoringSpaceId: spaceId },
+        dataset: getSharedTutoringDatasetForClass(state, classId),
+        memberEmails,
+        spaceId,
+        user,
+      })
+
+      set((current) => ({
+        classes: current.classes.map((item) =>
+          item.id === classId
+            ? {
+                ...item,
+                isTutoringGroup: true,
+                sharedTutoringMemberEmails: space.memberEmails || memberEmails,
+                sharedTutoringSpaceId: space.id || spaceId,
+                tutorialLinkedClassId: item.tutorialLinkedClassId || item.id,
+              }
+            : item,
+        ),
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: '',
+          sharedTutoringStatus: 'saved',
+        },
+      }))
+      await persistCollections(set, get, ['classes'])
+      await get().loadSharedTutoringSpaces()
+      return space
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’ha pogut compartir aquesta tutoria.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
+  linkClassToSharedTutoringSpace: async ({ classId = get().ui.activeClassId, spaceId }) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.email) throw new Error('Cal iniciar sessió amb Google abans de vincular una tutoria compartida.')
+    if (!classItem) throw new Error('No s’ha trobat aquesta classe.')
+    if (!spaceId) throw new Error('No s’ha indicat cap tutoria compartida.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'loading' },
+    }))
+
+    try {
+      const space = await loadTutoringSpace(spaceId)
+      const rosterClassId = classItem.tutorialLinkedClassId || classId
+      const existingStudentIds = new Set(
+        state.students.filter((student) => student.classId === rosterClassId).map((student) => student.id),
+      )
+      const mappedDataset = mapSharedTutoringDatasetToClass(space.collections, classId, rosterClassId)
+
+      set((current) => ({
+        classes: current.classes.map((item) =>
+          item.id === classId
+            ? {
+                ...item,
+                isTutoringGroup: true,
+                sharedTutoringMemberEmails: space.memberEmails || [],
+                sharedTutoringSpaceId: space.id || spaceId,
+                tutorialLinkedClassId: item.tutorialLinkedClassId || item.id,
+              }
+            : item,
+        ),
+        studentAntecedents: [
+          ...current.studentAntecedents.filter(
+            (antecedent) => antecedent.classId !== classId && !existingStudentIds.has(antecedent.studentId),
+          ),
+          ...mappedDataset.studentAntecedents,
+        ],
+        students: [
+          ...current.students.filter((student) => student.classId !== rosterClassId),
+          ...mappedDataset.students,
+        ],
+        tutorialGroupSets: [
+          ...current.tutorialGroupSets.filter((groupSet) => groupSet.classId !== classId),
+          ...mappedDataset.tutorialGroupSets,
+        ],
+        tutorialMarks: [
+          ...current.tutorialMarks.filter(
+            (mark) => mark.classId !== classId && !existingStudentIds.has(mark.studentId),
+          ),
+          ...mappedDataset.tutorialMarks,
+        ],
+        tutorialRecords: [
+          ...current.tutorialRecords.filter(
+            (record) => record.classId !== classId && !existingStudentIds.has(record.studentId),
+          ),
+          ...mappedDataset.tutorialRecords,
+        ],
+        tutorialRelations: [
+          ...current.tutorialRelations.filter(
+            (relation) =>
+              relation.classId !== classId &&
+              !existingStudentIds.has(relation.sourceStudentId) &&
+              !existingStudentIds.has(relation.targetStudentId),
+          ),
+          ...mappedDataset.tutorialRelations,
+        ],
+        tutorialSeatingPlans: [
+          ...current.tutorialSeatingPlans.filter((plan) => plan.classId !== classId),
+          ...mappedDataset.tutorialSeatingPlans,
+        ],
+        tutorialSociogramLayouts: [
+          ...current.tutorialSociogramLayouts.filter((layout) => layout.classId !== classId),
+          ...mappedDataset.tutorialSociogramLayouts,
+        ],
+        tutorialStudentRoles: [
+          ...current.tutorialStudentRoles.filter(
+            (role) => role.classId !== classId && !existingStudentIds.has(role.studentId),
+          ),
+          ...mappedDataset.tutorialStudentRoles,
+        ],
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: '',
+          sharedTutoringStatus: 'linked',
+        },
+      }))
+
+      await persistCollections(set, get, ['classes', ...SHARED_TUTORING_COLLECTIONS])
+      await get().loadSharedTutoringSpaces()
+      return space
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’ha pogut vincular aquesta tutoria compartida.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
+  syncSharedTutoringClass: async (classId = get().ui.activeClassId) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió amb Google abans de sincronitzar.')
+    if (!classItem?.sharedTutoringSpaceId) throw new Error('Aquesta classe encara no està vinculada a cap tutoria compartida.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'saving' },
+    }))
+
+    try {
+      const space = await saveTutoringSpace({
+        classItem,
+        dataset: getSharedTutoringDatasetForClass(state, classId),
+        memberEmails: classItem.sharedTutoringMemberEmails || [user.email],
+        spaceId: classItem.sharedTutoringSpaceId,
+        user,
+      })
+      await get().loadSharedTutoringSpaces()
+      set((current) => ({
+        cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'synced' },
+      }))
+      return space
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’ha pogut sincronitzar aquesta tutoria compartida.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      throw error
+    }
   },
 
   addTutorialRecord: async ({ classId, studentId, type, date, note }) => {

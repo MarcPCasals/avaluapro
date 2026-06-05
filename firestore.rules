@@ -86,6 +86,62 @@ service cloud.firestore {
         && request.resource.data.updatedAt is string;
     }
 
+    function isTutoringSpaceMember() {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email in resource.data.memberEmails;
+    }
+
+    function isTutoringSpaceMemberAfterWrite() {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email in request.resource.data.memberEmails;
+    }
+
+    function canAccessTutoringSpace(spaceId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email in get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberEmails;
+    }
+
+    function validTutoringSpaceCreate(spaceId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.resource.data.keys().hasOnly([
+          'className',
+          'createdAt',
+          'id',
+          'memberEmails',
+          'members',
+          'ownerEmailLower',
+          'ownerUid',
+          'sourceClassId',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.id == spaceId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmailLower == request.auth.token.email
+        && request.resource.data.memberEmails is list
+        && request.auth.token.email in request.resource.data.memberEmails
+        && request.resource.data.members is list
+        && request.resource.data.status == 'active';
+    }
+
+    function validTutoringSpaceUpdate() {
+      return isTutoringSpaceMember()
+        && isTutoringSpaceMemberAfterWrite()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'className',
+          'memberEmails',
+          'members',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.memberEmails is list
+        && request.resource.data.members is list;
+    }
+
     match /teacherGradePackages/{transferId} {
       allow create: if validTeacherGradePackageCreate(transferId);
 
@@ -98,6 +154,17 @@ service cloud.firestore {
       allow update: if validTeacherGradePackageImportUpdate();
 
       allow delete: if isPackageSender();
+    }
+
+    match /tutoringSpaces/{spaceId} {
+      allow create: if validTutoringSpaceCreate(spaceId);
+      allow read: if isTutoringSpaceMember();
+      allow update: if validTutoringSpaceUpdate();
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      match /{collectionName}/{documentId} {
+        allow read, create, update, delete: if canAccessTutoringSpace(spaceId);
+      }
     }
 
     match /users/{userId} {

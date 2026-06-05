@@ -1,17 +1,94 @@
-import { ArrowDown, ArrowUp, GraduationCap, Settings, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, Cloud, GraduationCap, Link2, RefreshCw, Settings, Share2, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassFormFields } from './ClassFormFields'
 
 export function ClassSettingsModal({ classId, onClose }) {
   const classes = useAvaluaproStore((state) => state.classes)
+  const cloud = useAvaluaproStore((state) => state.cloud)
+  const linkClassToSharedTutoringSpace = useAvaluaproStore((state) => state.linkClassToSharedTutoringSpace)
+  const loadSharedTutoringSpaces = useAvaluaproStore((state) => state.loadSharedTutoringSpaces)
+  const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
+  const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
   const updateClass = useAvaluaproStore((state) => state.updateClass)
   const reorderClass = useAvaluaproStore((state) => state.reorderClass)
   const deleteClass = useAvaluaproStore((state) => state.deleteClass)
+  const [shareEmail, setShareEmail] = useState('')
+  const [sharedMessage, setSharedMessage] = useState('')
+  const [sharedBusy, setSharedBusy] = useState('')
   const currentClass = classes.find((item) => item.id === classId)
   const orderedClasses = [...classes].sort((a, b) => (a.order || 0) - (b.order || 0))
+  const availableSharedTutoringSpaces = useMemo(
+    () =>
+      (cloud.sharedTutoringSpaces || []).filter(
+        (space) => space.id && space.id !== currentClass?.sharedTutoringSpaceId,
+      ),
+    [cloud.sharedTutoringSpaces, currentClass?.sharedTutoringSpaceId],
+  )
+
+  useEffect(() => {
+    if (cloud.user?.email) {
+      loadSharedTutoringSpaces()
+    }
+  }, [cloud.user?.email, loadSharedTutoringSpaces])
 
   if (!currentClass) return null
+
+  const sharedMembers = currentClass.sharedTutoringMemberEmails || []
+  const currentSharedSpace = (cloud.sharedTutoringSpaces || []).find(
+    (space) => space.id === currentClass.sharedTutoringSpaceId,
+  )
+  const cleanShareEmail = (value) => {
+    const cleanValue = String(value || '').trim().toLowerCase()
+    if (!cleanValue) return ''
+    return cleanValue.includes('@') ? cleanValue : `${cleanValue}@educand.ad`
+  }
+
+  const handleShareTutoring = async () => {
+    setSharedMessage('')
+    const recipientEmail = cleanShareEmail(shareEmail)
+    if (!recipientEmail) {
+      setSharedMessage('Escriu el correu del cotutor.')
+      return
+    }
+    setSharedBusy('share')
+    try {
+      await shareTutoringClass({ classId, recipientEmail })
+      setShareEmail('')
+      setSharedMessage(`Tutoria compartida amb ${recipientEmail}.`)
+    } catch (error) {
+      setSharedMessage(error.message || 'No s’ha pogut compartir aquesta tutoria.')
+    } finally {
+      setSharedBusy('')
+    }
+  }
+
+  const handleLinkTutoring = async (spaceId) => {
+    setSharedMessage('')
+    setSharedBusy(spaceId)
+    try {
+      await linkClassToSharedTutoringSpace({ classId, spaceId })
+      setSharedMessage('Tutoria compartida vinculada a aquesta classe.')
+    } catch (error) {
+      setSharedMessage(error.message || 'No s’ha pogut vincular aquesta tutoria.')
+    } finally {
+      setSharedBusy('')
+    }
+  }
+
+  const handleSyncTutoring = async () => {
+    setSharedMessage('')
+    setSharedBusy('sync')
+    try {
+      await syncSharedTutoringClass(classId)
+      setSharedMessage('Tutoria compartida sincronitzada.')
+    } catch (error) {
+      setSharedMessage(error.message || 'No s’ha pogut sincronitzar aquesta tutoria.')
+    } finally {
+      setSharedBusy('')
+    }
+  }
 
   return (
     <Modal onClose={onClose} size="lg" title="Configuració del grup">
@@ -99,19 +176,113 @@ export function ClassSettingsModal({ classId, onClose }) {
           </span>
         </label>
         {(currentClass.isTutoringGroup || currentClass.subject === 'Tutoria') && (
-          <label className="field-label">
-            Classe d’origen per compartir alumnes
-            <select
-              onChange={(event) => updateClass(classId, { tutorialLinkedClassId: event.target.value })}
-              value={currentClass.tutorialLinkedClassId || classId}
-            >
-              {orderedClasses.map((classItem) => (
-                <option key={classItem.id} value={classItem.id}>
-                  {classItem.name} · {classItem.subject || 'Sense assignatura'}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label className="field-label">
+              Classe d’origen per compartir alumnes
+              <select
+                onChange={(event) => updateClass(classId, { tutorialLinkedClassId: event.target.value })}
+                value={currentClass.tutorialLinkedClassId || classId}
+              >
+                {orderedClasses.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name} · {classItem.subject || 'Sense assignatura'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <section className="shared-tutoring-panel">
+              <div className="shared-tutoring-heading">
+                <Cloud size={18} />
+                <div>
+                  <strong>Tutoria compartida</strong>
+                  <span>
+                    Dona accés a un cotutor perquè tots dos pugueu treballar el mateix espai de tutoria.
+                  </span>
+                </div>
+              </div>
+              {!cloud.user?.email ? (
+                <p className="shared-tutoring-note">
+                  Inicia sessió amb Google per compartir o vincular tutories.
+                </p>
+              ) : (
+                <>
+                  <div className="shared-tutoring-current">
+                    <span>{currentClass.sharedTutoringSpaceId ? 'Vinculada' : 'Encara no compartida'}</span>
+                    {currentSharedSpace?.updatedAt && (
+                      <small>
+                        Última sincronització compartida:{' '}
+                        {new Date(currentSharedSpace.updatedAt).toLocaleString('ca-ES')}
+                      </small>
+                    )}
+                    {sharedMembers.length > 0 && (
+                      <small>Membres: {sharedMembers.join(', ')}</small>
+                    )}
+                  </div>
+                  <div className="shared-tutoring-actions">
+                    <label className="field-label">
+                      Correu del cotutor
+                      <input
+                        onChange={(event) => setShareEmail(event.target.value)}
+                        placeholder="nom o nom@educand.ad"
+                        value={shareEmail}
+                      />
+                    </label>
+                    <button
+                      className="secondary-action"
+                      disabled={sharedBusy === 'share'}
+                      onClick={handleShareTutoring}
+                      type="button"
+                    >
+                      <Share2 size={16} />
+                      Compartir
+                    </button>
+                    {currentClass.sharedTutoringSpaceId && (
+                      <button
+                        className="secondary-action"
+                        disabled={sharedBusy === 'sync'}
+                        onClick={handleSyncTutoring}
+                        type="button"
+                      >
+                        <RefreshCw size={16} />
+                        Sincronitzar ara
+                      </button>
+                    )}
+                  </div>
+                  {availableSharedTutoringSpaces.length > 0 && (
+                    <div className="shared-tutoring-list">
+                      <strong>Tutories compartides disponibles</strong>
+                      {availableSharedTutoringSpaces.map((space) => (
+                        <div className="shared-tutoring-space-row" key={space.id}>
+                          <div>
+                            <span>{space.className || 'Tutoria compartida'}</span>
+                            <small>{(space.memberEmails || []).join(', ')}</small>
+                          </div>
+                          <button
+                            className="secondary-action compact"
+                            disabled={sharedBusy === space.id}
+                            onClick={() => handleLinkTutoring(space.id)}
+                            type="button"
+                          >
+                            <Link2 size={15} />
+                            Vincular
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(sharedMessage || cloud.sharedTutoringError) && (
+                    <p
+                      className={`shared-tutoring-status ${
+                        cloud.sharedTutoringError && !sharedMessage ? 'error' : ''
+                      }`}
+                    >
+                      {sharedMessage || cloud.sharedTutoringError}
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+          </>
         )}
       </div>
       <div className="modal-section danger-zone">
