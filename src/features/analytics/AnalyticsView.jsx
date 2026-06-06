@@ -121,7 +121,7 @@ const chartHelp = {
   utReinforcement:
     'Transforma les dades de la UT en una proposta pràctica de reforç per a la propera sessió.',
   utStudents:
-    'Ordena alumnes de la UT segons rendiment, constància, tasques no fetes i incidències.',
+    'Mostra alumnes que van obtenir D en l’última mirada de les competències actives de la UT. Serveix per preparar reforç abans de tornar-les a treballar.',
   utTasks:
     'Mostra l’estat de les tasques associades a la UT: fetes, incompletes i no fetes.',
   trackingSummary:
@@ -619,6 +619,82 @@ function getLatestStudentLook(state, studentId, uts) {
     .filter((item) => item.score > 0)
 
   return validScores.at(-1) || { grade: '', score: 0, ut: null }
+}
+
+function getAntecedentCompetencyGrade(state, studentId, competency) {
+  const antecedent = state.studentAntecedents.find((item) => item.studentId === studentId)
+  if (!antecedent) return null
+
+  const competencyGrades = antecedent.competencyGrades || {}
+  const code = getCompetencyCode(competency.name)
+  const grade =
+    competencyGrades[competency.name] ||
+    competencyGrades[code] ||
+    competencyGrades[competency.id] ||
+    competencyGrades[competency.code]
+
+  if (!grade) return null
+
+  return {
+    grade,
+    sourceLabel: antecedent.courseLabel || 'antecedents',
+    sourceType: 'antecedent',
+  }
+}
+
+function getLatestPreviousCompetencyLook(state, studentId, activeCompetency, activeUt, classUts) {
+  const activeIndex = classUts.findIndex((ut) => ut.id === activeUt?.id)
+  const previousUts = activeIndex <= 0 ? [] : classUts.slice(0, activeIndex).reverse()
+  const activeCode = getCompetencyCode(activeCompetency.name)
+
+  for (const ut of previousUts) {
+    const matchingCompetency = getUtCompetencies(state, ut.id).find(
+      (competency) => competency.name === activeCompetency.name || getCompetencyCode(competency.name) === activeCode,
+    )
+    if (!matchingCompetency) continue
+
+    const grade = getStudentCompetencyGrade(state, studentId, matchingCompetency)
+    if (grade) {
+      return {
+        grade,
+        sourceLabel: ut.name,
+        sourceType: 'previous-ut',
+      }
+    }
+  }
+
+  return getAntecedentCompetencyGrade(state, studentId, activeCompetency)
+}
+
+function buildUtReinforcementProfiles({ activeCompetencies, activeUt, classUts, profiles, state }) {
+  const profileByStudentId = new Map(profiles.map((profile) => [profile.student.id, profile]))
+
+  return profiles
+    .map((profile) => {
+      const reasons = activeCompetencies
+        .map((competency) => {
+          const look = getLatestPreviousCompetencyLook(state, profile.student.id, competency, activeUt, classUts)
+          if (!look || (look.grade !== 'D' && look.grade !== 'NA')) return null
+
+          return {
+            competency: competency.name,
+            code: getCompetencyCode(competency.name),
+            grade: look.grade,
+            sourceLabel: look.sourceLabel,
+            sourceType: look.sourceType,
+          }
+        })
+        .filter(Boolean)
+
+      if (reasons.length === 0) return null
+
+      return {
+        ...(profileByStudentId.get(profile.student.id) || profile),
+        reinforcementReasons: reasons,
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.reinforcementReasons.length - a.reinforcementReasons.length || a.student.name.localeCompare(b.student.name))
 }
 
 function buildAntecedentEvolutionRows(state, students, uts, profiles) {
@@ -1709,10 +1785,14 @@ function StudentInsightModal({ insight, onClose }) {
                   <small>{profile.incidents} incid.</small>
                 </div>
                 <p className="insight-evidence">
-                  Dades: rendiment {profile.evaluation.grade || 'sense dades'} ({profile.evaluation.score || '-'}),
-                  constància {getConsistencyLabel(profile.tracking)}, {profile.tracking.missing} no fetes visibles,{' '}
-                  {profile.tracking.late} incompletes, {profile.redPointCount} punts vermells i {profile.incidents}{' '}
-                  punts negres.
+                  {profile.reinforcementReasons?.length > 0
+                    ? `Última mirada: ${profile.reinforcementReasons
+                        .map((reason) => `${reason.code} amb ${reason.grade} a ${reason.sourceLabel}`)
+                        .join(' · ')}.`
+                    : `Dades: rendiment ${profile.evaluation.grade || 'sense dades'} (${profile.evaluation.score || '-'}),
+                  constància ${getConsistencyLabel(profile.tracking)}, ${profile.tracking.missing} no fetes visibles,
+                  ${profile.tracking.late} incompletes, ${profile.redPointCount} punts vermells i ${profile.incidents}
+                  punts negres.`}
                 </p>
               </article>
             ))
@@ -2239,6 +2319,7 @@ function UtTasksSummary({ tasks, taskRecords, students, setInfo }) {
 function UtStatsView({
   activeUt,
   averageConsistency,
+  classUts,
   competencies,
   criterionRows,
   info,
@@ -2246,6 +2327,7 @@ function UtStatsView({
   onSelectGroup,
   profiles,
   setInfo,
+  state,
   students,
   taskRecords,
   tasks,
@@ -2260,9 +2342,13 @@ function UtStatsView({
           ).toFixed(2),
         )
   const priorityCriterion = [...criterionRows].filter((row) => row.total > 0).sort((a, b) => a.average - b.average)[0]
-  const priorityStudents = profiles.filter(
-    (profile) => profile.evaluation.score > 0 && profile.evaluation.score <= 2,
-  )
+  const reinforcementProfiles = buildUtReinforcementProfiles({
+    activeCompetencies: competencies,
+    activeUt,
+    classUts,
+    profiles,
+    state,
+  })
   const highStudents = profiles.filter((profile) => profile.evaluation.score >= 3)
 
   return (
@@ -2302,14 +2388,15 @@ function UtStatsView({
             onSelectGroup?.({
               kind: 'ut-reinforcement',
               title: `Alumnes a reforçar · ${activeUt?.name || 'UT activa'}`,
-              description: 'Alumnes amb C/D global dins la UT activa. Revisa quin criteri o competència explica la dificultat.',
+              description:
+                'Alumnes amb D en l’última mirada de les competències actives d’aquesta UT. Si encara és UT1, també es miren els antecedents acadèmics carregats.',
               icon: AlertTriangle,
-              profiles: priorityStudents,
+              profiles: reinforcementProfiles,
             })
           }
           setInfo={setInfo}
-          value={priorityStudents.length}
-          helper="Alumnes amb C/D global a la UT."
+          value={reinforcementProfiles.length}
+          helper="Segons l’última mirada de les competències actives."
         />
         <MetricCard
           className="habit"
@@ -2951,6 +3038,7 @@ export function AnalyticsView() {
           <UtStatsView
             activeUt={activeUt}
             averageConsistency={averageConsistency}
+            classUts={classUts}
             competencies={activeUtCompetencyRows}
             criterionRows={activeUtCriterionRows}
             info={null}
@@ -2958,6 +3046,7 @@ export function AnalyticsView() {
             onSelectGroup={setSelectedInsight}
             profiles={profiles}
             setInfo={setSelectedInfo}
+            state={state}
             students={students}
             taskRecords={state.taskRecords}
             tasks={currentTasks}

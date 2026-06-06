@@ -1460,6 +1460,48 @@ button.tutorial-record-pill {
   background: #ffedd5;
 }
 
+.tutorial-exemptions-card > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-exemptions-card > div:first-child h2 {
+  flex: 1;
+}
+
+.tutorial-exemption-summary,
+.tutorial-exemption-config {
+  display: grid;
+  gap: 8px;
+}
+
+.tutorial-exemption-summary {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.tutorial-exemption-summary article {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #9a3412;
+  background: #fff7ed;
+  font-weight: 900;
+}
+
+.tutorial-exemption-summary span,
+.tutorial-exemption-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tutorial-record-form-card {
   min-height: unset;
 }
@@ -5946,6 +5988,11 @@ button.tutorial-record-pill {
   margin: -8px 0 -3px;
 }
 
+.diagnosis-card.trend .info-help-button {
+  top: 12px;
+  right: 12px;
+}
+
 .trend-grid {
   fill: none;
   stroke: #e5e7eb;
@@ -6801,9 +6848,11 @@ button.tutorial-record-pill {
 }
 
 .action-list-card {
+  min-width: 0;
   display: grid;
   gap: 8px;
   padding: 14px;
+  overflow: hidden;
 }
 
 .tracking-action-grid .action-list-card,
@@ -6816,9 +6865,12 @@ button.tutorial-record-pill {
 
 .tracking-action-grid .action-list-card {
   align-content: start;
+  max-height: 430px;
+  overflow: auto;
 }
 
 .action-list-card header {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6829,6 +6881,29 @@ button.tutorial-record-pill {
   margin: 0;
   color: #64748b;
   font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.action-list-card article,
+.action-list-card button,
+.action-list-card strong,
+.action-list-card span,
+.action-list-card small {
+  min-width: 0;
+}
+
+.action-list-card article,
+.tracking-action-list article {
+  overflow: hidden;
+}
+
+.action-list-card strong,
+.action-list-card span,
+.tracking-action-list strong,
+.tracking-action-list span,
+.tracking-action-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .profile-sort-toggle {
@@ -7451,8 +7526,16 @@ button.tutorial-record-pill {
 
 .tracking-action-row > div {
   display: flex;
+  min-width: 0;
   justify-content: space-between;
   gap: 10px;
+}
+
+.tracking-action-row > div strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tracking-action-row strong,
@@ -7463,8 +7546,14 @@ button.tutorial-record-pill {
 }
 
 .tracking-action-row span {
+  flex: 0 0 auto;
+  max-width: 42%;
+  overflow: hidden;
   color: #b91c1c;
   font-weight: 950;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tracking-action-row p {
@@ -7483,7 +7572,7 @@ button.tutorial-record-pill {
 .tracking-behavior-row,
 .tracking-agenda-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, max-content);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
   gap: 12px;
   align-items: center;
   border: 1px solid #e5e7eb;
@@ -7546,10 +7635,14 @@ button.tutorial-record-pill {
 }
 
 .tracking-task-bars small {
+  max-width: 100%;
+  overflow: hidden;
   color: #64748b;
   font-size: 12px;
   font-weight: 850;
   text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tracking-ranking-metrics {
@@ -7558,6 +7651,7 @@ button.tutorial-record-pill {
   justify-content: flex-end;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .tracking-ranking-metrics b,
@@ -7578,7 +7672,7 @@ button.tutorial-record-pill {
 }
 
 .tracking-ranking-metrics small {
-  max-width: 150px;
+  max-width: 120px;
   overflow: hidden;
   color: #475569;
   background: white;
@@ -10326,6 +10420,17 @@ button.profile-followup-card:focus-visible {
   text-transform: uppercase;
 }
 
+.annotation-quick-status small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .annotation-tools-row {
   display: flex;
   justify-content: space-between;
@@ -10346,6 +10451,205 @@ button.profile-followup-card:focus-visible {
 .annotation-tools-row small {
   color: #16a34a;
   font-weight: 900;
+}
+
+.annotation-progress-section {
+  overflow: hidden;
+}
+
+.annotation-progress-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.75fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.annotation-evolution-charts {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.annotation-chart-card,
+.annotation-current-summary,
+.annotation-profile-card,
+.annotation-active-grades,
+.annotation-last-notes article {
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.annotation-chart-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.annotation-chart-card h4 {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.student-line-chart.compact,
+.student-radar-chart.compact {
+  width: 100%;
+  min-height: 180px;
+}
+
+.student-line-chart.compact line {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.student-line-chart.compact text {
+  fill: #64748b;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.student-line-chart.compact .x-label {
+  text-anchor: middle;
+}
+
+.student-line-chart.compact .line-fill {
+  fill: rgba(249, 115, 22, 0.1);
+  stroke: none;
+}
+
+.student-line-chart.compact .line-path {
+  fill: none;
+  stroke: #f97316;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.student-line-chart.compact .line-point {
+  fill: white;
+  stroke: #f97316;
+  stroke-width: 3;
+}
+
+.student-radar-chart.compact .radar-grid {
+  fill: none;
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.student-radar-chart.compact .radar-last {
+  fill: rgba(249, 115, 22, 0.12);
+  stroke: #f97316;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.student-radar-chart.compact .radar-label {
+  fill: #475569;
+  font-size: 11px;
+  font-weight: 1000;
+  text-anchor: middle;
+}
+
+.annotation-current-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: white;
+}
+
+.annotation-profile-card,
+.annotation-active-grades,
+.annotation-last-notes article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.annotation-profile-card span,
+.annotation-active-grades > strong,
+.annotation-last-notes span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.annotation-profile-card strong {
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.annotation-profile-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.annotation-profile-card.danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.annotation-profile-card.student-invisible {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.annotation-profile-card.habit {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.annotation-profile-card.stable {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.annotation-active-grades article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.annotation-active-grades article span {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-last-notes {
+  display: grid;
+  gap: 8px;
+}
+
+.annotation-last-notes strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.annotation-last-notes .team {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.annotation-last-notes .tutoring {
+  border-color: #fde68a;
+  background: #fffbeb;
 }
 
 .annotation-reminder-card {
@@ -10593,6 +10897,20 @@ button.profile-followup-card:focus-visible {
 .diagnosis-modification-entry:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.modified-letter-badge {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid #ef4444;
+  border-radius: 999px;
+  color: #991b1b;
+  background: #fee2e2;
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1;
 }
 
 .modified-competency-profile-panel {

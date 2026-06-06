@@ -2608,6 +2608,7 @@ export function TutoringView() {
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const [selectedTutorialRecordStudentId, setSelectedTutorialRecordStudentId] = useState('')
   const [selectedModifiedStudentId, setSelectedModifiedStudentId] = useState('')
+  const [showExemptionConfig, setShowExemptionConfig] = useState(false)
   const [showModifiedCompetencyConfig, setShowModifiedCompetencyConfig] = useState(false)
   const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
@@ -2762,6 +2763,13 @@ export function TutoringView() {
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
   const selectedSubjectArea = getSubjectArea(selectedSubject)
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
+  const exemptStudents = useMemo(
+    () =>
+      selectedSubject
+        ? classStudents.filter((student) => student.tutorialExemptSubjects?.includes(selectedSubject))
+        : [],
+    [classStudents, selectedSubject],
+  )
   const intelligenceSummary = useMemo(
     () =>
       MULTIPLE_INTELLIGENCE_OPTIONS.map((option) => ({
@@ -4073,28 +4081,31 @@ export function TutoringView() {
               <div>
                 <ShieldAlert size={24} />
                 <h2>Exempcions i balanç modificat</h2>
+                <button
+                  className="secondary-action compact"
+                  disabled={!selectedSubject}
+                  onClick={() => setShowExemptionConfig(true)}
+                  type="button"
+                >
+                  Configurar
+                </button>
               </div>
               <p>
-                Per a la matèria seleccionada ({selectedSubject || 'cap'}), marca alumnes exempts. La taula tutorial
-                ignorarà aquestes notes.
+                Per a la matèria seleccionada ({selectedSubject || 'cap'}), només es mostren els alumnes exempts. La
+                taula tutorial ignorarà aquestes notes.
               </p>
-              <div className="tutorial-exemption-list">
-                {classStudents.map((student) => {
-                  const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
-                  return (
-                    <button
-                      className={isExempt ? 'active' : ''}
-                      disabled={!selectedSubject}
-                      key={student.id}
-                      onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
-                      type="button"
-                    >
+              {exemptStudents.length === 0 ? (
+                <div className="empty-state compact">No hi ha cap alumne exempt en aquesta matèria.</div>
+              ) : (
+                <div className="tutorial-exemption-summary">
+                  {exemptStudents.map((student) => (
+                    <article key={student.id}>
                       <span>{student.name}</span>
-                      <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
-                    </button>
-                  )
-                })}
-              </div>
+                      <strong>Exempt/a</strong>
+                    </article>
+                  ))}
+                </div>
+              )}
             </article>
           </section>
 
@@ -5325,6 +5336,37 @@ export function TutoringView() {
                 </div>
               </article>
             ))}
+          </div>
+        </Modal>
+      )}
+      {showExemptionConfig && (
+        <Modal
+          onClose={() => setShowExemptionConfig(false)}
+          size="lg"
+          title={`Configurar exempcions · ${selectedSubject || 'matèria'}`}
+        >
+          <div className="tutorial-exemption-config">
+            <p>
+              Marca només els alumnes que no s’han d’avaluar en aquesta matèria. A la pantalla principal de seguiment
+              tutorial només apareixeran els exempts, perquè la lectura sigui ràpida.
+            </p>
+            <div className="tutorial-exemption-list">
+              {classStudents.map((student) => {
+                const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
+                return (
+                  <button
+                    className={isExempt ? 'active' : ''}
+                    disabled={!selectedSubject}
+                    key={student.id}
+                    onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
+                    type="button"
+                  >
+                    <span>{student.name}</span>
+                    <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </Modal>
       )}

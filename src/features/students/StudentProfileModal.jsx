@@ -422,7 +422,8 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
               type="button"
             >
               <SlidersHorizontal size={16} />
-              Competències modificades
+              <span>Competències</span>
+              <span className="modified-letter-badge">M</span>
             </button>
           </div>
           {showModifiedCompetenciesPanel && (

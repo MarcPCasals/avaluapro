@@ -26,7 +26,7 @@ export const DIAGNOSIS_OPTIONS = [
   },
   {
     id: 'high-capacity',
-    label: 'Altes capacitats',
+    label: 'AACC',
     color: 'orange',
   },
 ]

@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  BookOpen,
   ChevronDown,
   ChevronUp,
   Clipboard,
@@ -13,8 +12,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
-import { getStudentTrackingStats } from '../../lib/analytics'
-import { calculateGrade, gradeClassName } from '../../lib/grades'
+import { buildStudentProfiles, getStudentTrackingStats } from '../../lib/analytics'
+import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const ANNOTATION_TEXT_LIMIT = 700
@@ -26,6 +25,145 @@ function getCriterionMark(marks, studentId, criterionId) {
 function getCompetencyGrade(marks, studentId, competency) {
   const grades = competency.criteria.map((criterion) => getCriterionMark(marks, studentId, criterion.id))
   return calculateGrade(grades)
+}
+
+function getGradeFromAverage(score) {
+  if (!score) return ''
+  if (score >= 3.5) return 'A'
+  if (score >= 2.5) return 'B'
+  if (score >= 1.5) return 'C'
+  return 'D'
+}
+
+function getCompetencyCode(name = '') {
+  return name.match(/C\d+/i)?.[0]?.toUpperCase() || name.split(':')[0]?.trim() || name
+}
+
+function getCompetencyNumber(name = '') {
+  return Number(getCompetencyCode(name).replace(/\D/g, '')) || 999
+}
+
+function buildSmoothPath(points) {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+
+  const path = [`M ${points[0].x} ${points[0].y}`]
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[Math.max(0, index - 1)]
+    const p1 = points[index]
+    const p2 = points[index + 1]
+    const p3 = points[Math.min(points.length - 1, index + 2)]
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    path.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`)
+  }
+
+  return path.join(' ')
+}
+
+function buildAnnotationCanonicalCompetencies(competencies, classUts) {
+  const byName = new Map()
+
+  classUts.forEach((ut) => {
+    competencies
+      .filter((competency) => competency.utId === ut.id && !competency.inactive)
+      .forEach((competency) => {
+        if (!byName.has(competency.name)) {
+          byName.set(competency.name, {
+            code: getCompetencyCode(competency.name),
+            name: competency.name,
+            order: getCompetencyNumber(competency.name),
+          })
+        }
+      })
+  })
+
+  return Array.from(byName.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+}
+
+function buildAnnotationEvolution({ classUts, competencies, criteria, marks, studentId }) {
+  const canonicalCompetencies = buildAnnotationCanonicalCompetencies(competencies, classUts)
+  const utScores = classUts.map((ut) => {
+    const grades = competencies
+      .filter((competency) => competency.utId === ut.id && !competency.inactive)
+      .map((competency) => ({
+        ...competency,
+        criteria: criteria
+          .filter((criterion) => criterion.competencyId === competency.id)
+          .sort((a, b) => a.order - b.order),
+      }))
+      .map((competency) => getCompetencyGrade(marks, studentId, competency))
+      .filter(Boolean)
+    const grade = calculateGrade(grades)
+    return { ut, grade, score: getNumericFromGrade(grade) }
+  })
+  const validScores = utScores.filter((item) => item.score > 0)
+  const average =
+    validScores.length === 0
+      ? 0
+      : Number((validScores.reduce((sum, item) => sum + item.score, 0) / validScores.length).toFixed(2))
+  const firstScore = validScores[0]?.score || 0
+  const lastScore = validScores.at(-1)?.score || 0
+  const rhythm =
+    validScores.length < 2 ? 'Sense prou dades' : lastScore > firstScore ? 'Millora' : lastScore < firstScore ? 'Regressió' : 'Estable'
+
+  const radarRows = canonicalCompetencies.map((canonicalCompetency, index) => {
+    const grades = classUts.map((ut) => {
+      const competency = competencies.find(
+        (item) => item.utId === ut.id && !item.inactive && item.name === canonicalCompetency.name,
+      )
+      if (!competency) return ''
+      const competencyWithCriteria = {
+        ...competency,
+        criteria: criteria
+          .filter((criterion) => criterion.competencyId === competency.id)
+          .sort((a, b) => a.order - b.order),
+      }
+      return getCompetencyGrade(marks, studentId, competencyWithCriteria)
+    })
+    const firstGrade = grades.find(Boolean) || ''
+    const lastGrade = [...grades].reverse().find(Boolean) || ''
+    return {
+      angle: (Math.PI * 2 * index) / Math.max(canonicalCompetencies.length, 1) - Math.PI / 2,
+      code: canonicalCompetency.code,
+      firstScore: getNumericFromGrade(firstGrade),
+      lastScore: getNumericFromGrade(lastGrade),
+      name: canonicalCompetency.name,
+    }
+  })
+
+  return { average, grade: getGradeFromAverage(average), radarRows, rhythm, utScores, validScores }
+}
+
+function getAnnotationProfile(profile) {
+  if (!profile) return { label: 'Sense dades', tone: 'neutral', text: 'Encara no hi ha prou dades combinades.' }
+  const highConsistency = profile.tracking.hasTrackingData && profile.tracking.consistency >= 70
+  const lowConsistency = profile.tracking.hasTrackingData && profile.tracking.consistency < 60
+
+  if (profile.evaluation.score > 0 && profile.evaluation.score <= 2 && highConsistency) {
+    return {
+      label: 'Alumne invisible',
+      tone: 'student-invisible',
+      text: 'Treballa amb constància però encara no acaba d’assolir.',
+    }
+  }
+  if (profile.riskScore >= 2) {
+    return {
+      label: 'Intervenció prioritària',
+      tone: 'danger',
+      text: 'Combina senyals acadèmiques, de constància o de comportament.',
+    }
+  }
+  if (profile.evaluation.score >= 3 && lowConsistency) {
+    return { label: 'Hàbit preventiu', tone: 'habit', text: 'Assoleix, però la constància és fràgil.' }
+  }
+  return {
+    label: highConsistency ? 'Hàbit estable' : 'Seguiment ordinari',
+    tone: highConsistency ? 'stable' : 'neutral',
+    text: highConsistency ? 'Manté un patró de treball estable.' : 'Sense senyals combinades importants.',
+  }
 }
 
 function formatNote(note) {
@@ -221,6 +359,8 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const marks = useAvaluaproStore((state) => state.marks)
   const behaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
+  const semesters = useAvaluaproStore((state) => state.semesters)
+  const uts = useAvaluaproStore((state) => state.uts)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
@@ -265,6 +405,40 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             .sort((a, b) => a.order - b.order),
         })),
     [activeUtId, competencies, criteria],
+  )
+  const classUts = useMemo(() => {
+    const semesterOrder = new Map(
+      semesters
+        .filter((semester) => semester.classId === activeClassId)
+        .sort((a, b) => a.order - b.order)
+        .map((semester, index) => [semester.id, index]),
+    )
+
+    return uts
+      .filter((ut) => ut.classId === activeClassId)
+      .sort(
+        (a, b) =>
+          (semesterOrder.get(a.semesterId) ?? 999) - (semesterOrder.get(b.semesterId) ?? 999) ||
+          a.order - b.order,
+      )
+  }, [activeClassId, semesters, uts])
+  const studentProfile = useMemo(
+    () =>
+      buildStudentProfiles({ behaviorEvents, marks, students, taskRecords, tasks }, activeClassId).find(
+        (profile) => profile.student.id === studentId,
+      ),
+    [activeClassId, behaviorEvents, marks, studentId, students, taskRecords, tasks],
+  )
+  const annotationEvolution = useMemo(
+    () =>
+      buildAnnotationEvolution({
+        classUts,
+        competencies,
+        criteria,
+        marks,
+        studentId,
+      }),
+    [classUts, competencies, criteria, marks, studentId],
   )
   const studentBehaviorEvents = useMemo(
     () =>
@@ -311,6 +485,25 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const activeMissingTasks = getActiveMissingTasks(missingTasks, trackingNotes)
   const blackPoints = studentBehaviorEvents.filter((event) => event.type === 'incident')
   const diaryEntries = studentBehaviorEvents.filter((event) => event.type === 'positive')
+  const annotationProfile = getAnnotationProfile(studentProfile)
+  const linePoints = annotationEvolution.validScores.map((item, index) => {
+    const x =
+      annotationEvolution.validScores.length <= 1
+        ? 156
+        : 42 + (index / (annotationEvolution.validScores.length - 1)) * 250
+    const y = 176 - ((item.score - 1) / 3) * 132
+    return { ...item, x, y }
+  })
+  const linePath = buildSmoothPath(linePoints)
+  const radarCenter = 98
+  const radarRadius = 64
+  const radarPolygon = annotationEvolution.radarRows
+    .filter((row) => row.lastScore > 0)
+    .map((row) => {
+      const radius = (row.lastScore / 4) * radarRadius
+      return `${radarCenter + Math.cos(row.angle) * radius},${radarCenter + Math.sin(row.angle) * radius}`
+    })
+    .join(' ')
 
   const handleAddTeamNote = async () => {
     await addAgendaNote(studentId, 'team', teamText)
@@ -367,6 +560,11 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             <article className={activeDiagnoses.length > 0 ? 'active' : ''}>
               <strong>{activeDiagnoses.length}</strong>
               <span>diagnòstics marcats</span>
+              <small>
+                {activeDiagnoses.length > 0
+                  ? activeDiagnoses.map((diagnosis) => diagnosis.label).join(' · ')
+                  : 'Sense diagnòstics'}
+              </small>
             </article>
             <button
               className={`annotation-quick-card ${hasTeamAlert ? 'team' : ''}`}
@@ -415,72 +613,116 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <small>{reminder.meta}</small>
         </section>
 
-        <section className="profile-section">
+        <section className="profile-section annotation-progress-section">
           <div className="profile-section-title">
             <h3>
               <TrendingUp size={18} />
-              Resum de la UT activa
+              Progrés del curs i mirada actual
             </h3>
             <span className="profile-context-label">
               Nota {evaluationGrade || '-'} · {evaluatedCriteria}/{totalCriteria} criteris · {tracking.total} tasques
             </span>
           </div>
-          <div className="profile-alert-grid">
-            <article className="profile-alert-card diagnoses">
-              <div>
-                <strong>Diagnòstics</strong>
-                <span>
-                  {activeDiagnoses.length > 0
-                    ? activeDiagnoses.map((diagnosis) => diagnosis.label).join(' · ')
-                    : 'Sense diagnòstics marcats'}
-                </span>
-              </div>
-            </article>
-            <article className={`profile-alert-card ${hasTeamAlert ? 'team' : ''}`}>
-              <div>
-                <strong>Equips educatius</strong>
-                <span>{teamNotes.length} entrada/es</span>
-                {teamNotes[0] && <small>{formatDate(teamNotes[0].date)}</small>}
-              </div>
-            </article>
-            <article className={`profile-alert-card ${hasTutoringAlert ? 'tutoring' : ''}`}>
-              <div>
-                <strong>Tutoria</strong>
-                <span>{tutoringNotes.length} comentari/s</span>
-                {tutoringNotes[0] && <small>{formatDate(tutoringNotes[0].date)}</small>}
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="profile-section">
-          <h3>
-            <BookOpen size={18} />
-            Avaluació de la UT
-          </h3>
-          <div className="profile-competency-grid">
-            {activeCompetencies.map((competency) => {
-              const grade = getCompetencyGrade(marks, studentId, competency)
-              return (
-                <article className="profile-competency" key={competency.id}>
-                  <div>
-                    <strong>{competency.name}</strong>
-                    <span className={gradeClassName(grade)}>{grade || '-'}</span>
-                  </div>
-                  <ul>
-                    {competency.criteria.map((criterion) => (
-                      <li key={criterion.id}>
-                        <span>{criterion.name}</span>
-                        <strong>{getCriterionMark(marks, studentId, criterion.id) || '-'}</strong>
-                      </li>
+          <div className="annotation-progress-layout">
+            <div className="annotation-evolution-charts">
+              <article className="annotation-chart-card">
+                <h4>Trajectòria temporal</h4>
+                {linePoints.length === 0 ? (
+                  <p className="empty-list">Encara no hi ha evidències de curs.</p>
+                ) : (
+                  <svg className="student-line-chart compact" viewBox="0 0 320 210" role="img">
+                    {[4, 3.5, 3, 2.5, 2, 1.5, 1].map((value) => {
+                      const y = 176 - ((value - 1) / 3) * 132
+                      return (
+                        <g key={value}>
+                          <text x="10" y={y + 5}>
+                            {value.toFixed(1).replace('.', ',')}
+                          </text>
+                          <line x1="42" x2="292" y1={y} y2={y} />
+                        </g>
+                      )
+                    })}
+                    <path className="line-fill" d={`${linePath} L ${linePoints.at(-1)?.x || 42} 176 L ${linePoints[0]?.x || 42} 176 Z`} />
+                    <path className="line-path" d={linePath} />
+                    {linePoints.map((point, index) => (
+                      <circle className="line-point" cx={point.x} cy={point.y} key={`${point.ut.id}_${index}`} r="5" />
                     ))}
-                  </ul>
+                    {linePoints.map((point, index) => (
+                      <text className="x-label" key={`label_${point.ut.id}`} x={point.x} y="202">
+                        {point.ut.name || `Moment ${index + 1}`}
+                      </text>
+                    ))}
+                  </svg>
+                )}
+              </article>
+              <article className="annotation-chart-card">
+                <h4>Inici vs final</h4>
+                {annotationEvolution.radarRows.length === 0 ? (
+                  <p className="empty-list">Encara no hi ha competències amb evidències.</p>
+                ) : (
+                  <svg className="student-radar-chart compact" viewBox="0 0 196 196" role="img">
+                    {[0.25, 0.5, 0.75, 1].map((factor) => (
+                      <polygon
+                        className="radar-grid"
+                        key={factor}
+                        points={annotationEvolution.radarRows
+                          .map(
+                            (row) =>
+                              `${radarCenter + Math.cos(row.angle) * radarRadius * factor},${
+                                radarCenter + Math.sin(row.angle) * radarRadius * factor
+                              }`,
+                          )
+                          .join(' ')}
+                      />
+                    ))}
+                    {radarPolygon && <polygon className="radar-last" points={radarPolygon} />}
+                    {annotationEvolution.radarRows.map((row) => (
+                      <text
+                        className="radar-label"
+                        key={row.name}
+                        x={radarCenter + Math.cos(row.angle) * (radarRadius + 14)}
+                        y={radarCenter + Math.sin(row.angle) * (radarRadius + 14)}
+                      >
+                        {row.code}
+                      </text>
+                    ))}
+                  </svg>
+                )}
+              </article>
+            </div>
+            <aside className="annotation-current-summary">
+              <article className={`annotation-profile-card ${annotationProfile.tone}`}>
+                <span>Perfil de l’alumne</span>
+                <strong>{annotationProfile.label}</strong>
+                <p>{annotationProfile.text}</p>
+              </article>
+              <div className="annotation-active-grades">
+                <strong>Notes de la UT activa</strong>
+                {activeCompetencies.length === 0 ? (
+                  <p className="empty-list">Aquesta UT no té competències actives.</p>
+                ) : (
+                  activeCompetencies.map((competency) => {
+                    const grade = getCompetencyGrade(marks, studentId, competency)
+                    return (
+                      <article key={competency.id}>
+                        <span>{competency.name}</span>
+                        <strong className={gradeClassName(grade)}>{grade || '-'}</strong>
+                      </article>
+                    )
+                  })
+                )}
+              </div>
+              <div className="annotation-last-notes">
+                <article className={hasTeamAlert ? 'team' : ''}>
+                  <span>Últim equip educatiu</span>
+                  <strong>{teamNotes[0] ? formatDate(teamNotes[0].date) : 'Sense entrades'}</strong>
                 </article>
-              )
-            })}
-            {activeCompetencies.length === 0 && (
-              <p className="empty-list">Aquesta UT no té competències actives.</p>
-            )}
+                <article className={hasTutoringAlert ? 'tutoring' : ''}>
+                  <span>Última tutoria</span>
+                  <strong>{tutoringNotes[0] ? formatDate(tutoringNotes[0].date) : 'Sense entrades'}</strong>
+                </article>
+              </div>
+            </aside>
           </div>
         </section>
 
