@@ -3998,7 +3998,7 @@ export function TutoringView() {
           </div>
 
           <section className="tutorial-student-profile-tools">
-            <article className="tutoring-card tutorial-doip-card">
+            <article className="tutoring-card tutorial-doip-card" data-tour="tutoring-doip-card">
               <div>
                 <ClipboardList size={24} />
                 <h2>DOIPs pendents</h2>
@@ -4033,7 +4033,7 @@ export function TutoringView() {
               )}
             </article>
 
-            <article className="tutoring-card tutorial-modified-card">
+            <article className="tutoring-card tutorial-modified-card" data-tour="tutoring-modified-card">
               <div>
                 <SlidersHorizontal size={24} />
                 <h2>Competències modificades</h2>
@@ -4077,7 +4077,7 @@ export function TutoringView() {
               )}
             </article>
 
-            <article className="tutoring-card tutorial-exemptions-card">
+            <article className="tutoring-card tutorial-exemptions-card" data-tour="tutoring-exemptions-card">
               <div>
                 <ShieldAlert size={24} />
                 <h2>Exempcions i balanç modificat</h2>
@@ -4142,7 +4142,7 @@ export function TutoringView() {
               )}
             </article>
 
-            <article className="tutoring-card tutorial-intelligences-card">
+            <article className="tutoring-card tutorial-intelligences-card" data-tour="tutoring-intelligences-card">
               <div>
                 <Star size={24} />
                 <h2>Intel·ligències múltiples</h2>

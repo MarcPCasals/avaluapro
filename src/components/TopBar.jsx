@@ -322,7 +322,7 @@ export function TopBar() {
                 </button>
               )}
               <button
-                data-tour="data-safety-button"
+                data-tour="teacher-profile-button"
                 onClick={() => {
                   setShowProfile(true)
                   setShowDataMenu(false)
@@ -334,6 +334,7 @@ export function TopBar() {
               </button>
               <span className="top-menu-separator" />
               <button
+                data-tour="data-safety-button"
                 onClick={() => {
                   setDataSafetyInitialSection('')
                   setShowDataSafety(true)
@@ -345,6 +346,7 @@ export function TopBar() {
                 Còpies i estat
               </button>
               <button
+                data-tour="antecedents-button"
                 onClick={() => {
                   setDataSafetyInitialSection('antecedents')
                   setShowDataSafety(true)

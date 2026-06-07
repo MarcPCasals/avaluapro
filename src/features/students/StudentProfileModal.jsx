@@ -416,6 +416,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             })}
             <button
               className={`diagnosis-modification-entry ${showModifiedCompetenciesPanel ? 'active' : ''}`}
+              data-tour="student-modified-competencies"
               disabled={subjectModifiedCompetencies.length === 0}
               onClick={() => setShowManualModificationPanel((current) => !current)}
               title="Configurar competències modificades"

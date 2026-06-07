@@ -4,10 +4,14 @@ import {
   ClipboardCheck,
   Cloud,
   Database,
+  FileArchive,
   GraduationCap,
   HelpCircle,
   PlayCircle,
+  Send,
   ShieldCheck,
+  Sparkles,
+  SlidersHorizontal,
   Users,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -67,6 +71,26 @@ const helpSections = [
     title: 'Seguiment separat',
     text: 'La pantalla de seguiment només mostra dades de seguiment. La barreja amb l’avaluació es deixa per Estadístiques Globals.',
   },
+  {
+    icon: SlidersHorizontal,
+    title: 'Competències modificades i exempcions',
+    text: 'Les competències modificades es marquen des del perfil de l’alumne o des de tutoria. A la taula es veu la nota de progrés encerclada; quan s’envien al tutor compten com a balanç estàndard.',
+  },
+  {
+    icon: Send,
+    title: 'Compartir notes entre docents',
+    text: 'El professor envia només les notes de la seva matèria al correu del tutor. El tutor revisa coincidències d’alumnes abans d’importar-les.',
+  },
+  {
+    icon: FileArchive,
+    title: 'Antecedents acadèmics',
+    text: 'Serveixen per començar el curs amb una primera mirada de l’alumne: notes de competències del curs anterior, perfil i informació útil per fer seguiment.',
+  },
+  {
+    icon: GraduationCap,
+    title: 'Tutoria compartida',
+    text: 'Si hi ha cotutors, el mode tutoria pot treballar amb un espai compartit perquè el perfil tutorial, DOIPs, relacions i informes siguin comuns.',
+  },
 ]
 
 const guideLaunchers = [
@@ -87,6 +111,12 @@ const guideLaunchers = [
     id: 'tutoring',
     title: 'Guia de tutoria',
     text: 'Mode tutoria, avaluació tutorial, seguiment, relacions, grups i perfil de reunió.',
+  },
+  {
+    icon: Sparkles,
+    id: 'advanced',
+    title: 'Guia de funcions avançades',
+    text: 'Biblioteca de diagnòstics, compartir notes, antecedents, còpies i eines noves de tutoria.',
   },
 ]
 

@@ -61,6 +61,7 @@ export function SemesterUtTabs() {
         </button>
         <button
           className="diagnosis-library-trigger"
+          data-tour="diagnosis-library-button"
           onClick={() => setShowDiagnosisLibrary(true)}
           title="Biblioteca de diagnòstics"
           type="button"

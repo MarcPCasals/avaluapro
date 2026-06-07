@@ -444,7 +444,7 @@ const tutoringTourSteps = [
   {
     target: 'tutoring-hero',
     title: '2. Grup vinculat',
-    text: 'La tutoria queda connectada a una classe base: així aprofita alumnes, fotos i les notes que ja tens de la teva assignatura.',
+    text: 'La tutoria queda connectada a una classe base: així aprofita alumnes, fotos i les notes que ja tens de la teva assignatura. Si comparteixes tutoria, els cotutors treballen sobre el mateix espai tutorial.',
     mode: 'tutoring',
   },
   {
@@ -454,22 +454,52 @@ const tutoringTourSteps = [
     mode: 'tutoring',
   },
   {
+    target: 'tutoring-evaluation-panel',
+    title: '4. Notes de totes les matèries',
+    text: 'Avaluació tutorial treballa només amb competències. Pot carregar les notes de la classe vinculada i també notes rebudes d’altres docents, sempre separant matèria, competència, alumne i origen.',
+    mode: 'tutoring',
+  },
+  {
     target: 'tutoring-group-diagnosis',
-    title: '4. Diagnòstic del grup',
+    title: '5. Diagnòstic del grup',
     text: 'Aquí veus el percentatge de competències no assolides, cobertura de dades, àrees de dificultat i alumnes que convé mirar primer. Al principi pot haver-hi poca informació: les estadístiques apareixen a mesura que carregues notes.',
     mode: 'tutoring',
   },
   {
     target: 'tutoring-panel-tabs',
-    title: '5. Seguiment tutorial',
+    title: '6. Seguiment tutorial',
     text: 'Obre aquesta pestanya per registrar notes a l’agenda, fulls d’incidència, expulsions d’aula o de centre. Són dades pròpies del tutor.',
     action: 'Clica “Seguiment tutorial” quan vulguis veure aquest apartat.',
     completeWhen: 'tutoring-tracking-open',
     mode: 'tutoring',
   },
   {
+    target: 'tutoring-doip-card',
+    title: '7. DOIPs i equips educatius',
+    text: 'Aquesta targeta t’ajuda a veure quins alumnes encara no tenen cap DOIP registrat i a afegir ràpidament el resum de respostes de l’equip educatiu.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-modified-card',
+    title: '8. Competències modificades',
+    text: 'Aquí només apareixen alumnes amb competències modificades. Pots configurar-les manualment o deixar que arribin amb les notes tutorials compartides.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-exemptions-card',
+    title: '9. Exempcions',
+    text: 'Marca alumnes exempts d’una matèria perquè Avaluapro ignori aquestes competències i no les compti com a no assolides.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-intelligences-card',
+    title: '10. Intel·ligències múltiples',
+    text: 'Aquest bloc serveix per fer una lectura ràpida del perfil del grup i preparar activitats o agrupaments amb més criteri.',
+    mode: 'tutoring',
+  },
+  {
     target: 'tutoring-panel-tabs',
-    title: '6. Relacions i grups',
+    title: '11. Relacions i grups',
     text: 'Des d’aquí es construeix el sociograma, els grups cooperatius i la disposició d’aula. Les fotos venen del perfil de l’alumne.',
     action: 'Clica “Relacions i grups” per entrar a les eines socials del grup.',
     completeWhen: 'tutoring-relationships-open',
@@ -477,25 +507,43 @@ const tutoringTourSteps = [
   },
   {
     target: 'tutoring-relationship-tools',
-    title: '7. Tres eines socials',
+    title: '12. Tres eines socials',
     text: 'Les targetes obren el sociograma, els grups cooperatius i la disposició d’aula en gran. Així la pestanya queda neta i cada eina té espai per treballar.',
     mode: 'tutoring',
   },
   {
+    target: 'tutoring-tool-sociogram',
+    title: '13. Sociograma',
+    text: 'El sociograma mostra relacions reals del grup. Els alumnes estrella no generen una xarxa artificial: només ajuden a orientar grups i disposicions.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-tool-groups',
+    title: '14. Grups cooperatius',
+    text: 'Avaluapro proposa grups combinant notes, perfil, mitjos grups i relacions. Després pots editar alumnes concrets sense refer tota la proposta.',
+    mode: 'tutoring',
+  },
+  {
+    target: 'tutoring-tool-seating',
+    title: '15. Disposició d’aula',
+    text: 'La matriu de l’aula permet marcar taules, buits, alumnes bloquejats i alumnes a revisar. Quan generes proposta, intenta moure el mínim possible.',
+    mode: 'tutoring',
+  },
+  {
     target: 'tutoring-relation-form',
-    title: '8. Registra relacions',
+    title: '16. Registra relacions',
     text: 'Aquí pots escriure el nom d’un alumne i triar ràpidament la relació: afinitat, treballa bé o evitar. El cercador és més ràpid que recórrer tota la llista.',
     mode: 'tutoring',
   },
   {
     target: 'tutoring-relation-search',
-    title: '9. Consulta un alumne',
+    title: '17. Consulta un alumne',
     text: 'El cercador per alumne resumeix les relacions registrades i et dona accés ràpid al sociograma amb aquell alumne al centre.',
     mode: 'tutoring',
   },
   {
     target: 'tutoring-panel-tabs',
-    title: '10. Perfil i PDF',
+    title: '18. Perfil i PDF',
     text: 'Aquest apartat prepara el perfil individual de l’alumne i el resum descarregable per reunions o seguiment tutorial.',
     action: 'Clica “Perfil i PDF” quan vulguis revisar perfils individuals.',
     completeWhen: 'tutoring-profile-open',
@@ -503,8 +551,104 @@ const tutoringTourSteps = [
   },
   {
     target: 'tutoring-profile-panel',
-    title: '11. Final de la guia de tutoria',
+    title: '19. Final de la guia de tutoria',
     text: 'Ja tens situades les tres peces: diagnòstic global, seguiment tutorial i mapa social del grup. A partir d’aquí pots tornar a qualsevol pestanya segons la necessitat de reunió o seguiment.',
+    mode: 'tutoring',
+    final: true,
+  },
+]
+
+const advancedTourSteps = [
+  {
+    target: 'guide-button',
+    title: '1. Guies parcials',
+    text: 'Des del botó d’ajuda pots reprendre només la guia que necessites: demo, dades pròpies, tutoria o funcions avançades.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'diagnosis-library-button',
+    title: '2. Biblioteca de diagnòstics',
+    text: 'La biblioteca recull diagnòstics, estratègies i adaptacions. És una consulta ràpida: no cal omplir-ho tot a mà cada vegada.',
+    mode: 'evaluation',
+  },
+  {
+    target: 'student-name-open',
+    title: '3. Perfil de l’alumne',
+    text: 'Clica el nom d’un alumne per obrir el perfil. Allà pots carregar foto, marcar diagnòstics i configurar competències modificades.',
+    action: 'Obre el perfil d’un alumne per veure les opcions avançades.',
+    completeWhen: 'student-profile-open',
+    mode: 'evaluation',
+    placement: 'right',
+    requiresClassStudents: true,
+  },
+  {
+    target: 'student-modified-competencies',
+    title: '4. Competències modificades',
+    text: 'Aquest botó apareix al costat dels diagnòstics. Permet marcar competències modificades encara que no hi hagi un diagnòstic concret seleccionat.',
+    mode: 'evaluation',
+    placement: 'left',
+    requiresClassStudents: true,
+  },
+  {
+    target: 'modal-close',
+    title: '5. Torna a la taula',
+    text: 'Tanca el perfil per continuar amb les funcions de dades i compartició.',
+    action: 'Tanca el perfil de l’alumne.',
+    completeWhen: 'student-profile-closed',
+    mode: 'evaluation',
+    placement: 'left',
+    requiresClassStudents: true,
+  },
+  {
+    target: 'data-menu',
+    title: '6. Dades i Compte',
+    text: 'Aquest menú concentra còpies, antecedents i compartició de notes. Obre’l per veure les funcions avançades de dades.',
+    action: 'Obre el menú “Dades i Compte”.',
+    completeWhen: 'data-menu-open',
+    mode: 'evaluation',
+    placement: 'far-left',
+  },
+  {
+    target: 'data-safety-button',
+    title: '7. Còpies i estat',
+    text: 'Aquí veus l’estat de dades, sincronització, còpies al núvol i còpies manuals. És el lloc segur abans de restaurar o reiniciar.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'antecedents-button',
+    title: '8. Antecedents acadèmics',
+    text: 'Els antecedents permeten exportar informació útil de final de curs i carregar-la l’any següent per veure progrés des del primer dia.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'teacher-package-button',
+    title: '9. Compartir notes',
+    text: 'Els docents poden enviar notes de la seva matèria al tutor. El tutor revisa coincidències d’alumnes abans d’importar res.',
+    mode: 'evaluation',
+    placement: 'left',
+  },
+  {
+    target: 'stats-antecedents',
+    title: '10. Gràfics d’antecedents',
+    text: 'Quan hi ha antecedents carregats, Estadístiques Globals mostra evolució del curs anterior a la mirada actual: millores, empitjoraments i riscos mantinguts.',
+    dashboardScope: 'cross',
+    mode: 'analytics',
+    insight: 'dashboard',
+  },
+  {
+    target: 'tutoring-mode-button',
+    title: '11. Mode tutoria',
+    text: 'Quan una classe es marca com a tutoria, apareix aquest botó. Des d’aquí es gestionen notes de totes les matèries, DOIPs, relacions i informes.',
+    mode: 'evaluation',
+    placement: 'below',
+  },
+  {
+    target: 'tutoring-relationship-tools',
+    title: '12. Sociograma, grups i aula',
+    text: 'Les eines socials de tutoria s’obren en gran: sociograma, grups cooperatius i disposició d’aula. Són funcions potents, per això tenen guia pròpia.',
     mode: 'tutoring',
     final: true,
   },
@@ -704,6 +848,10 @@ export function GuidedTour() {
   const activeSteps = useMemo(() => {
     if (guideMode === 'demo') return tourSteps
     if (guideMode === 'tutoring') return tutoringTourSteps
+    if (guideMode === 'advanced') {
+      const hasClassStudents = activeClassStudentCount > 0
+      return advancedTourSteps.filter((item) => !item.requiresClassStudents || hasClassStudents)
+    }
     const hasClassStudents = activeClassStudentCount > 0
     const visibleSteps = ownDataTourSteps.filter((item) => !item.requiresClassStudents || hasClassStudents)
     return hasClassStudents ? visibleSteps : [...visibleSteps, waitingForStudentsStep]
