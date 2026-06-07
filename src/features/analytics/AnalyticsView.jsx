@@ -1082,7 +1082,7 @@ function TrendCard({ trend, setInfo }) {
         <span>Tendència global</span>
         <TrendingUp size={16} />
       </header>
-      <svg viewBox="0 0 320 120" role="img" aria-label="Tendència global de notes">
+      <svg className="trend-chart" viewBox="0 0 320 120" role="img" aria-label="Tendència global de notes">
         {[24, 42, 60, 78, 96].map((y) => (
           <line className="trend-grid" key={y} x1="16" x2="304" y1={y} y2={y} />
         ))}
@@ -3093,35 +3093,27 @@ export function AnalyticsView() {
             />
           </div>
           <div className="action-list-grid tracking-action-grid">
-              <ActionList
-                emptyText="Cap cas clar de constància alta amb rendiment baix."
-                helpKey="actionLists"
-                icon={Brain}
-                profiles={hardworkingLowAchievement}
-                setInfo={setSelectedInfo}
-                title="Alumnes invisibles"
-              />
-              <TrackingActionList
-                emptyText="Cap alumne amb constància baixa dins la UT activa."
-                icon={AlertTriangle}
-                profiles={lowTrackingProfiles}
-                setInfo={setSelectedInfo}
-                title="Baixa constància"
-              />
-              <TrackingActionList
-                emptyText="Cap alumne amb punts vermells visibles."
-                icon={MessageSquareText}
-                profiles={redPointProfiles}
-                setInfo={setSelectedInfo}
-                title="Punts vermells"
-              />
-              <TrackingActionList
-                emptyText="Cap incidència de comportament registrada."
-                icon={MessageSquareText}
-                profiles={incidentProfiles}
-                setInfo={setSelectedInfo}
-                title="Punts negres"
-              />
+            <TrackingActionList
+              emptyText="Cap alumne amb constància baixa dins la UT activa."
+              icon={AlertTriangle}
+              profiles={lowTrackingProfiles}
+              setInfo={setSelectedInfo}
+              title="Baixa constància"
+            />
+            <TrackingActionList
+              emptyText="Cap alumne amb punts vermells visibles."
+              icon={MessageSquareText}
+              profiles={redPointProfiles}
+              setInfo={setSelectedInfo}
+              title="Punts vermells"
+            />
+            <TrackingActionList
+              emptyText="Cap incidència de comportament registrada."
+              icon={MessageSquareText}
+              profiles={incidentProfiles}
+              setInfo={setSelectedInfo}
+              title="Punts negres"
+            />
           </div>
           <section className="global-diagnosis tracking-diagnosis">
             <div className="global-diagnosis-title">
