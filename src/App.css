@@ -683,7 +683,7 @@
 
 .tutoring-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
   gap: 18px;
   align-items: stretch;
   border: 1px solid #d1fae5;
@@ -710,13 +710,18 @@
 .tutoring-hero aside {
   display: grid;
   align-content: center;
-  justify-items: center;
-  gap: 4px;
+  gap: 10px;
   border: 1px solid #bbf7d0;
   border-radius: 8px;
   padding: 16px;
-  text-align: center;
   background: white;
+}
+
+.tutoring-hero-linked-count {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
 }
 
 .tutoring-hero aside strong {
@@ -733,6 +738,86 @@
 .tutoring-hero aside small {
   color: #64748b;
   font-weight: 800;
+}
+
+.tutoring-hero-share-panel .field-label {
+  gap: 5px;
+  margin: 0;
+  color: #475569;
+  font-size: 11px;
+  text-align: left;
+}
+
+.tutoring-hero-share-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.tutoring-hero-share-controls .secondary-action {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.tutoring-hero-share-message {
+  display: block;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #166534 !important;
+  background: #f0fdf4;
+}
+
+.tutoring-hero-share-message.error {
+  border-color: #fecaca;
+  color: #991b1b !important;
+  background: #fef2f2;
+}
+
+.educand-email-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+}
+
+.educand-email-field:focus-within {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+.educand-email-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.educand-email-field input:focus {
+  box-shadow: none;
+}
+
+.educand-email-field > span {
+  padding: 0 10px 0 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .tutoring-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .tutoring-hero-share-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .tutoring-grid {

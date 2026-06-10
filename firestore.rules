@@ -100,6 +100,17 @@ service cloud.firestore {
         );
     }
 
+    function isTutoringSpaceOwner() {
+      return signedIn()
+        && (
+          resource.data.ownerUid == request.auth.uid
+          || (
+            request.auth.token.email is string
+            && resource.data.ownerEmailLower == request.auth.token.email
+          )
+        );
+    }
+
     function isTutoringSpaceMemberAfterWrite() {
       return signedIn()
         && (
@@ -159,22 +170,40 @@ service cloud.firestore {
     }
 
     function validTutoringSpaceUpdate() {
-      return isTutoringSpaceMember()
+      return (isTutoringSpaceMember() || isTutoringSpaceOwner())
         && isTutoringSpaceMemberAfterWrite()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'className',
+          'createdAt',
+          'id',
           'lastSharedConflictAt',
           'memberEmails',
           'memberUids',
           'members',
+          'ownerEmailLower',
+          'ownerUid',
           'sharedConflictSummary',
           'sharedSummary',
+          'sourceClassId',
           'status',
           'updatedAt'
         ])
+        && (
+          !resource.data.keys().hasAny(['id'])
+          || request.resource.data.id == resource.data.id
+        )
+        && (
+          !resource.data.keys().hasAny(['ownerUid'])
+          || request.resource.data.ownerUid == resource.data.ownerUid
+        )
+        && (
+          !resource.data.keys().hasAny(['ownerEmailLower'])
+          || request.resource.data.ownerEmailLower == resource.data.ownerEmailLower
+        )
         && request.resource.data.memberEmails is list
         && request.resource.data.memberUids is list
-        && request.resource.data.members is list;
+        && request.resource.data.members is list
+        && request.resource.data.status == 'active';
     }
 
     match /teacherGradePackages/{transferId} {

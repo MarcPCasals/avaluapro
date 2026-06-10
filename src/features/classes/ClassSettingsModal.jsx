@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Cloud, GraduationCap, Link2, RefreshCw, Settings, Share2, Trash2 } from 'lucide-react'
+import { EducandEmailInput } from '../../components/EducandEmailInput'
 import { Modal } from '../../components/Modal'
+import { normalizeEducandEmail } from '../../lib/email'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassFormFields } from './ClassFormFields'
 
@@ -41,15 +43,9 @@ export function ClassSettingsModal({ classId, onClose }) {
   )
   const sharedSummary = currentSharedSpace?.sharedSummary || {}
   const sharedConflictCount = currentSharedSpace?.sharedConflictSummary?.count || 0
-  const cleanShareEmail = (value) => {
-    const cleanValue = String(value || '').trim().toLowerCase()
-    if (!cleanValue) return ''
-    return cleanValue.includes('@') ? cleanValue : `${cleanValue}@educand.ad`
-  }
-
   const handleShareTutoring = async () => {
     setSharedMessage('')
-    const recipientEmail = cleanShareEmail(shareEmail)
+    const recipientEmail = normalizeEducandEmail(shareEmail)
     if (!recipientEmail) {
       setSharedMessage('Escriu el correu del cotutor.')
       return
@@ -279,14 +275,11 @@ export function ClassSettingsModal({ classId, onClose }) {
                     </div>
                   )}
                   <div className="shared-tutoring-actions">
-                    <label className="field-label">
-                      Correu del cotutor
-                      <input
-                        onChange={(event) => setShareEmail(event.target.value)}
-                        placeholder="nom o nom@educand.ad"
-                        value={shareEmail}
-                      />
-                    </label>
+                    <EducandEmailInput
+                      label="Correu del cotutor"
+                      onChange={setShareEmail}
+                      value={shareEmail}
+                    />
                     <button
                       className="secondary-action"
                       disabled={sharedBusy === 'share'}

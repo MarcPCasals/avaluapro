@@ -18,10 +18,12 @@ import {
   Network,
   Plus,
   RotateCcw,
+  RefreshCw,
   Save,
   Search,
   ShieldAlert,
   Shuffle,
+  Share2,
   SlidersHorizontal,
   Star,
   Trash2,
@@ -29,9 +31,11 @@ import {
   UserX,
   UsersRound,
 } from 'lucide-react'
+import { EducandEmailInput } from '../../components/EducandEmailInput'
 import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
+import { normalizeEducandEmail } from '../../lib/email'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
@@ -2647,8 +2651,12 @@ export function TutoringView() {
   const [seatingPlanName, setSeatingPlanName] = useState('')
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
+  const [shareTutoringEmail, setShareTutoringEmail] = useState('')
+  const [shareTutoringMessage, setShareTutoringMessage] = useState('')
+  const [shareTutoringBusy, setShareTutoringBusy] = useState('')
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
+  const cloud = useAvaluaproStore((state) => state.cloud)
   const students = useAvaluaproStore((state) => state.students)
   const marks = useAvaluaproStore((state) => state.marks)
   const competencies = useAvaluaproStore((state) => state.competencies)
@@ -2674,6 +2682,8 @@ export function TutoringView() {
   const resetTutorialSociogramLayout = useAvaluaproStore((state) => state.resetTutorialSociogramLayout)
   const toggleTutorialStudentRole = useAvaluaproStore((state) => state.toggleTutorialStudentRole)
   const saveTutorialSeatingPlan = useAvaluaproStore((state) => state.saveTutorialSeatingPlan)
+  const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
+  const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -3427,6 +3437,46 @@ export function TutoringView() {
     )
   }
 
+  const handleShareTutoringFromHeader = async () => {
+    setShareTutoringMessage('')
+    const recipientEmail = normalizeEducandEmail(shareTutoringEmail)
+    if (!recipientEmail) {
+      setShareTutoringMessage('Escriu el correu del cotutor.')
+      return
+    }
+    setShareTutoringBusy('share')
+    try {
+      const space = await shareTutoringClass({ classId: activeClassId, recipientEmail })
+      setShareTutoringEmail('')
+      setShareTutoringMessage(
+        space?.sharedConflictSummary?.count > 0
+          ? `Tutoria compartida amb ${recipientEmail}. S’han conservat ${space.sharedConflictSummary.count} canvis remots recents.`
+          : `Tutoria compartida correctament amb ${recipientEmail}.`,
+      )
+    } catch (error) {
+      setShareTutoringMessage(error.message || 'No s’ha pogut compartir aquesta tutoria.')
+    } finally {
+      setShareTutoringBusy('')
+    }
+  }
+
+  const handleSyncTutoringFromHeader = async () => {
+    setShareTutoringMessage('')
+    setShareTutoringBusy('sync')
+    try {
+      const space = await syncSharedTutoringClass(activeClassId)
+      setShareTutoringMessage(
+        space?.sharedConflictSummary?.count > 0
+          ? `Sincronització feta. S’han conservat ${space.sharedConflictSummary.count} canvis recents d’un altre tutor.`
+          : 'Tutoria compartida sincronitzada correctament.',
+      )
+    } catch (error) {
+      setShareTutoringMessage(error.message || 'No s’ha pogut sincronitzar aquesta tutoria compartida.')
+    } finally {
+      setShareTutoringBusy('')
+    }
+  }
+
   return (
     <section className="tutoring-view" data-tour="tutoring-view">
       <header className="tutoring-hero" data-tour="tutoring-hero">
@@ -3441,10 +3491,50 @@ export function TutoringView() {
             seguiment tutorial i perfil individual de cada alumne.
           </p>
         </div>
-        <aside>
-          <strong>{classStudents.length}</strong>
-          <span>alumnes vinculats</span>
-          <small>Dades compartides amb {linkedClass?.name || 'la classe activa'}</small>
+        <aside className="tutoring-hero-share-panel">
+          <div className="tutoring-hero-linked-count">
+            <strong>{classStudents.length}</strong>
+            <span>alumnes vinculats</span>
+            <small>Dades compartides amb {linkedClass?.name || 'la classe activa'}</small>
+          </div>
+          <div className="tutoring-hero-share-controls">
+            <EducandEmailInput
+              label="Cotutor"
+              onChange={setShareTutoringEmail}
+              placeholder="nom"
+              value={shareTutoringEmail}
+            />
+            <button
+              className="secondary-action compact"
+              disabled={shareTutoringBusy === 'share' || !cloud.user?.email}
+              onClick={handleShareTutoringFromHeader}
+              title={cloud.user?.email ? 'Compartir aquesta tutoria' : 'Inicia sessió per compartir la tutoria'}
+              type="button"
+            >
+              <Share2 size={15} />
+              Afegir cotutor
+            </button>
+            {activeClass?.sharedTutoringSpaceId && (
+              <button
+                className="secondary-action compact"
+                disabled={shareTutoringBusy === 'sync'}
+                onClick={handleSyncTutoringFromHeader}
+                type="button"
+              >
+                <RefreshCw size={15} />
+                Sync
+              </button>
+            )}
+          </div>
+          {(shareTutoringMessage || cloud.sharedTutoringError) && (
+            <small
+              className={`tutoring-hero-share-message ${
+                cloud.sharedTutoringError && !shareTutoringMessage ? 'error' : ''
+              }`}
+            >
+              {shareTutoringMessage || cloud.sharedTutoringError}
+            </small>
+          )}
         </aside>
       </header>
 
