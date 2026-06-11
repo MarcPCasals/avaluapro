@@ -14461,6 +14461,123 @@ button.profile-followup-card:focus-visible {
   max-width: 760px;
 }
 
+.tutoring-share-modal {
+  display: grid;
+  gap: 18px;
+}
+
+.tutoring-share-status {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto 1fr auto;
+  padding: 14px;
+}
+
+.tutoring-share-status > span {
+  align-items: center;
+  background: #e2e8f0;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-flex;
+  font-size: 1.1rem;
+  font-weight: 900;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.tutoring-share-status > span.active {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.tutoring-share-status strong,
+.tutoring-share-status small {
+  display: block;
+}
+
+.tutoring-share-status small {
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.tutoring-share-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tutoring-share-list,
+.tutoring-share-linked-list {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.tutoring-share-list article,
+.tutoring-share-linked-list article {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.tutoring-share-list article.accepted {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.tutoring-share-list article.rejected {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.tutoring-share-list strong,
+.tutoring-share-list small,
+.tutoring-share-linked-list strong,
+.tutoring-share-linked-list small {
+  display: block;
+}
+
+.tutoring-share-list small,
+.tutoring-share-linked-list small {
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.tutoring-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .tutoring-share-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tutoring-share-status {
+    grid-template-columns: auto 1fr;
+  }
+
+  .tutoring-share-status .secondary-action {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
 .empty-cloud-backups {
   margin: 0;
 }

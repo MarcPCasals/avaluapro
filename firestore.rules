@@ -66,7 +66,8 @@ service cloud.firestore {
           'competencyCount',
           'emptyCount',
           'gradeCount',
-          'studentCount'
+          'studentCount',
+          'trackingStudentCount'
         ]);
     }
 
@@ -246,6 +247,7 @@ service cloud.firestore {
           'className',
           'createdAt',
           'id',
+          'outboxId',
           'recipientEmailLower',
           'respondedAt',
           'responseByEmail',
@@ -271,6 +273,71 @@ service cloud.firestore {
         && request.resource.data.responseByEmail == ''
         && request.resource.data.responseByUid == ''
         && request.resource.data.senderSeenAt == '';
+    }
+
+    function validTutoringInvitationOutboxCreate(senderUid, outboxId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && senderUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'className',
+          'createdAt',
+          'id',
+          'outboxId',
+          'recipientEmailLower',
+          'respondedAt',
+          'responseByEmail',
+          'responseByUid',
+          'senderEmail',
+          'senderEmailLower',
+          'senderName',
+          'senderSeenAt',
+          'senderUid',
+          'sourceClassId',
+          'spaceId',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.outboxId == outboxId
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmailLower == request.auth.token.email
+        && request.resource.data.senderEmail == request.auth.token.email
+        && request.resource.data.recipientEmailLower is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.respondedAt == ''
+        && request.resource.data.responseByEmail == ''
+        && request.resource.data.responseByUid == ''
+        && request.resource.data.senderSeenAt == '';
+    }
+
+    function validTutoringInvitationOutboxRecipientResponse() {
+      return signedIn()
+        && request.auth.token.email is string
+        && resource.data.recipientEmailLower == request.auth.token.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'respondedAt',
+          'responseByEmail',
+          'responseByUid',
+          'status',
+          'updatedAt'
+        ])
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['accepted', 'rejected']
+        && request.resource.data.responseByEmail == request.auth.token.email
+        && request.resource.data.responseByUid == request.auth.uid
+        && request.resource.data.respondedAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validTutoringInvitationOutboxSenderAck(senderUid) {
+      return signedIn()
+        && senderUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'senderSeenAt',
+          'updatedAt'
+        ])
+        && request.resource.data.senderSeenAt is string
+        && request.resource.data.updatedAt is string;
     }
 
     function validTutoringInvitationRecipientResponse(recipientEmailLower) {
@@ -330,6 +397,13 @@ service cloud.firestore {
       allow read: if isTutoringInvitationRecipient(recipientEmailLower) || isTutoringInvitationSender();
       allow update: if validTutoringInvitationRecipientResponse(recipientEmailLower) || validTutoringInvitationSenderAck();
       allow delete: if isTutoringInvitationRecipient(recipientEmailLower) || isTutoringInvitationSender();
+    }
+
+    match /tutoringInvitationOutbox/{senderUid}/items/{outboxId} {
+      allow create: if validTutoringInvitationOutboxCreate(senderUid, outboxId);
+      allow read, delete: if signedIn() && senderUid == request.auth.uid;
+      allow update: if validTutoringInvitationOutboxSenderAck(senderUid)
+        || validTutoringInvitationOutboxRecipientResponse();
     }
 
     match /users/{userId} {

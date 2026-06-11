@@ -16,6 +16,7 @@ import {
   Send,
   Settings,
   Trash2,
+  UsersRound,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from './Modal'
@@ -24,6 +25,7 @@ import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
 import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
+import { TutoringShareModal } from '../features/data/TutoringShareModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
@@ -109,6 +111,7 @@ export function TopBar() {
   const [showDataSafety, setShowDataSafety] = useState(false)
   const [dataSafetyInitialSection, setDataSafetyInitialSection] = useState('')
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
+  const [showTutoringShare, setShowTutoringShare] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -133,11 +136,16 @@ export function TopBar() {
   const signOutFromGoogle = useAvaluaproStore((state) => state.signOutFromGoogle)
   const loadReceivedTeacherGradePackages = useAvaluaproStore((state) => state.loadReceivedTeacherGradePackages)
   const loadSentTeacherGradePackages = useAvaluaproStore((state) => state.loadSentTeacherGradePackages)
+  const loadSharedTutoringInvitations = useAvaluaproStore((state) => state.loadSharedTutoringInvitations)
   const syncIndicator = getSyncIndicator(cloud)
   const SyncIcon = syncIndicator.icon
   const pendingTeacherPackages = useMemo(
     () => (cloud.teacherPackages || []).filter((packageItem) => packageItem.status !== 'imported').length,
     [cloud.teacherPackages],
+  )
+  const pendingTutoringShares = useMemo(
+    () => (cloud.sharedTutoringInvitations?.length || 0) + (cloud.sharedTutoringInvitationUpdates?.length || 0),
+    [cloud.sharedTutoringInvitationUpdates, cloud.sharedTutoringInvitations],
   )
 
   useEffect(() => {
@@ -159,13 +167,18 @@ export function TopBar() {
     if ((showDataMenu || showTeacherPackages) && cloud.user?.uid) {
       loadSentTeacherGradePackages()
     }
+    if ((showDataMenu || showTutoringShare) && cloud.user?.email) {
+      loadSharedTutoringInvitations()
+    }
   }, [
     cloud.user?.email,
     cloud.user?.uid,
+    loadSharedTutoringInvitations,
     loadReceivedTeacherGradePackages,
     loadSentTeacherGradePackages,
     showDataMenu,
     showTeacherPackages,
+    showTutoringShare,
   ])
 
   function handleDownloadBackup() {
@@ -372,6 +385,19 @@ export function TopBar() {
                   {pendingTeacherPackages}
                 </em>
               </button>
+              <button
+                onClick={() => {
+                  setShowTutoringShare(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <UsersRound size={18} />
+                <span className="top-menu-button-label">Compartir tutoria</span>
+                <em className={pendingTutoringShares > 0 ? 'top-menu-badge active' : 'top-menu-badge'}>
+                  {pendingTutoringShares}
+                </em>
+              </button>
             </div>
           )}
         </div>
@@ -415,6 +441,7 @@ export function TopBar() {
       )}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
+      {showTutoringShare && <TutoringShareModal onClose={() => setShowTutoringShare(false)} />}
       {showResetConfirm && (
         <Modal onClose={() => setShowResetConfirm(false)} size="lg" title="Reiniciar el curs">
           <div className="reset-course-modal">

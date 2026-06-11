@@ -13,7 +13,6 @@ import {
 import {
   arrayUnion,
   collection,
-  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -130,6 +129,25 @@ function getTutoringInvitationDocRef(recipientEmail, spaceId) {
 
 function getTutoringInvitationCollectionRef(recipientEmail) {
   return collection(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items')
+}
+
+function getTutoringInvitationOutboxId(recipientEmail, spaceId) {
+  const cleanEmail = normalizeEmail(recipientEmail).replace(/[^a-z0-9_-]/g, '_')
+  return `${String(spaceId || '').replaceAll('/', '_')}__${cleanEmail}`
+}
+
+function getTutoringInvitationOutboxDocRef(senderUid, recipientEmail, spaceId) {
+  return doc(
+    db,
+    'tutoringInvitationOutbox',
+    senderUid,
+    'items',
+    getTutoringInvitationOutboxId(recipientEmail, spaceId),
+  )
+}
+
+function getTutoringInvitationOutboxCollectionRef(senderUid) {
+  return collection(db, 'tutoringInvitationOutbox', senderUid, 'items')
 }
 
 function getSafeDocId(row, fallbackPrefix, index) {
@@ -620,6 +638,7 @@ export async function sendTutoringInvitation({ classItem, recipientEmail, spaceI
     className: classItem?.name || 'Tutoria compartida',
     createdAt: now,
     id: spaceId,
+    outboxId: getTutoringInvitationOutboxId(cleanRecipientEmail, spaceId),
     recipientEmailLower: cleanRecipientEmail,
     respondedAt: '',
     responseByEmail: '',
@@ -637,6 +656,7 @@ export async function sendTutoringInvitation({ classItem, recipientEmail, spaceI
 
   assertFirestoreDocumentSize(`tutoringInvitationInbox/${cleanRecipientEmail}/items`, spaceId, value)
   await setDoc(getTutoringInvitationDocRef(cleanRecipientEmail, spaceId), value, { merge: true })
+  await setDoc(getTutoringInvitationOutboxDocRef(user.uid, cleanRecipientEmail, spaceId), value, { merge: true })
   return value
 }
 
@@ -656,8 +676,7 @@ export async function listSentTutoringInvitationUpdates(userUid, maxItems = 20) 
   if (!userUid) return []
 
   try {
-    const invitationsQuery = query(collectionGroup(db, 'items'), where('senderUid', '==', userUid))
-    const snapshot = await getDocs(invitationsQuery)
+    const snapshot = await getDocs(getTutoringInvitationOutboxCollectionRef(userUid))
     return snapshot.docs
       .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
       .filter((invitation) => ['accepted', 'rejected'].includes(invitation.status) && !invitation.senderSeenAt)
@@ -702,6 +721,18 @@ export async function respondTutoringInvitation({ recipientEmail, spaceId, statu
     { merge: true },
   )
 
+  await setDoc(
+    getTutoringInvitationOutboxDocRef(invitation.senderUid, cleanRecipientEmail, spaceId),
+    cleanForFirestore({
+      respondedAt: now,
+      responseByEmail: user.email,
+      responseByUid: user.uid,
+      status,
+      updatedAt: now,
+    }),
+    { merge: true },
+  )
+
   if (status === 'rejected') {
     return { ...invitation, respondedAt: now, responseByEmail: user.email, responseByUid: user.uid, status }
   }
@@ -730,7 +761,7 @@ export async function acknowledgeTutoringInvitationUpdate({ recipientEmail, spac
   if (!spaceId || !cleanRecipientEmail) return
 
   await setDoc(
-    getTutoringInvitationDocRef(cleanRecipientEmail, spaceId),
+    getTutoringInvitationOutboxDocRef(user.uid, cleanRecipientEmail, spaceId),
     cleanForFirestore({
       senderSeenAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

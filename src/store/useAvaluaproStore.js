@@ -504,6 +504,52 @@ function normalizeEmail(value = '') {
   return String(value).trim().toLowerCase()
 }
 
+function normalizeName(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+function getSharedRowVersion(row = {}) {
+  return [row.sharedUpdatedAt, row.updatedAt, row.createdAt]
+    .map((value) => String(value || ''))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || ''
+}
+
+function mergeSharedRows(localRows = [], incomingRows = []) {
+  const rowsById = new Map()
+
+  localRows.forEach((row) => {
+    if (!row?.id) return
+    rowsById.set(row.id, row)
+  })
+
+  incomingRows.forEach((row) => {
+    if (!row?.id) return
+    const current = rowsById.get(row.id)
+    if (!current) {
+      rowsById.set(row.id, row)
+      return
+    }
+
+    const currentVersion = getSharedRowVersion(current)
+    const incomingVersion = getSharedRowVersion(row)
+    rowsById.set(
+      row.id,
+      incomingVersion && (!currentVersion || incomingVersion >= currentVersion)
+        ? { ...current, ...row }
+        : { ...row, ...current },
+    )
+  })
+
+  return Array.from(rowsById.values())
+}
+
 function getTutorialMarkKey(mark) {
   return [mark.classId, mark.studentId, mark.subject, mark.competencyKey || mark.criterionKey || ''].join('::')
 }
@@ -2280,9 +2326,6 @@ export const useAvaluaproStore = create((set, get) => ({
     try {
       const space = await loadTutoringSpace(spaceId)
       const rosterClassId = classItem.tutorialLinkedClassId || classId
-      const existingStudentIds = new Set(
-        state.students.filter((student) => student.classId === rosterClassId).map((student) => student.id),
-      )
       const mappedDataset = mapSharedTutoringDatasetToClass(space.collections, classId, rosterClassId)
 
       set((current) => ({
@@ -2297,55 +2340,18 @@ export const useAvaluaproStore = create((set, get) => ({
               }
             : item,
         ),
-        studentAntecedents: [
-          ...current.studentAntecedents.filter(
-            (antecedent) => antecedent.classId !== classId && !existingStudentIds.has(antecedent.studentId),
-          ),
-          ...mappedDataset.studentAntecedents,
-        ],
-        students: [
-          ...current.students.filter((student) => student.classId !== rosterClassId),
-          ...mappedDataset.students,
-        ],
-        tutorialGroupSets: [
-          ...current.tutorialGroupSets.filter((groupSet) => groupSet.classId !== classId),
-          ...mappedDataset.tutorialGroupSets,
-        ],
-        tutorialMarks: [
-          ...current.tutorialMarks.filter(
-            (mark) => mark.classId !== classId && !existingStudentIds.has(mark.studentId),
-          ),
-          ...mappedDataset.tutorialMarks,
-        ],
-        tutorialRecords: [
-          ...current.tutorialRecords.filter(
-            (record) => record.classId !== classId && !existingStudentIds.has(record.studentId),
-          ),
-          ...mappedDataset.tutorialRecords,
-        ],
-        tutorialRelations: [
-          ...current.tutorialRelations.filter(
-            (relation) =>
-              relation.classId !== classId &&
-              !existingStudentIds.has(relation.sourceStudentId) &&
-              !existingStudentIds.has(relation.targetStudentId),
-          ),
-          ...mappedDataset.tutorialRelations,
-        ],
-        tutorialSeatingPlans: [
-          ...current.tutorialSeatingPlans.filter((plan) => plan.classId !== classId),
-          ...mappedDataset.tutorialSeatingPlans,
-        ],
-        tutorialSociogramLayouts: [
-          ...current.tutorialSociogramLayouts.filter((layout) => layout.classId !== classId),
-          ...mappedDataset.tutorialSociogramLayouts,
-        ],
-        tutorialStudentRoles: [
-          ...current.tutorialStudentRoles.filter(
-            (role) => role.classId !== classId && !existingStudentIds.has(role.studentId),
-          ),
-          ...mappedDataset.tutorialStudentRoles,
-        ],
+        studentAntecedents: mergeSharedRows(current.studentAntecedents, mappedDataset.studentAntecedents),
+        students: mergeSharedRows(current.students, mappedDataset.students).map((student) => ({
+          ...student,
+          name: formatStudentNameForDisplay(student.name),
+        })),
+        tutorialGroupSets: mergeSharedRows(current.tutorialGroupSets, mappedDataset.tutorialGroupSets),
+        tutorialMarks: mergeSharedRows(current.tutorialMarks, mappedDataset.tutorialMarks),
+        tutorialRecords: mergeSharedRows(current.tutorialRecords, mappedDataset.tutorialRecords),
+        tutorialRelations: mergeSharedRows(current.tutorialRelations, mappedDataset.tutorialRelations),
+        tutorialSeatingPlans: mergeSharedRows(current.tutorialSeatingPlans, mappedDataset.tutorialSeatingPlans),
+        tutorialSociogramLayouts: mergeSharedRows(current.tutorialSociogramLayouts, mappedDataset.tutorialSociogramLayouts),
+        tutorialStudentRoles: mergeSharedRows(current.tutorialStudentRoles, mappedDataset.tutorialStudentRoles),
         cloud: {
           ...current.cloud,
           sharedTutoringError: '',
@@ -2387,6 +2393,7 @@ export const useAvaluaproStore = create((set, get) => ({
         spaceId: classItem.sharedTutoringSpaceId,
         user,
       })
+      await get().linkClassToSharedTutoringSpace({ classId, spaceId: classItem.sharedTutoringSpaceId })
       await get().loadSharedTutoringSpaces()
       set((current) => ({
         cloud: {
