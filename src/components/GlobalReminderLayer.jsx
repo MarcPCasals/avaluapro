@@ -78,6 +78,8 @@ export function GlobalReminderLayer() {
   const students = useAvaluaproStore((state) => state.students)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const teacherPackages = useAvaluaproStore((state) => state.cloud.teacherPackages || [])
+  const tutoringInvitations = useAvaluaproStore((state) => state.cloud.sharedTutoringInvitations || [])
+  const tutoringUpdates = useAvaluaproStore((state) => state.cloud.sharedTutoringInvitationUpdates || [])
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
@@ -99,15 +101,15 @@ export function GlobalReminderLayer() {
 
     return [
       ...agendaNotes
-        .filter((note) => note.type === 'agendaReminder' && isDue(note.reminder))
+        .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type) && isDue(note.reminder))
         .map((note) => ({
           id: `agenda_${note.id}`,
-          kind: 'agenda',
+          kind: note.type === 'agendaReminder' ? 'agenda' : 'general',
           note,
           reminder: note.reminder,
           student: students.find((student) => student.id === note.studentId),
           text: note.reminder?.text || note.text,
-          title: 'Nota a l’agenda pendent',
+          title: note.type === 'agendaReminder' ? 'Nota a l’agenda pendent' : 'Recordatori pendent',
         })),
       ...tasks
         .filter((task) => isDue(task.reminder))
@@ -143,12 +145,13 @@ export function GlobalReminderLayer() {
   }, [agendaNotes, students, taskRecords, tasks, tick])
 
   const pendingPackages = teacherPackages.filter((packageItem) => packageItem.status !== 'imported').length
-  usePendingBrowserBadge(dueReminders.length + pendingPackages)
+  const pendingTutoringShares = tutoringInvitations.length + tutoringUpdates.length
+  usePendingBrowserBadge(dueReminders.length + pendingPackages + pendingTutoringShares)
 
   const snoozeReminder = async (reminder) => {
     const snoozeUntil = getSnoozeUntilIso(55)
     const nextReminder = { ...reminder.reminder, snoozeUntil }
-    if (reminder.kind === 'agenda') {
+    if (reminder.kind === 'agenda' || reminder.kind === 'general') {
       await updateAgendaNote(reminder.note.id, { reminder: nextReminder })
       return
     }
@@ -162,7 +165,7 @@ export function GlobalReminderLayer() {
   const dismissReminder = async (reminder) => {
     const dismissedAt = new Date().toISOString()
     const nextReminder = { ...reminder.reminder, dismissedAt }
-    if (reminder.kind === 'agenda') {
+    if (reminder.kind === 'agenda' || reminder.kind === 'general') {
       await updateAgendaNote(reminder.note.id, { reminder: nextReminder })
       return
     }
@@ -191,6 +194,7 @@ export function GlobalReminderLayer() {
             <strong>{reminder.title}</strong>
             {reminder.student && <span>{reminder.student.name}</span>}
             {reminder.kind === 'task' && <span>Recordatori de tota la classe</span>}
+            {reminder.kind === 'general' && <span>Recordatori general</span>}
             {reminder.kind === 'agenda' && <span>Recorda registrar la nota a l’agenda.</span>}
             <small>{formatDue(reminder.reminder)}</small>
             {reminder.text && <p>{reminder.text}</p>}

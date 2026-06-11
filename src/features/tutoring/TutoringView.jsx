@@ -1636,6 +1636,21 @@ function getProfileSubjectTrackingSummaries(profile) {
   return [...summaries.values()].sort((a, b) => a.subject.localeCompare(b.subject, 'ca'))
 }
 
+function getAreaRadarLabel(name = '') {
+  const normalizedName = name.toLocaleLowerCase('ca')
+  if (normalizedName.includes('cient')) return 'C-T'
+  if (normalizedName.includes('lleng')) return 'Lleng.'
+  if (normalizedName.includes('educ')) return 'EF'
+  if (normalizedName.includes('art')) return 'Art.'
+  if (normalizedName.includes('inter')) return 'Inter.'
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 4))
+    .join(' ')
+    .slice(0, 10)
+}
+
 function AreaRadarChart({ areas }) {
   if (!areas?.length) {
     return <div className="empty-state compact">Encara no hi ha prou dades d’àrees per dibuixar el diagrama.</div>
@@ -1651,8 +1666,8 @@ function AreaRadarChart({ areas }) {
       ...area,
       axisX: center + Math.cos(angle) * radius,
       axisY: center + Math.sin(angle) * radius,
-      labelX: center + Math.cos(angle) * (radius + 24),
-      labelY: center + Math.sin(angle) * (radius + 24),
+      labelX: center + Math.cos(angle) * (radius + 18),
+      labelY: center + Math.sin(angle) * (radius + 18),
       x: center + Math.cos(angle) * scoreRadius,
       y: center + Math.sin(angle) * scoreRadius,
     }
@@ -1681,7 +1696,7 @@ function AreaRadarChart({ areas }) {
           <g key={point.id}>
             <circle className="radar-dot" cx={point.x} cy={point.y} r="3.6" />
             <text className="radar-label" textAnchor="middle" x={point.labelX} y={point.labelY}>
-              {point.name.split(' ')[0]}
+              {getAreaRadarLabel(point.name)}
             </text>
           </g>
         ))}

@@ -3034,7 +3034,9 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   addAgendaNote: async (studentId, type, text, meta = {}) => {
-    const classId = get().ui.activeClassId
+    const classId = Object.prototype.hasOwnProperty.call(meta, 'classId')
+      ? meta.classId
+      : get().ui.activeClassId
     const cleanText = text.trim()
     if (!cleanText) return
     const createdAt = new Date().toISOString()

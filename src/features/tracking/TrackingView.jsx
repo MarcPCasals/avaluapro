@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Bell,
@@ -7,6 +7,7 @@ import {
   Clock3,
   Clipboard,
   MessageCircle,
+  Search,
   Skull,
   Target,
   Trash2,
@@ -18,6 +19,7 @@ import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
+import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { NewTaskModal } from './NewTaskModal'
@@ -701,6 +703,7 @@ export function TrackingView() {
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showStudentsModal, setShowStudentsModal] = useState(false)
+  const [showRemindersModal, setShowRemindersModal] = useState(false)
   const [profileStudentId, setProfileStudentId] = useState(null)
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
   const [interventionFilter, setInterventionFilter] = useState('all')
@@ -715,6 +718,8 @@ export function TrackingView() {
   const [agendaWarningStudentId, setAgendaWarningStudentId] = useState(null)
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const [redDetailStudentId, setRedDetailStudentId] = useState(null)
+  const [studentSearch, setStudentSearch] = useState('')
+  const tableWrapRef = useRef(null)
   const interventionInsights = useMemo(
     () => buildTrackingInterventions(students, taskRecords, tasks, behaviorEvents),
     [students, taskRecords, tasks, behaviorEvents],
@@ -736,6 +741,30 @@ export function TrackingView() {
       ? students
       : students.filter((student) => insightByStudentId.get(student.id)?.level === interventionFilter))
       .filter((student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter)
+  const trackingOverview = useMemo(() => {
+    const rows = students.map((student) => {
+      const stats = getStudentTrackingStats(student.id, taskRecords, tasks)
+      const trackingAgendaNotes = getTrackingAgendaNotes(student.id, agendaNotes, activeClassId)
+      const missingTasks = getMissingTasksForStudent(student.id, taskRecords, tasks)
+      return {
+        redPointCount: getRedPointCount(student, missingTasks, trackingAgendaNotes),
+        stats,
+        student,
+      }
+    })
+    const evaluatedRows = rows.filter((row) => row.stats.total > 0)
+    const averageConsistency =
+      evaluatedRows.length > 0
+        ? Math.round(evaluatedRows.reduce((sum, row) => sum + row.stats.consistency, 0) / evaluatedRows.length)
+        : null
+    return {
+      agendaSoon: rows.filter((row) => row.redPointCount >= 2).sort((a, b) => b.redPointCount - a.redPointCount),
+      averageConsistency,
+      lowConsistency: evaluatedRows
+        .filter((row) => row.stats.consistency < 70)
+        .sort((a, b) => a.stats.consistency - b.stats.consistency),
+    }
+  }, [activeClassId, agendaNotes, students, taskRecords, tasks])
   const halfGroups = Array.from(new Set(students.map((student) => student.halfGroup).filter(Boolean))).sort()
   const focusInsights = interventionInsights.filter((insight) => insight.level !== 'stable').slice(0, 4)
   const today = new Date().toISOString().slice(0, 10)
@@ -845,6 +874,17 @@ export function TrackingView() {
     for (const student of filteredStudents) {
       await updateTaskRecord(student.id, taskId, 'DONE')
     }
+  }
+  const handleStudentSearch = (value) => {
+    setStudentSearch(value)
+    const query = value.trim().toLocaleLowerCase('ca')
+    if (!query) return
+    const match = filteredStudents.find((student) => student.name.toLocaleLowerCase('ca').includes(query))
+    if (!match) return
+    window.requestAnimationFrame(() => {
+      const target = tableWrapRef.current?.querySelector(`[data-student-row="${match.id}"]`)
+      target?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    })
   }
   const saveTaskNote = async ({ taskId, studentId, text, reminderDate, reminderTime, reminderText }) => {
     const patch = {}
@@ -982,6 +1022,7 @@ export function TrackingView() {
       {showStudentsModal && (
         <ManageStudentsModal classId={activeClassId} onClose={() => setShowStudentsModal(false)} />
       )}
+      {showRemindersModal && <RemindersModal onClose={() => setShowRemindersModal(false)} />}
       {profileStudentId && (
         <StudentProfileModal
           mode="tracking"
@@ -1179,38 +1220,97 @@ export function TrackingView() {
             {filter.label}
           </button>
         ))}
+        <label className="tracking-student-search">
+          <Search size={15} />
+          <input
+            list="tracking-student-search-list"
+            onChange={(event) => handleStudentSearch(event.target.value)}
+            placeholder="Busca alumne..."
+            value={studentSearch}
+          />
+          <datalist id="tracking-student-search-list">
+            {filteredStudents.map((student) => (
+              <option key={student.id} value={student.name} />
+            ))}
+          </datalist>
+        </label>
         <span>
           {filteredStudents.length} de {students.length} alumnes visibles
         </span>
       </div>
       {visibleTasks.length === 0 ? (
-        <section className="tracking-empty-tasks" data-tour="tracking-table">
-          <Clipboard size={26} />
-          <div>
-            <strong>No hi ha tasques visibles ara mateix.</strong>
-            <p>
-              {tasks.length === 0
-                ? 'Crea una primera tasca per començar el seguiment de la UT.'
-                : `Hi ha ${pastTaskCount} tasca/ques passades amagades. Mostra-les per revisar-les o continuar marcant estats.`}
-            </p>
-          </div>
-          {tasks.length === 0 ? (
-            <button className="primary-action compact" onClick={() => setShowTaskModal(true)} type="button">
-              Nova tasca
-            </button>
-          ) : (
-            <button className="secondary-action compact" onClick={() => setShowPastTasks(true)} type="button">
-              Mostra passades: {pastTaskCount}
-            </button>
-          )}
+        <section className="tracking-standby-panel" data-tour="tracking-table">
+          <article className="tracking-standby-summary">
+            <Clipboard size={24} />
+            <div>
+              <strong>No hi ha tasques visibles ara mateix.</strong>
+              <p>
+                {tasks.length === 0
+                  ? 'Crea una primera tasca per començar el seguiment de la UT.'
+                  : `Hi ha ${pastTaskCount} tasca/ques passades amagades. Mostra-les per revisar-les o continuar marcant estats.`}
+              </p>
+            </div>
+            {tasks.length === 0 ? (
+              <button className="primary-action compact" onClick={() => setShowTaskModal(true)} type="button">
+                Nova tasca
+              </button>
+            ) : (
+              <button className="secondary-action compact" onClick={() => setShowPastTasks(true)} type="button">
+                Mostra passades: {pastTaskCount}
+              </button>
+            )}
+          </article>
+          <article>
+            <span>Constància mitjana</span>
+            <strong>{trackingOverview.averageConsistency === null ? '-' : `${trackingOverview.averageConsistency}%`}</strong>
+            <small>
+              {trackingOverview.averageConsistency === null
+                ? 'Encara no hi ha dades de tasques.'
+                : 'Calculada amb totes les tasques de la UT.'}
+            </small>
+          </article>
+          <article className="warning">
+            <span>Constància baixa</span>
+            <strong>{trackingOverview.lowConsistency.length}</strong>
+            <div>
+              {trackingOverview.lowConsistency.slice(0, 4).map((row) => (
+                <button key={row.student.id} onClick={() => setProfileStudentId(row.student.id)} type="button">
+                  {row.student.name}
+                  <b>{row.stats.consistency}%</b>
+                </button>
+              ))}
+              {trackingOverview.lowConsistency.length === 0 && <small>Cap alumne per sota del 70%.</small>}
+            </div>
+          </article>
+          <article className="agenda">
+            <span>A prop de nota a l’agenda</span>
+            <strong>{trackingOverview.agendaSoon.length}</strong>
+            <div>
+              {trackingOverview.agendaSoon.slice(0, 4).map((row) => (
+                <button key={row.student.id} onClick={() => setAgendaDetailStudentId(row.student.id)} type="button">
+                  {row.student.name}
+                  <b>{row.redPointCount} vermells</b>
+                </button>
+              ))}
+              {trackingOverview.agendaSoon.length === 0 && <small>Cap alumne amb 2 o més punts vermells actius.</small>}
+            </div>
+          </article>
         </section>
       ) : (
-      <div className="grid-scroll" data-tour="tracking-table">
+      <div className="grid-scroll" data-tour="tracking-table" ref={tableWrapRef}>
         <table className="tracking-table">
           <thead>
             <tr>
               <th className="sticky-student tracking-student-header">
                 <span>Alumne</span>
+                <button
+                  className="note-signal"
+                  onClick={() => setShowRemindersModal(true)}
+                  title="Recordatoris del grup"
+                  type="button"
+                >
+                  <Bell size={19} />
+                </button>
               </th>
               {visibleTasks.map((task, taskIndex) => (
                 <th className="task-header" key={task.id}>
@@ -1283,6 +1383,7 @@ export function TrackingView() {
               return (
                 <tr
                   className={getStudentRowClass(dominantDiagnosis)}
+                  data-student-row={student.id}
                   data-tour={isDemoMarti ? 'demo-marti-tracking-row' : isDemoJoel ? 'demo-joel-tracking-row' : undefined}
                   key={student.id}
                 >

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Download, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
+import { Bell, BookOpen, Download, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
+import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { EditStructureModal } from './EditStructureModal'
@@ -116,6 +117,7 @@ export function EvaluationView() {
   const [showStudentsModal, setShowStudentsModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showRemindersModal, setShowRemindersModal] = useState(false)
   const [showSeatingModal, setShowSeatingModal] = useState(false)
   const [rubricCriterionId, setRubricCriterionId] = useState(null)
   const [profileStudentId, setProfileStudentId] = useState(null)
@@ -275,6 +277,7 @@ export function EvaluationView() {
       {showStudentsModal && (
         <ManageStudentsModal classId={activeClassId} onClose={() => setShowStudentsModal(false)} />
       )}
+      {showRemindersModal && <RemindersModal onClose={() => setShowRemindersModal(false)} />}
       {showStructureModal && (
         <EditStructureModal activeUtId={activeUtId} onClose={() => setShowStructureModal(false)} />
       )}
@@ -343,7 +346,14 @@ export function EvaluationView() {
                   <Users size={22} />
                   Alumnes
                 </span>
-                <MessageCircle size={22} className="note-signal" />
+                <button
+                  className="note-signal"
+                  onClick={() => setShowRemindersModal(true)}
+                  title="Recordatoris del grup"
+                  type="button"
+                >
+                  <Bell size={20} />
+                </button>
               </th>
               {competencies.map((competency) => {
                 const colSpan = competency.criteria.length + 1

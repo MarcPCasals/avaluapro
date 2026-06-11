@@ -348,6 +348,7 @@
 
 .top-menu-trigger {
   min-height: 44px;
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -419,6 +420,50 @@
 .top-menu-badge.active {
   color: white;
   background: #f97316;
+}
+
+.top-menu-badge.yellow,
+.top-menu-trigger-badge.yellow {
+  color: #78350f;
+  background: #fde68a;
+}
+
+.top-menu-badge.orange,
+.top-menu-trigger-badge.orange {
+  color: white;
+  background: #f97316;
+}
+
+.top-menu-badge.green,
+.top-menu-trigger-badge.green {
+  color: white;
+  background: #16a34a;
+}
+
+.top-menu-badge.red,
+.top-menu-trigger-badge.red {
+  color: white;
+  background: #dc2626;
+}
+
+.top-menu-badge.purple,
+.top-menu-trigger-badge.purple {
+  color: white;
+  background: #7c3aed;
+}
+
+.top-menu-trigger-badge {
+  min-width: 21px;
+  min-height: 21px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid #172033;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .top-menu-account {
@@ -683,7 +728,7 @@
 
 .tutoring-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
   gap: 18px;
   align-items: stretch;
   border: 1px solid #d1fae5;
@@ -750,7 +795,7 @@
 
 .tutoring-hero-share-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
   gap: 8px;
   align-items: end;
 }
@@ -792,7 +837,7 @@
 
 .educand-email-field input {
   width: 100%;
-  min-width: 0;
+  min-width: 84px;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -817,6 +862,14 @@
 
   .tutoring-hero-share-controls {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tracking-standby-panel {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .tracking-standby-summary {
+    grid-column: 1 / -1;
   }
 }
 
@@ -3941,8 +3994,8 @@ button.tutorial-record-pill {
 
 .tutorial-area-radar {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 0.86fr);
+  gap: 10px;
   align-items: center;
 }
 
@@ -3981,14 +4034,14 @@ button.tutorial-record-pill {
 
 .tutorial-area-radar .radar-label {
   fill: #475569;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 900;
 }
 
 .tutorial-area-radar > div {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .tutorial-area-radar span,
@@ -4005,8 +4058,15 @@ button.tutorial-record-pill {
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 850;
+}
+
+.tutorial-area-radar span strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tutorial-area-radar span strong {
@@ -4877,12 +4937,22 @@ button.tutorial-record-pill {
 
 .note-signal {
   float: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
   color: #f97316;
   padding: 10px;
   width: 42px;
   height: 42px;
   border-radius: 7px;
   background: #fff7ed;
+  cursor: pointer;
+}
+
+.note-signal:hover {
+  color: #ea580c;
+  background: #ffedd5;
 }
 
 .competency-header {
@@ -5382,10 +5452,129 @@ button.tutorial-record-pill {
 .tracking-filter-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   border-bottom: 1px solid #e5e7eb;
   padding: 10px 18px;
   background: white;
+}
+
+.tracking-student-search {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #64748b;
+  background: #ffffff;
+}
+
+.tracking-student-search input {
+  width: 170px;
+  min-height: 24px;
+  border: 0;
+  padding: 0;
+  color: #1f2937;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+}
+
+.tracking-standby-panel {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.35fr) repeat(3, minmax(190px, 1fr));
+  gap: 12px;
+  padding: 16px 18px 18px;
+  background: #f8fafc;
+}
+
+.tracking-standby-panel article {
+  min-height: 150px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  color: #334155;
+  background: white;
+}
+
+.tracking-standby-panel article > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tracking-standby-panel article > strong {
+  color: #111827;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.tracking-standby-panel article small {
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tracking-standby-summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.tracking-standby-summary strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #111827;
+  font-size: 18px;
+}
+
+.tracking-standby-summary p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.tracking-standby-panel article.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.tracking-standby-panel article.agenda {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.tracking-standby-panel article div {
+  display: grid;
+  gap: 6px;
+}
+
+.tracking-standby-panel article div button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  padding: 7px 8px;
+  color: #1f2937;
+  background: white;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tracking-standby-panel article div button b {
+  color: #ea580c;
+  white-space: nowrap;
 }
 
 .due-reminders {
@@ -5547,6 +5736,127 @@ button.tutorial-record-pill {
   color: #1e40af;
   font-size: 13px;
   font-weight: 900;
+}
+
+.reminders-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.reminder-composer,
+.reminder-list {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.reminder-composer header,
+.reminder-list header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f2937;
+  font-weight: 950;
+}
+
+.reminder-list header {
+  justify-content: space-between;
+}
+
+.reminder-list header span {
+  min-width: 30px;
+  min-height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #92400e;
+  background: #fde68a;
+  font-weight: 950;
+}
+
+.reminder-form-grid {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) repeat(2, minmax(140px, 0.55fr));
+  gap: 10px;
+}
+
+.reminder-form-grid label {
+  display: grid;
+  gap: 5px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.reminder-form-grid input,
+.reminder-form-grid select,
+.reminder-composer textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+  background: white;
+  font-weight: 800;
+}
+
+.reminder-composer textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.reminder-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
+}
+
+.reminder-row.agenda {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.reminder-row.general {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.reminder-row.task,
+.reminder-row.record {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.reminder-row > div {
+  min-width: 0;
+}
+
+.reminder-row strong,
+.reminder-row span,
+.reminder-row small {
+  display: block;
+}
+
+.reminder-row strong {
+  overflow: hidden;
+  color: #111827;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder-row span,
+.reminder-row small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .tracking-filter-row button {

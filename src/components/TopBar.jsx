@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   BarChart3,
+  Bell,
   ChevronDown,
   CheckCircle2,
   Cloud,
@@ -24,12 +25,14 @@ import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
+import { RemindersModal } from '../features/data/RemindersModal'
 import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
 import { TutoringShareModal } from '../features/data/TutoringShareModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
 import { downloadJson, getTodaySlug } from '../lib/downloads'
+import { getPendingReminderSummary } from '../lib/reminders'
 
 const colorClass = {
   blue: 'class-dot blue',
@@ -112,6 +115,7 @@ export function TopBar() {
   const [dataSafetyInitialSection, setDataSafetyInitialSection] = useState('')
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
   const [showTutoringShare, setShowTutoringShare] = useState(false)
+  const [showReminders, setShowReminders] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -130,6 +134,7 @@ export function TopBar() {
   const reorderClassToIndex = useAvaluaproStore((state) => state.reorderClassToIndex)
   const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
   const createBackup = useAvaluaproStore((state) => state.createBackup)
+  const createCloudBackup = useAvaluaproStore((state) => state.createCloudBackup)
   const restoreBackup = useAvaluaproStore((state) => state.restoreBackup)
   const cloud = useAvaluaproStore((state) => state.cloud)
   const signInWithGoogle = useAvaluaproStore((state) => state.signInWithGoogle)
@@ -147,6 +152,35 @@ export function TopBar() {
     () => (cloud.sharedTutoringInvitations?.length || 0) + (cloud.sharedTutoringInvitationUpdates?.length || 0),
     [cloud.sharedTutoringInvitationUpdates, cloud.sharedTutoringInvitations],
   )
+  const reminderSummary = useMemo(
+    () =>
+      getPendingReminderSummary({
+        agendaNotes: state.agendaNotes,
+        classes: state.classes,
+        students: state.students,
+        taskRecords: state.taskRecords,
+        tasks: state.tasks,
+      }),
+    [state.agendaNotes, state.classes, state.students, state.taskRecords, state.tasks],
+  )
+  const pendingReminderCount = reminderSummary.count
+  const activeBadgeTypes = [
+    pendingTeacherPackages > 0 ? 'notes' : '',
+    pendingTutoringShares > 0 ? 'tutoria' : '',
+    pendingReminderCount > 0 ? 'recordatoris' : '',
+  ].filter(Boolean)
+  const dataMenuBadgeColor = reminderSummary.hasTodayUpcoming
+    ? 'purple'
+    : activeBadgeTypes.length > 1
+      ? 'red'
+      : activeBadgeTypes[0] === 'notes'
+        ? 'orange'
+        : activeBadgeTypes[0] === 'tutoria'
+          ? 'green'
+          : activeBadgeTypes[0] === 'recordatoris'
+            ? 'yellow'
+            : ''
+  const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares + pendingReminderCount
 
   useEffect(() => {
     if (!showDataMenu) return undefined
@@ -211,6 +245,15 @@ export function TopBar() {
 
   async function handleResetToSeed() {
     setShowResetConfirm(true)
+  }
+
+  async function handleCreateCloudBackup() {
+    try {
+      await createCloudBackup('manual')
+      window.alert('Còpia al núvol creada correctament.')
+    } catch (error) {
+      window.alert(error.message || 'No s’ha pogut crear la còpia al núvol.')
+    }
   }
 
   async function confirmResetToSeed() {
@@ -300,6 +343,9 @@ export function TopBar() {
           >
             <Cloud size={20} />
             <span>Dades i Compte</span>
+            {dataMenuBadgeTotal > 0 && (
+              <em className={`top-menu-trigger-badge ${dataMenuBadgeColor}`}>{dataMenuBadgeTotal}</em>
+            )}
             <ChevronDown size={17} />
           </button>
           {showDataMenu && (
@@ -345,6 +391,23 @@ export function TopBar() {
                 <BarChart3 size={18} />
                 Perfil docent
               </button>
+              <button
+                onClick={() => {
+                  setShowReminders(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <Bell size={18} />
+                <span className="top-menu-button-label">Recordatoris</span>
+                <em
+                  className={`top-menu-badge ${pendingReminderCount > 0 ? 'active' : ''} ${
+                    reminderSummary.hasTodayUpcoming ? 'purple' : 'yellow'
+                  }`}
+                >
+                  {pendingReminderCount}
+                </em>
+              </button>
               <span className="top-menu-separator" />
               <button
                 data-tour="data-safety-button"
@@ -357,6 +420,10 @@ export function TopBar() {
               >
                 <Cloud size={18} />
                 Còpies i estat
+              </button>
+              <button disabled={!cloud.user} onClick={handleCreateCloudBackup} type="button">
+                <Cloud size={18} />
+                Crear còpia al núvol
               </button>
               <button
                 data-tour="antecedents-button"
@@ -381,7 +448,7 @@ export function TopBar() {
               >
                 <Send size={18} />
                 <span className="top-menu-button-label">Compartir notes</span>
-                <em className={pendingTeacherPackages > 0 ? 'top-menu-badge active' : 'top-menu-badge'}>
+                <em className={`top-menu-badge ${pendingTeacherPackages > 0 ? 'active orange' : ''}`}>
                   {pendingTeacherPackages}
                 </em>
               </button>
@@ -394,7 +461,7 @@ export function TopBar() {
               >
                 <UsersRound size={18} />
                 <span className="top-menu-button-label">Compartir tutoria</span>
-                <em className={pendingTutoringShares > 0 ? 'top-menu-badge active' : 'top-menu-badge'}>
+                <em className={`top-menu-badge ${pendingTutoringShares > 0 ? 'active green' : ''}`}>
                   {pendingTutoringShares}
                 </em>
               </button>
@@ -442,6 +509,7 @@ export function TopBar() {
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
       {showTutoringShare && <TutoringShareModal onClose={() => setShowTutoringShare(false)} />}
+      {showReminders && <RemindersModal onClose={() => setShowReminders(false)} />}
       {showResetConfirm && (
         <Modal onClose={() => setShowResetConfirm(false)} size="lg" title="Reiniciar el curs">
           <div className="reset-course-modal">

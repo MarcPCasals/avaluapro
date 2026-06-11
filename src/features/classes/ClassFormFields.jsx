@@ -38,7 +38,7 @@ export function ClassFormFields({ value, onChange }) {
         Tutor/a o tutors
         <input
           onChange={(event) => onChange({ tutors: event.target.value })}
-          placeholder="Ex: Marta Vila i Marc Pérez"
+          placeholder="Ex: Marc Pérez"
           value={value.tutors || ''}
         />
         <span className="field-hint">
