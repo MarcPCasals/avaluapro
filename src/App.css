@@ -1681,7 +1681,8 @@ button.tutorial-record-pill {
 }
 
 .tutorial-record-form label.full,
-.tutorial-record-form button {
+.tutorial-record-form button,
+.tutorial-agenda-kind-toggle {
   grid-column: 1 / -1;
 }
 
@@ -1729,6 +1730,36 @@ button.tutorial-record-pill {
 .tutorial-record-type-select.blue {
   border-color: #bfdbfe;
   background: #eff6ff;
+}
+
+.tutorial-agenda-kind-toggle {
+  display: grid;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-agenda-kind-toggle > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-agenda-kind-toggle button {
+  min-height: 40px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  background: #fff7ed;
+  font-weight: 950;
+}
+
+.tutorial-agenda-kind-toggle button.active {
+  border-color: #f97316;
+  color: #7c2d12;
+  background: #fed7aa;
 }
 
 .tutorial-relationships-panel {
@@ -3889,6 +3920,10 @@ button.tutorial-record-pill {
   background: #ffffff;
 }
 
+.tutorial-profile-insight-grid article.wide {
+  grid-column: span 3;
+}
+
 .tutorial-profile-insight-grid h4 {
   margin: 0;
   color: #1f2937;
@@ -3902,6 +3937,121 @@ button.tutorial-record-pill {
   font-size: 13px;
   font-weight: 800;
   line-height: 1.4;
+}
+
+.tutorial-area-radar {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.tutorial-area-radar svg {
+  width: 100%;
+  min-height: 190px;
+}
+
+.tutorial-area-radar .radar-grid {
+  fill: none;
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.tutorial-area-radar .radar-grid.outer {
+  stroke: #cbd5e1;
+}
+
+.tutorial-area-radar .radar-axis {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.tutorial-area-radar .radar-shape {
+  fill: rgba(249, 115, 22, 0.16);
+  stroke: #f97316;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.tutorial-area-radar .radar-dot {
+  fill: white;
+  stroke: #f97316;
+  stroke-width: 3;
+}
+
+.tutorial-area-radar .radar-label {
+  fill: #475569;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.tutorial-area-radar > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-area-radar span,
+.tutorial-subject-tracking-summary article {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.tutorial-area-radar span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tutorial-area-radar span strong {
+  color: #1f2937;
+}
+
+.tutorial-subject-tracking-summary {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tutorial-subject-tracking-summary h4 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.tutorial-subject-tracking-summary > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-subject-tracking-summary article {
+  display: grid;
+  gap: 4px;
+}
+
+.tutorial-subject-tracking-summary article strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.tutorial-subject-tracking-summary article span {
+  color: #2563eb;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.tutorial-subject-tracking-summary article small {
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .tutorial-profile-insight-row {
@@ -13820,6 +13970,17 @@ button.profile-followup-card:focus-visible {
   overflow: auto;
 }
 
+.teacher-package-inbox-hint {
+  margin: 0;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #166534;
+  background: #f0fdf4;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
 .teacher-package-inbox-list button {
   align-items: center;
   background: #f8fafc;
@@ -14111,6 +14272,12 @@ button.profile-followup-card:focus-visible {
   padding: 8px 12px;
 }
 
+.teacher-package-match-control small {
+  color: #b45309;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .teacher-package-match-control select {
   background: white;
   border: 1px solid var(--line);
@@ -14157,6 +14324,40 @@ button.profile-followup-card:focus-visible {
 .teacher-package-grade-strip .grade {
   min-height: 30px;
   min-width: 30px;
+}
+
+.teacher-package-grade-strip i,
+.teacher-package-received-grade i {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fca5a5;
+  border-radius: 999px;
+  color: #b91c1c;
+  background: #fff1f2;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.teacher-package-received-grade {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.teacher-package-tracking-chip {
+  justify-self: start;
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 900;
 }
 
 .teacher-package-empty,

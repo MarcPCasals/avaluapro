@@ -1877,6 +1877,8 @@ export const useAvaluaproStore = create((set, get) => ({
     return {
       ...preview.summary,
       importedGrades: updates.length,
+      sourceClassName: preview.packageData.source?.className || '',
+      subject: preview.packageData.source?.subject || '',
     }
   },
 
@@ -2409,26 +2411,61 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  addTutorialRecord: async ({ classId, studentId, type, date, note }) => {
+  addTutorialRecord: async ({ agendaKind = '', classId, studentId, type, date, note }) => {
     if (!classId || !studentId || !type) return
 
     const cleanNote = String(note || '').trim()
     const cleanDate = date || new Date().toISOString().slice(0, 10)
+    const now = new Date().toISOString()
 
-    set((state) => ({
-      tutorialRecords: [
-        ...state.tutorialRecords,
-        {
-          id: createId('trecord'),
-          classId,
-          studentId,
-          type,
-          date: cleanDate,
-          note: cleanNote,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }))
+    set((state) => {
+      const nextRecord = {
+        id: createId('trecord'),
+        classId,
+        studentId,
+        type,
+        date: cleanDate,
+        note: cleanNote,
+        createdAt: now,
+        ...(type === 'agenda' ? { agendaKind: agendaKind || 'work' } : {}),
+      }
+      const tutorialRecords = [...state.tutorialRecords, nextRecord]
+
+      if (type !== 'agenda') return { tutorialRecords }
+
+      const agendaRecords = tutorialRecords.filter(
+        (record) => record.classId === classId && record.studentId === studentId && record.type === 'agenda',
+      )
+      const agendaCount = agendaRecords.length
+      const alreadyCreatedIncident = tutorialRecords.some(
+        (record) =>
+          record.classId === classId &&
+          record.studentId === studentId &&
+          record.type === 'incident' &&
+          record.automatic === true &&
+          record.source === 'agenda-accumulation' &&
+          record.agendaThreshold === agendaCount,
+      )
+      if (agendaCount === 0 || agendaCount % 4 !== 0 || alreadyCreatedIncident) return { tutorialRecords }
+
+      const workCount = agendaRecords.filter((record) => (record.agendaKind || 'work') === 'work').length
+      const behaviorCount = agendaRecords.filter((record) => record.agendaKind === 'behavior').length
+      const automaticIncident = {
+        id: createId('trecord'),
+        agendaBreakdown: { behavior: behaviorCount, work: workCount },
+        agendaThreshold: agendaCount,
+        automatic: true,
+        classId,
+        createdAt: now,
+        date: cleanDate,
+        note: `Full d’incidents automàtic per acumulació de ${agendaCount} notes a l’agenda (${workCount} de treball · ${behaviorCount} de comportament).`,
+        source: 'agenda-accumulation',
+        studentId,
+        type: 'incident',
+      }
+
+      return { tutorialRecords: [...tutorialRecords, automaticIncident] }
+    })
     await persistCollections(set, get, ['tutorialRecords'])
   },
 

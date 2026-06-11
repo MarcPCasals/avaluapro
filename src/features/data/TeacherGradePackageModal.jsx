@@ -152,12 +152,14 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
             {packageData.source.subject} · {packageData.source.className}
           </strong>
           <p>
-            Aquest paquet conté només les notes finals de competència, sempre amb la darrera mirada disponible
-            per alumne i competència. Els criteris i les notes internes no viatgen al tutor.
+            Aquest paquet conté les notes finals de competència i un resum de constància de l’assignatura, sempre amb
+            la darrera mirada disponible per alumne i competència. Els criteris i les notes internes no viatgen al
+            tutor.
           </p>
           <small className="teacher-package-policy-note">
-            Exportació neta: no inclou comentaris, diagnòstics, DOIPs, fotos, sociograma ni registres de seguiment.
-            Només s’envien dades voluntàriament i només al correu destinatari indicat.
+            Exportació neta: no inclou comentaris, diagnòstics, DOIPs, fotos, sociograma ni registres detallats de
+            seguiment. Només s’envien notes i resum agregat de constància, voluntàriament i al correu destinatari
+            indicat.
           </small>
         </div>
         <div className="teacher-package-hero-actions">
@@ -260,14 +262,20 @@ function TeacherPackageSendPanel({ activeClass, packageError, packagePreview }) 
               <small>{student.halfGroup || 'Sense mig grup'}</small>
             </div>
             <div className="teacher-package-grade-strip">
-              {student.competencies.map((competency) => (
+            {student.competencies.map((competency) => (
                 <span key={competency.competencyKey}>
                   <em>{competency.competencyName.split(':')[0]}</em>
                   <b className={gradeClassName(competency.grade)}>{competency.grade || '-'}</b>
+                  {competency.modified && <i>M</i>}
                   <small>{competency.sourceUtName || 'Sense UT'}</small>
                 </span>
               ))}
             </div>
+            {student.trackingSummary?.hasTrackingData && (
+              <small className="teacher-package-tracking-chip">
+                Constància {student.trackingSummary.consistency}% · {student.trackingSummary.profile}
+              </small>
+            )}
           </article>
         ))}
       </section>
@@ -358,6 +366,25 @@ function TeacherPackageReceivePanel({ activeClass }) {
   const packageSize = packageData ? estimateTeacherGradePackageSize(packageData) : 0
   const packageNearLimit = packageSize > TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES
   const duplicateMatches = useMemo(() => getDuplicateTargetStudentMatches(preview?.rows || []), [preview])
+  const readyCloudPackages = useMemo(() => {
+    if (!cloud.teacherPackages?.length || targetStudents.length === 0) return []
+    return cloud.teacherPackages.filter((receivedPackage) => {
+      if (receivedPackage.status === 'imported') return false
+      try {
+        const packagePreview = previewTeacherGradePackage(receivedPackage.packageData, activeClass.id, {})
+        const duplicateRows = getDuplicateTargetStudentMatches(packagePreview.rows)
+        const size = estimateTeacherGradePackageSize(receivedPackage.packageData)
+        return (
+          packagePreview.summary.importableGrades > 0 &&
+          packagePreview.summary.missingMatches === 0 &&
+          duplicateRows.length === 0 &&
+          size <= TEACHER_GRADE_PACKAGE_SOFT_LIMIT_BYTES
+        )
+      } catch {
+        return false
+      }
+    })
+  }, [activeClass.id, cloud.teacherPackages, previewTeacherGradePackage, targetStudents.length])
 
   useEffect(() => {
     if (cloud.user?.email) {
@@ -419,7 +446,9 @@ function TeacherPackageReceivePanel({ activeClass }) {
         result.missingMatches > 0
           ? ` ${result.missingMatches} alumne/s han quedat fora perquè no tenien coincidència prou fiable.`
           : ''
-      setStatus(`${result.importedGrades} notes importades correctament a la tutoria.${missingMessage}`)
+      setStatus(
+        `Importat correctament: ${result.importedGrades} notes de ${result.subject || preview?.packageData.source.subject || 'la matèria'} carregades a la tutoria.${missingMessage}`,
+      )
       setError('')
       setAllowReimport(false)
     } catch (importError) {
@@ -429,6 +458,37 @@ function TeacherPackageReceivePanel({ activeClass }) {
         }`,
       )
       setStatus('')
+    }
+  }
+
+  const handleImportAllReadyPackages = async () => {
+    if (readyCloudPackages.length === 0) return
+
+    try {
+      setStatus('')
+      setError('')
+      let importedGrades = 0
+      let importedSubjects = 0
+      for (const receivedPackage of readyCloudPackages) {
+        const result = await importReceivedTeacherGradePackage({
+          classId: activeClass.id,
+          manualMatches: {},
+          packageId: receivedPackage.id,
+        })
+        importedGrades += result.importedGrades || 0
+        importedSubjects += 1
+      }
+      setSelectedCloudPackageId('')
+      setPackageData(null)
+      setPreview(null)
+      setManualMatches({})
+      setStatus(`Importat correctament: ${importedSubjects} assignatura/es i ${importedGrades} notes carregades.`)
+    } catch (importError) {
+      setError(
+        `No s’han pogut importar totes les assignatures. ${
+          importError.message || 'Revisa els paquets pendents i torna-ho a provar.'
+        }`,
+      )
     }
   }
 
@@ -480,6 +540,15 @@ function TeacherPackageReceivePanel({ activeClass }) {
           </p>
         </div>
         <div className="teacher-package-hero-actions">
+          <button
+            className="primary-action"
+            disabled={readyCloudPackages.length === 0}
+            onClick={handleImportAllReadyPackages}
+            type="button"
+          >
+            <CheckCircle2 size={18} />
+            Importar totes les assignatures
+          </button>
           <button className="primary-action" onClick={loadReceivedTeacherGradePackages} type="button">
             <RefreshCw size={18} />
             Actualitzar safata
@@ -509,6 +578,12 @@ function TeacherPackageReceivePanel({ activeClass }) {
           </header>
           {cloud.teacherPackages.length > 0 ? (
             <div className="teacher-package-inbox-list">
+              {readyCloudPackages.length > 0 && (
+                <p className="teacher-package-inbox-hint">
+                  {readyCloudPackages.length} paquet/s es poden importar directament. Els paquets amb noms dubtosos
+                  s’han de revisar abans.
+                </p>
+              )}
               {cloud.teacherPackages.map((receivedPackage) => (
                 <button
                   className={receivedPackage.id === selectedCloudPackageId ? 'selected' : ''}
@@ -688,6 +763,7 @@ function TeacherPackageReceivePanel({ activeClass }) {
                 </div>
                 <div className="teacher-package-match-control">
                   <span>{formatMatchStatus(row.status)}</span>
+                  {!row.targetStudent && <small>Assigna’l manualment a un alumne de la tutoria.</small>}
                   <select
                     aria-label={`Assignar alumne per ${row.sourceStudent.name}`}
                     onChange={(event) => handleManualMatchChange(row.sourceStudent.sourceStudentId, event.target.value)}
@@ -707,11 +783,17 @@ function TeacherPackageReceivePanel({ activeClass }) {
                 </div>
                 <div className="teacher-package-grade-strip">
                   {row.gradedCompetencies.map((competency) => (
-                    <b className={gradeClassName(competency.grade)} key={competency.competencyKey}>
-                      {competency.grade}
-                    </b>
+                    <span className="teacher-package-received-grade" key={competency.competencyKey}>
+                      <b className={gradeClassName(competency.grade)}>{competency.grade}</b>
+                      {competency.modified && <i>M</i>}
+                    </span>
                   ))}
                 </div>
+                {row.sourceStudent.trackingSummary?.hasTrackingData && (
+                  <small className="teacher-package-tracking-chip">
+                    Constància {row.sourceStudent.trackingSummary.consistency}% · {row.sourceStudent.trackingSummary.profile}
+                  </small>
+                )}
               </article>
             ))}
           </section>

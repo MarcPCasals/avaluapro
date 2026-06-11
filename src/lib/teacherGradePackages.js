@@ -1,4 +1,5 @@
 import { SUBJECT_STRUCTURES } from '../data/subjects'
+import { getStudentInterventionInsight, getStudentTrackingStats } from './analytics'
 import { calculateGrade } from './grades'
 
 export const TEACHER_GRADE_PACKAGE_SCHEMA = 'avaluapro.teacher-grade-package'
@@ -159,18 +160,6 @@ export function getLatestEvaluationCompetencyGrade({ classId, competencyName, st
         mark.studentId === studentId &&
         mark.competencyId === competency.id,
     )
-    if (modifiedMark) {
-      const sourceUt = utsById.get(competency.utId)
-      return {
-        competencyId: competency.id,
-        grade: 'D',
-        modified: true,
-        sourceUtId: sourceUt?.id || competency.utId,
-        sourceUtName: sourceUt?.name || 'UT anterior',
-        sourceUtOrder: utOrderById.get(competency.utId) ?? 0,
-      }
-    }
-
     const competencyCriteria = state.criteria.filter((criterion) => criterion.competencyId === competency.id)
     const criterionGrades = competencyCriteria
       .map((criterion) =>
@@ -178,11 +167,12 @@ export function getLatestEvaluationCompetencyGrade({ classId, competencyName, st
       )
       .filter(Boolean)
     const grade = calculateGrade(criterionGrades)
-    if (grade) {
+    if (grade || modifiedMark) {
       const sourceUt = utsById.get(competency.utId)
       return {
         competencyId: competency.id,
-        grade,
+        grade: grade || 'D',
+        modified: Boolean(modifiedMark),
         sourceUtId: sourceUt?.id || competency.utId,
         sourceUtName: sourceUt?.name || 'UT anterior',
         sourceUtOrder: utOrderById.get(competency.utId) ?? 0,
@@ -204,11 +194,14 @@ export function buildTeacherGradePackage({ classId, sender = {}, state }) {
   const sourceStudents = state.students
     .filter((student) => student.classId === classId)
     .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+  const sourceTasks = state.tasks.filter((task) => task.classId === classId)
   const createdAt = new Date().toISOString()
   let gradeCount = 0
   let emptyCount = 0
 
   const students = sourceStudents.map((student) => {
+    const trackingStats = getStudentTrackingStats(student.id, state.taskRecords, sourceTasks)
+    const trackingInsight = getStudentInterventionInsight(student, state.taskRecords, sourceTasks, state.behaviorEvents)
     const competencies = structure.map((competency, competencyIndex) => {
       const latestGrade = getLatestEvaluationCompetencyGrade({
         classId,
@@ -237,6 +230,18 @@ export function buildTeacherGradePackage({ classId, sender = {}, state }) {
       name: student.name,
       normalizedName: normalizeStudentNameForMatch(student.name),
       sourceStudentId: student.id,
+      trackingSummary: {
+        consistency: trackingStats.consistency,
+        done: trackingStats.done,
+        exempt: trackingStats.exempt,
+        hasTrackingData: trackingStats.hasTrackingData,
+        late: trackingStats.late,
+        missing: trackingStats.missing,
+        profile: trackingInsight.label,
+        profileLevel: trackingInsight.level,
+        redPointCount: trackingInsight.redPointCount,
+        total: trackingStats.total,
+      },
       competencies,
     }
   })
@@ -261,6 +266,7 @@ export function buildTeacherGradePackage({ classId, sender = {}, state }) {
       emptyCount,
       gradeCount,
       studentCount: sourceStudents.length,
+      trackingStudentCount: students.filter((student) => student.trackingSummary?.hasTrackingData).length,
     },
     version: TEACHER_GRADE_PACKAGE_VERSION,
   }
@@ -356,6 +362,7 @@ export function getTutorialMarkUpdatesFromTeacherPackage({ manualMatches = {}, p
         sourceStudentId: row.sourceStudent.sourceStudentId,
         sourceUtId: competency.sourceUtId,
         sourceUtName: competency.sourceUtName,
+        trackingSummary: row.sourceStudent.trackingSummary || null,
         modified: Boolean(competency.modified),
       },
       studentId: row.targetStudent.id,

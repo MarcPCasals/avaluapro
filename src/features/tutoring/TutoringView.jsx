@@ -46,6 +46,10 @@ const TUTORING_RECORD_TYPES = [
   { id: 'center-expulsion', label: 'Expulsions de centre', tone: 'slate' },
   { id: 'doip', label: 'DOIPs equip educatiu', tone: 'blue' },
 ]
+const TUTORING_AGENDA_NOTE_TYPES = [
+  { id: 'work', label: 'Treball' },
+  { id: 'behavior', label: 'Comportament' },
+]
 const MULTIPLE_INTELLIGENCE_OPTIONS = [
   { id: 'linguistic', label: 'Lingüística' },
   { id: 'logical', label: 'Logicomatemàtica' },
@@ -91,6 +95,10 @@ function countByType(records, type) {
 
 function getRecordTypeMeta(type) {
   return TUTORING_RECORD_TYPES.find((item) => item.id === type) || TUTORING_RECORD_TYPES[0]
+}
+
+function getAgendaNoteTypeLabel(type) {
+  return TUTORING_AGENDA_NOTE_TYPES.find((item) => item.id === type)?.label || 'Treball'
 }
 
 function getRelationTypeMeta(type) {
@@ -222,8 +230,13 @@ function getStoredTutorialCompetencyGradeSource(tutorialMarks, classId, studentI
   )
   if (directMark?.value) {
     return directMark.modified || directMark.source?.modified
-      ? { source: 'modified', value: 'D', modified: true }
-      : { source: 'manual', value: directMark.value }
+      ? {
+          source: 'modified',
+          trackingSummary: directMark.source?.trackingSummary || null,
+          value: directMark.value,
+          modified: true,
+        }
+      : { source: 'manual', trackingSummary: directMark.source?.trackingSummary || null, value: directMark.value }
   }
 
   const legacyCriterionGrades = competency.criteria
@@ -271,17 +284,6 @@ function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContex
         mark.studentId === studentId &&
         mark.competencyId === item.id,
     )
-    if (modifiedMark) {
-      const sourceUt = utsById.get(item.utId)
-      return {
-        modified: true,
-        source: 'modified',
-        utName: sourceUt?.name || 'UT anterior',
-        utOrder: utOrderById.get(item.utId) ?? 0,
-        value: 'D',
-      }
-    }
-
     const competencyCriteria = evaluationContext.criteria.filter((criterion) => criterion.competencyId === item.id)
     const criterionGrades = competencyCriteria
       .map(
@@ -292,13 +294,14 @@ function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContex
       )
       .filter(Boolean)
     const grade = calculateGrade(criterionGrades)
-    if (grade) {
+    if (grade || modifiedMark) {
       const sourceUt = utsById.get(item.utId)
       return {
-        source: 'linked',
+        modified: Boolean(modifiedMark),
+        source: modifiedMark ? 'modified' : 'linked',
         utName: sourceUt?.name || 'UT anterior',
         utOrder: utOrderById.get(item.utId) ?? 0,
-        value: grade,
+        value: grade || 'D',
       }
     }
   }
@@ -475,6 +478,7 @@ function summarizeTutorialData({
           score,
           sourceLabel: gradeSource.utName || 'Dades manuals',
           sourceOrder: Number.isFinite(gradeSource.utOrder) ? gradeSource.utOrder : 999,
+          trackingSummary: gradeSource.trackingSummary || null,
           notDeveloped: isNotDeveloped(grade),
         }
         evaluatedCompetencies.push(row)
@@ -1613,6 +1617,87 @@ function getProfileAreaSummaries(profile) {
     .sort((a, b) => b.notDevelopedPercent - a.notDevelopedPercent || a.averageScore - b.averageScore)
 }
 
+function getProfileSubjectTrackingSummaries(profile) {
+  const summaries = new Map()
+  profile.evaluatedCompetencies.forEach((item) => {
+    if (!item.trackingSummary?.hasTrackingData) return
+    if (summaries.has(item.subject)) return
+    summaries.set(item.subject, {
+      consistency: item.trackingSummary.consistency,
+      done: item.trackingSummary.done,
+      late: item.trackingSummary.late,
+      missing: item.trackingSummary.missing,
+      profile: item.trackingSummary.profile,
+      profileLevel: item.trackingSummary.profileLevel,
+      subject: item.subject,
+      total: item.trackingSummary.total,
+    })
+  })
+  return [...summaries.values()].sort((a, b) => a.subject.localeCompare(b.subject, 'ca'))
+}
+
+function AreaRadarChart({ areas }) {
+  if (!areas?.length) {
+    return <div className="empty-state compact">Encara no hi ha prou dades d’àrees per dibuixar el diagrama.</div>
+  }
+
+  const center = 90
+  const radius = 62
+  const safeAreas = areas.slice(0, 8)
+  const points = safeAreas.map((area, index) => {
+    const angle = (Math.PI * 2 * index) / safeAreas.length - Math.PI / 2
+    const scoreRadius = (Math.max(1, Math.min(4, area.averageScore || 1)) / 4) * radius
+    return {
+      ...area,
+      axisX: center + Math.cos(angle) * radius,
+      axisY: center + Math.sin(angle) * radius,
+      labelX: center + Math.cos(angle) * (radius + 24),
+      labelY: center + Math.sin(angle) * (radius + 24),
+      x: center + Math.cos(angle) * scoreRadius,
+      y: center + Math.sin(angle) * scoreRadius,
+    }
+  })
+  const polygon = points.map((point) => `${point.x},${point.y}`).join(' ')
+  const maxPolygon = points.map((point) => `${point.axisX},${point.axisY}`).join(' ')
+
+  return (
+    <div className="tutorial-area-radar">
+      <svg aria-label="Diagrama d’estrella per àrees" role="img" viewBox="0 0 180 180">
+        <polygon className="radar-grid outer" points={maxPolygon} />
+        {[0.25, 0.5, 0.75].map((scale) => (
+          <polygon
+            className="radar-grid"
+            key={scale}
+            points={points
+              .map((point) => `${center + (point.axisX - center) * scale},${center + (point.axisY - center) * scale}`)
+              .join(' ')}
+          />
+        ))}
+        {points.map((point) => (
+          <line className="radar-axis" key={point.id} x1={center} x2={point.axisX} y1={center} y2={point.axisY} />
+        ))}
+        <polygon className="radar-shape" points={polygon} />
+        {points.map((point) => (
+          <g key={point.id}>
+            <circle className="radar-dot" cx={point.x} cy={point.y} r="3.6" />
+            <text className="radar-label" textAnchor="middle" x={point.labelX} y={point.labelY}>
+              {point.name.split(' ')[0]}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div>
+        {safeAreas.map((area) => (
+          <span key={area.id}>
+            <strong>{area.name}</strong>
+            {area.averageGrade}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SubjectCatalogCard({ completion, item, onSelect }) {
   const isComplete = completion?.total > 0 && completion.completed === completion.total
 
@@ -2191,6 +2276,7 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
   )
   const profileAreaSummaries = getProfileAreaSummaries(profile)
   const profileSubjectSummaries = getProfileSubjectSummaries(profile)
+  const profileSubjectTrackingSummaries = getProfileSubjectTrackingSummaries(profile)
   const weakestSubjects = profileSubjectSummaries.filter((subject) => subject.notDeveloped > 0).slice(0, 4)
   const strongestSubjects = profileSubjectSummaries
     .filter((subject) => subject.evaluated > 0 && subject.notDeveloped === 0)
@@ -2409,6 +2495,10 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
               </article>
             </div>
             <div className="tutorial-profile-insight-grid">
+              <article className="wide">
+                <h4>Diagrama d’estrella per àrees</h4>
+                <AreaRadarChart areas={profileAreaSummaries} />
+              </article>
               <article>
                 <h4>Àrees del perfil</h4>
                 {profileAreaSummaries.length === 0 ? (
@@ -2466,6 +2556,22 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                 </article>
               ))}
             </div>
+            {profileSubjectTrackingSummaries.length > 0 && (
+              <div className="tutorial-subject-tracking-summary">
+                <h4>Constància rebuda per assignatura</h4>
+                <div>
+                  {profileSubjectTrackingSummaries.map((summary) => (
+                    <article key={summary.subject}>
+                      <strong>{summary.subject}</strong>
+                      <span>{summary.consistency}%</span>
+                      <small>
+                        {summary.profile} · {summary.done} fetes · {summary.late} incompletes · {summary.missing} no fetes
+                      </small>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -2521,7 +2627,11 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                       <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
                         <div>
                           <strong>{typeMeta.label}</strong>
-                          <span>{formatShortDate(record.date)}</span>
+                          <span>
+                            {formatShortDate(record.date)}
+                            {record.type === 'agenda' ? ` · ${getAgendaNoteTypeLabel(record.agendaKind)}` : ''}
+                            {record.automatic ? ' · Automàtic' : ''}
+                          </span>
                           <p>{record.note || 'Sense comentari afegit.'}</p>
                         </div>
                         <button
@@ -2620,6 +2730,7 @@ export function TutoringView() {
   const [exemptionForm, setExemptionForm] = useState({ studentId: '', subject: '' })
   const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
+    agendaKind: 'work',
     studentId: '',
     type: 'agenda',
     date: getTodayDateInput(),
@@ -3145,6 +3256,7 @@ export function TutoringView() {
       type: recordForm.type,
       date: recordForm.date,
       note: recordForm.note,
+      agendaKind: recordForm.agendaKind,
     })
     setRecordForm((current) => ({
       ...current,
@@ -4045,7 +4157,13 @@ export function TutoringView() {
                   Tipus
                   <select
                     className={`tutorial-record-type-select ${selectedRecordType.tone}`}
-                    onChange={(event) => setRecordForm((current) => ({ ...current, type: event.target.value }))}
+                    onChange={(event) =>
+                      setRecordForm((current) => ({
+                        ...current,
+                        type: event.target.value,
+                        agendaKind: event.target.value === 'agenda' ? current.agendaKind || 'work' : current.agendaKind,
+                      }))
+                    }
                     value={recordForm.type}
                   >
                     {TUTORING_RECORD_TYPES.map((type) => (
@@ -4055,6 +4173,24 @@ export function TutoringView() {
                     ))}
                   </select>
                 </label>
+
+                {recordForm.type === 'agenda' && (
+                  <div className="tutorial-agenda-kind-toggle">
+                    <span>Tipus de nota</span>
+                    <div>
+                      {TUTORING_AGENDA_NOTE_TYPES.map((type) => (
+                        <button
+                          className={recordForm.agendaKind === type.id ? 'active' : ''}
+                          key={type.id}
+                          onClick={() => setRecordForm((current) => ({ ...current, agendaKind: type.id }))}
+                          type="button"
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <label>
                   Data
