@@ -2025,6 +2025,7 @@ export const useAvaluaproStore = create((set, get) => ({
       throw new Error('Cal indicar un correu complet del cotutor.')
     }
 
+    const isNewSharedTutoringSpace = !classItem.sharedTutoringSpaceId
     const spaceId = classItem.sharedTutoringSpaceId || createId('tutoring_space')
     const memberEmails = Array.from(
       new Set(
@@ -2044,6 +2045,7 @@ export const useAvaluaproStore = create((set, get) => ({
         dataset: getSharedTutoringDatasetForClass(state, classId),
         memberEmails,
         spaceId,
+        skipExistingRead: isNewSharedTutoringSpace,
         user,
       })
 

@@ -595,15 +595,32 @@ export async function listTutoringSpacesForUser(userEmail, maxItems = 20) {
     .slice(0, maxItems)
 }
 
-export async function saveTutoringSpace({ classItem, dataset, memberEmails = [], spaceId, user }) {
+export async function saveTutoringSpace({
+  classItem,
+  dataset,
+  memberEmails = [],
+  spaceId,
+  skipExistingRead = false,
+  user,
+}) {
   if (!user?.uid || !user?.email) {
     throw new Error('Cal iniciar sessió amb Google abans de compartir una tutoria.')
   }
   if (!spaceId) throw new Error('No s’ha indicat cap espai de tutoria compartida.')
 
   const spaceRef = getTutoringSpaceDocRef(spaceId)
-  const existingSnapshot = await getDoc(spaceRef)
-  const existing = existingSnapshot.exists() ? existingSnapshot.data() : null
+  let existing = null
+  if (!skipExistingRead) {
+    try {
+      const existingSnapshot = await getDoc(spaceRef)
+      existing = existingSnapshot.exists() ? existingSnapshot.data() : null
+    } catch (error) {
+      throw new Error(
+        'No s’ha pogut llegir la tutoria compartida. Comprova que aquest compte encara hi tingui accés.',
+        { cause: error },
+      )
+    }
+  }
   const now = new Date().toISOString()
   const cleanOwnerEmail = normalizeEmail(existing?.ownerEmailLower || user.email)
   const cleanMembers = mergeMemberEmails(existing?.memberEmails || [], memberEmails, [user.email])
@@ -647,15 +664,31 @@ export async function saveTutoringSpace({ classItem, dataset, memberEmails = [],
   })
 
   assertFirestoreDocumentSize('tutoringSpaces', spaceId, value)
-  await setDoc(spaceRef, value, { merge: true })
+  try {
+    await setDoc(spaceRef, value, { merge: true })
+  } catch (error) {
+    throw new Error(
+      skipExistingRead
+        ? 'No s’ha pogut crear la tutoria compartida. Revisa que hagis iniciat sessió i que el correu del cotutor sigui correcte.'
+        : 'No s’ha pogut actualitzar la tutoria compartida. Revisa que aquest compte encara hi tingui accés.',
+      { cause: error },
+    )
+  }
 
   const syncResults = []
-  for (const collectionName of SHARED_TUTORING_COLLECTIONS) {
-    syncResults.push(
-      await mergeTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [], {
-        now,
-        user,
-      }),
+  try {
+    for (const collectionName of SHARED_TUTORING_COLLECTIONS) {
+      syncResults.push(
+        await mergeTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [], {
+          now,
+          user,
+        }),
+      )
+    }
+  } catch (error) {
+    throw new Error(
+      'La tutoria compartida s’ha creat, però no s’han pogut sincronitzar totes les dades. Torna-ho a provar amb el botó de sincronitzar.',
+      { cause: error },
     )
   }
 
