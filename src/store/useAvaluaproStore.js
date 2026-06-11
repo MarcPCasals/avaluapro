@@ -2835,6 +2835,13 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['agendaNotes'])
   },
 
+  updateAgendaNote: async (noteId, patch) => {
+    set((state) => ({
+      agendaNotes: state.agendaNotes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+    }))
+    await persistCollections(set, get, ['agendaNotes'])
+  },
+
   deleteAgendaNote: async (noteId) => {
     set((state) => ({
       agendaNotes: state.agendaNotes.filter((note) => note.id !== noteId),

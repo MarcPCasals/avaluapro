@@ -5221,6 +5221,108 @@ button.tutorial-record-pill {
   font-weight: 750;
 }
 
+.global-reminder-layer {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 70;
+  width: min(420px, calc(100vw - 36px));
+  display: grid;
+  gap: 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 247, 237, 0.98);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
+}
+
+.global-reminder-layer > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #9a3412;
+  font-weight: 950;
+}
+
+.global-reminder-layer > header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-reminder-layer > header strong {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #ea580c;
+}
+
+.global-reminder-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px;
+  color: #c2410c;
+  background: white;
+}
+
+.global-reminder-card.agenda {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff7f7;
+}
+
+.global-reminder-card > div {
+  min-width: 0;
+}
+
+.global-reminder-card strong,
+.global-reminder-card span,
+.global-reminder-card small {
+  display: block;
+}
+
+.global-reminder-card strong {
+  color: #111827;
+}
+
+.global-reminder-card span,
+.global-reminder-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.global-reminder-card p {
+  margin: 6px 0 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.global-reminder-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.global-package-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .tracking-filter-row button {
   min-height: 34px;
   border: 1px solid #e5e7eb;
@@ -9089,6 +9191,20 @@ button.tutorial-record-pill {
   background: #f9fafb;
 }
 
+button.profile-alert-card {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.profile-alert-card:hover,
+button.profile-alert-card:focus-visible {
+  border-color: #fb923c;
+  box-shadow: 0 0 0 3px #ffedd5;
+  outline: none;
+}
+
 .profile-alert-card.diagnoses {
   border-color: #bfdbfe;
   background: #eff6ff;
@@ -9518,6 +9634,69 @@ button.profile-followup-card:focus-visible {
   color: #64748b;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.agenda-reminder-scheduler {
+  display: grid;
+  grid-template-columns: 1fr 140px 120px auto;
+  gap: 10px;
+  align-items: end;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff7ed;
+}
+
+.agenda-reminder-scheduler > div {
+  display: grid;
+  gap: 3px;
+}
+
+.agenda-reminder-scheduler > div strong {
+  color: #1f2937;
+}
+
+.agenda-reminder-scheduler > div span,
+.agenda-reminder-scheduler label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.agenda-reminder-scheduler label {
+  display: grid;
+  gap: 5px;
+}
+
+.agenda-reminder-scheduler input,
+.agenda-reminder-scheduler textarea {
+  min-height: 38px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+  outline: none;
+}
+
+.agenda-reminder-text {
+  grid-column: 1 / -2;
+}
+
+.agenda-reminder-text textarea {
+  min-height: 58px;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .agenda-reminder-scheduler {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenda-reminder-scheduler > div,
+  .agenda-reminder-text,
+  .agenda-reminder-scheduler .secondary-action {
+    grid-column: 1 / -1;
+  }
 }
 
 .agenda-note-history div {
@@ -10463,6 +10642,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .annotation-quick-card {
+  font: inherit;
   cursor: pointer;
 }
 
@@ -10514,6 +10694,26 @@ button.profile-followup-card:focus-visible {
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.annotation-quick-card small {
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.annotation-diagnosis-lines {
+  display: grid;
+  gap: 4px;
+  max-height: 92px;
+  overflow: auto;
+}
+
+.annotation-diagnosis-lines small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .annotation-tools-row {
@@ -10903,6 +11103,37 @@ button.profile-followup-card:focus-visible {
 .annotation-section textarea:focus {
   border-color: #f97316;
   box-shadow: 0 0 0 3px #ffedd5;
+}
+
+.student-note-history-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.student-note-history-modal label {
+  display: grid;
+  gap: 7px;
+  color: #475569;
+  font-weight: 900;
+}
+
+.student-note-history-modal textarea {
+  min-height: 110px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.student-note-history-modal.team textarea:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px #fee2e2;
+}
+
+.student-note-history-modal.tutoring textarea:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px #fef3c7;
 }
 
 .diagnosis-chip-list {

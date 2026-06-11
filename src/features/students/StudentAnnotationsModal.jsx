@@ -542,7 +542,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title={`Anotacions i resum: ${student.name}`}>
+    <Modal onClose={onClose} size="xl" title={`Anotacions Equips Educatius: ${student.name}`}>
       <div className="annotations-panel" data-tour="annotation-panel">
         <section className="annotation-hero">
           <div className="annotation-photo-card">
@@ -560,11 +560,13 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             <article className={activeDiagnoses.length > 0 ? 'active' : ''}>
               <strong>{activeDiagnoses.length}</strong>
               <span>diagnòstics marcats</span>
-              <small>
-                {activeDiagnoses.length > 0
-                  ? activeDiagnoses.map((diagnosis) => diagnosis.label).join(' · ')
-                  : 'Sense diagnòstics'}
-              </small>
+              <div className="annotation-diagnosis-lines">
+                {activeDiagnoses.length > 0 ? (
+                  activeDiagnoses.map((diagnosis) => <small key={diagnosis.id}>{diagnosis.label}</small>)
+                ) : (
+                  <small>Sense diagnòstics</small>
+                )}
+              </div>
             </article>
             <button
               className={`annotation-quick-card ${hasTeamAlert ? 'team' : ''}`}
@@ -574,6 +576,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             >
               <strong>{teamNotes.length}</strong>
               <span>equips educatius</span>
+              <small>Clicar per accés ràpid</small>
             </button>
             <button
               className={`annotation-quick-card ${hasTutoringAlert && !hasTeamAlert ? 'tutoring' : ''}`}
@@ -583,6 +586,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             >
               <strong>{tutoringNotes.length}</strong>
               <span>comentaris tutoria</span>
+              <small>Clicar per accés ràpid</small>
             </button>
           </div>
         </section>
@@ -718,7 +722,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
                   <strong>{teamNotes[0] ? formatDate(teamNotes[0].date) : 'Sense entrades'}</strong>
                 </article>
                 <article className={hasTutoringAlert ? 'tutoring' : ''}>
-                  <span>Última tutoria</span>
+                  <span>Últim comentari dels tutors</span>
                   <strong>{tutoringNotes[0] ? formatDate(tutoringNotes[0].date) : 'Sense entrades'}</strong>
                 </article>
               </div>
@@ -793,7 +797,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             expanded={expandedSections.tutoring}
             notes={tutoringNotes}
             onToggle={() => toggleSection('tutoring')}
-            title="Última tutoria"
+            title="Últim comentari dels tutors"
           />
         </section>
 
@@ -828,11 +832,11 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
               <button className="annotation-collapse" onClick={() => toggleSection('tutoring')} type="button">
                 <h3>
                   <MessageCircle size={18} />
-                  4. Comentari tutoria
+                  4. Comentaris dels tutors
                 </h3>
                 {expandedSections.tutoring ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </button>
-              <span>Marca l’alumne en groc si no hi ha alerta d’equip educatiu.</span>
+              <span>Informació que els tutors comuniquen i que cal tenir present a classe.</span>
             </div>
             <button className="secondary-action" disabled={!tutoringText.trim()} onClick={handleAddTutoringNote} type="button">
               + Nova entrada
@@ -841,7 +845,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
           <textarea
             maxLength={ANNOTATION_TEXT_LIMIT}
             onChange={(event) => setTutoringText(event.target.value)}
-            placeholder="Escriu una nova entrada de tutoria..."
+            placeholder="Escriu una nova indicació dels tutors..."
             ref={tutoringTextRef}
             value={tutoringText}
           />

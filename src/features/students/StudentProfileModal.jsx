@@ -27,6 +27,57 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString('ca-ES')
 }
 
+function StudentNoteHistoryModal({ notes, onClose, onDelete, onSave, title, tone }) {
+  const [text, setText] = useState('')
+  const sortedNotes = [...notes].sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))
+
+  const handleSave = async () => {
+    await onSave(text)
+    setText('')
+  }
+
+  return (
+    <Modal onClose={onClose} size="lg" title={title}>
+      <div className={`student-note-history-modal ${tone}`}>
+        <div className="annotation-entry-list">
+          {sortedNotes.length === 0 ? (
+            <p className="empty-list">Encara no hi ha cap entrada registrada.</p>
+          ) : (
+            sortedNotes.map((note) => (
+              <article className={`annotation-entry ${tone}`} key={note.id}>
+                <header>
+                  <span>{formatDate(note.date || note.createdAt)}</span>
+                  <button className="ghost-icon-button" onClick={() => onDelete(note.id)} title="Eliminar entrada" type="button">
+                    <Trash2 size={14} />
+                  </button>
+                </header>
+                <p>{note.text}</p>
+              </article>
+            ))
+          )}
+        </div>
+        <label>
+          Nova entrada
+          <textarea
+            maxLength={700}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Escriu una nova entrada..."
+            value={text}
+          />
+        </label>
+        <div className="modal-actions">
+          <button className="secondary-action" onClick={onClose} type="button">
+            Tancar
+          </button>
+          <button className="primary-action" disabled={!text.trim()} onClick={handleSave} type="button">
+            Afegir entrada
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 const antecedentProfiles = [
   { id: 'invisible', label: 'Alumne invisible', description: 'Treballa, però no acaba d’assolir.' },
   { id: 'priority', label: 'Intervenció prioritària', description: 'Cal una mirada inicial clara.' },
@@ -186,11 +237,12 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     : ''
   const agendaNotes = state.agendaNotes
     .filter((note) => note.classId === activeClassId && note.studentId === studentId)
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))
+  const teamNotes = agendaNotes.filter((note) => note.type === 'team')
+  const tutoringNotes = agendaNotes.filter((note) => note.type === 'tutoring')
   const teamNote = agendaNotes.find((note) => note.type === 'team')
   const tutoringNote = agendaNotes.find((note) => note.type === 'tutoring')
   const diagnoses = student?.diagnoses || []
-  const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id))
   const classUtIds = new Set(state.uts.filter((ut) => ut.classId === student?.classId).map((ut) => ut.id))
   const classCompetencies = state.competencies.filter((competency) => classUtIds.has(competency.utId))
   const subjectModifiedCompetencies = subjectCompetencies.map((competency, index) => {
@@ -211,11 +263,14 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   })
   const hasModificationTriggerDiagnosis = diagnoses.some((diagnosisId) => modificationTriggerDiagnoses.has(diagnosisId))
   const hasModifiedCompetencies = subjectModifiedCompetencies.some((competency) => competency.modified)
+  const modifiedCompetencyCount = subjectModifiedCompetencies.filter((competency) => competency.modified).length
   const [showManualModificationPanel, setShowManualModificationPanel] = useState(false)
   const showModifiedCompetenciesPanel =
     subjectModifiedCompetencies.length > 0 &&
     (hasModificationTriggerDiagnosis || hasModifiedCompetencies || showManualModificationPanel)
   const updateStudent = state.updateStudent
+  const addAgendaNote = state.addAgendaNote
+  const deleteAgendaNote = state.deleteAgendaNote
   const setCompetencyModification = state.setCompetencyModification
   const upsertStudentAntecedent = state.upsertStudentAntecedent
   const deleteStudentAntecedent = state.deleteStudentAntecedent
@@ -224,6 +279,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const [diagnosisInfoId, setDiagnosisInfoId] = useState(null)
   const [showPtiLinkModal, setShowPtiLinkModal] = useState(false)
   const [ptiLinkDraft, setPtiLinkDraft] = useState(student?.ptiUrl || '')
+  const [historyModalType, setHistoryModalType] = useState('')
 
   if (!student) return null
 
@@ -343,18 +399,24 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             )}
           </div>
           <div className="annotation-quick-status">
-            <article className={activeDiagnoses.length > 0 ? 'active' : ''}>
-              <strong>{activeDiagnoses.length}</strong>
-              <span>diagnòstics marcats</span>
+            <article className={modifiedCompetencyCount > 0 ? 'active modified' : ''}>
+              <strong>{modifiedCompetencyCount}</strong>
+              <span>competències modificades</span>
             </article>
-            <article className={teamNote ? 'team' : ''}>
+            <button className={`annotation-quick-card ${teamNote ? 'team' : ''}`} onClick={() => setHistoryModalType('team')} type="button">
               <strong>{teamNote ? 'Sí' : '-'}</strong>
               <span>equip educatiu</span>
-            </article>
-            <article className={tutoringNote && !teamNote ? 'tutoring' : ''}>
+              <small>Clicar per veure registre</small>
+            </button>
+            <button
+              className={`annotation-quick-card ${tutoringNote && !teamNote ? 'tutoring' : ''}`}
+              onClick={() => setHistoryModalType('tutoring')}
+              type="button"
+            >
               <strong>{tutoringNote ? 'Sí' : '-'}</strong>
               <span>tutoria</span>
-            </article>
+              <small>Clicar per veure registre</small>
+            </button>
           </div>
         </section>
 
@@ -520,22 +582,42 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             </h3>
           </div>
           <div className="profile-alert-grid">
-            <article className={`profile-alert-card ${teamNote ? 'team' : ''}`}>
+            <button className={`profile-alert-card ${teamNote ? 'team' : ''}`} onClick={() => setHistoryModalType('team')} type="button">
               <div>
                 <strong>Últim equip educatiu</strong>
                 <span>{teamNote ? teamNote.text : 'Sense entrades d’equip educatiu'}</span>
                 {teamNote && <small>{formatDate(teamNote.date)}</small>}
               </div>
-            </article>
-            <article className={`profile-alert-card ${tutoringNote ? 'tutoring' : ''}`}>
+            </button>
+            <button className={`profile-alert-card ${tutoringNote ? 'tutoring' : ''}`} onClick={() => setHistoryModalType('tutoring')} type="button">
               <div>
-                <strong>Última tutoria</strong>
+                <strong>Últim comentari dels tutors</strong>
                 <span>{tutoringNote ? tutoringNote.text : 'Sense comentaris de tutoria'}</span>
                 {tutoringNote && <small>{formatDate(tutoringNote.date)}</small>}
               </div>
-            </article>
+            </button>
           </div>
         </section>
+        {historyModalType === 'team' && (
+          <StudentNoteHistoryModal
+            notes={teamNotes}
+            onClose={() => setHistoryModalType('')}
+            onDelete={deleteAgendaNote}
+            onSave={(text) => addAgendaNote(studentId, 'team', text)}
+            title={`Entrades d’equip educatiu: ${student.name}`}
+            tone="team"
+          />
+        )}
+        {historyModalType === 'tutoring' && (
+          <StudentNoteHistoryModal
+            notes={tutoringNotes}
+            onClose={() => setHistoryModalType('')}
+            onDelete={deleteAgendaNote}
+            onSave={(text) => addAgendaNote(studentId, 'tutoring', text)}
+            title={`Comentaris dels tutors: ${student.name}`}
+            tone="tutoring"
+          />
+        )}
 
         <section className="profile-section student-antecedents-section">
           <div className="profile-section-title">

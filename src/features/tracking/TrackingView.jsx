@@ -190,8 +190,31 @@ function BehaviorEventModal({ events = [], student, type, onClose, onSave }) {
   )
 }
 
-function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCount, onClose, onLastChance, onRegisterAgenda }) {
+function getLocalDateTimeDefaults() {
+  const nextHour = new Date(Date.now() + 60 * 60 * 1000)
+  nextHour.setMinutes(0, 0, 0)
+  const localDate = new Date(nextHour.getTime() - nextHour.getTimezoneOffset() * 60 * 1000)
+  return {
+    date: localDate.toISOString().slice(0, 10),
+    time: nextHour.toTimeString().slice(0, 5),
+  }
+}
+
+function AgendaWarningModal({
+  student,
+  missingTasks,
+  redPointCount,
+  blackPointCount,
+  onClose,
+  onLastChance,
+  onRegisterAgenda,
+  onScheduleReminder,
+}) {
   const [copyState, setCopyState] = useState('')
+  const defaultReminder = getLocalDateTimeDefaults()
+  const [reminderDate, setReminderDate] = useState(defaultReminder.date)
+  const [reminderTime, setReminderTime] = useState(defaultReminder.time)
+  const [reminderText, setReminderText] = useState('')
   const activeMissingTasks = redPointCount > 0 ? missingTasks.slice(-redPointCount) : []
   const agendaText = buildTrackingAgendaText({ blackPointCount, missingTasks: activeMissingTasks, redPointCount, student })
   const agendaReason =
@@ -238,6 +261,46 @@ function AgendaWarningModal({ student, missingTasks, redPointCount, blackPointCo
                 <span>{new Date(task.date).toLocaleDateString('ca-ES')}</span>
               </div>
             ))}
+          </div>
+          <div className="agenda-reminder-scheduler">
+            <div>
+              <strong>Recorda-m’ho més tard</strong>
+              <span>Programa l’avís per quan sigui bon moment de posar la nota a l’agenda.</span>
+            </div>
+            <label>
+              Data
+              <input type="date" value={reminderDate} onChange={(event) => setReminderDate(event.target.value)} />
+            </label>
+            <label>
+              Hora
+              <input type="time" value={reminderTime} onChange={(event) => setReminderTime(event.target.value)} />
+            </label>
+            <label className="agenda-reminder-text">
+              Text del recordatori
+              <textarea
+                maxLength={500}
+                onChange={(event) => setReminderText(event.target.value)}
+                placeholder="Ex: Posar nota a l’agenda abans de sortir de classe."
+                value={reminderText}
+              />
+            </label>
+            <button
+              className="secondary-action"
+              disabled={!reminderDate}
+              onClick={() =>
+                onScheduleReminder({
+                  agendaText,
+                  date: reminderDate,
+                  missingTasks: activeMissingTasks,
+                  text: reminderText.trim() || agendaText,
+                  time: reminderTime,
+                })
+              }
+              type="button"
+            >
+              <Bell size={16} />
+              Programar recordatori
+            </button>
           </div>
           <div className="modal-actions">
             <button className="secondary-action" onClick={copyAgendaText} type="button">
@@ -670,6 +733,7 @@ export function TrackingView() {
   const now = new Date()
   const isReminderDue = (reminder = {}) => {
     if (!reminder.date) return false
+    if (reminder.dismissedAt) return false
     if (reminder.snoozeUntil && new Date(reminder.snoozeUntil) > now) return false
     const dueAt = new Date(`${reminder.date}T${reminder.time || '00:00'}`)
     return dueAt <= now
@@ -958,6 +1022,23 @@ export function TrackingView() {
               taskIds: tasksForAgenda.map((task) => task.id),
             })
             await deferTaskAgendaWarning(agendaWarningStudent.id, agendaWarningRedPoints)
+            setAgendaWarningStudentId(null)
+          }}
+          onScheduleReminder={async ({ agendaText, date, missingTasks: tasksForReminder, text, time }) => {
+            await addAgendaNote(agendaWarningStudent.id, 'agendaReminder', text, {
+              blackPointCount: agendaWarningBlackPoints,
+              originalAgendaText: agendaText,
+              redPointCount: agendaWarningRedPoints,
+              reminder: {
+                date,
+                dismissedAt: '',
+                snoozeUntil: '',
+                text,
+                time: time || '',
+              },
+              source: 'agenda-reminder',
+              taskIds: tasksForReminder.map((task) => task.id),
+            })
             setAgendaWarningStudentId(null)
           }}
         />

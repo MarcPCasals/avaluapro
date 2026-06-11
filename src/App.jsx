@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Info, Loader2, PlayCircle, Trash2 } from 'lucide-react'
+import { GlobalReminderLayer } from './components/GlobalReminderLayer'
 import { MainNavigation } from './components/MainNavigation'
 import { SemesterUtTabs } from './components/SemesterUtTabs'
 import { TopBar } from './components/TopBar'
@@ -104,6 +105,7 @@ function App() {
         {activeMode === 'analytics' && <AnalyticsView />}
         {activeMode === 'tutoring' && <TutoringView />}
       </main>
+      <GlobalReminderLayer />
       {!defaultSubject && !onboarding.demoMode && <TeacherProfileModal forceSetup onClose={() => {}} />}
       <GuidedTour />
     </div>
