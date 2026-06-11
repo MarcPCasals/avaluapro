@@ -206,6 +206,100 @@ service cloud.firestore {
         && request.resource.data.status == 'active';
     }
 
+    function hasAcceptedTutoringInvitation(spaceId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/tutoringInvitationInbox/$(request.auth.token.email)/items/$(spaceId))
+        && get(/databases/$(database)/documents/tutoringInvitationInbox/$(request.auth.token.email)/items/$(spaceId)).data.status == 'accepted';
+    }
+
+    function validTutoringSpaceInvitationAccept(spaceId) {
+      return hasAcceptedTutoringInvitation(spaceId)
+        && isTutoringSpaceMemberAfterWrite()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'memberEmails',
+          'memberUids',
+          'members',
+          'updatedAt'
+        ])
+        && request.resource.data.memberEmails is list
+        && request.resource.data.memberUids is list
+        && request.resource.data.members is list
+        && request.auth.token.email in request.resource.data.memberEmails
+        && request.auth.uid in request.resource.data.memberUids;
+    }
+
+    function isTutoringInvitationRecipient(recipientEmailLower) {
+      return signedIn()
+        && request.auth.token.email is string
+        && recipientEmailLower == request.auth.token.email;
+    }
+
+    function isTutoringInvitationSender() {
+      return signedIn() && resource.data.senderUid == request.auth.uid;
+    }
+
+    function validTutoringInvitationCreate(recipientEmailLower, spaceId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.resource.data.keys().hasOnly([
+          'className',
+          'createdAt',
+          'id',
+          'recipientEmailLower',
+          'respondedAt',
+          'responseByEmail',
+          'responseByUid',
+          'senderEmail',
+          'senderEmailLower',
+          'senderName',
+          'senderSeenAt',
+          'senderUid',
+          'sourceClassId',
+          'spaceId',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.id == spaceId
+        && request.resource.data.spaceId == spaceId
+        && request.resource.data.recipientEmailLower == recipientEmailLower
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmailLower == request.auth.token.email
+        && request.resource.data.senderEmail == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.respondedAt == ''
+        && request.resource.data.responseByEmail == ''
+        && request.resource.data.responseByUid == ''
+        && request.resource.data.senderSeenAt == '';
+    }
+
+    function validTutoringInvitationRecipientResponse(recipientEmailLower) {
+      return isTutoringInvitationRecipient(recipientEmailLower)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'respondedAt',
+          'responseByEmail',
+          'responseByUid',
+          'status',
+          'updatedAt'
+        ])
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['accepted', 'rejected']
+        && request.resource.data.responseByEmail == request.auth.token.email
+        && request.resource.data.responseByUid == request.auth.uid
+        && request.resource.data.respondedAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validTutoringInvitationSenderAck() {
+      return isTutoringInvitationSender()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'senderSeenAt',
+          'updatedAt'
+        ])
+        && request.resource.data.senderSeenAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
     match /teacherGradePackages/{transferId} {
       allow create: if validTeacherGradePackageCreate(transferId);
 
@@ -223,12 +317,19 @@ service cloud.firestore {
     match /tutoringSpaces/{spaceId} {
       allow create: if validTutoringSpaceCreate(spaceId);
       allow read: if isTutoringSpaceMember();
-      allow update: if validTutoringSpaceUpdate();
+      allow update: if validTutoringSpaceUpdate() || validTutoringSpaceInvitationAccept(spaceId);
       allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
 
       match /{collectionName}/{documentId} {
         allow read, create, update, delete: if canAccessTutoringSpace(spaceId);
       }
+    }
+
+    match /tutoringInvitationInbox/{recipientEmailLower}/items/{spaceId} {
+      allow create: if validTutoringInvitationCreate(recipientEmailLower, spaceId);
+      allow read: if isTutoringInvitationRecipient(recipientEmailLower) || isTutoringInvitationSender();
+      allow update: if validTutoringInvitationRecipientResponse(recipientEmailLower) || validTutoringInvitationSenderAck();
+      allow delete: if isTutoringInvitationRecipient(recipientEmailLower) || isTutoringInvitationSender();
     }
 
     match /users/{userId} {

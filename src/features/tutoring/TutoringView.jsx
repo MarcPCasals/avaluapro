@@ -3474,8 +3474,8 @@ export function TutoringView() {
       setShareTutoringEmail('')
       setShareTutoringMessage(
         space?.sharedConflictSummary?.count > 0
-          ? `Tutoria compartida amb ${recipientEmail}. S’han conservat ${space.sharedConflictSummary.count} canvis remots recents.`
-          : `Tutoria compartida correctament amb ${recipientEmail}.`,
+          ? `Sol·licitud enviada a ${recipientEmail}. S’han conservat ${space.sharedConflictSummary.count} canvis remots recents.`
+          : `Sol·licitud de cotutoria enviada a ${recipientEmail}. Quan l’accepti, treballareu el mateix espai.`,
       )
     } catch (error) {
       setShareTutoringMessage(error.message || 'No s’ha pogut compartir aquesta tutoria.')

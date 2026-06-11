@@ -9902,6 +9902,65 @@ button.profile-followup-card:focus-visible {
   align-items: center;
 }
 
+.tutoring-invitation-modal {
+  max-width: 640px;
+}
+
+.tutoring-invitation-card {
+  align-items: flex-start;
+  background: #f8fbff;
+  border: 1px solid #cfe0ff;
+  border-radius: 18px;
+  display: flex;
+  gap: 16px;
+  padding: 18px;
+}
+
+.tutoring-invitation-card.accepted {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.tutoring-invitation-card.rejected {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.tutoring-invitation-card h3 {
+  color: #172033;
+  font-size: 1.3rem;
+  margin: 0 0 8px;
+}
+
+.tutoring-invitation-card p {
+  color: #5f6c82;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.tutoring-invitation-icon {
+  align-items: center;
+  background: #e8f0ff;
+  border-radius: 16px;
+  color: #2563eb;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.tutoring-invitation-card.accepted .tutoring-invitation-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.tutoring-invitation-card.rejected .tutoring-invitation-icon {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
 .tracking-history-list {
   display: grid;
   gap: 8px;

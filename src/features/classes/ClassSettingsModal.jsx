@@ -56,8 +56,8 @@ export function ClassSettingsModal({ classId, onClose }) {
       setShareEmail('')
       setSharedMessage(
         space?.sharedConflictSummary?.count > 0
-          ? `Tutoria compartida, però s’han conservat ${space.sharedConflictSummary.count} canvis remots recents. Sincronitza abans de continuar.`
-          : `Tutoria compartida amb ${recipientEmail}.`,
+          ? `Sol·licitud enviada a ${recipientEmail}. S’han conservat ${space.sharedConflictSummary.count} canvis remots recents.`
+          : `Sol·licitud de cotutoria enviada a ${recipientEmail}. Quan l’accepti, treballareu el mateix espai.`,
       )
     } catch (error) {
       setSharedMessage(error.message || 'No s’ha pogut compartir aquesta tutoria.')

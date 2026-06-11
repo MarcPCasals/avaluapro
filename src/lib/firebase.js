@@ -11,7 +11,9 @@ import {
   signOut,
 } from 'firebase/auth'
 import {
+  arrayUnion,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -120,6 +122,14 @@ function getTutoringSpaceCollectionRef() {
 
 function getTutoringSpaceDocRef(spaceId) {
   return doc(db, 'tutoringSpaces', spaceId)
+}
+
+function getTutoringInvitationDocRef(recipientEmail, spaceId) {
+  return doc(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items', spaceId)
+}
+
+function getTutoringInvitationCollectionRef(recipientEmail) {
+  return collection(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items')
 }
 
 function getSafeDocId(row, fallbackPrefix, index) {
@@ -593,6 +603,140 @@ export async function listTutoringSpacesForUser(userEmail, maxItems = 20) {
     .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
     .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
     .slice(0, maxItems)
+}
+
+export async function sendTutoringInvitation({ classItem, recipientEmail, spaceId, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans d’enviar una invitació de cotutoria.')
+  }
+  const cleanRecipientEmail = normalizeEmail(recipientEmail)
+  if (!cleanRecipientEmail || !cleanRecipientEmail.includes('@')) {
+    throw new Error('Cal indicar un correu complet del cotutor.')
+  }
+  if (!spaceId) throw new Error('No s’ha indicat cap espai de tutoria compartida.')
+
+  const now = new Date().toISOString()
+  const value = cleanForFirestore({
+    className: classItem?.name || 'Tutoria compartida',
+    createdAt: now,
+    id: spaceId,
+    recipientEmailLower: cleanRecipientEmail,
+    respondedAt: '',
+    responseByEmail: '',
+    responseByUid: '',
+    senderEmail: user.email,
+    senderEmailLower: normalizeEmail(user.email),
+    senderName: user.displayName || user.email,
+    senderSeenAt: '',
+    senderUid: user.uid,
+    sourceClassId: classItem?.id || '',
+    spaceId,
+    status: 'pending',
+    updatedAt: now,
+  })
+
+  assertFirestoreDocumentSize(`tutoringInvitationInbox/${cleanRecipientEmail}/items`, spaceId, value)
+  await setDoc(getTutoringInvitationDocRef(cleanRecipientEmail, spaceId), value, { merge: true })
+  return value
+}
+
+export async function listReceivedTutoringInvitations(userEmail, maxItems = 20) {
+  const cleanEmail = normalizeEmail(userEmail)
+  if (!cleanEmail) return []
+
+  const snapshot = await getDocs(getTutoringInvitationCollectionRef(cleanEmail))
+  return snapshot.docs
+    .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+    .filter((invitation) => invitation.status === 'pending')
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+    .slice(0, maxItems)
+}
+
+export async function listSentTutoringInvitationUpdates(userUid, maxItems = 20) {
+  if (!userUid) return []
+
+  try {
+    const invitationsQuery = query(collectionGroup(db, 'items'), where('senderUid', '==', userUid))
+    const snapshot = await getDocs(invitationsQuery)
+    return snapshot.docs
+      .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+      .filter((invitation) => ['accepted', 'rejected'].includes(invitation.status) && !invitation.senderSeenAt)
+      .sort((a, b) =>
+        String(b.respondedAt || b.updatedAt || b.createdAt || '').localeCompare(
+          String(a.respondedAt || a.updatedAt || a.createdAt || ''),
+        ),
+      )
+      .slice(0, maxItems)
+  } catch (error) {
+    console.warn('No s’han pogut carregar els avisos de resposta de cotutoria.', error)
+    return []
+  }
+}
+
+export async function respondTutoringInvitation({ recipientEmail, spaceId, status, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans de respondre una invitació de cotutoria.')
+  }
+  const cleanRecipientEmail = normalizeEmail(recipientEmail || user.email)
+  if (!spaceId || !cleanRecipientEmail) throw new Error('No s’ha trobat aquesta invitació de cotutoria.')
+  if (!['accepted', 'rejected'].includes(status)) throw new Error('Resposta de cotutoria no vàlida.')
+
+  const invitationRef = getTutoringInvitationDocRef(cleanRecipientEmail, spaceId)
+  const invitationSnapshot = await getDoc(invitationRef)
+  if (!invitationSnapshot.exists()) throw new Error('No s’ha trobat aquesta invitació de cotutoria.')
+  const invitation = { id: invitationSnapshot.id, ...invitationSnapshot.data() }
+  if (invitation.recipientEmailLower !== cleanRecipientEmail) {
+    throw new Error('Aquesta invitació no està adreçada al teu compte.')
+  }
+
+  const now = new Date().toISOString()
+  await setDoc(
+    invitationRef,
+    cleanForFirestore({
+      respondedAt: now,
+      responseByEmail: user.email,
+      responseByUid: user.uid,
+      status,
+      updatedAt: now,
+    }),
+    { merge: true },
+  )
+
+  if (status === 'rejected') {
+    return { ...invitation, respondedAt: now, responseByEmail: user.email, responseByUid: user.uid, status }
+  }
+
+  await setDoc(
+    getTutoringSpaceDocRef(spaceId),
+    {
+      memberEmails: arrayUnion(cleanRecipientEmail),
+      memberUids: arrayUnion(user.uid),
+      members: arrayUnion({
+        emailLower: cleanRecipientEmail,
+        role: 'tutor',
+        uid: user.uid,
+      }),
+      updatedAt: now,
+    },
+    { merge: true },
+  )
+
+  return loadTutoringSpace(spaceId)
+}
+
+export async function acknowledgeTutoringInvitationUpdate({ recipientEmail, spaceId, user }) {
+  if (!user?.uid) return
+  const cleanRecipientEmail = normalizeEmail(recipientEmail)
+  if (!spaceId || !cleanRecipientEmail) return
+
+  await setDoc(
+    getTutoringInvitationDocRef(cleanRecipientEmail, spaceId),
+    cleanForFirestore({
+      senderSeenAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    { merge: true },
+  )
 }
 
 export async function saveTutoringSpace({

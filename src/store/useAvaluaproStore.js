@@ -10,8 +10,11 @@ import {
 } from '../lib/teacherGradePackages'
 import {
   SHARED_TUTORING_COLLECTIONS,
+  acknowledgeTutoringInvitationUpdate,
   listReceivedTeacherGradePackages,
+  listReceivedTutoringInvitations,
   listSentTeacherGradePackages,
+  listSentTutoringInvitationUpdates,
   listCloudBackups,
   listTutoringSpacesForUser,
   loadCloudBackup,
@@ -19,9 +22,11 @@ import {
   loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
+  respondTutoringInvitation,
   saveCloudBackup,
   saveCloudCollections,
   saveTutoringSpace,
+  sendTutoringInvitation,
   sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
@@ -834,7 +839,11 @@ export const useAvaluaproStore = create((set, get) => ({
     teacherPackagesError: '',
     teacherPackagesStatus: 'idle',
     sharedTutoringSpaces: [],
+    sharedTutoringInvitations: [],
+    sharedTutoringInvitationUpdates: [],
     sharedTutoringError: '',
+    sharedTutoringInvitationError: '',
+    sharedTutoringInvitationStatus: 'idle',
     sharedTutoringStatus: 'idle',
   },
   status: 'idle',
@@ -875,6 +884,7 @@ export const useAvaluaproStore = create((set, get) => ({
               get().loadReceivedTeacherGradePackages()
               get().loadSentTeacherGradePackages()
               get().loadSharedTutoringSpaces()
+              get().loadSharedTutoringInvitations()
             }, 0)
           }
         },
@@ -944,7 +954,11 @@ export const useAvaluaproStore = create((set, get) => ({
           teacherPackagesError: '',
           teacherPackagesStatus: 'idle',
           sharedTutoringSpaces: [],
+          sharedTutoringInvitations: [],
+          sharedTutoringInvitationUpdates: [],
           sharedTutoringError: '',
+          sharedTutoringInvitationError: '',
+          sharedTutoringInvitationStatus: 'idle',
           sharedTutoringStatus: 'idle',
         },
       }))
@@ -2010,6 +2024,46 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
+  loadSharedTutoringInvitations: async () => {
+    const state = get()
+    if (!state.cloud.user?.email) return { received: [], sentUpdates: [] }
+
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        sharedTutoringInvitationError: '',
+        sharedTutoringInvitationStatus: 'loading',
+      },
+    }))
+
+    try {
+      const [received, sentUpdates] = await Promise.all([
+        listReceivedTutoringInvitations(state.cloud.user.email, 20),
+        listSentTutoringInvitationUpdates(state.cloud.user.uid, 20),
+      ])
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringInvitationError: '',
+          sharedTutoringInvitations: received,
+          sharedTutoringInvitationStatus: 'loaded',
+          sharedTutoringInvitationUpdates: sentUpdates,
+        },
+      }))
+      return { received, sentUpdates }
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringInvitationError:
+            error.message || 'No s’han pogut carregar les invitacions de cotutoria.',
+          sharedTutoringInvitationStatus: 'error',
+        },
+      }))
+      return { received: [], sentUpdates: [] }
+    }
+  },
+
   shareTutoringClass: async ({ classId = get().ui.activeClassId, recipientEmail }) => {
     const state = get()
     const user = state.cloud.user
@@ -2029,7 +2083,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const spaceId = classItem.sharedTutoringSpaceId || createId('tutoring_space')
     const memberEmails = Array.from(
       new Set(
-        [user.email, ...(classItem.sharedTutoringMemberEmails || []), cleanRecipientEmail]
+        [user.email, ...(classItem.sharedTutoringMemberEmails || [])]
           .map(normalizeEmail)
           .filter(Boolean),
       ),
@@ -2046,6 +2100,12 @@ export const useAvaluaproStore = create((set, get) => ({
         memberEmails,
         spaceId,
         skipExistingRead: isNewSharedTutoringSpace,
+        user,
+      })
+      const invitation = await sendTutoringInvitation({
+        classItem: { ...classItem, sharedTutoringSpaceId: spaceId },
+        recipientEmail: cleanRecipientEmail,
+        spaceId,
         user,
       })
 
@@ -2072,7 +2132,8 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       await persistCollections(set, get, ['classes'])
       await get().loadSharedTutoringSpaces()
-      return space
+      await get().loadSharedTutoringInvitations()
+      return { ...space, invitation, invitationSentTo: cleanRecipientEmail }
     } catch (error) {
       set((current) => ({
         cloud: {
@@ -2083,6 +2144,123 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       throw error
     }
+  },
+
+  acceptSharedTutoringInvitation: async (spaceId) => {
+    const state = get()
+    const user = state.cloud.user
+    if (!user?.uid || !user?.email) {
+      throw new Error('Cal iniciar sessió amb Google abans d’acceptar una cotutoria.')
+    }
+    const invitation = state.cloud.sharedTutoringInvitations.find((item) => item.spaceId === spaceId || item.id === spaceId)
+    if (!invitation) throw new Error('No s’ha trobat aquesta invitació de cotutoria.')
+
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        sharedTutoringInvitationError: '',
+        sharedTutoringInvitationStatus: 'saving',
+      },
+    }))
+
+    try {
+      const space = await respondTutoringInvitation({
+        recipientEmail: user.email,
+        spaceId: invitation.spaceId || invitation.id,
+        status: 'accepted',
+        user,
+      })
+      const targetSpaceId = space.id || invitation.spaceId || invitation.id
+      const normalizedClassName = normalizeName(space.className || invitation.className || '')
+      let targetClass = get().classes.find((classItem) => classItem.sharedTutoringSpaceId === targetSpaceId)
+      if (!targetClass) {
+        targetClass = get().classes.find(
+          (classItem) =>
+            normalizeName(classItem.name || '') === normalizedClassName &&
+            (classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
+        )
+      }
+
+      let nextClassId = targetClass?.id
+      if (!nextClassId) {
+        nextClassId = createId('class')
+        const timeline = createCourseTimeline(nextClassId)
+        const nextClass = {
+          color: DEFAULT_CLASS_COLORS[get().classes.length % DEFAULT_CLASS_COLORS.length],
+          halfGroups: DEFAULT_HALF_GROUPS,
+          id: nextClassId,
+          isTutoringGroup: true,
+          name: space.className || invitation.className || 'Tutoria compartida',
+          order: getNextClassOrder(get().classes),
+          sharedTutoringMemberEmails: space.memberEmails || [user.email],
+          sharedTutoringSpaceId: targetSpaceId,
+          subject: 'Tutoria',
+          tutorialLinkedClassId: nextClassId,
+          utModelReady: true,
+        }
+        set((current) => ({
+          classes: [...current.classes, nextClass],
+          semesters: [...current.semesters, ...timeline.semesters],
+          uts: [...current.uts, ...timeline.uts],
+        }))
+        await persistCollections(set, get, ['classes', 'semesters', 'uts'])
+      }
+
+      await get().linkClassToSharedTutoringSpace({ classId: nextClassId, spaceId: targetSpaceId })
+      await get().setActiveClass(nextClassId)
+      get().setActiveMode('tutoring')
+      await get().loadSharedTutoringInvitations()
+      return space
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringInvitationError:
+            error.message || 'No s’ha pogut acceptar aquesta invitació de cotutoria.',
+          sharedTutoringInvitationStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
+  rejectSharedTutoringInvitation: async (spaceId) => {
+    const state = get()
+    const user = state.cloud.user
+    if (!user?.uid || !user?.email) {
+      throw new Error('Cal iniciar sessió amb Google abans de rebutjar una cotutoria.')
+    }
+    const invitation = state.cloud.sharedTutoringInvitations.find((item) => item.spaceId === spaceId || item.id === spaceId)
+    if (!invitation) throw new Error('No s’ha trobat aquesta invitació de cotutoria.')
+
+    await respondTutoringInvitation({
+      recipientEmail: user.email,
+      spaceId: invitation.spaceId || invitation.id,
+      status: 'rejected',
+      user,
+    })
+    await get().loadSharedTutoringInvitations()
+  },
+
+  acknowledgeSharedTutoringInvitationUpdate: async (spaceId) => {
+    const state = get()
+    const user = state.cloud.user
+    const update = state.cloud.sharedTutoringInvitationUpdates.find((item) => item.spaceId === spaceId || item.id === spaceId)
+    if (!update || !user?.uid) return
+
+    await acknowledgeTutoringInvitationUpdate({
+      recipientEmail: update.recipientEmailLower,
+      spaceId: update.spaceId || update.id,
+      user,
+    })
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        sharedTutoringInvitationUpdates: current.cloud.sharedTutoringInvitationUpdates.filter(
+          (item) => (item.spaceId || item.id) !== (update.spaceId || update.id),
+        ),
+      },
+    }))
   },
 
   linkClassToSharedTutoringSpace: async ({ classId = get().ui.activeClassId, spaceId }) => {
