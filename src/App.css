@@ -1579,6 +1579,80 @@ button.tutorial-record-pill {
   font-weight: 900;
 }
 
+.tutorial-exemption-count,
+.tutorial-exemption-toggle {
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #c2410c;
+  background: #ffedd5;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.tutorial-exemption-toggle {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.tutorial-exemption-toggle:not(.active) {
+  color: #475569;
+  border-color: #dbeafe;
+  background: #f8fafc;
+}
+
+.tutorial-exemption-toggle span,
+.tutorial-exemption-toggle strong {
+  min-width: 0;
+}
+
+.tutorial-exemption-toggle span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorial-exemption-detail,
+.tutorial-doip-detail-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.tutorial-exemption-detail article {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff7ed;
+}
+
+.tutorial-exemption-detail article > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.tutorial-exemption-detail strong {
+  color: #1f2937;
+}
+
+.tutorial-exemption-detail small {
+  color: #9a3412;
+  font-weight: 850;
+}
+
 .tutorial-exemption-summary span,
 .tutorial-exemption-list span {
   min-width: 0;
@@ -4564,8 +4638,10 @@ button.tutorial-record-pill {
 
 .grid-scroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   background: white;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tracking-empty-tasks {
@@ -6014,12 +6090,25 @@ button.tutorial-record-pill {
   color: #cbd5e1;
 }
 
-.grade-ut-column b {
+.grade-ut-column b,
+.grade-ut-column .grade-count-badge {
   min-width: 22px;
+  border: 0;
   border-radius: 6px;
   padding: 2px 5px;
   text-align: center;
   background: #f1f5f9;
+  font: inherit;
+  font-weight: 950;
+}
+
+.grade-ut-column .grade-count-badge:not(:disabled) {
+  cursor: pointer;
+}
+
+.grade-ut-column .grade-count-badge:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
 }
 
 .grade-ut-column .grade-count-badge.grade-A {
@@ -7473,13 +7562,28 @@ button.tutorial-record-pill {
   gap: 7px;
 }
 
-.mini-grade-strip span {
+.mini-grade-strip button {
   min-height: 42px;
   display: grid;
   place-items: center;
   gap: 2px;
+  border: 0;
   border-radius: 8px;
+  font: inherit;
   font-weight: 950;
+}
+
+.mini-grade-strip button:not(:disabled) {
+  cursor: pointer;
+}
+
+.mini-grade-strip button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.mini-grade-strip button:disabled {
+  opacity: 0.7;
 }
 
 .mini-grade-strip b {
@@ -8620,6 +8724,11 @@ button.tutorial-record-pill {
   font-weight: 850;
 }
 
+.student-radar-legend.compact {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
 .student-radar-legend strong {
   color: #ea580c;
 }
@@ -9699,9 +9808,30 @@ button.profile-followup-card:focus-visible {
   }
 }
 
-.agenda-note-history div {
+.agenda-note-history > div:not(.agenda-note-history-row) {
   align-items: flex-start;
   flex-direction: column;
+}
+
+.agenda-note-history-row {
+  align-items: flex-start;
+  flex-direction: row;
+}
+
+.agenda-task-list .agenda-note-history-row {
+  display: flex;
+}
+
+.agenda-note-history-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+}
+
+.agenda-note-history-row .icon-button {
+  flex: 0 0 auto;
 }
 
 .agenda-note-history small {
@@ -11783,6 +11913,31 @@ button.profile-followup-card:focus-visible {
   color: #475569;
   font-weight: 750;
   line-height: 1.55;
+}
+
+.diagnosis-library-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.diagnosis-library-index a {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.diagnosis-library-index a:hover,
+.diagnosis-library-index a:focus-visible {
+  border-color: #93c5fd;
+  background: white;
+  outline: none;
 }
 
 .diagnosis-summary-box {
@@ -15564,8 +15719,19 @@ button.profile-followup-card:focus-visible {
     flex: 0 0 auto;
   }
 
+  .content-area,
+  .work-surface {
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .grid-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(100dvh - 210px);
+    overflow: auto;
     overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
   }
 
   .evaluation-table {

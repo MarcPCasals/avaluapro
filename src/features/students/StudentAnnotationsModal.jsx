@@ -504,6 +504,13 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
       return `${radarCenter + Math.cos(row.angle) * radius},${radarCenter + Math.sin(row.angle) * radius}`
     })
     .join(' ')
+  const firstRadarPolygon = annotationEvolution.radarRows
+    .filter((row) => row.firstScore > 0)
+    .map((row) => {
+      const radius = (row.firstScore / 4) * radarRadius
+      return `${radarCenter + Math.cos(row.angle) * radius},${radarCenter + Math.sin(row.angle) * radius}`
+    })
+    .join(' ')
 
   const handleAddTeamNote = async () => {
     await addAgendaNote(studentId, 'team', teamText)
@@ -679,6 +686,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
                           .join(' ')}
                       />
                     ))}
+                    {firstRadarPolygon && <polygon className="radar-first" points={firstRadarPolygon} />}
                     {radarPolygon && <polygon className="radar-last" points={radarPolygon} />}
                     {annotationEvolution.radarRows.map((row) => (
                       <text
@@ -691,6 +699,12 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
                       </text>
                     ))}
                   </svg>
+                )}
+                {annotationEvolution.radarRows.length > 0 && (
+                  <div className="student-radar-legend compact">
+                    <span>Primera mirada</span>
+                    <strong>Darrera mirada</strong>
+                  </div>
                 )}
               </article>
             </div>

@@ -2612,8 +2612,12 @@ export function TutoringView() {
   const [selectedTutorialProfileId, setSelectedTutorialProfileId] = useState('')
   const [selectedTutorialRecordStudentId, setSelectedTutorialRecordStudentId] = useState('')
   const [selectedModifiedStudentId, setSelectedModifiedStudentId] = useState('')
+  const [selectedExemptionStudentId, setSelectedExemptionStudentId] = useState('')
+  const [selectedDoipStudentId, setSelectedDoipStudentId] = useState('')
+  const [doipDraft, setDoipDraft] = useState('')
   const [showExemptionConfig, setShowExemptionConfig] = useState(false)
   const [showModifiedCompetencyConfig, setShowModifiedCompetencyConfig] = useState(false)
+  const [exemptionForm, setExemptionForm] = useState({ studentId: '', subject: '' })
   const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
     studentId: '',
@@ -2773,12 +2777,15 @@ export function TutoringView() {
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
   const selectedSubjectArea = getSubjectArea(selectedSubject)
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
-  const exemptStudents = useMemo(
+  const exemptionRows = useMemo(
     () =>
-      selectedSubject
-        ? classStudents.filter((student) => student.tutorialExemptSubjects?.includes(selectedSubject))
-        : [],
-    [classStudents, selectedSubject],
+      classStudents
+        .map((student) => ({
+          student,
+          subjects: (student.tutorialExemptSubjects || []).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ca')),
+        }))
+        .filter((row) => row.subjects.length > 0),
+    [classStudents],
   )
   const intelligenceSummary = useMemo(
     () =>
@@ -2820,6 +2827,10 @@ export function TutoringView() {
     () => buildTutorialCompetencies(modifiedConfigSubject),
     [modifiedConfigSubject],
   )
+  const selectedExemptionRow = exemptionRows.find((row) => row.student.id === selectedExemptionStudentId)
+  const exemptionConfigStudent = classStudents.find((student) => student.id === exemptionForm.studentId) || classStudents[0]
+  const exemptionConfigSubject =
+    exemptionForm.subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || ''
 
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
   const toggleStudentArrayValue = async (student, field, value) => {
@@ -2835,6 +2846,13 @@ export function TutoringView() {
       subject: subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || '',
     })
     setShowModifiedCompetencyConfig(true)
+  }
+  const openExemptionConfig = (studentId = '', subject = '') => {
+    setExemptionForm({
+      studentId: studentId || classStudents[0]?.id || '',
+      subject: subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || '',
+    })
+    setShowExemptionConfig(true)
   }
   const linkedGradeCount = useMemo(() => {
     if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
@@ -2962,6 +2980,12 @@ export function TutoringView() {
   const selectedTutorialRecordRow = tutorialRecordSummary.studentRows.find(
     (row) => row.student.id === selectedTutorialRecordStudentId,
   )
+  const selectedDoipStudent = classStudents.find((student) => student.id === selectedDoipStudentId)
+  const selectedDoipRecords = selectedDoipStudent
+    ? classTutorialRecords
+        .filter((record) => record.studentId === selectedDoipStudent.id && record.type === 'doip')
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+    : []
   const selectedRelationRow =
     tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
     tutorialRelationSummary.studentRows[0]
@@ -4102,19 +4126,7 @@ export function TutoringView() {
               ) : (
                 <div className="tutorial-doip-list">
                   {tutorialRecordSummary.studentsWithoutDoip.slice(0, 12).map((row) => (
-                    <button
-                      key={row.student.id}
-                      onClick={() =>
-                        setRecordForm((current) => ({
-                          ...current,
-                          date: getTodayDateInput(),
-                          note: '',
-                          studentId: row.student.id,
-                          type: 'doip',
-                        }))
-                      }
-                      type="button"
-                    >
+                    <button key={row.student.id} onClick={() => setSelectedDoipStudentId(row.student.id)} type="button">
                       <span>{row.student.name}</span>
                       <small>Afegir resposta DOIP</small>
                     </button>
@@ -4173,25 +4185,34 @@ export function TutoringView() {
                 <h2>Exempcions i balanç modificat</h2>
                 <button
                   className="secondary-action compact"
-                  disabled={!selectedSubject}
-                  onClick={() => setShowExemptionConfig(true)}
+                  disabled={classStudents.length === 0}
+                  onClick={() => openExemptionConfig()}
                   type="button"
                 >
                   Configurar
                 </button>
               </div>
               <p>
-                Per a la matèria seleccionada ({selectedSubject || 'cap'}), només es mostren els alumnes exempts. La
-                taula tutorial ignorarà aquestes notes.
+                Només es mostren els alumnes amb alguna matèria exempta. La taula tutorial ignorarà aquestes notes.
               </p>
-              {exemptStudents.length === 0 ? (
-                <div className="empty-state compact">No hi ha cap alumne exempt en aquesta matèria.</div>
+              {exemptionRows.length === 0 ? (
+                <div className="empty-state compact">Encara no hi ha cap alumne amb matèries exemptes.</div>
               ) : (
                 <div className="tutorial-exemption-summary">
-                  {exemptStudents.map((student) => (
-                    <article key={student.id}>
-                      <span>{student.name}</span>
-                      <strong>Exempt/a</strong>
+                  {exemptionRows.map((row) => (
+                    <article key={row.student.id}>
+                      <span>{row.student.name}</span>
+                      {row.subjects.length === 1 ? (
+                        <strong>{row.subjects[0]}</strong>
+                      ) : (
+                        <button
+                          className="tutorial-exemption-count"
+                          onClick={() => setSelectedExemptionStudentId(row.student.id)}
+                          type="button"
+                        >
+                          {row.subjects.length} matèries
+                        </button>
+                      )}
                     </article>
                   ))}
                 </div>
@@ -5404,6 +5425,70 @@ export function TutoringView() {
           row={selectedTutorialRecordRow}
         />
       )}
+      {selectedDoipStudent && (
+        <Modal
+          onClose={() => {
+            setSelectedDoipStudentId('')
+            setDoipDraft('')
+          }}
+          size="lg"
+          title={`Resposta DOIP: ${selectedDoipStudent.name}`}
+        >
+          <div className="tutorial-doip-detail-modal">
+            {selectedDoipRecords.length === 0 ? (
+              <div className="empty-state compact">Encara no hi ha cap resposta DOIP registrada per aquest alumne.</div>
+            ) : (
+              <div className="tutorial-record-history compact">
+                {selectedDoipRecords.map((record) => (
+                  <article className="tutorial-record-entry blue" key={record.id}>
+                    <div>
+                      <strong>{formatShortDate(record.date)}</strong>
+                      <p>{record.note || 'Sense resum afegit.'}</p>
+                    </div>
+                    <button
+                      className="icon-button danger subtle"
+                      onClick={() => deleteTutorialRecord(record.id)}
+                      title="Eliminar resposta DOIP"
+                      type="button"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+            <label className="field-label">
+              Resum de respostes de l’equip educatiu
+              <textarea
+                maxLength={TUTORING_TEXT_LIMIT}
+                onChange={(event) => setDoipDraft(event.target.value)}
+                placeholder="Resumeix les respostes rebudes i els acords principals."
+                value={doipDraft}
+              />
+            </label>
+            <div className="modal-actions">
+              <button
+                className="secondary-action"
+                disabled={!doipDraft.trim()}
+                onClick={async () => {
+                  await addTutorialRecord({
+                    classId: activeClassId,
+                    date: getTodayDateInput(),
+                    note: doipDraft,
+                    studentId: selectedDoipStudent.id,
+                    type: 'doip',
+                  })
+                  setDoipDraft('')
+                }}
+                type="button"
+              >
+                Afegir resposta DOIP
+              </button>
+              <small>Si més endavant demanes un altre DOIP, pots afegir una altra entrada aquí mateix.</small>
+            </div>
+          </div>
+        </Modal>
+      )}
       {selectedModifiedRow && (
         <Modal
           onClose={() => setSelectedModifiedStudentId('')}
@@ -5429,34 +5514,91 @@ export function TutoringView() {
           </div>
         </Modal>
       )}
+      {selectedExemptionRow && (
+        <Modal
+          onClose={() => setSelectedExemptionStudentId('')}
+          size="lg"
+          title={`Matèries exemptes: ${selectedExemptionRow.student.name}`}
+        >
+          <div className="tutorial-exemption-detail">
+            {selectedExemptionRow.subjects.map((subject) => {
+              const subjectMeta = allSubjectOptions.find((item) => item.subject === subject)
+              return (
+                <article key={subject}>
+                  <div>
+                    <strong>{subject}</strong>
+                    <small>{subjectMeta?.areaName || getSubjectArea(subject)?.name || 'Àrea no indicada'}</small>
+                  </div>
+                  <button
+                    className="secondary-action compact danger"
+                    onClick={() => toggleStudentArrayValue(selectedExemptionRow.student, 'tutorialExemptSubjects', subject)}
+                    type="button"
+                  >
+                    Treure exempció
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        </Modal>
+      )}
       {showExemptionConfig && (
         <Modal
           onClose={() => setShowExemptionConfig(false)}
           size="lg"
-          title={`Configurar exempcions · ${selectedSubject || 'matèria'}`}
+          title="Configurar matèries exemptes"
         >
           <div className="tutorial-exemption-config">
             <p>
-              Marca només els alumnes que no s’han d’avaluar en aquesta matèria. A la pantalla principal de seguiment
-              tutorial només apareixeran els exempts, perquè la lectura sigui ràpida.
+              Tria un alumne i una matèria. Pots repetir el procés si un alumne està exempt de més d’una assignatura.
             </p>
-            <div className="tutorial-exemption-list">
-              {classStudents.map((student) => {
-                const isExempt = student.tutorialExemptSubjects?.includes(selectedSubject)
-                return (
-                  <button
-                    className={isExempt ? 'active' : ''}
-                    disabled={!selectedSubject}
-                    key={student.id}
-                    onClick={() => toggleStudentArrayValue(student, 'tutorialExemptSubjects', selectedSubject)}
-                    type="button"
-                  >
-                    <span>{student.name}</span>
-                    <strong>{isExempt ? 'Exempt/a' : 'Avaluable'}</strong>
-                  </button>
-                )
-              })}
+            <div className="tutorial-modified-config-fields">
+              <label>
+                Alumne
+                <select
+                  onChange={(event) => setExemptionForm((current) => ({ ...current, studentId: event.target.value }))}
+                  value={exemptionConfigStudent?.id || ''}
+                >
+                  {classStudents.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Assignatura exempta
+                <select
+                  onChange={(event) => setExemptionForm((current) => ({ ...current, subject: event.target.value }))}
+                  value={exemptionConfigSubject}
+                >
+                  {allSubjectOptions.map((item) => (
+                    <option key={item.subject} value={item.subject}>
+                      {item.subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
+            {!exemptionConfigStudent ? (
+              <div className="empty-state compact">Afegeix alumnes abans de configurar exempcions.</div>
+            ) : (
+              <button
+                className={`tutorial-exemption-toggle ${
+                  exemptionConfigStudent.tutorialExemptSubjects?.includes(exemptionConfigSubject) ? 'active' : ''
+                }`}
+                disabled={!exemptionConfigSubject}
+                onClick={() => toggleStudentArrayValue(exemptionConfigStudent, 'tutorialExemptSubjects', exemptionConfigSubject)}
+                type="button"
+              >
+                <span>{exemptionConfigSubject || 'Assignatura'}</span>
+                <strong>
+                  {exemptionConfigStudent.tutorialExemptSubjects?.includes(exemptionConfigSubject)
+                    ? 'Treure exempció'
+                    : 'Marcar com a exempta'}
+                </strong>
+              </button>
+            )}
           </div>
         </Modal>
       )}

@@ -345,6 +345,27 @@ function getGradeAverage(grades) {
   return Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(2))
 }
 
+function buildGradeListProfiles(rows) {
+  return rows
+    .map(({ grade, student }) => ({
+      evaluation: {
+        grade,
+        score: getNumericFromGrade(grade),
+      },
+      incidents: 0,
+      redPointCount: 0,
+      reinforcementReasons: [],
+      student,
+      tracking: {
+        consistency: 0,
+        hasTrackingData: false,
+        late: 0,
+        missing: 0,
+      },
+    }))
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca'))
+}
+
 function getCompetencyCode(name) {
   return name.match(/^C\d+/)?.[0] || name
 }
@@ -383,15 +404,22 @@ function buildGradeUtMatrix(state, students, uts, canonicalCompetencies) {
       const competenciesByName = new Map(competencies.map((competency) => [competency.name, competency]))
       const competencyRows = canonicalCompetencies.map((canonicalCompetency) => {
         const competency = competenciesByName.get(canonicalCompetency.name)
-        const count = competency
-          ? students.filter((student) => getStudentCompetencyGrade(state, student.id, competency) === grade).length
-          : 0
+        const gradeRows = competency
+          ? students
+              .map((student) => ({
+                grade: getStudentCompetencyGrade(state, student.id, competency),
+                student,
+              }))
+              .filter((item) => item.grade === grade)
+          : []
+        const count = gradeRows.length
         return {
           id: `${ut.id}_${canonicalCompetency.key}`,
           code: canonicalCompetency.code,
           name: canonicalCompetency.name,
           count,
           hasCompetency: Boolean(competency),
+          profiles: buildGradeListProfiles(gradeRows),
         }
       })
       const count = students.filter((student) => getStudentUtGrade(state, student.id, ut.id).grade === grade).length
@@ -549,7 +577,13 @@ function buildUtCriterionRows(state, students, competencies) {
 
 function buildUtCompetencyRows(state, students, competencies) {
   return competencies.map((competency) => {
-    const grades = students.map((student) => getStudentCompetencyGrade(state, student.id, competency)).filter(Boolean)
+    const studentGrades = students
+      .map((student) => ({
+        grade: getStudentCompetencyGrade(state, student.id, competency),
+        student,
+      }))
+      .filter((item) => item.grade)
+    const grades = studentGrades.map((item) => item.grade)
     const counts = gradeOrder.reduce((acc, grade) => ({ ...acc, [grade]: 0 }), {})
     grades.forEach((grade) => {
       if (counts[grade] !== undefined) counts[grade] += 1
@@ -565,6 +599,13 @@ function buildUtCompetencyRows(state, students, competencies) {
       ...competency,
       counts,
       average: getGradeAverage(grades),
+      gradeProfiles: gradeOrder.reduce(
+        (acc, grade) => ({
+          ...acc,
+          [grade]: buildGradeListProfiles(studentGrades.filter((item) => item.grade === grade)),
+        }),
+        {},
+      ),
       riskStudents,
       total: grades.length,
     }
@@ -905,7 +946,7 @@ function sortProfilesByTeachingPriority(profiles) {
   })
 }
 
-function GradeUtMatrix({ matrix, setInfo }) {
+function GradeUtMatrix({ matrix, onSelectGroup, setInfo }) {
   return (
     <section className="grade-ut-matrix" data-tour="stats-evaluation">
       <HelpSectionHeading
@@ -934,13 +975,24 @@ function GradeUtMatrix({ matrix, setInfo }) {
                     ut.competencyRows.map((competency) => (
                       <small className={!competency.hasCompetency ? 'muted' : ''} key={competency.id}>
                         <span>{competency.name}</span>
-                        <b
+                        <button
                           className={`grade-count-badge grade-${
                             competency.hasCompetency && competency.count > 0 ? row.grade : 'empty'
                           }`}
+                          disabled={!competency.hasCompetency || competency.count === 0}
+                          onClick={() =>
+                            onSelectGroup?.({
+                              kind: 'grade-list',
+                              title: `${row.grade} · ${ut.name} · ${competency.name}`,
+                              description: `Alumnes que han tret ${row.grade} en aquesta competència i UT.`,
+                              icon: BarChart3,
+                              profiles: competency.profiles,
+                            })
+                          }
+                          type="button"
                         >
                           {competency.hasCompetency ? competency.count : '-'}
-                        </b>
+                        </button>
                       </small>
                     ))
                   )}
@@ -2153,7 +2205,7 @@ function ProgressChangePanel({ declinedRows, improvedRows, onSelectStudent, setI
   )
 }
 
-function UtCompetencyOverview({ competencies, setInfo }) {
+function UtCompetencyOverview({ competencies, onSelectGroup, setInfo }) {
   return (
     <section className="ut-competency-overview">
       {competencies.map((competency) => {
@@ -2177,10 +2229,24 @@ function UtCompetencyOverview({ competencies, setInfo }) {
             </div>
             <div className="mini-grade-strip">
               {gradeOrder.map((grade) => (
-                <span className={`grade-${grade}`} key={grade}>
+                <button
+                  className={`grade-${grade}`}
+                  disabled={(competency.counts[grade] || 0) === 0}
+                  key={grade}
+                  onClick={() =>
+                    onSelectGroup?.({
+                      kind: 'grade-list',
+                      title: `${grade} · ${competency.name} · UT activa`,
+                      description: `Alumnes que han tret ${grade} en aquesta competència activa.`,
+                      icon: Target,
+                      profiles: competency.gradeProfiles?.[grade] || [],
+                    })
+                  }
+                  type="button"
+                >
                   {grade}
                   <b>{competency.counts[grade]}</b>
-                </span>
+                </button>
               ))}
             </div>
             <small>{competency.riskStudents.length} alumnes amb D</small>
@@ -2408,7 +2474,7 @@ function UtStatsView({
         />
       </div>
 
-      <UtCompetencyOverview competencies={competencies} setInfo={setInfo} />
+      <UtCompetencyOverview competencies={competencies} onSelectGroup={onSelectGroup} setInfo={setInfo} />
 
       <div className="analytics-two-column">
         <UtCriterionFocus criterionRows={criterionRows} setInfo={setInfo} students={students} />
@@ -3019,7 +3085,7 @@ export function AnalyticsView() {
 
       {dashboardScope === 'evaluation' && (
         <>
-          <GradeUtMatrix matrix={gradeMatrix} setInfo={setSelectedInfo} />
+          <GradeUtMatrix matrix={gradeMatrix} onSelectGroup={setSelectedInsight} setInfo={setSelectedInfo} />
 
           <div className="analytics-two-column lower evaluation-detail-grid">
             <ProgressChangePanel

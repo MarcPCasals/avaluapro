@@ -328,7 +328,7 @@ function AgendaWarningModal({
   )
 }
 
-function AgendaNotesModal({ notes, onClose, onSave, student }) {
+function AgendaNotesModal({ notes, onClose, onDelete, onSave, student }) {
   const [text, setText] = useState('')
   const sortedNotes = [...notes].sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date))
 
@@ -351,17 +351,27 @@ function AgendaNotesModal({ notes, onClose, onSave, student }) {
           </div>
           <div className="agenda-task-list agenda-note-history">
             {sortedNotes.map((note) => (
-              <div key={note.id}>
-                <strong>
-                  {new Date(note.date).toLocaleDateString('ca-ES')}
-                  {note.source === 'direct' ? ' · Nota directa' : ' · Acumulació'}
-                </strong>
-                {Number.isFinite(note.redPointCount) && (
-                  <small>
-                    {note.redPointCount} punts vermells · {note.blackPointCount || 0} punts negres
-                  </small>
-                )}
-                <span>{note.text}</span>
+              <div className="agenda-note-history-row" key={note.id}>
+                <div>
+                  <strong>
+                    {new Date(note.date).toLocaleDateString('ca-ES')}
+                    {note.source === 'direct' ? ' · Nota directa' : ' · Acumulació'}
+                  </strong>
+                  {Number.isFinite(note.redPointCount) && (
+                    <small>
+                      {note.redPointCount} punts vermells · {note.blackPointCount || 0} punts negres
+                    </small>
+                  )}
+                  <span>{note.text}</span>
+                </div>
+                <button
+                  className="icon-button danger subtle"
+                  onClick={() => onDelete(note.id)}
+                  title="Eliminar nota"
+                  type="button"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
             {notes.length === 0 && <p className="empty-list">Aquest alumne encara no té notes a l’agenda.</p>}
@@ -684,6 +694,7 @@ export function TrackingView() {
   const updateTaskRecord = useAvaluaproStore((state) => state.updateTaskRecord)
   const addBehaviorEvent = useAvaluaproStore((state) => state.addBehaviorEvent)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
+  const deleteAgendaNote = useAvaluaproStore((state) => state.deleteAgendaNote)
   const deferTaskAgendaWarning = useAvaluaproStore((state) => state.deferTaskAgendaWarning)
   const deleteTask = useAvaluaproStore((state) => state.deleteTask)
   const updateTask = useAvaluaproStore((state) => state.updateTask)
@@ -1047,6 +1058,7 @@ export function TrackingView() {
         <AgendaNotesModal
           notes={agendaDetailNotes}
           onClose={() => setAgendaDetailStudentId(null)}
+          onDelete={deleteAgendaNote}
           onSave={(text) =>
             addAgendaNote(agendaDetailStudent.id, 'tracking', text, {
               blackPointCount: 0,
