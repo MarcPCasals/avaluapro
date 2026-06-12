@@ -2523,6 +2523,65 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialRelations'])
   },
 
+  importTutorialRelations: async (relations = []) => {
+    const validRelations = relations.filter(
+      (relation) =>
+        relation?.classId &&
+        relation?.sourceStudentId &&
+        relation?.targetStudentId &&
+        relation?.type &&
+        relation.sourceStudentId !== relation.targetStudentId,
+    )
+    if (validRelations.length === 0) return
+
+    const now = new Date().toISOString()
+    set((state) => {
+      const nextRelations = [...state.tutorialRelations]
+      const indexByKey = new Map(
+        nextRelations.map((relation, index) => [
+          `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_${relation.type}`,
+          index,
+        ]),
+      )
+
+      validRelations.forEach((relation) => {
+        const key = `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_${relation.type}`
+        const existingIndex = indexByKey.get(key)
+        const nextRelation = {
+          classId: relation.classId,
+          sourceStudentId: relation.sourceStudentId,
+          targetStudentId: relation.targetStudentId,
+          type: relation.type,
+          strength: Math.min(3, Math.max(1, Number(relation.strength) || 2)),
+          note: String(relation.note || '').trim(),
+          source: relation.source || 'sociometric-questionnaire',
+          sourceLabel: relation.sourceLabel || 'Qüestionari sociomètric',
+          importedAt: relation.importedAt || now,
+          updatedAt: now,
+        }
+
+        if (existingIndex >= 0) {
+          nextRelations[existingIndex] = {
+            ...nextRelations[existingIndex],
+            ...nextRelation,
+            createdAt: nextRelations[existingIndex].createdAt || now,
+          }
+          return
+        }
+
+        indexByKey.set(key, nextRelations.length)
+        nextRelations.push({
+          id: createId('trel'),
+          createdAt: relation.createdAt || now,
+          ...nextRelation,
+        })
+      })
+
+      return { tutorialRelations: nextRelations }
+    })
+    await persistCollections(set, get, ['tutorialRelations'])
+  },
+
   deleteTutorialRelation: async (relationId) => {
     if (!relationId) return
 

@@ -75,6 +75,18 @@ const SOCIOGRAM_FILTERS = [
   { id: 'supportive', label: 'Afinitats' },
   { id: 'avoid', label: 'Evitar' },
 ]
+const SOCIOMETRIC_POSITIVE_LIMIT = 4
+const SOCIOMETRIC_AVOID_LIMIT = 3
+const SOCIOMETRIC_TEMPLATE_HEADER = [
+  'Alumne',
+  'Elecció 1',
+  'Elecció 2',
+  'Elecció 3',
+  'Elecció 4',
+  'Rebuig 1',
+  'Rebuig 2',
+  'Rebuig 3',
+].join('\t')
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 const TUTORING_TEXT_LIMIT = 700
@@ -699,6 +711,287 @@ function summarizeTutorialRelations({ relations, students }) {
     positiveCount: relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship').length,
     reciprocalCount: reciprocalPairs.size,
     studentRows,
+  }
+}
+
+function normalizeSociometricName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['’`´]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function splitSociometricRow(line) {
+  const cleanLine = String(line || '').trim()
+  if (!cleanLine) return []
+  if (cleanLine.includes('\t')) return cleanLine.split('\t').map((cell) => cell.trim())
+  if (cleanLine.includes(';')) return cleanLine.split(';').map((cell) => cell.trim())
+  return [cleanLine]
+}
+
+function isSociometricHeader(cells) {
+  const normalized = cells.map((cell) => normalizeSociometricName(cell))
+  return normalized.some((cell) => ['alumne', 'alumna', 'nom', 'nom alumne', 'respondent'].includes(cell))
+}
+
+function getSociometricColumnIndexes(headerCells) {
+  const normalizedHeaders = headerCells.map((cell) => normalizeSociometricName(cell))
+  const respondentIndex = Math.max(
+    0,
+    normalizedHeaders.findIndex(
+      (header) =>
+        header === 'alumne' ||
+        header === 'alumna' ||
+        header === 'nom' ||
+        header.includes('nom alumne') ||
+        header.includes('responent') ||
+        header.includes('respondent'),
+    ),
+  )
+  const avoidIndexes = normalizedHeaders
+    .map((header, index) => ({ header, index }))
+    .filter(
+      ({ header, index }) =>
+        index !== respondentIndex &&
+        (header.includes('rebuig') ||
+          header.includes('rechaz') ||
+          header.includes('evitar') ||
+          header.includes('no anir') ||
+          header.includes('no t agrad')),
+    )
+    .map(({ index }) => index)
+  const positiveIndexes = normalizedHeaders
+    .map((header, index) => ({ header, index }))
+    .filter(
+      ({ header, index }) =>
+        index !== respondentIndex &&
+        !avoidIndexes.includes(index) &&
+        (header.includes('eleccio') ||
+          header.includes('elegir') ||
+          header.includes('tria') ||
+          header.includes('agrad') ||
+          header.includes('pati') ||
+          header.includes('posit')),
+    )
+    .map(({ index }) => index)
+
+  return {
+    avoidIndexes:
+      avoidIndexes.length > 0
+        ? avoidIndexes.slice(0, SOCIOMETRIC_AVOID_LIMIT)
+        : Array.from({ length: SOCIOMETRIC_AVOID_LIMIT }, (_, index) => respondentIndex + 1 + SOCIOMETRIC_POSITIVE_LIMIT + index),
+    positiveIndexes:
+      positiveIndexes.length > 0
+        ? positiveIndexes.slice(0, SOCIOMETRIC_POSITIVE_LIMIT)
+        : Array.from({ length: SOCIOMETRIC_POSITIVE_LIMIT }, (_, index) => respondentIndex + 1 + index),
+    respondentIndex,
+  }
+}
+
+function matchSociometricStudent(rawName, students) {
+  const normalizedName = normalizeSociometricName(rawName)
+  if (!normalizedName) return { issue: 'empty', student: null }
+
+  const exactMatch = students.find((student) => normalizeSociometricName(student.name) === normalizedName)
+  if (exactMatch) return { issue: '', student: exactMatch }
+
+  const candidates = students.filter((student) => {
+    const studentName = normalizeSociometricName(student.name)
+    if (!studentName) return false
+    return (
+      studentName.includes(normalizedName) ||
+      normalizedName.includes(studentName) ||
+      normalizedName
+        .split(' ')
+        .filter((part) => part.length >= 3)
+        .every((part) => studentName.includes(part))
+    )
+  })
+
+  if (candidates.length === 1) return { issue: 'approximate', student: candidates[0] }
+  if (candidates.length > 1) return { issue: 'ambiguous', student: null }
+
+  return { issue: 'missing', student: null }
+}
+
+function parseSociometricResponseText(rawText, students) {
+  const lines = String(rawText || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) {
+    return {
+      avoidCount: 0,
+      issues: [],
+      matchedResponses: 0,
+      positiveCount: 0,
+      relations: [],
+      responsesCount: 0,
+    }
+  }
+
+  const firstCells = splitSociometricRow(lines[0])
+  const hasHeader = isSociometricHeader(firstCells)
+  const indexes = hasHeader
+    ? getSociometricColumnIndexes(firstCells)
+    : {
+        avoidIndexes: Array.from({ length: SOCIOMETRIC_AVOID_LIMIT }, (_, index) => 1 + SOCIOMETRIC_POSITIVE_LIMIT + index),
+        positiveIndexes: Array.from({ length: SOCIOMETRIC_POSITIVE_LIMIT }, (_, index) => 1 + index),
+        respondentIndex: 0,
+      }
+  const dataLines = hasHeader ? lines.slice(1) : lines
+  const now = new Date().toISOString()
+  const importedLabel = `Qüestionari sociomètric · ${formatShortDate(getTodayDateInput())}`
+  const issues = []
+  const relationByKey = new Map()
+  let matchedResponses = 0
+
+  dataLines.forEach((line, lineIndex) => {
+    const rowNumber = lineIndex + (hasHeader ? 2 : 1)
+    const cells = splitSociometricRow(line)
+    const sourceName = cells[indexes.respondentIndex] || ''
+    const sourceMatch = matchSociometricStudent(sourceName, students)
+    if (!sourceMatch.student) {
+      issues.push({
+        detail: sourceName || 'Fila sense nom',
+        label:
+          sourceMatch.issue === 'ambiguous'
+            ? 'Nom ambigu'
+            : sourceMatch.issue === 'empty'
+              ? 'Fila sense alumne'
+              : 'Alumne no trobat',
+        rowNumber,
+      })
+      return
+    }
+
+    matchedResponses += 1
+    if (sourceMatch.issue === 'approximate') {
+      issues.push({
+        detail: `${sourceName} → ${sourceMatch.student.name}`,
+        label: 'Coincidència aproximada',
+        rowNumber,
+      })
+    }
+
+    const addChoice = (targetName, type) => {
+      const cleanTargetName = String(targetName || '').trim()
+      if (!cleanTargetName) return
+      const targetMatch = matchSociometricStudent(cleanTargetName, students)
+      if (!targetMatch.student) {
+        issues.push({
+          detail: cleanTargetName,
+          label: targetMatch.issue === 'ambiguous' ? 'Destinatari ambigu' : 'Destinatari no trobat',
+          rowNumber,
+        })
+        return
+      }
+      if (targetMatch.student.id === sourceMatch.student.id) {
+        issues.push({
+          detail: cleanTargetName,
+          label: 'Un alumne no es pot triar a si mateix',
+          rowNumber,
+        })
+        return
+      }
+
+      const pairKey = `${sourceMatch.student.id}__${targetMatch.student.id}`
+      const relationKey = `${pairKey}__${type}`
+      const oppositeKey = `${pairKey}__${type === 'avoid' ? 'friendship' : 'avoid'}`
+      if (relationByKey.has(oppositeKey)) {
+        if (type !== 'avoid') {
+          issues.push({
+            detail: `${sourceMatch.student.name} → ${targetMatch.student.name}`,
+            label: 'Ja constava com a rebuig; no s’importa l’elecció',
+            rowNumber,
+          })
+          return
+        }
+        relationByKey.delete(oppositeKey)
+        issues.push({
+          detail: `${sourceMatch.student.name} → ${targetMatch.student.name}`,
+          label: 'Triat en positiu i en rebuig; es conserva el rebuig',
+          rowNumber,
+        })
+      }
+      relationByKey.set(relationKey, {
+        classId: '',
+        createdAt: now,
+        importedAt: now,
+        note: importedLabel,
+        source: 'sociometric-questionnaire',
+        sourceLabel: importedLabel,
+        sourceStudentId: sourceMatch.student.id,
+        strength: 2,
+        targetStudentId: targetMatch.student.id,
+        type,
+      })
+    }
+
+    indexes.positiveIndexes.forEach((index) => addChoice(cells[index], 'friendship'))
+    indexes.avoidIndexes.forEach((index) => addChoice(cells[index], 'avoid'))
+  })
+
+  const relations = [...relationByKey.values()]
+  return {
+    avoidCount: relations.filter((relation) => relation.type === 'avoid').length,
+    issues,
+    matchedResponses,
+    positiveCount: relations.filter((relation) => relation.type === 'friendship').length,
+    relations,
+    responsesCount: dataLines.length,
+  }
+}
+
+function summarizeSociometricMetrics({ relations, students }) {
+  const positiveRelations = relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship')
+  const avoidRelations = relations.filter((relation) => relation.type === 'avoid')
+  const possibleDirected = students.length * Math.max(0, students.length - 1)
+  const reciprocalPairs = new Set()
+
+  positiveRelations.forEach((relation) => {
+    const hasReverse = positiveRelations.some(
+      (candidate) =>
+        candidate.sourceStudentId === relation.targetStudentId && candidate.targetStudentId === relation.sourceStudentId,
+    )
+    if (hasReverse) reciprocalPairs.add([relation.sourceStudentId, relation.targetStudentId].sort().join('__'))
+  })
+
+  const rows = students.map((student) => {
+    const positiveReceived = positiveRelations.filter((relation) => relation.targetStudentId === student.id).length
+    const positiveGiven = positiveRelations.filter((relation) => relation.sourceStudentId === student.id).length
+    const avoidReceived = avoidRelations.filter((relation) => relation.targetStudentId === student.id).length
+    const avoidGiven = avoidRelations.filter((relation) => relation.sourceStudentId === student.id).length
+    let category = 'Promig'
+    if (positiveReceived >= 4 && avoidReceived <= 1) category = 'Líder'
+    else if (avoidReceived >= 3 && positiveReceived <= 2) category = 'Rebutjat'
+    else if (positiveReceived >= 3 && avoidReceived >= 2) category = 'Controvertit'
+    else if (positiveReceived === 0 && positiveGiven === 0 && avoidReceived === 0) category = 'Aïllat'
+    else if (positiveReceived >= 2 && avoidReceived <= 1) category = 'Acceptat'
+
+    return { avoidGiven, avoidReceived, category, positiveGiven, positiveReceived, student }
+  })
+  const categoryCounts = ['Líder', 'Acceptat', 'Promig', 'Controvertit', 'Aïllat', 'Rebutjat'].map((category) => ({
+    category,
+    count: rows.filter((row) => row.category === category).length,
+  }))
+
+  return {
+    categoryCounts,
+    density: possibleDirected > 0 ? Math.round(((positiveRelations.length + avoidRelations.length) / possibleDirected) * 100) : 0,
+    inclusion:
+      students.length > 0
+        ? Math.round((rows.filter((row) => row.positiveGiven + row.positiveReceived > 0).length / students.length) * 100)
+        : 0,
+    moreno: students.length > 1 ? Math.round((reciprocalPairs.size / (students.length * (students.length - 1) / 2)) * 100) : 0,
+    positivity:
+      positiveRelations.length + avoidRelations.length > 0
+        ? Math.round((positiveRelations.length / (positiveRelations.length + avoidRelations.length)) * 100)
+        : 0,
+    rows,
   }
 }
 
@@ -2761,6 +3054,8 @@ export function TutoringView() {
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
+  const [sociometricPasteText, setSociometricPasteText] = useState('')
+  const [sociometricImportMessage, setSociometricImportMessage] = useState('')
   const [sociogramFilter, setSociogramFilter] = useState('all')
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
@@ -2806,6 +3101,7 @@ export function TutoringView() {
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
+  const importTutorialRelations = useAvaluaproStore((state) => state.importTutorialRelations)
   const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
   const upsertTutorialSociogramLayout = useAvaluaproStore((state) => state.upsertTutorialSociogramLayout)
@@ -3068,6 +3364,14 @@ export function TutoringView() {
     () => summarizeTutorialRelations({ students: classStudents, relations: classTutorialRelations }),
     [classStudents, classTutorialRelations],
   )
+  const sociometricPreview = useMemo(
+    () => parseSociometricResponseText(sociometricPasteText, classStudents),
+    [classStudents, sociometricPasteText],
+  )
+  const sociometricMetrics = useMemo(
+    () => summarizeSociometricMetrics({ students: classStudents, relations: classTutorialRelations }),
+    [classStudents, classTutorialRelations],
+  )
   const tutorialRecordRowsByStudent = useMemo(
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRecordSummary.studentRows],
@@ -3304,6 +3608,31 @@ export function TutoringView() {
       note: '',
     }))
     setRelationSearch((current) => ({ ...current, target: '' }))
+  }
+
+  const handleCopySociometricTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(SOCIOMETRIC_TEMPLATE_HEADER)
+      setSociometricImportMessage('Capçalera copiada. Enganxa-la al teu full de càlcul o Google Forms.')
+    } catch {
+      setSociometricImportMessage('No s’ha pogut copiar automàticament. Pots copiar la capçalera manualment.')
+    }
+  }
+
+  const handleImportSociometricResponses = async () => {
+    if (!activeClassId || sociometricPreview.relations.length === 0) return
+
+    await importTutorialRelations(
+      sociometricPreview.relations.map((relation) => ({
+        ...relation,
+        classId: activeClassId,
+      })),
+    )
+    setSociometricImportMessage(
+      `Importades ${sociometricPreview.positiveCount} eleccions i ${sociometricPreview.avoidCount} rebuigs. Revisa el sociograma.`,
+    )
+    setSociometricPasteText('')
+    setActiveRelationshipTool('sociogram')
   }
 
   const handleRelationSearchChange = (field, value) => {
@@ -4522,6 +4851,147 @@ export function TutoringView() {
               <strong>Disposició d’aula</strong>
               <span>Matriu flexible de taules i cadires.</span>
             </button>
+            <button data-tour="tutoring-tool-survey" onClick={() => setActiveRelationshipTool('survey')} type="button">
+              <ClipboardList size={25} />
+              <strong>Qüestionari sociomètric</strong>
+              <span>Importa respostes de Forms/Excel i crea relacions reals.</span>
+            </button>
+          </section>
+
+          <section
+            className={`sociometric-import-panel relationship-tool-panel ${
+              activeRelationshipTool === 'survey' ? 'active' : ''
+            }`}
+          >
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <ClipboardList size={17} />
+                  Qüestionari sociomètric
+                </span>
+                <h2>Importar respostes del grup</h2>
+                <p>
+                  Enganxa les respostes d’un Google Forms o d’un full de càlcul. Avaluapro les converteix en afinitats
+                  i incompatibilitats del sociograma.
+                </p>
+              </div>
+              <div className="sociometric-import-actions">
+                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                  Tornar a eines
+                </button>
+                <button className="secondary-action compact" onClick={handleCopySociometricTemplate} type="button">
+                  <Clipboard size={16} />
+                  Copiar capçalera
+                </button>
+              </div>
+            </header>
+
+            <div className="sociometric-import-layout">
+              <article className="sociometric-import-help">
+                <FileSpreadsheet size={24} />
+                <h3>Format recomanat</h3>
+                <p>
+                  Una fila per alumne. La primera columna és qui respon. Després, 4 eleccions positives i 3 rebuigs.
+                </p>
+                <code>{SOCIOMETRIC_TEMPLATE_HEADER}</code>
+                <small>
+                  També funciona si el full ve de Google Forms i la columna “Alumne” no és la primera. Els noms poden
+                  tenir accents diferents o formes curtes: Avaluapro intentarà fer coincidència aproximada.
+                </small>
+              </article>
+
+              <label className="sociometric-import-textarea">
+                Enganxa aquí les respostes
+                <textarea
+                  onChange={(event) => {
+                    setSociometricPasteText(event.target.value)
+                    setSociometricImportMessage('')
+                  }}
+                  placeholder={`${SOCIOMETRIC_TEMPLATE_HEADER}\nALUMNE 1\tALUMNE 2\tALUMNE 3\tALUMNE 4\tALUMNE 5\tALUMNE 6\tALUMNE 7\tALUMNE 8`}
+                  value={sociometricPasteText}
+                />
+              </label>
+            </div>
+
+            <div className="sociometric-preview-grid">
+              <article>
+                <span>Respostes</span>
+                <strong>{sociometricPreview.responsesCount}</strong>
+              </article>
+              <article>
+                <span>Coincidències</span>
+                <strong>{sociometricPreview.matchedResponses}</strong>
+              </article>
+              <article className="positive">
+                <span>Eleccions</span>
+                <strong>{sociometricPreview.positiveCount}</strong>
+              </article>
+              <article className="danger">
+                <span>Rebuigs</span>
+                <strong>{sociometricPreview.avoidCount}</strong>
+              </article>
+              <article className={sociometricPreview.issues.length > 0 ? 'warning' : ''}>
+                <span>Revisions</span>
+                <strong>{sociometricPreview.issues.length}</strong>
+              </article>
+            </div>
+
+            {sociometricImportMessage && <div className="sociometric-import-message">{sociometricImportMessage}</div>}
+
+            {sociometricPreview.issues.length > 0 && (
+              <div className="sociometric-issue-list">
+                <strong>Files a revisar abans o després d’importar</strong>
+                {sociometricPreview.issues.slice(0, 12).map((issue, index) => (
+                  <p key={`${issue.rowNumber}_${issue.label}_${index}`}>
+                    Fila {issue.rowNumber}: {issue.label} · {issue.detail}
+                  </p>
+                ))}
+                {sociometricPreview.issues.length > 12 && (
+                  <small>Hi ha {sociometricPreview.issues.length - 12} avís/os més.</small>
+                )}
+              </div>
+            )}
+
+            <div className="sociometric-results-preview">
+              <header>
+                <div>
+                  <span className="section-kicker">
+                    <BarChart3 size={17} />
+                    Lectura ràpida
+                  </span>
+                  <h3>Indicadors sociomètrics actuals</h3>
+                </div>
+                <div className="sociometric-metric-strip">
+                  <span>Densitat {sociometricMetrics.density}%</span>
+                  <span>Inclusió {sociometricMetrics.inclusion}%</span>
+                  <span>Positivitat {sociometricMetrics.positivity}%</span>
+                  <span>Moreno {sociometricMetrics.moreno}%</span>
+                </div>
+              </header>
+              <div className="sociometric-classification-grid">
+                {sociometricMetrics.categoryCounts.map((item) => (
+                  <article key={item.category}>
+                    <span>{item.category}</span>
+                    <strong>{item.count}</strong>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <footer className="sociometric-import-footer">
+              <p>
+                En importar, les respostes queden guardades com a relacions tutorials i alimenten el sociograma, els
+                grups cooperatius i la disposició d’aula.
+              </p>
+              <button
+                className="primary-action"
+                disabled={sociometricPreview.relations.length === 0}
+                onClick={handleImportSociometricResponses}
+                type="button"
+              >
+                Importar {sociometricPreview.relations.length} relacions
+              </button>
+            </footer>
           </section>
 
           <section

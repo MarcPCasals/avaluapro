@@ -1899,7 +1899,7 @@ button.tutorial-record-pill {
 
 .tutorial-tool-launch-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -1950,6 +1950,261 @@ button.tutorial-record-pill {
   align-content: start;
   background: #ffffff;
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.38);
+}
+
+.sociometric-import-panel {
+  gap: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.sociometric-import-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sociometric-import-panel > header h2 {
+  margin: 6px 0;
+  color: #111827;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+.sociometric-import-panel > header p {
+  max-width: 780px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.sociometric-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sociometric-import-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(380px, 1.22fr);
+  gap: 14px;
+}
+
+.sociometric-import-help,
+.sociometric-import-textarea,
+.sociometric-preview-grid article,
+.sociometric-issue-list,
+.sociometric-results-preview {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.sociometric-import-help {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sociometric-import-help strong {
+  color: #1e3a8a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.sociometric-import-help code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  color: #1e3a8a;
+  font-weight: 850;
+}
+
+.sociometric-import-help small {
+  color: #64748b;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.sociometric-import-textarea {
+  display: grid;
+  gap: 10px;
+  color: #334155;
+  font-weight: 950;
+}
+
+.sociometric-import-textarea textarea {
+  min-height: 260px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  color: #0f172a;
+  font: 800 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.sociometric-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sociometric-preview-grid article {
+  display: grid;
+  gap: 6px;
+  min-height: 92px;
+}
+
+.sociometric-preview-grid span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.sociometric-preview-grid strong {
+  color: #111827;
+  font-size: 34px;
+  font-weight: 950;
+}
+
+.sociometric-preview-grid article.positive strong {
+  color: #16a34a;
+}
+
+.sociometric-preview-grid article.danger strong {
+  color: #dc2626;
+}
+
+.sociometric-preview-grid article.warning strong {
+  color: #d97706;
+}
+
+.sociometric-import-message {
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  color: #166534;
+  font-weight: 900;
+}
+
+.sociometric-issue-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.sociometric-issue-list p {
+  margin: 0;
+  color: #92400e;
+  font-weight: 800;
+}
+
+.sociometric-issue-list small {
+  color: #92400e;
+  font-weight: 850;
+}
+
+.sociometric-results-preview {
+  display: grid;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.sociometric-results-preview > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sociometric-results-preview h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.sociometric-results-preview p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.sociometric-metric-strip {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sociometric-metric-strip span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.sociometric-classification-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sociometric-classification-grid article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.sociometric-classification-grid span {
+  color: #64748b;
+  font-weight: 950;
+}
+
+.sociometric-classification-grid strong {
+  color: #111827;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.sociometric-import-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.sociometric-import-footer p {
+  max-width: 760px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .tutorial-sociogram-visual-card {
@@ -16591,7 +16846,7 @@ button.profile-followup-card:focus-visible {
   }
 
   .tutorial-tool-launch-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -16609,9 +16864,34 @@ button.profile-followup-card:focus-visible {
     padding: 12px;
   }
 
+  .sociometric-import-panel > header,
+  .sociometric-results-preview > header,
+  .sociometric-import-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sociometric-import-actions,
+  .sociometric-metric-strip {
+    justify-content: flex-start;
+  }
+
+  .sociometric-import-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sociometric-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sociometric-classification-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .tutorial-sociogram-visual-card,
   .cooperative-generator-panel,
-  .tutorial-seating-planner-panel {
+  .tutorial-seating-planner-panel,
+  .sociometric-import-panel {
     gap: 10px;
     padding: 12px;
   }
