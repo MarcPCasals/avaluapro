@@ -2245,6 +2245,42 @@ button.tutorial-record-pill {
   justify-content: flex-end;
 }
 
+.tutorial-sociogram-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tutorial-sociogram-insight-grid article {
+  display: grid;
+  gap: 4px;
+  min-height: 98px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.tutorial-sociogram-insight-grid span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-sociogram-insight-grid strong {
+  color: #1d4ed8;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.tutorial-sociogram-insight-grid small {
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .tutorial-sociogram-filter-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -2396,6 +2432,78 @@ button.tutorial-record-pill {
   font-weight: 900;
 }
 
+.tutorial-sociogram-node.node-large {
+  width: 116px;
+  min-height: 82px;
+}
+
+.tutorial-sociogram-node.node-large span,
+.tutorial-sociogram-node.node-large .tutorial-sociogram-node-photo {
+  width: 39px;
+  height: 39px;
+}
+
+.tutorial-sociogram-node.node-small {
+  width: 94px;
+  min-height: 68px;
+}
+
+.tutorial-sociogram-node.node-small span,
+.tutorial-sociogram-node.node-small .tutorial-sociogram-node-photo {
+  width: 30px;
+  height: 30px;
+}
+
+.tutorial-sociogram-node.social-leader {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.tutorial-sociogram-node.social-leader span {
+  color: #166534;
+  background: #bbf7d0;
+}
+
+.tutorial-sociogram-node.social-accepted {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.tutorial-sociogram-node.social-average {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.tutorial-sociogram-node.social-controversial {
+  border-color: #ddd6fe;
+  background: #faf5ff;
+}
+
+.tutorial-sociogram-node.social-controversial span {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.tutorial-sociogram-node.social-isolated {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tutorial-sociogram-node.social-isolated span {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.tutorial-sociogram-node.social-rejected {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.tutorial-sociogram-node.social-rejected span {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
 .tutorial-sociogram-node.selected {
   z-index: 4;
   width: 132px;
@@ -2444,6 +2552,99 @@ button.tutorial-record-pill {
   opacity: 1;
 }
 
+.tutorial-sociogram-selected-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(420px, 1.4fr);
+  gap: 12px;
+  align-items: stretch;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.tutorial-sociogram-selected-panel h3 {
+  margin: 6px 0 4px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.tutorial-sociogram-selected-panel p {
+  margin: 0;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.tutorial-sociogram-selected-panel dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.tutorial-sociogram-selected-panel dl div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.tutorial-sociogram-selected-panel dt {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tutorial-sociogram-selected-panel dd {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+.sociometric-category-pill {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.sociometric-category-pill.green {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.sociometric-category-pill.blue {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.sociometric-category-pill.slate {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.sociometric-category-pill.violet {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.sociometric-category-pill.gray {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.sociometric-category-pill.red {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
 .tutorial-sociogram-legend {
   display: flex;
   align-items: center;
@@ -2472,6 +2673,11 @@ button.tutorial-record-pill {
 .tutorial-sociogram-legend span.red {
   color: #991b1b;
   background: #fee2e2;
+}
+
+.tutorial-sociogram-legend span.gray {
+  color: #475569;
+  background: #f1f5f9;
 }
 
 .tutorial-sociogram-legend strong {
@@ -16087,6 +16293,14 @@ button.profile-followup-card:focus-visible {
     min-height: 430px;
   }
 
+  .tutorial-sociogram-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tutorial-sociogram-selected-panel {
+    grid-template-columns: 1fr;
+  }
+
   .tutorial-sociogram-node {
     width: 92px;
   }
@@ -16213,8 +16427,13 @@ button.profile-followup-card:focus-visible {
     width: 100%;
   }
 
-.tutorial-sociogram-canvas {
+  .tutorial-sociogram-canvas {
     min-height: 520px;
+  }
+
+  .tutorial-sociogram-insight-grid,
+  .tutorial-sociogram-selected-panel dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -16926,6 +17145,18 @@ button.profile-followup-card:focus-visible {
 
   .tutorial-sociogram-canvas {
     min-height: 440px;
+  }
+
+  .tutorial-sociogram-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tutorial-sociogram-selected-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .tutorial-sociogram-selected-panel dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tutorial-sociogram-node {

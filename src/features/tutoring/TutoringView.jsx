@@ -87,6 +87,14 @@ const SOCIOMETRIC_TEMPLATE_HEADER = [
   'Rebuig 2',
   'Rebuig 3',
 ].join('\t')
+const SOCIOMETRIC_CATEGORY_META = {
+  Líder: { id: 'leader', label: 'Líder', tone: 'green', description: 'Molta elecció positiva i poc rebuig.' },
+  Acceptat: { id: 'accepted', label: 'Acceptat', tone: 'blue', description: 'Bona integració social al grup.' },
+  Promig: { id: 'average', label: 'Promig', tone: 'slate', description: 'Relacions dins del patró habitual.' },
+  Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'violet', description: 'Rep eleccions positives i rebuigs.' },
+  Aïllat: { id: 'isolated', label: 'Aïllat', tone: 'gray', description: 'Poques connexions registrades.' },
+  Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep força rebuigs i poques eleccions.' },
+}
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 const TUTORING_TEXT_LIMIT = 700
@@ -972,7 +980,8 @@ function summarizeSociometricMetrics({ relations, students }) {
     else if (positiveReceived === 0 && positiveGiven === 0 && avoidReceived === 0) category = 'Aïllat'
     else if (positiveReceived >= 2 && avoidReceived <= 1) category = 'Acceptat'
 
-    return { avoidGiven, avoidReceived, category, positiveGiven, positiveReceived, student }
+    const categoryMeta = SOCIOMETRIC_CATEGORY_META[category] || SOCIOMETRIC_CATEGORY_META.Promig
+    return { avoidGiven, avoidReceived, category, categoryMeta, positiveGiven, positiveReceived, student }
   })
   const categoryCounts = ['Líder', 'Acceptat', 'Promig', 'Controvertit', 'Aïllat', 'Rebutjat'].map((category) => ({
     category,
@@ -3368,6 +3377,14 @@ export function TutoringView() {
     () => parseSociometricResponseText(sociometricPasteText, classStudents),
     [classStudents, sociometricPasteText],
   )
+  const sociometricTemplateText = useMemo(
+    () =>
+      [
+        SOCIOMETRIC_TEMPLATE_HEADER,
+        ...classStudents.map((student) => [student.name, '', '', '', '', '', '', ''].join('\t')),
+      ].join('\n'),
+    [classStudents],
+  )
   const sociometricMetrics = useMemo(
     () => summarizeSociometricMetrics({ students: classStudents, relations: classTutorialRelations }),
     [classStudents, classTutorialRelations],
@@ -3419,6 +3436,13 @@ export function TutoringView() {
   const selectedRelationRow =
     tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
     tutorialRelationSummary.studentRows[0]
+  const sociometricRowsByStudentId = useMemo(
+    () => new Map(sociometricMetrics.rows.map((row) => [row.student.id, row])),
+    [sociometricMetrics.rows],
+  )
+  const selectedSociometricRow = selectedRelationRow
+    ? sociometricRowsByStudentId.get(selectedRelationRow.student.id)
+    : null
   const tutorialSociogramMap = useMemo(
     () =>
       buildTutorialSociogramMap({
@@ -3612,11 +3636,17 @@ export function TutoringView() {
 
   const handleCopySociometricTemplate = async () => {
     try {
-      await navigator.clipboard.writeText(SOCIOMETRIC_TEMPLATE_HEADER)
-      setSociometricImportMessage('Capçalera copiada. Enganxa-la al teu full de càlcul o Google Forms.')
+      await navigator.clipboard.writeText(sociometricTemplateText)
+      setSociometricImportMessage('Plantilla copiada amb la llista d’alumnes. Enganxa-la al full de càlcul.')
     } catch {
       setSociometricImportMessage('No s’ha pogut copiar automàticament. Pots copiar la capçalera manualment.')
     }
+  }
+
+  const handleDownloadSociometricTemplate = () => {
+    const blob = new Blob([sociometricTemplateText], { type: 'text/tab-separated-values;charset=utf-8' })
+    downloadBlob(blob, `avaluapro-sociograma-${activeClass?.name || 'classe'}-${getTodaySlug()}.tsv`)
+    setSociometricImportMessage('Plantilla descarregada. Pots obrir-la amb Excel, Numbers o Google Sheets.')
   }
 
   const handleImportSociometricResponses = async () => {
@@ -4881,7 +4911,11 @@ export function TutoringView() {
                 </button>
                 <button className="secondary-action compact" onClick={handleCopySociometricTemplate} type="button">
                   <Clipboard size={16} />
-                  Copiar capçalera
+                  Copiar plantilla
+                </button>
+                <button className="secondary-action compact" onClick={handleDownloadSociometricTemplate} type="button">
+                  <FileDown size={16} />
+                  Descarregar plantilla
                 </button>
               </div>
             </header>
@@ -4895,8 +4929,9 @@ export function TutoringView() {
                 </p>
                 <code>{SOCIOMETRIC_TEMPLATE_HEADER}</code>
                 <small>
-                  També funciona si el full ve de Google Forms i la columna “Alumne” no és la primera. Els noms poden
-                  tenir accents diferents o formes curtes: Avaluapro intentarà fer coincidència aproximada.
+                  Pots copiar o descarregar una plantilla amb tots els alumnes. També funciona si el full ve de Google
+                  Forms i la columna “Alumne” no és la primera. Els noms poden tenir accents diferents o formes curtes:
+                  Avaluapro intentarà fer coincidència aproximada.
                 </small>
               </article>
 
@@ -5039,6 +5074,29 @@ export function TutoringView() {
               </div>
             </header>
 
+            <div className="tutorial-sociogram-insight-grid">
+              <article>
+                <span>Densitat de xarxa</span>
+                <strong>{sociometricMetrics.density}%</strong>
+                <small>Connexions registrades respecte al total possible.</small>
+              </article>
+              <article>
+                <span>Inclusió</span>
+                <strong>{sociometricMetrics.inclusion}%</strong>
+                <small>Alumnes amb almenys una relació positiva.</small>
+              </article>
+              <article>
+                <span>Positivitat</span>
+                <strong>{sociometricMetrics.positivity}%</strong>
+                <small>Pes de les eleccions positives respecte als rebuigs.</small>
+              </article>
+              <article>
+                <span>Reciprocitat</span>
+                <strong>{sociometricMetrics.moreno}%</strong>
+                <small>Eleccions positives que són mútues.</small>
+              </article>
+            </div>
+
             {classStudents.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes a la tutoria per veure el sociograma.</div>
             ) : (
@@ -5080,49 +5138,90 @@ export function TutoringView() {
                   ))}
                 </svg>
                 <div className="tutorial-sociogram-node-layer">
-                  {tutorialSociogramMap.nodes.map((node) => (
-                    <button
-                      className={`tutorial-sociogram-node ${node.isSelected ? 'selected' : ''} ${
-                        node.isRelated ? 'related' : ''
-                      } ${node.isDimmed ? 'dimmed' : ''} ${node.avoidCount > 0 ? 'has-avoid' : ''} ${
-                        node.isStar ? 'is-star' : ''
-                      } ${node.isConflict ? 'is-conflict' : ''}`}
-                      key={node.id}
-                      onClick={() => setSelectedRelationStudentId(node.id)}
-                      onPointerCancel={(event) => handleSociogramPointerUp(event, node)}
-                      onPointerDown={(event) => handleSociogramPointerDown(event, node)}
-                      onPointerMove={(event) => handleSociogramPointerMove(event, node)}
-                      onPointerUp={(event) => handleSociogramPointerUp(event, node)}
-                      style={{ left: `${node.x}%`, top: `${node.y}%` }}
-                      title={node.student.name}
-                      type="button"
-                    >
-                      {node.student.photoUrl ? (
-                        <img
-                          alt=""
-                          className="tutorial-sociogram-node-photo"
-                          draggable="false"
-                          src={node.student.photoUrl}
-                        />
-                      ) : (
-                        <span>{node.initials}</span>
-                      )}
-                      <strong>{node.student.name}</strong>
-                      <small>
-                        {node.isStar ? 'estrella · ' : ''}
-                        {node.isConflict ? 'conflictiu · ' : ''}
-                        {node.supportiveCount || 0}+ · {node.avoidCount || 0} evitar
-                      </small>
-                    </button>
-                  ))}
+                  {tutorialSociogramMap.nodes.map((node) => {
+                    const sociometricRow = sociometricRowsByStudentId.get(node.id)
+                    const categoryId = sociometricRow?.categoryMeta?.id || 'average'
+                    const sizeClass =
+                      (sociometricRow?.positiveReceived || 0) >= 4
+                        ? 'node-large'
+                        : (sociometricRow?.positiveReceived || 0) >= 2
+                          ? 'node-medium'
+                          : 'node-small'
+
+                    return (
+                      <button
+                        className={`tutorial-sociogram-node social-${categoryId} ${sizeClass} ${
+                          node.isSelected ? 'selected' : ''
+                        } ${node.isRelated ? 'related' : ''} ${node.isDimmed ? 'dimmed' : ''} ${
+                          node.avoidCount > 0 ? 'has-avoid' : ''
+                        } ${node.isStar ? 'is-star' : ''} ${node.isConflict ? 'is-conflict' : ''}`}
+                        key={node.id}
+                        onClick={() => setSelectedRelationStudentId(node.id)}
+                        onPointerCancel={(event) => handleSociogramPointerUp(event, node)}
+                        onPointerDown={(event) => handleSociogramPointerDown(event, node)}
+                        onPointerMove={(event) => handleSociogramPointerMove(event, node)}
+                        onPointerUp={(event) => handleSociogramPointerUp(event, node)}
+                        style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                        title={`${node.student.name} · ${sociometricRow?.category || 'Promig'}`}
+                        type="button"
+                      >
+                        {node.student.photoUrl ? (
+                          <img
+                            alt=""
+                            className="tutorial-sociogram-node-photo"
+                            draggable="false"
+                            src={node.student.photoUrl}
+                          />
+                        ) : (
+                          <span>{node.initials}</span>
+                        )}
+                        <strong>{node.student.name}</strong>
+                        <small>
+                          {sociometricRow?.category || 'Promig'} · {sociometricRow?.positiveReceived || 0} reb. ·{' '}
+                          {sociometricRow?.avoidReceived || 0} rebuigs
+                        </small>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
+            )}
+
+            {selectedSociometricRow && (
+              <aside className="tutorial-sociogram-selected-panel">
+                <div>
+                  <span className={`sociometric-category-pill ${selectedSociometricRow.categoryMeta.tone}`}>
+                    {selectedSociometricRow.category}
+                  </span>
+                  <h3>{selectedSociometricRow.student.name}</h3>
+                  <p>{selectedSociometricRow.categoryMeta.description}</p>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Eleccions rebudes</dt>
+                    <dd>{selectedSociometricRow.positiveReceived}</dd>
+                  </div>
+                  <div>
+                    <dt>Eleccions fetes</dt>
+                    <dd>{selectedSociometricRow.positiveGiven}</dd>
+                  </div>
+                  <div>
+                    <dt>Rebuigs rebuts</dt>
+                    <dd>{selectedSociometricRow.avoidReceived}</dd>
+                  </div>
+                  <div>
+                    <dt>Rebuigs fets</dt>
+                    <dd>{selectedSociometricRow.avoidGiven}</dd>
+                  </div>
+                </dl>
+              </aside>
             )}
 
             <footer className="tutorial-sociogram-legend">
               <span className="green">Afinitat / treballa bé</span>
               <span className="blue">Relació habitual</span>
               <span className="red">Evitar de moment</span>
+              <span className="gray">Mida = eleccions rebudes</span>
               <strong>
                 {tutorialSociogramMap.selectedNode?.student.name || 'Sense alumne seleccionat'} ·{' '}
                 {tutorialSociogramMap.relatedCount} relació/ns visibles
