@@ -23,6 +23,11 @@ Els documents principals són:
 - `docs/comparticio-docents.md`
 - `docs/checklist-final-seguretat.md`
 
+## Eines auxiliars
+
+- `docs/google-forms-sociograma.md`: guia per crear un Google Forms sociomètric i importar-ne les respostes a Avaluapro.
+- `scripts/generar-formulari-sociometric-avaluapro.gs`: Apps Script per generar automàticament el formulari sociomètric i una plantilla compatible amb Avaluapro.
+
 ## Desenvolupament
 
 Projecte creat amb Vite + React.
