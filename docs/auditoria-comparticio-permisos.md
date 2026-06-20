@@ -217,7 +217,7 @@ Correccio:
 
 Severitat: alta.
 
-Un qüestionari actiu es pot carregar sense autenticacio i el document inclou `studentOptions` amb identificadors i noms.
+**Corregit localment el 20 de juny de 2026.** El document general amb `studentOptions` ja no es pot consultar públicament. La informació necessària per respondre només es lliura en consultar un token individual vàlid i no es permet enumerar els tokens.
 
 No es necessariament il.licit si esta justificat i controlat, pero l'enllac actua com a unica barrera d'acces.
 
@@ -235,7 +235,7 @@ Severitat: critica abans d'utilitzar alumnes reals.
 
 Estat a 19/06/2026: l'actualitzacio publica ha estat bloquejada a les rules locals i coberta per proves automatitzades. Pendent de desplegament.
 
-Les rules permeten `create` i `update` publics mentre el qüestionari esta actiu. El client utilitza habitualment un identificador relacionat amb l'alumne per construir el document de resposta.
+**Corregit localment el 20 de juny de 2026.** Les rules ja no permeten actualitzar una resposta publica existent. Cada resposta utilitza com a identificador un token individual aleatori i nomes es pot crear una vegada.
 
 Una persona que conegui o dedueixi l'identificador podria modificar una resposta anterior.
 
@@ -251,14 +251,22 @@ Correccio:
 
 Severitat: alta.
 
-L'estat pot canviar entre `active` i `closed`, pero no hi ha una data de caducitat aplicada per les rules.
+**Corregit localment el 20 de juny de 2026.** Els qüestionaris i els tokens individuals caduquen al cap de 24 hores. La caducitat es valida tant al client com a les rules de Firestore.
 
 Correccio:
 
 - afegir `expiresAt`;
-- validar la caducitat a les rules;
+- ~~validar la caducitat a les rules;~~ fet localment;
 - tancar automaticament o manualment el formulari despres de la sessio;
 - definir eliminacio de respostes.
+
+Estat a 20/06/2026:
+
+- el propietari pot eliminar completament qüestionari, tokens i respostes des de l'app;
+- els cotutors no poden executar aquesta eliminació;
+- en eliminar una classe, també s'eliminen els qüestionaris al núvol creats pel mateix docent;
+- política provisional: eliminar les dades brutes després de sincronitzar i no conservar-les més de set dies després de caducar;
+- resta pendent una purga automàtica executada per backend.
 
 ### C8. Les proves automatitzades de rules no existeixen
 
@@ -271,9 +279,9 @@ El projecte inclou:
 - Firebase Emulator configurat per a proves;
 - `@firebase/rules-unit-testing`;
 - script `npm run test:rules`;
-- dinou proves de rules sobre lectura, membres, invitacions, revocacio, sortida, tombstones, subcol.leccions i respostes sociometriques;
+- vint-i-sis proves de rules sobre lectura, membres, invitacions, revocacio, sortida, tombstones, subcol.leccions, tokens, caducitat, informació prèvia, respostes i eliminacio sociometrica;
 - cinc proves pures sobre fusio i versions de tombstones;
-- execucio local correcta de les vint-i-quatre proves.
+- execucio local correcta de les proves de seguretat.
 
 Encara cal ampliar la cobertura a paquets de notes, eliminacions, revocacio, caducitat i casos limits addicionals.
 
@@ -293,13 +301,13 @@ Fins que el Ministeri o l'assessor indiquin una altra cosa:
 ## 7. Ordre de correccio
 
 1. ~~Preparar Firebase Emulator i les proves de rules.~~ Fet localment.
-2. ~~Escriure les primeres proves dels riscos actuals.~~ Fet: 24 proves.
+2. ~~Escriure les primeres proves dels riscos actuals.~~ Fet: 31 proves de seguretat entre rules i fusio.
 3. ~~Restringir la gestio de membres al propietari i a l'acceptacio controlada.~~ Fet localment.
 4. ~~Enumerar les subcol.leccions compartides permeses.~~ Fet localment.
 5. ~~Definir i aplicar permisos d'eliminacio.~~ Fet localment amb tombstones; prova real pendent.
 6. ~~Implementar revocacio i sortida.~~ Fet localment; prova real pendent.
 7. ~~Bloquejar l'actualitzacio publica de respostes sociometriques.~~ Fet localment.
-8. Afegir caducitat i tokens adequats al formulari.
+8. ~~Afegir caducitat i tokens adequats al formulari.~~ Fet localment: token aleatori individual, identitat fixada, un sol ús i caducitat de 24 hores.
 9. Repetir proves manuals amb dos comptes docents i alumnes ficticis.
 10. Actualitzar el dossier amb el resultat verificat.
 
@@ -315,7 +323,7 @@ npm run build
 
 Resultats:
 
-- 19 proves de rules superades;
+- 26 proves de rules superades;
 - 5 proves de fusio de dades compartides superades;
 - lint correcte en tots els fitxers modificats;
 - el lint global continua bloquejat per tres avisos no relacionats a `TutoringView.jsx`;

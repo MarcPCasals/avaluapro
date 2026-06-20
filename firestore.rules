@@ -457,7 +457,10 @@ service cloud.firestore {
 
     function activeSociometricSurveyById(surveyId) {
       return exists(/databases/$(database)/documents/sociometricSurveys/$(surveyId))
-        && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.status == 'active';
+        && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.status == 'active'
+        && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.expiresAtEpochMs is number
+        && request.time.toMillis()
+          < get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.expiresAtEpochMs;
     }
 
     function validSociometricSurveyCreate(surveyId) {
@@ -468,6 +471,8 @@ service cloud.firestore {
           'classId',
           'className',
           'createdAt',
+          'expiresAt',
+          'expiresAtEpochMs',
           'id',
           'importedRelationCount',
           'lastSyncedAt',
@@ -499,6 +504,9 @@ service cloud.firestore {
         && request.resource.data.importedRelationCount == 0
         && request.resource.data.lastSyncedAt == ''
         && request.resource.data.createdAt is string
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number
+        && request.resource.data.expiresAtEpochMs > request.time.toMillis()
         && request.resource.data.updatedAt is string;
     }
 
@@ -508,21 +516,81 @@ service cloud.firestore {
           'importedRelationCount',
           'lastSyncedAt',
           'responseCount',
+          'expiresAt',
+          'expiresAtEpochMs',
           'status',
           'updatedAt'
         ])
         && request.resource.data.status in ['active', 'closed']
         && request.resource.data.responseCount is number
         && request.resource.data.importedRelationCount is number
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number
         && request.resource.data.updatedAt is string;
     }
 
+    function validSociometricAccessTokenCreate(surveyId, tokenId) {
+      let survey = getAfter(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data;
+      return signedIn()
+        && survey.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'avoidLimit',
+          'classId',
+          'className',
+          'createdAt',
+          'expiresAt',
+          'expiresAtEpochMs',
+          'positiveLimit',
+          'privacyNoticeVersion',
+          'studentId',
+          'studentName',
+          'studentOptions',
+          'surveyId',
+          'tokenId'
+        ])
+        && request.resource.data.tokenId == tokenId
+        && request.resource.data.surveyId == surveyId
+        && request.resource.data.studentId in survey.studentOptionIds
+        && request.resource.data.studentName is string
+        && request.resource.data.classId == survey.classId
+        && request.resource.data.className == survey.className
+        && request.resource.data.studentOptions == survey.studentOptions
+        && request.resource.data.positiveLimit == survey.positiveLimit
+        && request.resource.data.privacyNoticeVersion is string
+        && request.resource.data.avoidLimit == survey.avoidLimit
+        && request.resource.data.createdAt == survey.createdAt
+        && request.resource.data.expiresAt == survey.expiresAt
+        && request.resource.data.expiresAtEpochMs == survey.expiresAtEpochMs;
+    }
+
+    function validSociometricAccessTokenUpdate(surveyId) {
+      return canAccessSociometricSurveyById(surveyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'expiresAt',
+          'expiresAtEpochMs'
+        ])
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number;
+    }
+
+    function validSociometricAccessTokenRead(surveyId, tokenId) {
+      return activeSociometricSurveyById(surveyId)
+        && resource.data.tokenId == tokenId
+        && resource.data.surveyId == surveyId
+        && resource.data.expiresAtEpochMs is number
+        && request.time.toMillis() < resource.data.expiresAtEpochMs;
+    }
+
     function validSociometricResponseWrite(surveyId, responseId) {
+      let token = get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)/accessTokens/$(responseId)).data;
       return activeSociometricSurveyById(surveyId)
         && request.resource.data.keys().hasOnly([
+          'accessToken',
           'avoidStudentIds',
           'classId',
           'positiveStudentIds',
+          'privacyNoticeAcknowledged',
+          'privacyNoticeVersion',
           'responseId',
           'studentId',
           'studentName',
@@ -530,13 +598,21 @@ service cloud.firestore {
           'surveyId'
         ])
         && request.resource.data.responseId == responseId
+        && request.resource.data.accessToken == responseId
         && request.resource.data.surveyId == surveyId
         && request.resource.data.classId == get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.classId
         && request.resource.data.studentId is string
         && request.resource.data.studentName is string
+        && token.tokenId == responseId
+        && token.studentId == request.resource.data.studentId
+        && token.studentName == request.resource.data.studentName
+        && token.expiresAtEpochMs is number
+        && request.time.toMillis() < token.expiresAtEpochMs
         && request.resource.data.studentId in get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.studentOptionIds
         && request.resource.data.positiveStudentIds is list
         && request.resource.data.avoidStudentIds is list
+        && request.resource.data.privacyNoticeAcknowledged == true
+        && request.resource.data.privacyNoticeVersion == token.privacyNoticeVersion
         && request.resource.data.positiveStudentIds.size() <= get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.positiveLimit
         && request.resource.data.avoidStudentIds.size() <= get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.avoidLimit
         && request.resource.data.submittedAt is string;
@@ -588,15 +664,26 @@ service cloud.firestore {
 
     match /sociometricSurveys/{surveyId} {
       allow create: if validSociometricSurveyCreate(surveyId);
-      allow get: if resource.data.status == 'active' || canAccessSociometricSurvey();
+      allow get: if canAccessSociometricSurvey();
       allow list: if false;
       allow update: if validSociometricSurveyUpdate();
       allow delete: if isSociometricSurveyOwner();
 
+      match /accessTokens/{tokenId} {
+        allow create: if validSociometricAccessTokenCreate(surveyId, tokenId);
+        allow get: if validSociometricAccessTokenRead(surveyId, tokenId)
+          || canAccessSociometricSurveyById(surveyId);
+        allow list: if false;
+        allow update: if validSociometricAccessTokenUpdate(surveyId);
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.ownerUid == request.auth.uid;
+      }
+
       match /responses/{responseId} {
         allow create: if validSociometricResponseWrite(surveyId, responseId);
         allow get, list: if canAccessSociometricSurveyById(surveyId);
-        allow delete: if canAccessSociometricSurveyById(surveyId);
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.ownerUid == request.auth.uid;
       }
     }
 

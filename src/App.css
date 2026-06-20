@@ -125,6 +125,129 @@
   font-weight: 900;
 }
 
+.public-sociometric-privacy {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #a5b4fc;
+  border-radius: 8px;
+  padding: 16px;
+  background: #eef2ff;
+}
+
+.public-sociometric-privacy-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.public-sociometric-privacy-heading > span {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #4338ca;
+}
+
+.public-sociometric-privacy h2,
+.public-sociometric-privacy p {
+  margin: 0;
+}
+
+.public-sociometric-privacy h2 {
+  color: #1e1b4b;
+  font-size: 18px;
+}
+
+.public-sociometric-privacy-heading p {
+  margin-top: 2px;
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.public-sociometric-privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.public-sociometric-privacy-grid article {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid #c7d2fe;
+  border-radius: 7px;
+  padding: 11px;
+  background: #ffffff;
+}
+
+.public-sociometric-privacy-grid article > svg {
+  flex: 0 0 auto;
+  color: #4338ca;
+}
+
+.public-sociometric-privacy-grid article div {
+  display: grid;
+  gap: 4px;
+}
+
+.public-sociometric-privacy-grid strong {
+  color: #1e1b4b;
+  font-size: 13px;
+}
+
+.public-sociometric-privacy-grid p,
+.public-sociometric-privacy details p {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.public-sociometric-privacy details {
+  border-top: 1px solid #c7d2fe;
+  padding-top: 11px;
+}
+
+.public-sociometric-privacy summary {
+  color: #3730a3;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.public-sociometric-privacy details > div {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.public-sociometric-privacy-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid #818cf8;
+  border-radius: 7px;
+  padding: 11px;
+  color: #1e1b4b;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.public-sociometric-privacy-check input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: #4338ca;
+}
+
 .public-sociometric-question {
   display: grid;
   gap: 15px;
@@ -304,6 +427,10 @@
 }
 
 @media (max-width: 760px) {
+  .public-sociometric-privacy-grid {
+    grid-template-columns: 1fr;
+  }
+
   .public-sociometric-screen {
     padding: 10px;
   }

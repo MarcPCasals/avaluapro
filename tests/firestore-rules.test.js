@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 
 const PROJECT_ID = 'avaluapro-rules-test'
 const OWNER = { uid: 'owner-uid', email: 'owner@educand.ad' }
@@ -14,6 +14,7 @@ const COTUTOR = { uid: 'cotutor-uid', email: 'cotutor@educand.ad' }
 const THIRD = { uid: 'third-uid', email: 'third@educand.ad' }
 const SPACE_ID = 'space-1'
 const SURVEY_ID = 'survey-1'
+const ACCESS_TOKEN = 'a'.repeat(48)
 
 let testEnv
 
@@ -45,11 +46,14 @@ function tutoringSpaceData(overrides = {}) {
 }
 
 function sociometricSurveyData(overrides = {}) {
+  const expiresAtEpochMs = Date.now() + 24 * 60 * 60 * 1000
   return {
     avoidLimit: 3,
     classId: 'class-1',
     className: 'Tutoria 1A',
     createdAt: '2026-06-19T08:00:00.000Z',
+    expiresAt: new Date(expiresAtEpochMs).toISOString(),
+    expiresAtEpochMs,
     id: SURVEY_ID,
     importedRelationCount: 0,
     lastSyncedAt: '',
@@ -69,12 +73,35 @@ function sociometricSurveyData(overrides = {}) {
   }
 }
 
+function sociometricAccessTokenData(overrides = {}) {
+  const survey = sociometricSurveyData()
+  return {
+    avoidLimit: survey.avoidLimit,
+    classId: survey.classId,
+    className: survey.className,
+    createdAt: survey.createdAt,
+    expiresAt: survey.expiresAt,
+    expiresAtEpochMs: survey.expiresAtEpochMs,
+    positiveLimit: survey.positiveLimit,
+    privacyNoticeVersion: '2026-06-20-v1',
+    studentId: 'student-1',
+    studentName: 'Alumna Un',
+    studentOptions: survey.studentOptions,
+    surveyId: SURVEY_ID,
+    tokenId: ACCESS_TOKEN,
+    ...overrides,
+  }
+}
+
 function sociometricResponseData(overrides = {}) {
   return {
+    accessToken: ACCESS_TOKEN,
     avoidStudentIds: [],
     classId: 'class-1',
     positiveStudentIds: ['student-2'],
-    responseId: 'student_student-1',
+    privacyNoticeAcknowledged: true,
+    privacyNoticeVersion: '2026-06-20-v1',
+    responseId: ACCESS_TOKEN,
     studentId: 'student-1',
     studentName: 'Alumna Un',
     submittedAt: '2026-06-19T08:10:00.000Z',
@@ -98,6 +125,10 @@ beforeEach(async () => {
     const db = context.firestore()
     await setDoc(doc(db, 'tutoringSpaces', SPACE_ID), tutoringSpaceData())
     await setDoc(doc(db, 'sociometricSurveys', SURVEY_ID), sociometricSurveyData())
+    await setDoc(
+      doc(db, 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN),
+      sociometricAccessTokenData(),
+    )
   })
 })
 
@@ -353,16 +384,94 @@ describe('cotutoria compartida', () => {
 })
 
 describe('questionari sociometric public', () => {
-  test('un questionari actiu es pot consultar sense autenticacio', async () => {
+  test('el propietari pot crear atomicament el questionari i els tokens individuals', async () => {
+    const db = authDb(OWNER)
+    const surveyId = 'survey-new'
+    const tokenId = 'b'.repeat(48)
+    const survey = sociometricSurveyData({ id: surveyId })
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'sociometricSurveys', surveyId), survey)
+    batch.set(
+      doc(db, 'sociometricSurveys', surveyId, 'accessTokens', tokenId),
+      sociometricAccessTokenData({
+        expiresAt: survey.expiresAt,
+        expiresAtEpochMs: survey.expiresAtEpochMs,
+        surveyId,
+        tokenId,
+      }),
+    )
+    await assertSucceeds(batch.commit())
+  })
+
+  test('el document general amb la llista d alumnes no es public', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
-    await assertSucceeds(getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID)))
+    await assertFails(getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID)))
+  })
+
+  test('un token individual valid es pot consultar pero no enumerar', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertSucceeds(
+      getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN)),
+    )
+    await assertFails(getDocs(collection(publicDb, 'sociometricSurveys', SURVEY_ID, 'accessTokens')))
   })
 
   test('una persona pot crear una resposta valida', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
     await assertSucceeds(
       setDoc(
-        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', 'student_student-1'),
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
+        sociometricResponseData(),
+      ),
+    )
+  })
+
+  test('el token no permet respondre en nom d un altre alumne', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
+        sociometricResponseData({
+          studentId: 'student-2',
+          studentName: 'Alumne Dos',
+        }),
+      ),
+    )
+  })
+
+  test('no es pot enviar sense acreditar la lectura de l avis informatiu', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
+        sociometricResponseData({ privacyNoticeAcknowledged: false }),
+      ),
+    )
+  })
+
+  test('un questionari caducat no es pot consultar ni respondre', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const expiredAt = Date.now() - 1000
+      await updateDoc(doc(context.firestore(), 'sociometricSurveys', SURVEY_ID), {
+        expiresAt: new Date(expiredAt).toISOString(),
+        expiresAtEpochMs: expiredAt,
+      })
+      await updateDoc(
+        doc(context.firestore(), 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN),
+        {
+          expiresAt: new Date(expiredAt).toISOString(),
+          expiresAtEpochMs: expiredAt,
+        },
+      )
+    })
+
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN)),
+    )
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
         sociometricResponseData(),
       ),
     )
@@ -371,7 +480,7 @@ describe('questionari sociometric public', () => {
   test('una resposta publica existent no es pot sobreescriure', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
-        doc(context.firestore(), 'sociometricSurveys', SURVEY_ID, 'responses', 'student_student-1'),
+        doc(context.firestore(), 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
         sociometricResponseData(),
       )
     })
@@ -379,7 +488,7 @@ describe('questionari sociometric public', () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
     await assertFails(
       setDoc(
-        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', 'student_student-1'),
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
         sociometricResponseData({
           avoidStudentIds: ['student-2'],
           positiveStudentIds: [],
@@ -387,6 +496,33 @@ describe('questionari sociometric public', () => {
         }),
       ),
     )
+  })
+
+  test('nomes el propietari pot eliminar tokens i respostes', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
+        sociometricResponseData(),
+      )
+    })
+
+    await assertFails(
+      deleteDoc(doc(authDb(COTUTOR), 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN)),
+    )
+    await assertFails(
+      deleteDoc(doc(authDb(COTUTOR), 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN)),
+    )
+    await assertSucceeds(
+      deleteDoc(doc(authDb(OWNER), 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN)),
+    )
+    await assertSucceeds(
+      deleteDoc(doc(authDb(OWNER), 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN)),
+    )
+  })
+
+  test('nomes el propietari pot eliminar el questionari complet', async () => {
+    await assertFails(deleteDoc(doc(authDb(COTUTOR), 'sociometricSurveys', SURVEY_ID)))
+    await assertSucceeds(deleteDoc(doc(authDb(OWNER), 'sociometricSurveys', SURVEY_ID)))
   })
 })
 

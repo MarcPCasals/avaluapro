@@ -27,6 +27,8 @@ La còpia manual conté l'estat complet del docent:
 - antecedents;
 - configuració docent.
 
+No inclou els qüestionaris sociomètrics temporals, els tokens individuals ni les respostes brutes. Els moments i les relacions sociomètriques que el docent ja ha sincronitzat sí que formen part de les dades pedagògiques ordinàries.
+
 És una dada molt sensible. S'ha de conservar en un lloc segur i no enviar per canals no controlats si conté dades reals d'alumnes.
 
 ## 2. Còpies al núvol
@@ -125,3 +127,19 @@ No han d'incloure:
 | Acumulació de tasques antigues | Neteja específica de tasques per data |
 | Antecedents massa carregats | Export minimalista només amb dades útils |
 | Còpies al núvol massa opaques | Mostrar darreres còpies, data, tipus i volum |
+
+## 9. Qüestionaris sociomètrics
+
+S'aplica provisionalment aquesta política específica:
+
+1. l'enllaç públic i els tokens individuals caduquen al cap de 24 hores;
+2. les respostes brutes només es conserven fins que el docent les ha revisat i sincronitzat;
+3. després de sincronitzar, el propietari ha d'utilitzar `Eliminar dades brutes`;
+4. aquesta eliminació esborra el qüestionari, els tokens i les respostes de Firestore;
+5. les relacions i el moment sociomètric derivats es conserven separadament dins les dades pedagògiques del docent;
+6. eliminar una classe també elimina els qüestionaris al núvol creats pel mateix docent.
+7. els qüestionaris temporals i els tokens queden exclosos tant de les còpies manuals com de les còpies al núvol.
+
+Com a límit operatiu provisional, les respostes brutes no haurien de superar els set dies després de la caducitat. Abans d'un pilot institucional cal implementar una purga automàtica en un backend de confiança, perquè una aplicació web no pot garantir l'eliminació si cap docent torna a obrir-la.
+
+El termini del resultat pedagògic derivat s'haurà de fixar amb el Ministeri o el responsable del tractament segons la finalitat, el curs acadèmic i la política documental aplicable.

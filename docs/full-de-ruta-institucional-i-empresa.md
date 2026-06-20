@@ -187,14 +187,17 @@ Fer coincidir la documentacio i les garanties de seguretat amb el funcionament a
 - [x] Definir que passa amb les copies locals quan es revoca un membre: es mantenen al dispositiu, deixen de sincronitzar-se i l'app n'informa.
 - [x] Impedir a les rules locals que els cotutors modifiquin la llista de membres o els seus rols.
 - [x] Restringir les subcol.leccions de `tutoringSpaces` a una llista explicita en les rules locals.
-- [ ] Validar amb dos comptes reals l'eliminacio compartida. **Parcial:** tombstones implementats, eliminacio fisica bloquejada i 24 proves automatitzades superades.
+- [ ] Validar amb dos comptes reals l'eliminacio compartida. **Parcial:** tombstones implementats, eliminacio fisica bloquejada i 31 proves automatitzades superades.
 - [ ] Provar invitacions acceptades, rebutjades, duplicades i enviades al correu equivocat. **Parcial:** acceptacio, revocacio i sortida cobertes per proves de rules.
 - [ ] Provar conflictes d'edicio simultania entre dos cotutors.
 - [ ] Verificar que cada canvi sensible deixa autoria i data suficients.
-- [ ] Revisar el formulari sociometric public i la visibilitat dels noms.
-- [ ] Definir caducitat, tancament i eliminacio dels qüestionaris.
-- [ ] Evitar respostes duplicades o suplantacions quan sigui necessari. **Parcial:** ja no es poden sobreescriure respostes existents.
-- [ ] Ampliar les proves automatitzades amb Firebase Emulator a totes les rules compartides. **Parcial:** 19 proves de rules i 5 proves de fusio superades.
+- [ ] Revisar el formulari sociometric public i la visibilitat dels noms. **Parcial:** el document general ja no es public ni revela la llista; cada token valid continua mostrant els noms necessaris per respondre.
+- [x] Definir caducitat, tancament i eliminació manual dels qüestionaris. **Fet localment:** caducitat de 24 hores i eliminació completa de qüestionari, tokens i respostes només pel propietari.
+- [ ] Implementar purga automàtica de respostes sociomètriques. **Política provisional:** eliminar després de sincronitzar i, com a màxim, set dies després de caducar. Requereix backend programat abans del pilot institucional.
+- [x] Evitar respostes duplicades o suplantacions quan sigui necessari. **Fet localment:** enllaç individual amb token aleatori, identitat fixada i resposta d'un sol ús. No elimina el risc que un alumne comparteixi voluntàriament el seu enllaç.
+- [x] Mostrar informació essencial abans de respondre. **Fet localment:** finalitat, destinataris, no anonimat, conservació, ús de l'enllaç i canal de consulta.
+- [ ] Validar jurídicament la informació als participants i completar responsable, base jurídica, DPD, drets i canal institucional.
+- [ ] Ampliar les proves automatitzades amb Firebase Emulator a totes les rules compartides. **Parcial:** 26 proves de rules i 5 proves de fusio superades.
 - [ ] Actualitzar `docs/firebase-acces.md`, `docs/mapa-dades.md` i la fitxa tecnica amb el resultat final.
 
 La matriu, les troballes i les decisions provisionals es troben a `docs/auditoria-comparticio-permisos.md`.

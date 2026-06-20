@@ -17,6 +17,7 @@ Aquest document indica quins fitxers llegir, per què serveix cadascun i quina r
 Els documents principals són:
 
 - `docs/full-de-ruta-institucional-i-empresa.md`
+- `docs/informacio-participants-sociometria.md`: text informatiu mostrat als alumnes abans de respondre i punts pendents de validació institucional.
 - `docs/fitxa-tecnica-direccio-ministeri.md`
 - `docs/proteccio-dades-avaluapro.md`
 - `docs/mapa-dades.md`

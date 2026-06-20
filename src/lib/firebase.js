@@ -60,6 +60,7 @@ const authReady = setPersistence(auth, browserLocalPersistence).catch((error) =>
 })
 const FIRESTORE_DOCUMENT_SOFT_LIMIT = 900_000
 export const SOCIOMETRIC_SURVEYS_COLLECTION = 'sociometricSurveys'
+export const SOCIOMETRIC_PRIVACY_NOTICE_VERSION = '2026-06-20-v1'
 
 function getFirebaseAuthErrorMessage(error) {
   const message = String(error?.message || '')
@@ -155,6 +156,10 @@ function getTutoringInvitationOutboxCollectionRef(senderUid) {
 
 export function getSociometricSurveyDocRef(surveyId) {
   return doc(db, SOCIOMETRIC_SURVEYS_COLLECTION, String(surveyId || '').replaceAll('/', '_'))
+}
+
+function getSociometricSurveyAccessTokensCollectionRef(surveyId) {
+  return collection(getSociometricSurveyDocRef(surveyId), 'accessTokens')
 }
 
 export function getSociometricSurveyResponsesCollectionRef(surveyId) {
@@ -343,6 +348,8 @@ function normalizeSociometricSurveyPayload(survey = {}, user = {}) {
     classId: String(survey.classId || '').trim(),
     className: String(survey.className || '').trim(),
     createdAt: survey.createdAt || now,
+    expiresAt: String(survey.expiresAt || '').trim(),
+    expiresAtEpochMs: Number(survey.expiresAtEpochMs) || 0,
     importedRelationCount: Math.max(0, Number(survey.importedRelationCount) || 0),
     lastSyncedAt: survey.lastSyncedAt || '',
     memberUids,
@@ -359,13 +366,14 @@ function normalizeSociometricSurveyPayload(survey = {}, user = {}) {
 
 function getSociometricResponseDocId(response = {}) {
   const responseId = normalizeFirestoreId(response.responseId)
-  const studentId = normalizeFirestoreId(response.studentId)
-  return responseId || (studentId ? `student_${studentId}` : `response_${Date.now()}`)
+  const accessToken = normalizeFirestoreId(response.accessToken)
+  return responseId || accessToken
 }
 
 function normalizeSociometricResponsePayload({ response = {}, responseId, surveyId }) {
   const cleanResponseId = normalizeFirestoreId(responseId || response.responseId)
   return cleanForFirestore({
+    accessToken: normalizeFirestoreId(response.accessToken),
     responseId: cleanResponseId,
     surveyId: normalizeFirestoreId(response.surveyId || surveyId),
     classId: String(response.classId || '').trim(),
@@ -377,6 +385,8 @@ function normalizeSociometricResponsePayload({ response = {}, responseId, survey
     avoidStudentIds: Array.isArray(response.avoidStudentIds)
       ? response.avoidStudentIds.map((studentId) => String(studentId || '').trim()).filter(Boolean)
       : [],
+    privacyNoticeAcknowledged: response.privacyNoticeAcknowledged === true,
+    privacyNoticeVersion: String(response.privacyNoticeVersion || '').trim(),
     submittedAt: response.submittedAt || new Date().toISOString(),
   })
 }
@@ -504,33 +514,71 @@ export async function createSociometricSurveyDocument({ survey, user }) {
   }
 
   assertFirestoreDocumentSize(SOCIOMETRIC_SURVEYS_COLLECTION, value.id, value)
-  await setDoc(getSociometricSurveyDocRef(value.id), value)
+  const batch = writeBatch(db)
+  batch.set(getSociometricSurveyDocRef(value.id), value)
+  ;(survey.accessTokens || []).forEach((access) => {
+    const tokenId = normalizeFirestoreId(access.token)
+    if (!tokenId || !access.studentId) return
+    batch.set(
+      doc(getSociometricSurveyAccessTokensCollectionRef(value.id), tokenId),
+      cleanForFirestore({
+        avoidLimit: value.avoidLimit,
+        classId: value.classId,
+        className: value.className,
+        createdAt: value.createdAt,
+        expiresAt: value.expiresAt,
+        expiresAtEpochMs: value.expiresAtEpochMs,
+        positiveLimit: value.positiveLimit,
+        privacyNoticeVersion: SOCIOMETRIC_PRIVACY_NOTICE_VERSION,
+        studentId: String(access.studentId).trim(),
+        studentName: String(access.studentName || '').trim(),
+        studentOptions: value.studentOptions,
+        surveyId: value.id,
+        tokenId,
+      }),
+    )
+  })
+  await batch.commit()
   return value
 }
 
-export async function loadPublicSociometricSurvey(surveyId) {
+export async function loadPublicSociometricSurvey(surveyId, accessToken) {
   if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+  if (!accessToken) throw new Error('Aquest enllaç individual no és vàlid.')
 
-  const surveySnapshot = await getDoc(getSociometricSurveyDocRef(surveyId))
-  if (!surveySnapshot.exists()) throw new Error('No s’ha trobat aquest qüestionari sociomètric.')
+  const cleanToken = normalizeFirestoreId(accessToken)
+  const tokenSnapshot = await getDoc(doc(getSociometricSurveyAccessTokensCollectionRef(surveyId), cleanToken))
+  if (!tokenSnapshot.exists()) throw new Error('Aquest enllaç individual no és vàlid o ja ha caducat.')
 
-  const survey = { id: surveySnapshot.id, ...surveySnapshot.data() }
-  if (survey.status !== 'active') {
+  const access = tokenSnapshot.data()
+  if (Date.now() >= Number(access.expiresAtEpochMs || 0)) {
     throw new Error('Aquest qüestionari sociomètric ja no accepta respostes.')
   }
 
-  return survey
+  return {
+    ...access,
+    accessToken: cleanToken,
+    id: surveyId,
+    respondent: {
+      studentId: access.studentId,
+      studentName: access.studentName,
+    },
+  }
 }
 
-export async function submitSociometricSurveyResponse({ response, surveyId }) {
+export async function submitSociometricSurveyResponse({ accessToken, response, surveyId }) {
   if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+  if (!accessToken) throw new Error('Aquest enllaç individual no és vàlid.')
 
-  const survey = await loadPublicSociometricSurvey(surveyId)
-  const responseDocId = getSociometricResponseDocId(response)
+  const survey = await loadPublicSociometricSurvey(surveyId, accessToken)
+  const responseDocId = getSociometricResponseDocId({ ...response, accessToken })
   const value = normalizeSociometricResponsePayload({
     response: {
       ...response,
+      accessToken,
       classId: response?.classId || survey.classId,
+      studentId: survey.respondent.studentId,
+      studentName: survey.respondent.studentName,
       surveyId: survey.id,
     },
     responseId: responseDocId,
@@ -556,6 +604,32 @@ export async function listSociometricSurveyResponses(surveyId) {
   return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
 }
 
+export async function deleteSociometricSurveyDocument({ surveyId, user }) {
+  if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+  if (!user?.uid) throw new Error('Cal iniciar sessió per eliminar el qüestionari.')
+
+  const surveyRef = getSociometricSurveyDocRef(surveyId)
+  const surveySnapshot = await getDoc(surveyRef)
+  if (!surveySnapshot.exists()) return
+  if (surveySnapshot.data().ownerUid !== user.uid) {
+    throw new Error('Només el docent propietari pot eliminar les dades brutes del qüestionari.')
+  }
+
+  const [tokensSnapshot, responsesSnapshot] = await Promise.all([
+    getDocs(getSociometricSurveyAccessTokensCollectionRef(surveyId)),
+    getDocs(getSociometricSurveyResponsesCollectionRef(surveyId)),
+  ])
+  const childRefs = [...tokensSnapshot.docs, ...responsesSnapshot.docs].map((snapshotDoc) => snapshotDoc.ref)
+
+  for (let index = 0; index < childRefs.length; index += 450) {
+    const batch = writeBatch(db)
+    childRefs.slice(index, index + 450).forEach((childRef) => batch.delete(childRef))
+    await batch.commit()
+  }
+
+  await deleteDoc(surveyRef)
+}
+
 export async function updateSociometricSurveySyncMeta({
   importedRelationCount = 0,
   lastSyncedAt = new Date().toISOString(),
@@ -575,14 +649,34 @@ export async function updateSociometricSurveySyncMeta({
   return value
 }
 
-export async function updateSociometricSurveyDocumentStatus({ status, surveyId }) {
+export async function updateSociometricSurveyDocumentStatus({
+  accessTokens = [],
+  expiresAt = '',
+  expiresAtEpochMs = 0,
+  status,
+  surveyId,
+}) {
   if (!surveyId || !['active', 'closed'].includes(status)) return null
 
   const value = cleanForFirestore({
+    ...(status === 'active' ? { expiresAt, expiresAtEpochMs } : {}),
     status,
     updatedAt: new Date().toISOString(),
   })
-  await setDoc(getSociometricSurveyDocRef(surveyId), value, { merge: true })
+  const batch = writeBatch(db)
+  batch.set(getSociometricSurveyDocRef(surveyId), value, { merge: true })
+  if (status === 'active') {
+    accessTokens.forEach((access) => {
+      const tokenId = normalizeFirestoreId(access.token)
+      if (!tokenId) return
+      batch.set(
+        doc(getSociometricSurveyAccessTokensCollectionRef(surveyId), tokenId),
+        cleanForFirestore({ expiresAt, expiresAtEpochMs }),
+        { merge: true },
+      )
+    })
+  }
+  await batch.commit()
   return value
 }
 

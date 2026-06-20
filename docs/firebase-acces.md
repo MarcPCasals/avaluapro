@@ -14,6 +14,7 @@ tutoringSpaces/{spaceId}/{collectionName}/{documentId}
 tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
 tutoringInvitationOutbox/{senderUid}/items/{outboxId}
 sociometricSurveys/{surveyId}
+sociometricSurveys/{surveyId}/accessTokens/{tokenId}
 sociometricSurveys/{surveyId}/responses/{responseId}
 ```
 
@@ -31,7 +32,7 @@ Les rules actuals de Firestore tenen diverses zones privades i compartides:
 | `teacherGradePackages/{packageId}` | Emissor i correu destinatari del paquet | Correcte, amb mes risc per ser una ruta compartida. |
 | `tutoringSpaces/{spaceId}` i subcol.leccions | Membres de la cotutoria | Critic: comparteix dades tutorials d'alta sensibilitat i requereix auditoria granular. |
 | Safates d'invitacions | Emissor o destinatari segons el flux | Requereix proves de comptes, duplicats, revocacio i casos limits. |
-| `sociometricSurveys` i respostes | Docents membres; part del formulari actiu es publica | Critic: cal revisar noms visibles, suplantacio, caducitat i conservacio. |
+| `sociometricSurveys`, tokens i respostes | Docents membres; consulta publica temporal amb token individual | Token aleatori d'un sol ús i caducitat de 24 hores implementats localment. Continuen pendents la minimització dels noms visibles i la política de conservació. |
 
 El punt mes delicat es `teacherGradePackages`, perque es global i compartit. Les rules actuals ja limiten:
 

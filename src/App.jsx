@@ -147,7 +147,9 @@ function TutoringInvitationCenter() {
 }
 
 function App() {
-  const sociometricSurveyId = new URLSearchParams(window.location.search).get('sociometric')
+  const publicParams = new URLSearchParams(window.location.search)
+  const sociometricSurveyId = publicParams.get('sociometric')
+  const sociometricAccessToken = publicParams.get('token')
   const initialize = useAvaluaproStore((state) => state.initialize)
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
@@ -162,7 +164,7 @@ function App() {
   }, [initialize, sociometricSurveyId])
 
   if (sociometricSurveyId) {
-    return <SociometricPublicForm surveyId={sociometricSurveyId} />
+    return <SociometricPublicForm accessToken={sociometricAccessToken} surveyId={sociometricSurveyId} />
   }
 
   if (status === 'loading' || status === 'idle') {

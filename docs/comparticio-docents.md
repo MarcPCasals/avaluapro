@@ -123,10 +123,11 @@ Rutes:
 
 ```text
 sociometricSurveys/{surveyId}
+sociometricSurveys/{surveyId}/accessTokens/{tokenId}
 sociometricSurveys/{surveyId}/responses/{responseId}
 ```
 
-El formulari public actual pot carregar un qüestionari actiu sense autenticacio docent. El document del qüestionari conte opcions d'alumnes amb identificador i nom, i les respostes poden incloure:
+El document general del qüestionari no es public. Cada alumne rep un token individual aleatori i no enumerable que caduca al cap de 24 hores. El token fixa la identitat de qui respon i permet una sola resposta. El formulari mostra les opcions d'alumnes necessaries per completar la dinamica i les respostes poden incloure:
 
 - alumne que respon;
 - nom de l'alumne;
@@ -136,17 +137,17 @@ El formulari public actual pot carregar un qüestionari actiu sense autenticacio
 
 Aquest flux es especialment delicat perque tracta relacions entre menors i pot ser accessible a qui disposi de l'enllac o identificador actiu.
 
-Abans d'un us institucional cal decidir i provar:
+Abans d'un us institucional encara cal decidir i provar:
 
 - si cal mostrar noms complets;
 - si es poden utilitzar codis temporals;
-- com s'evita que un alumne respongui per un altre;
-- com es limiten respostes duplicades;
-- quan caduca l'enllac;
+- com es reparteixen els tokens sense confusions ni reenviaments;
 - qui pot tancar o eliminar el qüestionari;
-- quant de temps es conserven les respostes;
+- la purga automatica de les respostes, amb un maxim provisional de set dies des de la caducitat;
 - quina informacio es dona als alumnes;
 - com s'evita la reutilitzacio de l'enllac fora del context previst.
+
+Des del 20 de juny de 2026, el formulari informa abans de respondre sobre finalitat, docents autoritzats, no anonimat, caducitat, conservació i ús individual de l'enllaç. L'alumne ha de marcar que ho ha llegit i entès. Aquesta marca no es presenta com a consentiment. Resta pendent completar i validar la clàusula institucional amb el responsable del tractament.
 
 ## 5. Principis de proteccio necessaris
 
@@ -173,8 +174,8 @@ Abans d'un us institucional cal decidir i provar:
 | Eliminacio compartida | Implementada localment amb tombstones; l'eliminacio fisica directa queda bloquejada. |
 | Rols diferenciats | El model guarda un rol, pero les rules no estan validades com a control granular. |
 | Restriccio explicita de subcol.leccions | Implementada localment; qualsevol col.leccio no prevista queda bloquejada. |
-| Qüestionari sociometric public | Implementat; revisio de privacitat i anti-suplantacio pendent. |
-| Proves automatitzades | 19 proves de rules i 5 proves de fusio superades; cobertura addicional pendent. |
+| Qüestionari sociometric public | Token individual, identitat fixada, un sol us, caducitat de 24 hores i eliminacio manual completa implementats localment. |
+| Proves automatitzades | 26 proves de rules i 5 proves de fusio superades; cobertura addicional pendent. |
 
 ## 7. Eliminacio i tombstones
 
