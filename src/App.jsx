@@ -10,6 +10,7 @@ import { EvaluationView } from './features/evaluation/EvaluationView'
 import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
 import { TrackingView } from './features/tracking/TrackingView'
+import { SociometricPublicForm } from './features/tutoring/SociometricPublicForm'
 import { TutoringView } from './features/tutoring/TutoringView'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
@@ -146,6 +147,7 @@ function TutoringInvitationCenter() {
 }
 
 function App() {
+  const sociometricSurveyId = new URLSearchParams(window.location.search).get('sociometric')
   const initialize = useAvaluaproStore((state) => state.initialize)
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
@@ -155,8 +157,13 @@ function App() {
   const onboarding = useAvaluaproStore((state) => state.onboarding)
 
   useEffect(() => {
+    if (sociometricSurveyId) return
     initialize()
-  }, [initialize])
+  }, [initialize, sociometricSurveyId])
+
+  if (sociometricSurveyId) {
+    return <SociometricPublicForm surveyId={sociometricSurveyId} />
+  }
 
   if (status === 'loading' || status === 'idle') {
     return (

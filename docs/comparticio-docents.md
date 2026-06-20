@@ -1,150 +1,199 @@
-# Bloc 7: comparticio entre docents
+# Comparticio de dades entre docents
 
-Aquest document defineix com Avaluapro permet compartir notes entre docents mantenint una politica simple: nomes es comparteixen dades enviades voluntariament i nomes al docent destinatari indicat.
+Data d'actualitzacio: 18 de juny de 2026
+Estat: descripcio del funcionament actual; auditoria de seguretat pendent
 
-## 1. Que es comparteix
+Aquest document descriu els fluxos compartits actuals d'Avaluapro. No certifica que les rules siguin suficients per a un desplegament institucional. La revisio anterior del 4 de juny nomes cobria els paquets de notes i ha quedat superada per la incorporacio de cotutories compartides i qüestionaris sociometrics.
 
-La comparticio actual es limita als paquets de notes entre professor d'assignatura i tutor.
+## 1. Fluxos compartits actuals
 
-El paquet inclou:
+Avaluapro te tres mecanismes diferents:
 
-- emissor;
-- correu destinatari;
-- classe origen;
-- materia;
-- alumnes;
-- notes finals de competencia;
-- UT o ultima mirada d'on surt la nota;
-- estat del paquet: enviat o importat.
+| Flux | Finalitat | Durada |
+| --- | --- | --- |
+| Paquet de notes | Enviar notes finals d'un professor al tutor. | Puntual. |
+| Cotutoria compartida | Treballar conjuntament sobre dades tutorials d'un grup. | Persistent fins que es desvinculi o elimini. |
+| Qüestionari sociometric | Recollir respostes dels alumnes mitjancant un formulari public. | Temporal, mentre estigui actiu. |
 
-No inclou:
+## 2. Paquets de notes
 
-- comentaris;
-- diagnostics;
-- DOIPs;
-- comportament;
-- agenda;
-- fotos;
-- sociograma;
-- grups cooperatius;
-- disposicio d'aula;
-- camps oberts de text.
-
-## 2. Ruta Firestore
-
-Els paquets viuen fora de l'espai privat `users/{uid}` perque han de poder ser llegits per dos docents:
+Ruta:
 
 ```text
 teacherGradePackages/{packageId}
 ```
 
-Aquesta ruta es l'unica ruta compartida prevista actualment.
+El paquet inclou:
 
-## 3. Qui pot enviar
-
-Pot crear un paquet:
-
-- un usuari autenticat amb Google;
-- que sigui l'emissor real del paquet;
-- amb `senderUid` igual al seu `request.auth.uid`;
-- amb `senderEmail` igual al seu correu autenticat;
-- amb un paquet que segueixi l'esquema `avaluapro.teacher-grade-package`.
-
-El docent emissor nomes envia les dades que decideix enviar clicant el boto corresponent. No hi ha publicacio automatica de notes cap a altres docents.
-
-## 4. Qui pot rebre
-
-Pot llegir un paquet:
-
-- el docent emissor;
-- el docent destinatari si el seu correu autenticat coincideix amb `recipientEmailLower`.
-
-Cap altre docent pot llegir el paquet.
-
-El destinatari no pot veure res del quadern personal de l'emissor: nomes el paquet enviat explicitament.
-
-## 5. Importacio i confirmacio de rebuda
-
-Quan el tutor importa un paquet, Avaluapro marca el paquet com a:
-
-```text
-status: imported
-importedAt: <data i hora>
-importedByEmail: <correu del tutor>
-importedByUid: <uid del tutor>
-```
-
-Aixo permet que l'emissor vegi que el cami s'ha completat correctament, sense haver de demanar confirmacio manual.
-
-El destinatari nomes pot actualitzar aquests camps de confirmacio. No pot modificar:
-
-- notes;
-- alumnes;
-- materia;
 - emissor;
 - destinatari;
-- contingut del paquet.
+- classe i materia d'origen;
+- alumnes;
+- notes finals de competencia;
+- estat d'enviament o importacio.
 
-## 6. Registre d'enviaments
+No hauria d'incloure:
 
-L'app mostra els darrers paquets enviats pel docent emissor.
+- comentaris tutorials;
+- diagnostics;
+- DOIPs;
+- comportament;
+- fotos;
+- sociograma;
+- dades familiars o mediques.
 
-Per cada enviament es mostra:
+Les rules preveuen:
 
-- materia;
-- classe origen;
-- correu destinatari;
-- data d'enviament;
-- estat: enviat o importat pel tutor;
-- data de rebuda/importacio si ja s'ha completat.
+- creacio per l'emissor autenticat;
+- lectura per emissor i destinatari;
+- confirmacio d'importacio pel destinatari;
+- eliminacio per l'emissor.
 
-## 7. Registre d'importacions
+Continua sent necessari provar aquest flux amb dos comptes i dades ficticies.
 
-El tutor veu la seva safata de paquets rebuts.
+## 3. Cotutories compartides
 
-Abans d'importar, Avaluapro fa una previsualitzacio:
+Rutes:
 
-- alumnes amb coincidencia exacta;
-- alumnes amb coincidencia probable;
-- alumnes que cal revisar;
-- alumnes sense coincidencia;
-- nombre de notes importables.
+```text
+tutoringSpaces/{spaceId}
+tutoringSpaces/{spaceId}/{collectionName}/{documentId}
+tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
+tutoringInvitationOutbox/{senderUid}/items/{outboxId}
+```
 
-Les files sense coincidencia fiable no s'importen per evitar posar notes a l'alumne equivocat.
+Una invitacio s'envia a un correu concret. Quan el destinatari l'accepta, el seu correu i `uid` s'afegeixen a l'espai compartit.
 
-## 8. Errors clars
+### Dades sincronitzades
 
-L'app ha de mostrar missatges concrets quan:
+El codi actual comparteix aquestes col.leccions:
 
-- no hi ha sessio de Google;
-- el correu destinatari no es valid;
-- el paquet no es valid;
-- el paquet es massa gran;
-- cap alumne coincideix;
-- hi ha alumnes sense coincidencia;
-- el paquet no esta adrecat al compte connectat;
-- la classe de desti no es una tutoria adequada.
+```text
+students
+tutorialRecords
+tutorialMarks
+tutorialRelations
+tutorialGroupSets
+tutorialSociometricMoments
+tutorialSociogramLayouts
+tutorialStudentRoles
+tutorialSeatingPlans
+studentAntecedents
+```
 
-## 9. Politica simple
+Aixo pot incloure:
 
-Politica d'us:
+- noms i perfils d'alumnes;
+- fotografies o referencies d'imatge;
+- diagnostics i necessitats educatives;
+- anotacions personals;
+- DOIPs i registres tutorials;
+- qualificacions tutorials;
+- relacions positives, incompatibilitats i sociograma;
+- rols socials;
+- grups cooperatius;
+- disposicions d'aula;
+- antecedents academics.
 
-> Avaluapro nomes comparteix dades quan un docent les envia voluntariament. El destinatari nomes pot veure el paquet enviat al seu correu, no el quadern complet de l'emissor.
+Per tant, la cotutoria compartida no es un simple enviament: dona acces persistent a un conjunt ampli de dades d'alta sensibilitat.
 
-Aquesta politica busca ser segura sense frenar el dia a dia:
+### Funcionament de sincronitzacio
 
-- un clic per preparar paquet;
-- correu destinatari amb `@educand.ad` per defecte;
-- registre automatic d'enviament;
-- confirmacio automatica quan el tutor importa;
-- revisio de coincidencies abans d'incorporar notes.
+- els canvis locals de col.leccions tutorials poden provocar sincronitzacio amb l'espai compartit;
+- en vincular una classe, les dades remotes es fusionen amb les locals;
+- la versio mes recent segons les marques temporals te preferencia;
+- el sistema registra `sharedUpdatedAt`, `sharedUpdatedByEmail` i `sharedUpdatedByUid` en les files sincronitzades;
+- existeix un resum de conflictes quan es conserven canvis remots mes recents.
 
-## 10. Riscos i mesures
+### Qüestions que encara s'han de validar
 
-| Risc | Mesura |
+- permisos diferenciats entre propietari i cotutor;
+- qui pot convidar o eliminar membres;
+- revocacio d'acces;
+- tractament de copies ja descarregades o sincronitzades;
+- qui pot eliminar dades compartides;
+- llista explicita de subcol.leccions permeses;
+- resolucio segura de conflictes;
+- registre d'auditoria suficient;
+- final de curs i eliminacio de l'espai.
+
+## 4. Qüestionaris sociometrics
+
+Rutes:
+
+```text
+sociometricSurveys/{surveyId}
+sociometricSurveys/{surveyId}/responses/{responseId}
+```
+
+El formulari public actual pot carregar un qüestionari actiu sense autenticacio docent. El document del qüestionari conte opcions d'alumnes amb identificador i nom, i les respostes poden incloure:
+
+- alumne que respon;
+- nom de l'alumne;
+- eleccions positives;
+- alumnes que prefereix evitar;
+- data d'enviament.
+
+Aquest flux es especialment delicat perque tracta relacions entre menors i pot ser accessible a qui disposi de l'enllac o identificador actiu.
+
+Abans d'un us institucional cal decidir i provar:
+
+- si cal mostrar noms complets;
+- si es poden utilitzar codis temporals;
+- com s'evita que un alumne respongui per un altre;
+- com es limiten respostes duplicades;
+- quan caduca l'enllac;
+- qui pot tancar o eliminar el qüestionari;
+- quant de temps es conserven les respostes;
+- quina informacio es dona als alumnes;
+- com s'evita la reutilitzacio de l'enllac fora del context previst.
+
+## 5. Principis de proteccio necessaris
+
+- Compartir nomes les dades necessaries per a la funcio de cada docent.
+- No assumir que tots els cotutors necessiten editar-ho tot.
+- Diferenciar propietat, lectura, edicio, invitacio i eliminacio.
+- Permetre retirar accessos.
+- Mantenir autoria i data dels canvis.
+- Fer servir dades ficticies en totes les proves.
+- Establir terminis de conservacio i eliminacio.
+- Informar clarament abans d'activar formularis publics.
+- Revisar les rules amb proves automatitzades.
+
+## 6. Estat actual
+
+| Element | Estat |
 | --- | --- |
-| Enviar a un correu equivocat | Correu visible abans d'enviar i registre d'enviament |
-| Importar notes a alumnes equivocats | Previsualitzacio i bloqueig de files sense coincidencia |
-| Destinatari modificant contingut | Rules: nomes pot marcar importat |
-| Docent veient dades no enviades | Rules: nomes emissor o destinatari del paquet |
-| Compartir dades massa sensibles | Paquet limitat a notes finals de competencia |
+| Paquets de notes | Implementats; prova completa amb dos comptes pendent. |
+| Invitacions de cotutoria | Implementades; proves de casos limits pendents. |
+| Espais persistents de cotutoria | Implementats; auditoria de permisos pendent. |
+| Metadades d'autoria de files | Implementades parcialment en la sincronitzacio. |
+| Revocacio de membres | Implementada localment per al propietari; prova real i desplegament pendents. |
+| Sortida voluntaria | Implementada localment per al cotutor; conserva la copia local sense sincronitzacio. |
+| Eliminacio compartida | Implementada localment amb tombstones; l'eliminacio fisica directa queda bloquejada. |
+| Rols diferenciats | El model guarda un rol, pero les rules no estan validades com a control granular. |
+| Restriccio explicita de subcol.leccions | Implementada localment; qualsevol col.leccio no prevista queda bloquejada. |
+| Qüestionari sociometric public | Implementat; revisio de privacitat i anti-suplantacio pendent. |
+| Proves automatitzades | 19 proves de rules i 5 proves de fusio superades; cobertura addicional pendent. |
+
+## 7. Eliminacio i tombstones
+
+En una cotutoria no es fa un `delete` fisic directe des del client. Quan un docent elimina una dada compartida:
+
+1. el document es substitueix per un tombstone;
+2. desapareix el contingut pedagogic sensible;
+3. es conserven identificador, data i autoria de la baixa;
+4. els altres dispositius retiren la seva copia activa en sincronitzar;
+5. una copia antiga no pot ressuscitar la dada si es anterior a la baixa.
+
+Els tombstones es conserven mentre l'espai compartit continuï actiu. La purga fisica s'haura de fer en el procediment de tancament de curs o eliminacio administrativa de l'espai.
+
+## 8. Decisio temporal
+
+Fins que es completi l'auditoria:
+
+- no utilitzar aquestes funcionalitats amb dades reals en proves;
+- no considerar la comparticio institucionalment validada;
+- no presentar la documentacio anterior com si nomes es compartissin notes;
+- limitar qualsevol demostracio a alumnes ficticis;
+- mantenir aquesta revisio com a prioritat anterior al pilot institucional.

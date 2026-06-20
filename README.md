@@ -16,11 +16,13 @@ Aquest document indica quins fitxers llegir, per què serveix cadascun i quina r
 
 Els documents principals són:
 
+- `docs/full-de-ruta-institucional-i-empresa.md`
 - `docs/fitxa-tecnica-direccio-ministeri.md`
 - `docs/proteccio-dades-avaluapro.md`
 - `docs/mapa-dades.md`
 - `docs/firebase-acces.md`
 - `docs/comparticio-docents.md`
+- `docs/auditoria-comparticio-permisos.md`
 - `docs/checklist-final-seguretat.md`
 
 ## Eines auxiliars

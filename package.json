@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:firebase": "VITE_BASE_PATH=/ vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:rules": "bash scripts/run-firestore-rules-tests.sh",
+    "test:shared-sync": "node --test tests/shared-tutoring-sync.test.js",
+    "test:security": "npm run test:shared-sync && npm run test:rules"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
@@ -21,12 +24,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "firebase-tools": "^15.22.0",
     "globals": "^17.5.0",
     "vite": "^8.0.10"
   }

@@ -26,6 +26,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { COLLECTIONS } from '../data/seedData'
+import { getSharedRowVersion } from './sharedTutoringRows'
 
 export const SHARED_TUTORING_COLLECTIONS = [
   'students',
@@ -33,6 +34,7 @@ export const SHARED_TUTORING_COLLECTIONS = [
   'tutorialMarks',
   'tutorialRelations',
   'tutorialGroupSets',
+  'tutorialSociometricMoments',
   'tutorialSociogramLayouts',
   'tutorialStudentRoles',
   'tutorialSeatingPlans',
@@ -57,6 +59,7 @@ const authReady = setPersistence(auth, browserLocalPersistence).catch((error) =>
   console.warn('No s’ha pogut fixar la persistència local de Firebase Auth.', error)
 })
 const FIRESTORE_DOCUMENT_SOFT_LIMIT = 900_000
+export const SOCIOMETRIC_SURVEYS_COLLECTION = 'sociometricSurveys'
 
 function getFirebaseAuthErrorMessage(error) {
   const message = String(error?.message || '')
@@ -150,6 +153,14 @@ function getTutoringInvitationOutboxCollectionRef(senderUid) {
   return collection(db, 'tutoringInvitationOutbox', senderUid, 'items')
 }
 
+export function getSociometricSurveyDocRef(surveyId) {
+  return doc(db, SOCIOMETRIC_SURVEYS_COLLECTION, String(surveyId || '').replaceAll('/', '_'))
+}
+
+export function getSociometricSurveyResponsesCollectionRef(surveyId) {
+  return collection(getSociometricSurveyDocRef(surveyId), 'responses')
+}
+
 function getSafeDocId(row, fallbackPrefix, index) {
   return String(row?.id || `${fallbackPrefix}_${index}`).replaceAll('/', '_')
 }
@@ -217,16 +228,8 @@ async function saveBackupRows(uid, backupId, collectionName, rows = []) {
   }
 }
 
-function getLatestIsoTimestamp(...values) {
-  return values
-    .map((value) => String(value || ''))
-    .filter(Boolean)
-    .sort()
-    .at(-1) || ''
-}
-
 function getTutoringRowVersion(row = {}) {
-  return getLatestIsoTimestamp(row.sharedUpdatedAt, row.updatedAt, row.createdAt)
+  return getSharedRowVersion(row)
 }
 
 function buildSharedEditMeta(row = {}, user, now) {
@@ -257,6 +260,17 @@ async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], 
       existingValue?.sharedUpdatedByUid &&
       user?.uid &&
       existingValue.sharedUpdatedByUid !== user.uid
+
+    if (existingValue?.sharedDeletedAt && remoteVersion && (!localVersion || remoteVersion >= localVersion)) {
+      conflicts.push({
+        collectionName,
+        documentId: docId,
+        remoteDeletedAt: existingValue.sharedDeletedAt,
+        remoteUpdatedAt: remoteVersion,
+        remoteUpdatedByEmail: existingValue.sharedDeletedByEmail || '',
+      })
+      return
+    }
 
     if (existingValue && remoteEditedByOther && remoteVersion && (!localVersion || remoteVersion > localVersion)) {
       conflicts.push({
@@ -294,6 +308,77 @@ async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], 
 
 function normalizeEmail(value = '') {
   return String(value).trim().toLowerCase()
+}
+
+function normalizeFirestoreId(value = '') {
+  return String(value || '').trim().replaceAll('/', '_')
+}
+
+function normalizeStudentOption(option = {}) {
+  return {
+    id: String(option.id || option.studentId || '').trim(),
+    name: String(option.name || option.studentName || '').trim(),
+  }
+}
+
+function normalizeSociometricSurveyPayload(survey = {}, user = {}) {
+  const now = new Date().toISOString()
+  const studentOptions = (Array.isArray(survey.studentOptions) ? survey.studentOptions : [])
+    .map(normalizeStudentOption)
+    .filter((option) => option.id && option.name)
+  const studentOptionIds = Array.isArray(survey.studentOptionIds)
+    ? survey.studentOptionIds.map((studentId) => String(studentId || '').trim()).filter(Boolean)
+    : studentOptions.map((option) => option.id)
+  const ownerUid = String(survey.ownerUid || user.uid || '').trim()
+  const memberUids = Array.from(
+    new Set([
+      ownerUid,
+      ...(Array.isArray(survey.memberUids) ? survey.memberUids : []),
+    ]),
+  ).filter(Boolean)
+
+  return cleanForFirestore({
+    id: normalizeFirestoreId(survey.id),
+    avoidLimit: Math.max(0, Number(survey.avoidLimit) || 3),
+    classId: String(survey.classId || '').trim(),
+    className: String(survey.className || '').trim(),
+    createdAt: survey.createdAt || now,
+    importedRelationCount: Math.max(0, Number(survey.importedRelationCount) || 0),
+    lastSyncedAt: survey.lastSyncedAt || '',
+    memberUids,
+    ownerEmailLower: normalizeEmail(survey.ownerEmailLower || user.email || ''),
+    ownerUid,
+    positiveLimit: Math.max(0, Number(survey.positiveLimit) || 4),
+    responseCount: Math.max(0, Number(survey.responseCount) || 0),
+    status: survey.status === 'closed' ? 'closed' : 'active',
+    studentOptionIds,
+    studentOptions,
+    updatedAt: survey.updatedAt || survey.createdAt || now,
+  })
+}
+
+function getSociometricResponseDocId(response = {}) {
+  const responseId = normalizeFirestoreId(response.responseId)
+  const studentId = normalizeFirestoreId(response.studentId)
+  return responseId || (studentId ? `student_${studentId}` : `response_${Date.now()}`)
+}
+
+function normalizeSociometricResponsePayload({ response = {}, responseId, surveyId }) {
+  const cleanResponseId = normalizeFirestoreId(responseId || response.responseId)
+  return cleanForFirestore({
+    responseId: cleanResponseId,
+    surveyId: normalizeFirestoreId(response.surveyId || surveyId),
+    classId: String(response.classId || '').trim(),
+    studentId: String(response.studentId || '').trim(),
+    studentName: String(response.studentName || '').trim(),
+    positiveStudentIds: Array.isArray(response.positiveStudentIds)
+      ? response.positiveStudentIds.map((studentId) => String(studentId || '').trim()).filter(Boolean)
+      : [],
+    avoidStudentIds: Array.isArray(response.avoidStudentIds)
+      ? response.avoidStudentIds.map((studentId) => String(studentId || '').trim()).filter(Boolean)
+      : [],
+    submittedAt: response.submittedAt || new Date().toISOString(),
+  })
 }
 
 function mergeMemberEmails(...emailGroups) {
@@ -403,6 +488,102 @@ export async function signInWithGoogle() {
 
 export async function signOutFromGoogle() {
   await signOut(auth)
+}
+
+export async function createSociometricSurveyDocument({ survey, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans de crear un qüestionari sociomètric.')
+  }
+
+  const value = normalizeSociometricSurveyPayload(survey, user)
+  if (!value.id || !value.classId || value.studentOptions.length === 0) {
+    throw new Error('El qüestionari sociomètric necessita classe i alumnes abans de publicar-se.')
+  }
+  if (value.ownerUid !== user.uid || value.ownerEmailLower !== normalizeEmail(user.email)) {
+    throw new Error('El qüestionari sociomètric ha de pertànyer al docent connectat.')
+  }
+
+  assertFirestoreDocumentSize(SOCIOMETRIC_SURVEYS_COLLECTION, value.id, value)
+  await setDoc(getSociometricSurveyDocRef(value.id), value)
+  return value
+}
+
+export async function loadPublicSociometricSurvey(surveyId) {
+  if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+
+  const surveySnapshot = await getDoc(getSociometricSurveyDocRef(surveyId))
+  if (!surveySnapshot.exists()) throw new Error('No s’ha trobat aquest qüestionari sociomètric.')
+
+  const survey = { id: surveySnapshot.id, ...surveySnapshot.data() }
+  if (survey.status !== 'active') {
+    throw new Error('Aquest qüestionari sociomètric ja no accepta respostes.')
+  }
+
+  return survey
+}
+
+export async function submitSociometricSurveyResponse({ response, surveyId }) {
+  if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+
+  const survey = await loadPublicSociometricSurvey(surveyId)
+  const responseDocId = getSociometricResponseDocId(response)
+  const value = normalizeSociometricResponsePayload({
+    response: {
+      ...response,
+      classId: response?.classId || survey.classId,
+      surveyId: survey.id,
+    },
+    responseId: responseDocId,
+    surveyId: survey.id,
+  })
+
+  if (!value.studentId || !value.studentName) {
+    throw new Error('Cal triar el teu nom abans d’enviar el qüestionari.')
+  }
+
+  await setDoc(doc(getSociometricSurveyResponsesCollectionRef(survey.id), responseDocId), value)
+  return value
+}
+
+export async function listSociometricSurveyResponses(surveyId) {
+  if (!surveyId) return []
+
+  const responsesQuery = query(
+    getSociometricSurveyResponsesCollectionRef(surveyId),
+    orderBy('submittedAt', 'asc'),
+  )
+  const snapshot = await getDocs(responsesQuery)
+  return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+}
+
+export async function updateSociometricSurveySyncMeta({
+  importedRelationCount = 0,
+  lastSyncedAt = new Date().toISOString(),
+  responseCount = 0,
+  surveyId,
+} = {}) {
+  if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
+
+  const now = new Date().toISOString()
+  const value = cleanForFirestore({
+    importedRelationCount: Math.max(0, Number(importedRelationCount) || 0),
+    lastSyncedAt,
+    responseCount: Math.max(0, Number(responseCount) || 0),
+    updatedAt: now,
+  })
+  await setDoc(getSociometricSurveyDocRef(surveyId), value, { merge: true })
+  return value
+}
+
+export async function updateSociometricSurveyDocumentStatus({ status, surveyId }) {
+  if (!surveyId || !['active', 'closed'].includes(status)) return null
+
+  const value = cleanForFirestore({
+    status,
+    updatedAt: new Date().toISOString(),
+  })
+  await setDoc(getSociometricSurveyDocRef(surveyId), value, { merge: true })
+  return value
 }
 
 export async function saveCloudCollections(uid, dataset, collectionsToSave = COLLECTIONS, meta = {}) {
@@ -768,6 +949,136 @@ export async function acknowledgeTutoringInvitationUpdate({ recipientEmail, spac
     }),
     { merge: true },
   )
+}
+
+export async function removeTutoringSpaceMember({ memberEmail, spaceId, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans de retirar un cotutor.')
+  }
+  const cleanMemberEmail = normalizeEmail(memberEmail)
+  if (!spaceId || !cleanMemberEmail) throw new Error('No s’ha indicat quin cotutor cal retirar.')
+
+  const spaceRef = getTutoringSpaceDocRef(spaceId)
+  const snapshot = await getDoc(spaceRef)
+  if (!snapshot.exists()) throw new Error('No s’ha trobat aquesta tutoria compartida.')
+  const space = { id: snapshot.id, ...snapshot.data() }
+  if (space.ownerUid !== user.uid && normalizeEmail(space.ownerEmailLower) !== normalizeEmail(user.email)) {
+    throw new Error('Només el propietari de la tutoria pot retirar cotutors.')
+  }
+  if (cleanMemberEmail === normalizeEmail(space.ownerEmailLower)) {
+    throw new Error('El propietari no es pot retirar de la seva pròpia tutoria.')
+  }
+
+  const targetMembers = (space.members || []).filter(
+    (member) => normalizeEmail(member.emailLower || member.email) === cleanMemberEmail,
+  )
+  const targetUids = new Set(targetMembers.map((member) => String(member.uid || '').trim()).filter(Boolean))
+  const nextMemberEmails = (space.memberEmails || []).filter((email) => normalizeEmail(email) !== cleanMemberEmail)
+  const nextMemberUids = (space.memberUids || []).filter((uid) => !targetUids.has(String(uid || '').trim()))
+  const nextMembers = (space.members || []).filter(
+    (member) => normalizeEmail(member.emailLower || member.email) !== cleanMemberEmail,
+  )
+  const now = new Date().toISOString()
+
+  await Promise.all([
+    deleteDoc(getTutoringInvitationDocRef(cleanMemberEmail, spaceId)),
+    deleteDoc(getTutoringInvitationOutboxDocRef(user.uid, cleanMemberEmail, spaceId)),
+  ])
+
+  await setDoc(
+    spaceRef,
+    cleanForFirestore({
+      memberEmails: nextMemberEmails,
+      memberUids: nextMemberUids,
+      members: nextMembers,
+      updatedAt: now,
+    }),
+    { merge: true },
+  )
+
+  return {
+    ...space,
+    memberEmails: nextMemberEmails,
+    memberUids: nextMemberUids,
+    members: nextMembers,
+    updatedAt: now,
+  }
+}
+
+export async function leaveTutoringSpace({ spaceId, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans d’abandonar una cotutoria.')
+  }
+  if (!spaceId) throw new Error('No s’ha indicat quina cotutoria vols abandonar.')
+
+  const spaceRef = getTutoringSpaceDocRef(spaceId)
+  const snapshot = await getDoc(spaceRef)
+  if (!snapshot.exists()) throw new Error('No s’ha trobat aquesta tutoria compartida.')
+  const space = { id: snapshot.id, ...snapshot.data() }
+  const cleanUserEmail = normalizeEmail(user.email)
+  if (space.ownerUid === user.uid || normalizeEmail(space.ownerEmailLower) === cleanUserEmail) {
+    throw new Error('El propietari no pot abandonar la tutoria sense transferir-la o eliminar-la.')
+  }
+
+  const nextMemberEmails = (space.memberEmails || []).filter((email) => normalizeEmail(email) !== cleanUserEmail)
+  const nextMemberUids = (space.memberUids || []).filter((uid) => String(uid || '').trim() !== user.uid)
+  const nextMembers = (space.members || []).filter((member) => {
+    const memberEmail = normalizeEmail(member.emailLower || member.email)
+    return memberEmail !== cleanUserEmail && String(member.uid || '').trim() !== user.uid
+  })
+  const now = new Date().toISOString()
+
+  await deleteDoc(getTutoringInvitationDocRef(cleanUserEmail, spaceId))
+  await setDoc(
+    spaceRef,
+    cleanForFirestore({
+      memberEmails: nextMemberEmails,
+      memberUids: nextMemberUids,
+      members: nextMembers,
+      updatedAt: now,
+    }),
+    { merge: true },
+  )
+
+  return {
+    ...space,
+    memberEmails: nextMemberEmails,
+    memberUids: nextMemberUids,
+    members: nextMembers,
+    updatedAt: now,
+  }
+}
+
+export async function tombstoneTutoringSpaceRow({
+  classId,
+  collectionName,
+  documentId,
+  spaceId,
+  user,
+}) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans d’eliminar dades d’una cotutoria compartida.')
+  }
+  if (!SHARED_TUTORING_COLLECTIONS.includes(collectionName)) {
+    throw new Error('Aquesta col·lecció no forma part de la cotutoria compartida.')
+  }
+  if (!spaceId || !documentId) throw new Error('No s’ha pogut identificar la dada compartida que cal eliminar.')
+
+  const deletedAt = new Date().toISOString()
+  const safeDocumentId = String(documentId).replaceAll('/', '_')
+  const value = cleanForFirestore({
+    classId: classId || '',
+    id: safeDocumentId,
+    sharedDeletedAt: deletedAt,
+    sharedDeletedByEmail: normalizeEmail(user.email),
+    sharedDeletedByUid: user.uid,
+    sharedUpdatedAt: deletedAt,
+    sharedUpdatedByEmail: normalizeEmail(user.email),
+    sharedUpdatedByUid: user.uid,
+  })
+
+  await setDoc(doc(db, 'tutoringSpaces', spaceId, collectionName, safeDocumentId), value)
+  return value
 }
 
 export async function saveTutoringSpace({

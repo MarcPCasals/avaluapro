@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Cloud, GraduationCap, Link2, RefreshCw, Settings, Share2, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  Cloud,
+  GraduationCap,
+  Link2,
+  LogOut,
+  RefreshCw,
+  Settings,
+  Share2,
+  Trash2,
+  UserMinus,
+} from 'lucide-react'
 import { EducandEmailInput } from '../../components/EducandEmailInput'
 import { Modal } from '../../components/Modal'
 import { normalizeEducandEmail } from '../../lib/email'
@@ -9,8 +21,10 @@ import { ClassFormFields } from './ClassFormFields'
 export function ClassSettingsModal({ classId, onClose }) {
   const classes = useAvaluaproStore((state) => state.classes)
   const cloud = useAvaluaproStore((state) => state.cloud)
+  const leaveSharedTutoringSpace = useAvaluaproStore((state) => state.leaveSharedTutoringSpace)
   const linkClassToSharedTutoringSpace = useAvaluaproStore((state) => state.linkClassToSharedTutoringSpace)
   const loadSharedTutoringSpaces = useAvaluaproStore((state) => state.loadSharedTutoringSpaces)
+  const removeSharedTutoringMember = useAvaluaproStore((state) => state.removeSharedTutoringMember)
   const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
   const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
   const updateClass = useAvaluaproStore((state) => state.updateClass)
@@ -43,6 +57,12 @@ export function ClassSettingsModal({ classId, onClose }) {
   )
   const sharedSummary = currentSharedSpace?.sharedSummary || {}
   const sharedConflictCount = currentSharedSpace?.sharedConflictSummary?.count || 0
+  const currentUserEmail = normalizeEducandEmail(cloud.user?.email || '')
+  const ownerEmail = normalizeEducandEmail(currentSharedSpace?.ownerEmailLower || '')
+  const isSharedOwner = Boolean(
+    currentSharedSpace &&
+      (currentSharedSpace.ownerUid === cloud.user?.uid || (ownerEmail && ownerEmail === currentUserEmail)),
+  )
   const handleShareTutoring = async () => {
     setSharedMessage('')
     const recipientEmail = normalizeEducandEmail(shareEmail)
@@ -91,6 +111,46 @@ export function ClassSettingsModal({ classId, onClose }) {
       )
     } catch (error) {
       setSharedMessage(error.message || 'No s’ha pogut sincronitzar aquesta tutoria.')
+    } finally {
+      setSharedBusy('')
+    }
+  }
+
+  const handleRemoveSharedMember = async (memberEmail) => {
+    const answer = window.confirm(
+      `Vols retirar ${memberEmail} d’aquesta cotutoria? Perdrà l’accés al núvol, però pot conservar dades que ja tingui al seu dispositiu o en còpies exportades.`,
+    )
+    if (!answer) return
+
+    setSharedMessage('')
+    setSharedBusy(`remove-${memberEmail}`)
+    try {
+      await removeSharedTutoringMember({ classId, memberEmail })
+      setSharedMessage(`${memberEmail} ja no té accés a aquesta cotutoria compartida.`)
+    } catch (error) {
+      setSharedMessage(error.message || 'No s’ha pogut retirar aquest cotutor.')
+    } finally {
+      setSharedBusy('')
+    }
+  }
+
+  const handleLeaveSharedTutoring = async () => {
+    const answer = window.confirm(
+      [
+        'Vols abandonar aquesta cotutoria compartida?',
+        '',
+        'Perdràs l’accés al núvol compartit. Les dades ja sincronitzades es mantindran en aquesta classe com a còpia local i deixaran de sincronitzar-se.',
+      ].join('\n'),
+    )
+    if (!answer) return
+
+    setSharedMessage('')
+    setSharedBusy('leave')
+    try {
+      await leaveSharedTutoringSpace(classId)
+      setSharedMessage('Has abandonat la cotutoria. Aquesta classe conserva les dades locals sense sincronització compartida.')
+    } catch (error) {
+      setSharedMessage(error.message || 'No s’ha pogut abandonar aquesta cotutoria.')
     } finally {
       setSharedBusy('')
     }
@@ -274,21 +334,64 @@ export function ClassSettingsModal({ classId, onClose }) {
                       </article>
                     </div>
                   )}
+                  {currentSharedSpace && (
+                    <div className="shared-tutoring-list">
+                      <strong>Membres i accessos</strong>
+                      {(currentSharedSpace.memberEmails || sharedMembers).map((memberEmail) => {
+                        const cleanMemberEmail = normalizeEducandEmail(memberEmail)
+                        const isOwnerMember = cleanMemberEmail === ownerEmail
+                        return (
+                          <div className="shared-tutoring-space-row" key={memberEmail}>
+                            <div>
+                              <span>{memberEmail}</span>
+                              <small>{isOwnerMember ? 'Propietari' : 'Cotutor'}</small>
+                            </div>
+                            {isSharedOwner && !isOwnerMember && (
+                              <button
+                                className="secondary-action compact"
+                                disabled={Boolean(sharedBusy)}
+                                onClick={() => handleRemoveSharedMember(memberEmail)}
+                                type="button"
+                              >
+                                <UserMinus size={15} />
+                                Retirar
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {!isSharedOwner && (
+                        <button
+                          className="danger-action compact"
+                          disabled={Boolean(sharedBusy)}
+                          onClick={handleLeaveSharedTutoring}
+                          type="button"
+                        >
+                          <LogOut size={15} />
+                          Abandonar cotutoria
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="shared-tutoring-actions">
-                    <EducandEmailInput
-                      label="Correu del cotutor"
-                      onChange={setShareEmail}
-                      value={shareEmail}
-                    />
-                    <button
-                      className="secondary-action"
-                      disabled={sharedBusy === 'share'}
-                      onClick={handleShareTutoring}
-                      type="button"
-                    >
-                      <Share2 size={16} />
-                      Compartir
-                    </button>
+                    {(!currentClass.sharedTutoringSpaceId || isSharedOwner) && (
+                      <>
+                        <EducandEmailInput
+                          label="Correu del cotutor"
+                          onChange={setShareEmail}
+                          value={shareEmail}
+                        />
+                        <button
+                          className="secondary-action"
+                          disabled={sharedBusy === 'share'}
+                          onClick={handleShareTutoring}
+                          type="button"
+                        >
+                          <Share2 size={16} />
+                          Compartir
+                        </button>
+                      </>
+                    )}
                     {currentClass.sharedTutoringSpaceId && (
                       <button
                         className="secondary-action"

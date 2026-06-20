@@ -2,7 +2,7 @@
 
 Data: 4 de juny de 2026  
 Projecte: Avaluapro  
-Estat: document breu de presentacio tecnica i proteccio de dades
+Estat: document breu de presentacio; pendent d'actualitzar completament abans d'una nova presentacio institucional
 
 Aquest document resumeix com esta dissenyat Avaluapro, quines dades tracta i quines mesures aplica per protegir-les. No substitueix una revisio juridica, una avaluacio d'impacte ni el contracte d'encarrec de tractament que pugui correspondre en un us institucional.
 
@@ -35,6 +35,8 @@ Avaluapro funciona com una aplicacio web moderna.
 | Autenticacio | Firebase Authentication amb Google | Permet identificar el docent i vincular les dades al seu compte. |
 | Base de dades al nuvol | Cloud Firestore | Guarda dades sincronitzades del docent i copies al nuvol. |
 | Comparticio controlada | Firestore `teacherGradePackages` | Permet enviar notes d'un professor a un tutor destinatari concret. |
+| Cotutories compartides | Firestore `tutoringSpaces` | Permet sincronitzar dades tutorials entre membres acceptats d'una cotutoria. Auditoria granular pendent. |
+| Sociometria publica | Firestore `sociometricSurveys` | Permet recollir respostes amb un formulari actiu. Revisio de privacitat pendent abans d'us institucional. |
 | Fotos i imatges | Ara comprimides dins les dades; futur Firebase Storage | Es recomana migrar imatges grans a Storage quan l'us creixi. |
 
 ## 3. Firebase i Google Cloud
@@ -132,20 +134,15 @@ Important: quan un docent descarrega una copia manual, aquest fitxer queda fora 
 
 ## 8. Comparticio entre docents
 
-Avaluapro permet compartir notes amb tutors mitjancant paquets controlats.
+Avaluapro disposa actualment de tres fluxos:
 
-Caracteristiques:
+1. paquets puntuals de notes entre professor i tutor;
+2. cotutories persistents amb sincronitzacio de dades tutorials;
+3. qüestionaris sociometrics actius accessibles mitjancant un enllac.
 
-- el professor emissor indica el correu destinatari;
-- el paquet queda associat a emissor i destinatari;
-- nomes emissor i destinatari poden llegir-lo;
-- el destinatari pot importar-lo;
-- el sistema registra estat d'importacio;
-- el paquet ha de contenir nomes notes necessaries, no comentaris, diagnostics ni dades tutorials.
+Els paquets de notes estan limitats a les notes necessaries. En canvi, les cotutories poden incloure alumnes, perfils, DOIPs, registres, notes tutorials, relacions, sociograma, rols, grups, disposicions i antecedents.
 
-Politica recomanada:
-
-> Avaluapro nomes comparteix dades enviades voluntariament i de manera explicita pel docent emissor.
+La descripcio completa es troba a `docs/comparticio-docents.md`. Abans d'un desplegament institucional cal auditar permisos, rols, revocacio, eliminacio, autoria, conflictes de sincronitzacio i el grau d'exposicio dels formularis sociometrics.
 
 ## 9. Riscos identificats
 

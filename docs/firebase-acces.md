@@ -1,13 +1,27 @@
 # Bloc 2: Firebase i acces
 
-Data: 4 de juny de 2026  
-Estat: auditoria tecnica del Bloc 2
+Data original: 4 de juny de 2026
+Avís d'actualitzacio: 18 de juny de 2026
+Estat: auditoria antiga de l'espai privat; la part de comparticio requereix una nova auditoria
 
-Aquest document revisa com Avaluapro usa Firebase, quines rutes utilitza, quines dades queden separades per usuari i quines mesures convindria preparar abans d'un us mes ampli.
+Aquest document va revisar inicialment com Avaluapro usava Firebase. La separacio de `users/{uid}` continua sent la base privada, pero les seccions que afirmaven que `teacherGradePackages` era l'unica ruta compartida han quedat desactualitzades.
+
+Actualment tambe existeixen:
+
+```text
+tutoringSpaces/{spaceId}
+tutoringSpaces/{spaceId}/{collectionName}/{documentId}
+tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
+tutoringInvitationOutbox/{senderUid}/items/{outboxId}
+sociometricSurveys/{surveyId}
+sociometricSurveys/{surveyId}/responses/{responseId}
+```
+
+La revisio prioritaria queda definida a `docs/comparticio-docents.md` i a la fase 0 de `docs/full-de-ruta-institucional-i-empresa.md`.
 
 ## 1. Rules de Firestore
 
-Les rules actuals de Firestore tenen tres zones:
+Les rules actuals de Firestore tenen diverses zones privades i compartides:
 
 | Ruta | Qui hi pot accedir | Valoracio |
 | --- | --- | --- |
@@ -15,6 +29,9 @@ Les rules actuals de Firestore tenen tres zones:
 | `users/{uid}/{collection}` | Nomes l'usuari autenticat amb aquell mateix `uid` | Correcte. |
 | `users/{uid}/cloudBackups/{backupId}` | Nomes l'usuari autenticat amb aquell mateix `uid` | Correcte. |
 | `teacherGradePackages/{packageId}` | Emissor i correu destinatari del paquet | Correcte, amb mes risc per ser una ruta compartida. |
+| `tutoringSpaces/{spaceId}` i subcol.leccions | Membres de la cotutoria | Critic: comparteix dades tutorials d'alta sensibilitat i requereix auditoria granular. |
+| Safates d'invitacions | Emissor o destinatari segons el flux | Requereix proves de comptes, duplicats, revocacio i casos limits. |
+| `sociometricSurveys` i respostes | Docents membres; part del formulari actiu es publica | Critic: cal revisar noms visibles, suplantacio, caducitat i conservacio. |
 
 El punt mes delicat es `teacherGradePackages`, perque es global i compartit. Les rules actuals ja limiten:
 
@@ -23,7 +40,7 @@ El punt mes delicat es `teacherGradePackages`, perque es global i compartit. Les
 - actualitzacio: nomes el destinatari pot marcar-lo com a importat;
 - eliminacio: nomes l'emissor.
 
-Conclusio: les rules de Firestore son adequades per al model actual d'Avaluapro.
+Conclusio actualitzada: no s'ha de considerar validat tot el model compartit fins que es completi la nova auditoria i les proves automatitzades.
 
 ## 2. Rutes d'usuari
 
@@ -36,6 +53,12 @@ users/{uid}/{collectionName}
 users/{uid}/cloudBackups/{backupId}
 users/{uid}/cloudBackups/{backupId}/{collectionName}/{documentId}
 teacherGradePackages/{packageId}
+tutoringSpaces/{spaceId}
+tutoringSpaces/{spaceId}/{collectionName}/{documentId}
+tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
+tutoringInvitationOutbox/{senderUid}/items/{outboxId}
+sociometricSurveys/{surveyId}
+sociometricSurveys/{surveyId}/responses/{responseId}
 ```
 
 Les dades reals del docent viuen dins `users/{uid}`. Aixo inclou:
@@ -54,39 +77,15 @@ Les dades reals del docent viuen dins `users/{uid}`. Aixo inclou:
 
 Conclusio: la separacio per usuari esta ben aplicada.
 
-## 3. Rutes compartides entre docents
+## 3. Rutes compartides
 
-L'unica ruta compartida detectada es:
+La descripcio anterior d'una unica ruta compartida ja no es valida. Hi ha paquets puntuals, espais persistents de cotutoria, safates d'invitacions i formularis sociometrics.
+
+El detall actualitzat es troba a:
 
 ```text
-teacherGradePackages/{packageId}
+docs/comparticio-docents.md
 ```
-
-Serveix per enviar notes d'un professor a un tutor. Aquesta ruta no ha de contenir tot el quadern docent, nomes el paquet necessari:
-
-- emissor;
-- destinatari;
-- classe origen;
-- materia;
-- alumnes;
-- notes finals de competencies;
-- estat d'importacio;
-- data i usuari de confirmacio quan el tutor importa el paquet.
-
-No hauria d'incloure:
-
-- comentaris;
-- diagnostics;
-- DOIPs;
-- comportament;
-- fotos;
-- sociograma;
-- dades familiars o mediques;
-- observacions obertes.
-
-Conclusio: la ruta compartida te sentit, pero s'ha de mantenir molt limitada.
-
-La politica completa queda definida a `docs/comparticio-docents.md`.
 
 ## 4. Comprovacio d'aillament entre usuaris
 
@@ -177,11 +176,13 @@ La decisio completa queda definida a `docs/app-check-entorn-public.md`.
 
 ## Conclusio del Bloc 2
 
-El model Firebase actual es coherent:
+El model privat continua sent coherent, pero el model compartit esta pendent de revalidacio:
 
 - les dades personals viuen a `users/{uid}`;
 - les copies al nuvol tambe viuen dins `users/{uid}`;
-- l'unica ruta compartida es `teacherGradePackages`;
-- les rules actuals bloquegen l'acces entre usuaris;
+- ja no hi ha una unica ruta compartida;
+- les cotutories comparteixen un conjunt ampli de dades tutorials;
+- els qüestionaris sociometrics introdueixen un flux public temporal;
+- cal provar permisos, revocacio, eliminacio i autoria;
 - Storage encara no esta actiu, pero ja te proposta de rules futures;
 - App Check esta documentat al Bloc 8, pero no s'activa encara per no bloquejar docents legitims.

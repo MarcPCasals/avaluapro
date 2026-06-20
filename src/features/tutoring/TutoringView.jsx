@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  Ban,
   BarChart3,
   BookOpenCheck,
   CalendarDays,
@@ -8,13 +9,18 @@ import {
   Clipboard,
   ClipboardList,
   Eye,
+  ExternalLink,
   FileDown,
   FileSpreadsheet,
+  FileText,
   GraduationCap,
   HeartHandshake,
   Layers3,
   LayoutGrid,
+  Loader2,
   Lock,
+  MapPin,
+  Move,
   Network,
   Plus,
   RotateCcw,
@@ -28,16 +34,23 @@ import {
   Star,
   Trash2,
   TrendingDown,
+  TrendingUp,
   UserX,
   UsersRound,
+  X,
 } from 'lucide-react'
 import { EducandEmailInput } from '../../components/EducandEmailInput'
 import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
+import { listSociometricSurveyResponses } from '../../lib/firebase'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
+import { SociometricComparisonSelector } from './SociometricComparisonSelector'
+import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
+import { buildSociometricStudentReports } from './sociometricStudentProfileUtils'
 
 const TUTORING_RECORD_TYPES = [
   { id: 'agenda', label: 'Notes a l’agenda', tone: 'amber' },
@@ -66,17 +79,106 @@ const TUTORING_RELATION_TYPES = [
   { id: 'avoid', label: 'Evitar de moment', shortLabel: 'Incompatibilitat', tone: 'red' },
 ]
 const COOPERATIVE_GROUP_STRATEGIES = [
-  { id: 'balanced', label: 'Equilibrat' },
-  { id: 'supportive', label: 'Prioritza suports' },
-  { id: 'calm', label: 'Evita tensions' },
+  { id: 'balanced', label: 'Equilibrat', description: 'Barreja rendiment, seguiment i sociometria.' },
+  { id: 'supportive', label: 'Suportiu', description: 'Prioritza integrar alumnes vulnerables amb vincles segurs.' },
+  { id: 'calm', label: 'Treball eficient', description: 'Prioritza relacions positives de treball i evita tensions.' },
 ]
 const SOCIOGRAM_FILTERS = [
-  { id: 'all', label: 'Totes' },
-  { id: 'supportive', label: 'Afinitats' },
-  { id: 'avoid', label: 'Evitar' },
+  { id: 'all', label: 'Tot' },
+  { id: 'social', label: 'Social' },
+  { id: 'work', label: 'Treball' },
+  { id: 'avoid', label: 'Rebuig' },
 ]
+const SOCIOMETRIC_REPORT_TYPES = [
+  {
+    id: 'quick',
+    title: 'Informe ràpid del grup',
+    description: 'Una pàgina per veure estat general, alumnes prioritaris i primeres accions.',
+    icon: BarChart3,
+    estimate: '1 pàgina',
+    status: 'Fase 2',
+  },
+  {
+    id: 'complete',
+    title: 'Informe docent complet',
+    description: 'Lectura més extensa del grup amb sociograma, alertes i pla d’intervenció.',
+    icon: FileText,
+    estimate: '3-5 pàgines',
+    status: 'Fase 5',
+  },
+  {
+    id: 'individual',
+    title: 'Fitxes individuals',
+    description: 'Una fitxa breu per alumne amb classificació, relacions i recomanacions.',
+    icon: UsersRound,
+    estimate: '1 pàgina/alumne',
+    status: 'Fase 3',
+  },
+  {
+    id: 'comparative',
+    title: 'Informe comparatiu',
+    description: 'Comparació entre dos moments sociomètrics per veure evolució i impacte.',
+    icon: TrendingDown,
+    estimate: '2-3 pàgines',
+    status: 'Fase 7',
+  },
+]
+const SOCIOMETRIC_REPORT_SECTIONS = [
+  { id: 'summary', label: 'Resum del grup', required: true, pages: 1 },
+  { id: 'sociogram', label: 'Sociograma visual', required: false, pages: 1 },
+  { id: 'priority', label: 'Alumnes prioritaris', required: false, pages: 1 },
+  { id: 'contexts', label: 'Social vs treball', required: false, pages: 1 },
+  { id: 'alerts', label: 'Alertes pedagògiques', required: false, pages: 1 },
+  { id: 'interventions', label: 'Propostes d’intervenció', required: false, pages: 1 },
+  { id: 'individual', label: 'Fitxes individuals', required: false, pages: 1 },
+  { id: 'technical', label: 'Annex tècnic', required: false, pages: 2 },
+]
+const DEFAULT_SOCIOMETRIC_REPORT_SECTIONS = {
+  quick: {
+    alerts: false,
+    contexts: true,
+    individual: false,
+    interventions: true,
+    priority: true,
+    sociogram: false,
+    summary: true,
+    technical: false,
+  },
+  complete: {
+    alerts: true,
+    contexts: true,
+    individual: false,
+    interventions: true,
+    priority: true,
+    sociogram: true,
+    summary: true,
+    technical: false,
+  },
+  individual: {
+    alerts: false,
+    contexts: false,
+    individual: true,
+    interventions: true,
+    priority: false,
+    sociogram: false,
+    summary: true,
+    technical: false,
+  },
+  comparative: {
+    alerts: false,
+    contexts: true,
+    individual: false,
+    interventions: true,
+    priority: true,
+    sociogram: true,
+    summary: true,
+    technical: false,
+  },
+}
 const SOCIOMETRIC_POSITIVE_LIMIT = 4
 const SOCIOMETRIC_AVOID_LIMIT = 3
+const TEACHER_OBSERVATION_RELATION_SOURCE = 'teacher-observation'
+const SOCIOMETRIC_PUBLIC_FORM_SOURCE = 'sociometric-public-form'
 const SOCIOMETRIC_TEMPLATE_HEADER = [
   'Alumne',
   'Elecció 1',
@@ -89,8 +191,8 @@ const SOCIOMETRIC_TEMPLATE_HEADER = [
 ].join('\t')
 const SOCIOMETRIC_CATEGORY_META = {
   Líder: { id: 'leader', label: 'Líder', tone: 'green', description: 'Molta elecció positiva i poc rebuig.' },
-  Acceptat: { id: 'accepted', label: 'Acceptat', tone: 'blue', description: 'Bona integració social al grup.' },
-  Promig: { id: 'average', label: 'Promig', tone: 'slate', description: 'Relacions dins del patró habitual.' },
+  Promig: { id: 'average', label: 'Promig', tone: 'blue', description: 'Bona acceptació general i relació fluida amb el grup.' },
+  Acceptat: { id: 'accepted', label: 'Acceptat', tone: 'cyan', description: 'Poca afinitat explícita, però sense rebuig significatiu.' },
   Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'violet', description: 'Rep eleccions positives i rebuigs.' },
   Aïllat: { id: 'isolated', label: 'Aïllat', tone: 'gray', description: 'Poques connexions registrades.' },
   Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep força rebuigs i poques eleccions.' },
@@ -129,6 +231,58 @@ function getRelationCategory(type) {
   return type === 'avoid' ? 'avoid' : 'supportive'
 }
 
+function getRelationPedagogicalWeight(relation) {
+  if (relation?.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE) return 1
+  if (!relation?.source || relation?.source === TEACHER_OBSERVATION_RELATION_SOURCE) return 2
+  return 1
+}
+
+function getRelationInfluence(relation) {
+  const strength = Math.min(3, Math.max(1, Number(relation?.strength) || 2))
+  return getRelationPedagogicalWeight(relation) * (strength / 2)
+}
+
+function getWeightedRelationCount(relations) {
+  return relations.reduce((total, relation) => total + getRelationPedagogicalWeight(relation), 0)
+}
+
+function isSociometricSocialRelation(relation) {
+  return (
+    relation?.type === 'friendship' ||
+    relation?.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE ||
+    relation?.source === 'sociometric-questionnaire'
+  )
+}
+
+function getSociogramRelationContext(relation) {
+  if (relation?.type === 'avoid') return 'avoid'
+  if (relation?.type === 'positive') return 'work'
+  if (relation?.type === 'friendship') return 'social'
+  return isSociometricSocialRelation(relation) ? 'social' : 'work'
+}
+
+function isSociogramReciprocalRelation(relation, relations) {
+  return relations.some(
+    (candidate) =>
+      candidate.sourceStudentId === relation.targetStudentId &&
+      candidate.targetStudentId === relation.sourceStudentId &&
+      candidate.type === relation.type,
+  )
+}
+
+function getStableUnitInterval(value) {
+  const hash = String(value || '')
+    .split('')
+    .reduce((total, char, index) => (total + char.charCodeAt(0) * (index + 11)) % 1009, 17)
+  return hash / 1009
+}
+
+function getPercentile(sortedValues, ratio) {
+  if (!sortedValues.length) return 0
+  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.ceil(sortedValues.length * ratio) - 1))
+  return sortedValues[index]
+}
+
 function getSociogramInitials(name) {
   const [surnameBlock = '', firstNameBlock = ''] = String(name || '').split(',')
   const firstName = firstNameBlock.trim().split(/\s+/).filter(Boolean)[0]
@@ -141,6 +295,31 @@ function getSociogramInitials(name) {
     .join('')
 
   return `${firstName?.[0] || ''}${firstSurname?.[0] || ''}`.toUpperCase() || fallback.toUpperCase() || '?'
+}
+
+function getSociogramShortCode(name) {
+  const [surnameBlock = '', firstNameBlock = ''] = String(name || '').split(',')
+  const fallbackParts = String(name || '').split(/\s+/).filter(Boolean)
+  const firstName = (firstNameBlock.trim().split(/\s+/).filter(Boolean)[0] || fallbackParts[0] || '').trim()
+  const firstSurname = (surnameBlock.trim().split(/\s+/).filter(Boolean)[0] || fallbackParts[1] || '').trim()
+  const namePart = firstName.slice(0, 3)
+  const surnamePart = firstSurname.slice(0, 1)
+  const code = `${namePart}${surnamePart}`
+  return code ? `${code.slice(0, 1).toUpperCase()}${code.slice(1)}` : getSociogramInitials(name)
+}
+
+function getSeatingShortName(name) {
+  const [surnameBlock = '', firstNameBlock = ''] = String(name || '').split(',')
+  const fallbackParts = String(name || '').split(/\s+/).filter(Boolean)
+  const firstName = firstNameBlock.trim().split(/\s+/).filter(Boolean)[0] || fallbackParts[0] || ''
+  const surnameInitials = surnameBlock
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .reverse()
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
+  return `${firstName} ${surnameInitials}`.trim() || String(name || '')
 }
 
 function getTodayDateInput() {
@@ -164,6 +343,23 @@ function formatLongDate(value) {
 function printTutorialProfile() {
   document.body.classList.add('tutorial-profile-printing')
   const clearPrintClass = () => document.body.classList.remove('tutorial-profile-printing')
+  window.addEventListener('afterprint', clearPrintClass, { once: true })
+  window.print()
+  window.setTimeout(clearPrintClass, 1200)
+}
+
+function printSociometricReport(extraPrintClass = '') {
+  const printModeClass = typeof extraPrintClass === 'string' ? extraPrintClass : ''
+  document.body.classList.add('sociometric-report-printing')
+  if (printModeClass) {
+    document.body.classList.add(printModeClass)
+  }
+  const clearPrintClass = () => {
+    document.body.classList.remove('sociometric-report-printing')
+    if (printModeClass) {
+      document.body.classList.remove(printModeClass)
+    }
+  }
   window.addEventListener('afterprint', clearPrintClass, { once: true })
   window.print()
   window.setTimeout(clearPrintClass, 1200)
@@ -443,6 +639,22 @@ function average(values) {
   return cleanValues.reduce((total, value) => total + value, 0) / cleanValues.length
 }
 
+const {
+  analyzeTutorialSeatingPlan,
+  buildCooperativeGroups,
+  buildStudentCooperativeProfile: getStudentCooperativeProfile,
+  enrichCooperativeGroups,
+  isInfluentialSeatingProfile,
+  isSupportiveSeatingProfile,
+  isVulnerableSeatingProfile,
+  moveCooperativeMemberToGroup,
+  relationBetween,
+  summarizeCooperativePair,
+} = createCooperativeSociometricHelpers({
+  getRelationInfluence,
+  getRelationTypeMeta,
+})
+
 function getGradeFromAverageScore(score) {
   if (!score) return ''
   if (score >= 3.5) return 'A'
@@ -672,16 +884,24 @@ function summarizeTutorialRelations({ relations, students }) {
     .map((student) => {
       const outgoing = relations.filter((relation) => relation.sourceStudentId === student.id)
       const incoming = relations.filter((relation) => relation.targetStudentId === student.id)
-      const supportiveCount = [...outgoing, ...incoming].filter(
-        (relation) => relation.type === 'positive' || relation.type === 'friendship',
-      ).length
-      const avoidCount = [...outgoing, ...incoming].filter((relation) => relation.type === 'avoid').length
+      const supportiveCount = getWeightedRelationCount(
+        [...outgoing, ...incoming].filter((relation) => relation.type === 'positive' || relation.type === 'friendship'),
+      )
+      const avoidCount = getWeightedRelationCount(
+        [...outgoing, ...incoming].filter((relation) => relation.type === 'avoid'),
+      )
 
       return {
         student,
+        socialPositiveCount: getWeightedRelationCount(
+          [...outgoing, ...incoming].filter((relation) => relation.type === 'friendship'),
+        ),
         incoming,
         outgoing,
         supportiveCount,
+        workPositiveCount: getWeightedRelationCount(
+          [...outgoing, ...incoming].filter((relation) => relation.type === 'positive'),
+        ),
         avoidCount,
         total: outgoing.length + incoming.length,
       }
@@ -718,7 +938,9 @@ function summarizeTutorialRelations({ relations, students }) {
     isolatedStudents: studentRows.filter((row) => row.total === 0).map((row) => row.student),
     positiveCount: relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship').length,
     reciprocalCount: reciprocalPairs.size,
+    socialPositiveCount: relations.filter((relation) => relation.type === 'friendship').length,
     studentRows,
+    workPositiveCount: relations.filter((relation) => relation.type === 'positive').length,
   }
 }
 
@@ -955,8 +1177,11 @@ function parseSociometricResponseText(rawText, students) {
 }
 
 function summarizeSociometricMetrics({ relations, students }) {
-  const positiveRelations = relations.filter((relation) => relation.type === 'positive' || relation.type === 'friendship')
-  const avoidRelations = relations.filter((relation) => relation.type === 'avoid')
+  const positiveRelations = relations.filter((relation) => relation.type === 'friendship')
+  const avoidRelations = relations.filter(
+    (relation) => relation.type === 'avoid' && isSociometricSocialRelation(relation),
+  )
+  const workRelations = relations.filter((relation) => relation.type === 'positive')
   const possibleDirected = students.length * Math.max(0, students.length - 1)
   const reciprocalPairs = new Set()
 
@@ -969,50 +1194,400 @@ function summarizeSociometricMetrics({ relations, students }) {
   })
 
   const rows = students.map((student) => {
-    const positiveReceived = positiveRelations.filter((relation) => relation.targetStudentId === student.id).length
-    const positiveGiven = positiveRelations.filter((relation) => relation.sourceStudentId === student.id).length
-    const avoidReceived = avoidRelations.filter((relation) => relation.targetStudentId === student.id).length
-    const avoidGiven = avoidRelations.filter((relation) => relation.sourceStudentId === student.id).length
-    let category = 'Promig'
-    if (positiveReceived >= 4 && avoidReceived <= 1) category = 'Líder'
-    else if (avoidReceived >= 3 && positiveReceived <= 2) category = 'Rebutjat'
-    else if (positiveReceived >= 3 && avoidReceived >= 2) category = 'Controvertit'
-    else if (positiveReceived === 0 && positiveGiven === 0 && avoidReceived === 0) category = 'Aïllat'
-    else if (positiveReceived >= 2 && avoidReceived <= 1) category = 'Acceptat'
+    const positiveReceived = getWeightedRelationCount(
+      positiveRelations.filter((relation) => relation.targetStudentId === student.id),
+    )
+    const positiveGiven = getWeightedRelationCount(
+      positiveRelations.filter((relation) => relation.sourceStudentId === student.id),
+    )
+    const avoidReceived = getWeightedRelationCount(
+      avoidRelations.filter((relation) => relation.targetStudentId === student.id),
+    )
+    const avoidGiven = getWeightedRelationCount(
+      avoidRelations.filter((relation) => relation.sourceStudentId === student.id),
+    )
+    return { avoidGiven, avoidReceived, positiveGiven, positiveReceived, student }
+  })
+  const positiveReceivedValues = rows.map((row) => row.positiveReceived).sort((a, b) => a - b)
+  const avoidReceivedValues = rows.map((row) => row.avoidReceived).sort((a, b) => a - b)
+  const p15 = getPercentile(positiveReceivedValues, 0.15)
+  const p40 = getPercentile(positiveReceivedValues, 0.4)
+  const p60Avoid = getPercentile(avoidReceivedValues, 0.6)
+  const p75Avoid = getPercentile(avoidReceivedValues, 0.75)
+  const p85 = getPercentile(positiveReceivedValues, 0.85)
+
+  const classifiedRows = rows.map((row) => {
+    const { avoidGiven, avoidReceived, positiveGiven, positiveReceived, student } = row
+    let category = 'Acceptat'
+    if (avoidReceived > 0 && avoidReceived >= Math.max(1, p75Avoid)) category = 'Rebutjat'
+    else if (positiveReceived >= Math.max(1, p85) && avoidReceived <= p60Avoid) category = 'Líder'
+    else if (positiveReceived >= Math.max(1, p40) && avoidReceived >= Math.max(1, p60Avoid)) category = 'Controvertit'
+    else if (positiveReceived <= p15 && positiveGiven <= 1 && avoidReceived <= p60Avoid) category = 'Aïllat'
+    else if (positiveReceived >= Math.max(1, p40) && avoidReceived <= p60Avoid) category = 'Promig'
 
     const categoryMeta = SOCIOMETRIC_CATEGORY_META[category] || SOCIOMETRIC_CATEGORY_META.Promig
-    return { avoidGiven, avoidReceived, category, categoryMeta, positiveGiven, positiveReceived, student }
+    const nodeSizeClass = positiveReceived >= Math.max(1, p85) ? 'node-large' : positiveReceived >= Math.max(1, p40) ? 'node-medium' : 'node-small'
+    return { avoidGiven, avoidReceived, category, categoryMeta, nodeSizeClass, positiveGiven, positiveReceived, student }
   })
   const categoryCounts = ['Líder', 'Acceptat', 'Promig', 'Controvertit', 'Aïllat', 'Rebutjat'].map((category) => ({
     category,
-    count: rows.filter((row) => row.category === category).length,
+    count: classifiedRows.filter((row) => row.category === category).length,
   }))
+  const socialComponentMap = getPositiveComponentMap(students, positiveRelations)
+  const subgroupCount = new Set(socialComponentMap.values()).size
+  const meaningfulSubgroupCount = Math.max(
+    0,
+    [...new Set(socialComponentMap.values())].filter(
+      (componentKey) => componentKey.split('__').filter(Boolean).length >= 2,
+    ).length,
+  )
 
   return {
     categoryCounts,
-    density: possibleDirected > 0 ? Math.round(((positiveRelations.length + avoidRelations.length) / possibleDirected) * 100) : 0,
+    density:
+      possibleDirected > 0
+        ? Math.round(((getWeightedRelationCount(positiveRelations) + getWeightedRelationCount(avoidRelations)) / possibleDirected) * 100)
+        : 0,
     inclusion:
       students.length > 0
-        ? Math.round((rows.filter((row) => row.positiveGiven + row.positiveReceived > 0).length / students.length) * 100)
+        ? Math.round((classifiedRows.filter((row) => row.positiveGiven + row.positiveReceived > 0).length / students.length) * 100)
         : 0,
     moreno: students.length > 1 ? Math.round((reciprocalPairs.size / (students.length * (students.length - 1) / 2)) * 100) : 0,
+    reciprocalPairCount: reciprocalPairs.size,
+    rejectionDensity: possibleDirected > 0 ? Math.round((getWeightedRelationCount(avoidRelations) / possibleDirected) * 100) : 0,
+    socialRelationCount: positiveRelations.length,
+    subgroupCount,
+    meaningfulSubgroupCount,
+    workRelationCount: workRelations.length,
     positivity:
       positiveRelations.length + avoidRelations.length > 0
-        ? Math.round((positiveRelations.length / (positiveRelations.length + avoidRelations.length)) * 100)
+        ? Math.round(
+            (getWeightedRelationCount(positiveRelations) /
+              (getWeightedRelationCount(positiveRelations) + getWeightedRelationCount(avoidRelations))) *
+              100,
+          )
         : 0,
-    rows,
+    rows: classifiedRows,
   }
 }
 
-function getRingPosition(index, total, radiusX, radiusY, centerX = 50, centerY = 50) {
-  if (total <= 1) {
-    return { x: centerX, y: centerY - radiusY }
+function getSociometricRelationTimestamp(relation) {
+  return relation?.importedAt || relation?.createdAt || relation?.updatedAt || ''
+}
+
+function getSociometricRelationsUntil(relations, cutoffValue) {
+  if (!cutoffValue || cutoffValue === 'current') return relations
+  return relations.filter((relation) => {
+    const timestamp = getSociometricRelationTimestamp(relation)
+    return timestamp && timestamp <= cutoffValue
+  })
+}
+
+function getSociometricComparisonOptionTimestamp(value, momentsById) {
+  if (!value || value === 'current') return 'current'
+  if (String(value).startsWith('moment:')) {
+    const moment = momentsById.get(String(value).slice('moment:'.length))
+    return moment?.capturedAt || ''
+  }
+  if (String(value).startsWith('legacy:')) return String(value).slice('legacy:'.length)
+  return String(value)
+}
+
+function getSociometricComparisonRelations({ currentRelations, momentsById, value }) {
+  if (!value || value === 'current') return currentRelations
+  if (String(value).startsWith('moment:')) {
+    const moment = momentsById.get(String(value).slice('moment:'.length))
+    return moment?.relationsSnapshot || []
+  }
+  if (String(value).startsWith('legacy:')) {
+    return getSociometricRelationsUntil(currentRelations, String(value).slice('legacy:'.length))
+  }
+  return getSociometricRelationsUntil(currentRelations, value)
+}
+
+function getSociometricComparisonTone(delta, inverse = false) {
+  if (delta === 0) return 'neutral'
+  const isPositive = inverse ? delta < 0 : delta > 0
+  return isPositive ? 'positive' : 'danger'
+}
+
+function getSociometricCategoryRisk(category) {
+  if (category === 'Rebutjat') return 3
+  if (category === 'Aïllat') return 2
+  if (category === 'Controvertit') return 1
+  return 0
+}
+
+function buildSociometricComparisonReport({ endMetrics, startMetrics, students }) {
+  const startRowsByStudentId = new Map((startMetrics.rows || []).map((row) => [row.student.id, row]))
+  const endRowsByStudentId = new Map((endMetrics.rows || []).map((row) => [row.student.id, row]))
+  const metricRows = [
+    {
+      description: 'Relacions registrades respecte al màxim possible.',
+      end: endMetrics.density,
+      inverse: false,
+      label: 'Cohesió',
+      start: startMetrics.density,
+      suffix: '%',
+    },
+    {
+      description: 'Alumnes amb almenys una relació positiva.',
+      end: endMetrics.inclusion,
+      inverse: false,
+      label: 'Inclusió',
+      start: startMetrics.inclusion,
+      suffix: '%',
+    },
+    {
+      description: 'Pes de les positives respecte als rebuigs.',
+      end: endMetrics.positivity,
+      inverse: false,
+      label: 'Positivitat',
+      start: startMetrics.positivity,
+      suffix: '%',
+    },
+    {
+      description: 'Vincles de rebuig o a evitar.',
+      end: endMetrics.rejectionDensity,
+      inverse: true,
+      label: 'Rebuig',
+      start: startMetrics.rejectionDensity,
+      suffix: '%',
+    },
+    {
+      description: 'Parelles positives mútues.',
+      end: endMetrics.reciprocalPairCount,
+      inverse: false,
+      label: 'Reciprocitat',
+      start: startMetrics.reciprocalPairCount,
+      suffix: '',
+    },
+    {
+      description: 'Relacions de treball registrades pel docent.',
+      end: endMetrics.workRelationCount,
+      inverse: false,
+      label: 'Treball',
+      start: startMetrics.workRelationCount,
+      suffix: '',
+    },
+  ].map((metric) => {
+    const delta = metric.end - metric.start
+    return {
+      ...metric,
+      delta,
+      tone: getSociometricComparisonTone(delta, metric.inverse),
+    }
+  })
+
+  const studentChanges = students
+    .map((student) => {
+      const startRow = startRowsByStudentId.get(student.id)
+      const endRow = endRowsByStudentId.get(student.id)
+      const startRisk = getSociometricCategoryRisk(startRow?.category)
+      const endRisk = getSociometricCategoryRisk(endRow?.category)
+      const positiveDelta = (endRow?.positiveReceived || 0) - (startRow?.positiveReceived || 0)
+      const rejectionDelta = (endRow?.avoidReceived || 0) - (startRow?.avoidReceived || 0)
+      const riskDelta = endRisk - startRisk
+
+      return {
+        endCategory: endRow?.category || 'Sense dades',
+        positiveDelta,
+        rejectionDelta,
+        riskDelta,
+        startCategory: startRow?.category || 'Sense dades',
+        student,
+      }
+    })
+    .filter((item) => item.riskDelta !== 0 || item.positiveDelta !== 0 || item.rejectionDelta !== 0)
+
+  const improvedStudents = studentChanges
+    .filter((item) => item.riskDelta < 0 || item.positiveDelta > 0 || item.rejectionDelta < 0)
+    .sort((a, b) => a.riskDelta - b.riskDelta || b.positiveDelta - a.positiveDelta || a.rejectionDelta - b.rejectionDelta)
+  const worsenedStudents = studentChanges
+    .filter((item) => item.riskDelta > 0 || item.rejectionDelta > 0)
+    .sort((a, b) => b.riskDelta - a.riskDelta || b.rejectionDelta - a.rejectionDelta || a.positiveDelta - b.positiveDelta)
+  const newLeaders = students
+    .map((student) => ({
+      endCategory: endRowsByStudentId.get(student.id)?.category,
+      startCategory: startRowsByStudentId.get(student.id)?.category,
+      student,
+    }))
+    .filter((item) => item.endCategory === 'Líder' && item.startCategory !== 'Líder')
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca'))
+  const resolvedPriorityStudents = students
+    .map((student) => ({
+      endCategory: endRowsByStudentId.get(student.id)?.category,
+      startCategory: startRowsByStudentId.get(student.id)?.category,
+      student,
+    }))
+    .filter(
+      (item) =>
+        ['Rebutjat', 'Aïllat', 'Controvertit'].includes(item.startCategory) &&
+        !['Rebutjat', 'Aïllat', 'Controvertit'].includes(item.endCategory),
+    )
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca'))
+  const densityDelta = endMetrics.density - startMetrics.density
+  const rejectionDelta = endMetrics.rejectionDensity - startMetrics.rejectionDensity
+  const inclusionDelta = endMetrics.inclusion - startMetrics.inclusion
+
+  let summary = 'El grup no mostra canvis sociomètrics rellevants entre els dos moments seleccionats.'
+  if (densityDelta > 0 && rejectionDelta <= 0) {
+    summary = 'El grup mostra una evolució positiva: augmenta la connexió i el rebuig no creix.'
+  } else if (inclusionDelta > 0) {
+    summary = 'La millora principal és la inclusió: més alumnes entren dins la xarxa positiva.'
+  } else if (rejectionDelta > 0) {
+    summary = 'La comparativa alerta d’un augment del rebuig; convé revisar contextos i agrupaments.'
+  } else if (densityDelta < 0) {
+    summary = 'La xarxa sembla més feble que al moment inicial; cal reforçar vincles segurs i activitats cooperatives.'
   }
 
-  const angle = -Math.PI / 2 + (index / total) * Math.PI * 2
+  const actions = [
+    rejectionDelta > 0
+      ? 'Revisar quins agrupaments o situacions han coincidit amb l’augment de rebuig.'
+      : 'Mantenir les mesures que han evitat que el rebuig augmenti.',
+    inclusionDelta > 0
+      ? 'Identificar quines activitats han ajudat a incloure més alumnes i repetir-ne l’estructura.'
+      : 'Planificar una activitat pont per als alumnes que encara no guanyen connexions positives.',
+    resolvedPriorityStudents.length > 0
+      ? `Consolidar la millora de ${resolvedPriorityStudents[0].student.name} sense exposar-lo com a cas especial.`
+      : 'Fer una nova presa de dades després de dues o tres setmanes d’intervenció.',
+  ]
+
   return {
-    x: centerX + Math.cos(angle) * radiusX,
-    y: centerY + Math.sin(angle) * radiusY,
+    actions,
+    improvedStudents,
+    metricRows,
+    newLeaders,
+    resolvedPriorityStudents,
+    summary,
+    worsenedStudents,
+  }
+}
+
+function normalizeImpactTimestamp(value) {
+  if (!value || value === 'current') return new Date().toISOString()
+  return String(value)
+}
+
+function isTimestampWithinImpactWindow(timestamp, startTimestamp, endTimestamp) {
+  if (!timestamp) return false
+  const start = normalizeImpactTimestamp(startTimestamp)
+  const end = normalizeImpactTimestamp(endTimestamp)
+  return String(timestamp) > start && String(timestamp) <= end
+}
+
+function buildSociometricImpactReport({
+  comparisonReport,
+  endTimestamp,
+  groupSets,
+  relations,
+  seatingPlans,
+  startTimestamp,
+  tutorialRecords,
+}) {
+  const interventions = [
+    ...(groupSets || [])
+      .filter((groupSet) => isTimestampWithinImpactWindow(groupSet.updatedAt || groupSet.createdAt, startTimestamp, endTimestamp))
+      .map((groupSet) => ({
+        date: groupSet.updatedAt || groupSet.createdAt,
+        detail: `${groupSet.groups?.length || 0} grups · ${groupSet.strategy || 'balanced'}`,
+        title: groupSet.name || 'Grups cooperatius guardats',
+        type: 'groups',
+      })),
+    ...(seatingPlans || [])
+      .filter((plan) => isTimestampWithinImpactWindow(plan.updatedAt || plan.createdAt, startTimestamp, endTimestamp))
+      .map((plan) => ({
+        date: plan.updatedAt || plan.createdAt,
+        detail: `${plan.seats?.length || 0} llocs assignats`,
+        title: plan.title || 'Disposició d’aula guardada',
+        type: 'seating',
+      })),
+  ]
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 6)
+
+  const teacherObservationRelations = (relations || []).filter(
+    (relation) =>
+      relation.source === TEACHER_OBSERVATION_RELATION_SOURCE &&
+      isTimestampWithinImpactWindow(relation.updatedAt || relation.createdAt, startTimestamp, endTimestamp),
+  )
+  const tutorialRecordsInWindow = (tutorialRecords || []).filter((record) =>
+    isTimestampWithinImpactWindow(record.updatedAt || record.createdAt || record.date, startTimestamp, endTimestamp),
+  )
+
+  const metricByLabel = new Map((comparisonReport.metricRows || []).map((metric) => [metric.label, metric]))
+  const inclusionDelta = metricByLabel.get('Inclusió')?.delta || 0
+  const rejectionDelta = metricByLabel.get('Rebuig')?.delta || 0
+  const workDelta = metricByLabel.get('Treball')?.delta || 0
+
+  const signals = []
+
+  if (interventions.length === 0 && teacherObservationRelations.length === 0 && tutorialRecordsInWindow.length === 0) {
+    signals.push({
+      tone: 'neutral',
+      title: 'No hi ha intervencions guardades entre els dos moments',
+      text: 'La comparativa mostra el canvi del grup, però encara no pot relacionar-lo amb una acció registrada a Avaluapro.',
+    })
+  }
+
+  if (interventions.some((item) => item.type === 'groups')) {
+    signals.push({
+      tone: inclusionDelta > 0 ? 'positive' : inclusionDelta < 0 ? 'warning' : 'neutral',
+      title: 'Agrupaments cooperatius i inclusió',
+      text:
+        inclusionDelta > 0
+          ? 'Després de guardar nous grups cooperatius, la inclusió puja. Val la pena revisar què ha funcionat i repetir l’estructura.'
+          : inclusionDelta < 0
+            ? 'Tot i haver guardat agrupaments, la inclusió no millora. Potser cal ajustar parelles pont o repartir millor els suports.'
+            : 'Hi ha hagut agrupaments nous, però la inclusió global es manté força estable.',
+    })
+  }
+
+  if (interventions.some((item) => item.type === 'seating')) {
+    signals.push({
+      tone: rejectionDelta < 0 ? 'positive' : rejectionDelta > 0 ? 'warning' : 'neutral',
+      title: 'Disposició d’aula i rebuig',
+      text:
+        rejectionDelta < 0
+          ? 'La disposició d’aula coincideix amb una baixada del rebuig. Sembla una línia prometedora per consolidar.'
+          : rejectionDelta > 0
+            ? 'Hi ha una disposició guardada, però el rebuig puja. Convé revisar proximitats i incompatibilitats.'
+            : 'La disposició d’aula no sembla haver mogut el nivell de rebuig de manera clara.',
+    })
+  }
+
+  if (teacherObservationRelations.length > 0) {
+    signals.push({
+      tone: workDelta > 0 ? 'positive' : 'neutral',
+      title: 'Observacions docents i mapa de treball',
+      text:
+        workDelta > 0
+          ? `S’han registrat ${teacherObservationRelations.length} observació/ns docents i també creixen les relacions de treball útils.`
+          : `S’han registrat ${teacherObservationRelations.length} observació/ns docents. Encara cal més recorregut per veure impacte clar al mapa de treball.`,
+    })
+  }
+
+  if (tutorialRecordsInWindow.length > 0 && comparisonReport.worsenedStudents.length > 0) {
+    signals.push({
+      tone: 'warning',
+      title: 'Canvis socials a contrastar amb el seguiment tutorial',
+      text: `Hi ha ${tutorialRecordsInWindow.length} registre/s tutorials en aquest període i també alumnes que empitjoren. Val la pena mirar si coincideixen contextos o moments d’aula.`,
+    })
+  }
+
+  if (comparisonReport.resolvedPriorityStudents.length > 0) {
+    signals.push({
+      tone: 'positive',
+      title: 'Hi ha prioritats que surten de zona sensible',
+      text: `${comparisonReport.resolvedPriorityStudents.length} alumne/s deixen categories de més risc. Convindria mantenir les condicions que han ajudat aquesta millora.`,
+    })
+  }
+
+  return {
+    interventions,
+    observationCount: teacherObservationRelations.length,
+    recordCount: tutorialRecordsInWindow.length,
+    signals: signals.slice(0, 5),
   }
 }
 
@@ -1032,21 +1607,166 @@ function getSociogramPosition(studentId, fallback, positionsByStudentId) {
   }
 }
 
+function getSociogramRingDefinitions(sociometricRows) {
+  const order = ['leader', 'average', 'accepted', 'controversial', 'isolated', 'rejected']
+  const labels = {
+    accepted: 'Acceptats',
+    average: 'Promig',
+    controversial: 'Controvertits',
+    isolated: 'Aïllats',
+    leader: 'Líders',
+    rejected: 'Rebutjats',
+  }
+  const occupied = order.filter((categoryId) =>
+    sociometricRows.some((row) => (row.categoryMeta?.id || 'average') === categoryId),
+  )
+  const radiusByCategory = {
+    accepted: 31,
+    average: 18,
+    controversial: 38,
+    isolated: 44,
+    leader: 7,
+    rejected: 49,
+  }
+
+  return occupied.map((categoryId) => ({
+    categoryId,
+    label: labels[categoryId] || categoryId,
+    radius: occupied.length <= 1 ? 0 : radiusByCategory[categoryId] || 36,
+  }))
+}
+
+function getSociogramNodeRadiusPercent(node) {
+  if (node?.nodeSizeClass === 'node-large') return 2.6
+  if (node?.nodeSizeClass === 'node-small') return 1.75
+  return 2.1
+}
+
+function getSociogramLinkEndpoint(source, target) {
+  const deltaX = target.x - source.x
+  const deltaY = target.y - source.y
+  const distance = Math.hypot(deltaX, deltaY)
+  if (!distance) return { x: target.x, y: target.y }
+  const offset = getSociogramNodeRadiusPercent(target) + 0.8
+  return {
+    x: target.x - (deltaX / distance) * offset,
+    y: target.y - (deltaY / distance) * offset,
+  }
+}
+
+function getPositiveComponentMap(students, relations) {
+  const adjacency = new Map(students.map((student) => [student.id, new Set()]))
+  relations
+    .filter((relation) => relation.type === 'friendship' || relation.type === 'positive')
+    .forEach((relation) => {
+      adjacency.get(relation.sourceStudentId)?.add(relation.targetStudentId)
+      adjacency.get(relation.targetStudentId)?.add(relation.sourceStudentId)
+    })
+
+  const componentByStudentId = new Map()
+  const visited = new Set()
+  students.forEach((student) => {
+    if (visited.has(student.id)) return
+    const stack = [student.id]
+    const members = []
+    visited.add(student.id)
+    while (stack.length > 0) {
+      const currentId = stack.pop()
+      members.push(currentId)
+      adjacency.get(currentId)?.forEach((nextId) => {
+        if (visited.has(nextId)) return
+        visited.add(nextId)
+        stack.push(nextId)
+      })
+    }
+    const componentKey = members.sort().join('__') || student.id
+    members.forEach((memberId) => componentByStudentId.set(memberId, componentKey))
+  })
+  return componentByStudentId
+}
+
+function buildRadialSociogramNodes({ positionsByStudentId, relations, roleRowsByStudent, sociometricRows, studentRows, students }) {
+  const rowsByStudentId = new Map(studentRows.map((row) => [row.student.id, row]))
+  const sociometricRowsByStudentId = new Map(sociometricRows.map((row) => [row.student.id, row]))
+  const componentByStudentId = getPositiveComponentMap(students, relations)
+  const codeByStudentId = new Map(students.map((student) => [student.id, getSociogramShortCode(student.name)]))
+  const rings = getSociogramRingDefinitions(sociometricRows)
+  const nodes = []
+
+  rings.forEach((ring) => {
+    const ringStudents = students
+      .filter((student) => (sociometricRowsByStudentId.get(student.id)?.categoryMeta?.id || 'average') === ring.categoryId)
+      .sort((a, b) => {
+        const componentCompare = String(componentByStudentId.get(a.id) || '').localeCompare(
+          String(componentByStudentId.get(b.id) || ''),
+          'ca',
+        )
+        if (componentCompare !== 0) return componentCompare
+        const rowA = sociometricRowsByStudentId.get(a.id)
+        const rowB = sociometricRowsByStudentId.get(b.id)
+        const scoreA = (rowA?.positiveReceived || 0) - (rowA?.avoidReceived || 0)
+        const scoreB = (rowB?.positiveReceived || 0) - (rowB?.avoidReceived || 0)
+        if (scoreA !== scoreB) return scoreB - scoreA
+        return a.name.localeCompare(b.name, 'ca')
+      })
+
+    ringStudents.forEach((student, index) => {
+      const sociometricRow = sociometricRowsByStudentId.get(student.id)
+      const total = ringStudents.length
+      const isFullyIsolated =
+        ring.categoryId === 'isolated' &&
+        (sociometricRow?.positiveReceived || 0) === 0 &&
+        (sociometricRow?.positiveGiven || 0) === 0 &&
+        (sociometricRow?.avoidReceived || 0) === 0 &&
+        (sociometricRow?.avoidGiven || 0) === 0
+      const reservedOffset = isFullyIsolated ? 0.68 : 0
+      const angle =
+        -Math.PI / 2 +
+        reservedOffset * Math.PI +
+        ((index + getStableUnitInterval(student.id) * 0.2) / Math.max(1, total)) * Math.PI * 2
+      const fallback = {
+        x: 50 + Math.cos(angle) * ring.radius,
+        y: 50 + Math.sin(angle) * ring.radius * 0.86,
+      }
+
+      nodes.push({
+        ...rowsByStudentId.get(student.id),
+        id: student.id,
+        code: codeByStudentId.get(student.id),
+        initials: getSociogramInitials(student.name),
+        isConflict: Boolean(roleRowsByStudent?.get(student.id)?.conflict),
+        isStar: Boolean(roleRowsByStudent?.get(student.id)?.star),
+        ring,
+        student,
+        ...getSociogramPosition(student.id, fallback, positionsByStudentId),
+      })
+    })
+  })
+
+  return { nodes, rings }
+}
+
 function buildTutorialSociogramMap({
   filter,
+  onlyReciprocal,
   positionsByStudentId,
   relations,
   roleRowsByStudent,
   selectedStudentId,
+  sociometricRows,
   studentRows,
   students,
 }) {
   const studentsById = new Map(students.map((student) => [student.id, student]))
-  const rowsByStudentId = new Map(studentRows.map((row) => [row.student.id, row]))
   const selectedId = selectedStudentId || studentRows[0]?.student.id || students[0]?.id || ''
-  const filteredRelations = relations.filter((relation) => {
+  const validRelations = relations.filter(
+    (relation) => studentsById.has(relation.sourceStudentId) && studentsById.has(relation.targetStudentId),
+  )
+  const filteredRelations = validRelations.filter((relation) => {
     if (!studentsById.has(relation.sourceStudentId) || !studentsById.has(relation.targetStudentId)) return false
-    if (filter === 'supportive') return getRelationCategory(relation.type) === 'supportive'
+    if (onlyReciprocal && !isSociogramReciprocalRelation(relation, validRelations)) return false
+    if (filter === 'social') return getSociogramRelationContext(relation) === 'social'
+    if (filter === 'work') return getSociogramRelationContext(relation) === 'work'
     if (filter === 'avoid') return getRelationCategory(relation.type) === 'avoid'
     return true
   })
@@ -1056,85 +1776,38 @@ function buildTutorialSociogramMap({
       .flatMap((relation) => [relation.sourceStudentId, relation.targetStudentId]),
   )
   selectedRelationStudentIds.delete(selectedId)
-
-  const selectedStudent = studentsById.get(selectedId)
-  const relatedStudents = [...selectedRelationStudentIds]
-    .map((studentId) => studentsById.get(studentId))
-    .filter(Boolean)
-    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
-  const remainingStudents = students
-    .filter((student) => student.id !== selectedId && !selectedRelationStudentIds.has(student.id))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
-
-  const nodes = []
-  if (selectedStudent) {
-    nodes.push({
-      ...rowsByStudentId.get(selectedStudent.id),
-      id: selectedStudent.id,
-      initials: getSociogramInitials(selectedStudent.name),
-      isConflict: Boolean(roleRowsByStudent?.get(selectedStudent.id)?.conflict),
-      isDimmed: false,
-      isRelated: false,
-      isSelected: true,
-      isStar: Boolean(roleRowsByStudent?.get(selectedStudent.id)?.star),
-      student: selectedStudent,
-      ...getSociogramPosition(selectedStudent.id, { x: 50, y: 50 }, positionsByStudentId),
-    })
-  }
-
-  relatedStudents.forEach((student, index) => {
-    const position = getSociogramPosition(
-      student.id,
-      getRingPosition(index, relatedStudents.length, 28, 26),
-      positionsByStudentId,
-    )
-    nodes.push({
-      ...rowsByStudentId.get(student.id),
-      id: student.id,
-      initials: getSociogramInitials(student.name),
-      isConflict: Boolean(roleRowsByStudent?.get(student.id)?.conflict),
-      isDimmed: false,
-      isRelated: true,
-      isSelected: false,
-      isStar: Boolean(roleRowsByStudent?.get(student.id)?.star),
-      student,
-      ...position,
-    })
+  const { nodes, rings } = buildRadialSociogramNodes({
+    positionsByStudentId,
+    relations: validRelations,
+    roleRowsByStudent,
+    sociometricRows,
+    studentRows,
+    students,
   })
+  const normalizedNodes = nodes.map((node) => ({
+    ...node,
+    isDimmed: Boolean(selectedId) && node.id !== selectedId && !selectedRelationStudentIds.has(node.id),
+    isRelated: selectedRelationStudentIds.has(node.id),
+    isSelected: node.id === selectedId,
+  }))
 
-  remainingStudents.forEach((student, index) => {
-    const position = getSociogramPosition(
-      student.id,
-      getRingPosition(index, remainingStudents.length, 44, 37),
-      positionsByStudentId,
-    )
-    nodes.push({
-      ...rowsByStudentId.get(student.id),
-      id: student.id,
-      initials: getSociogramInitials(student.name),
-      isConflict: Boolean(roleRowsByStudent?.get(student.id)?.conflict),
-      isDimmed: Boolean(selectedStudent),
-      isRelated: false,
-      isSelected: false,
-      isStar: Boolean(roleRowsByStudent?.get(student.id)?.star),
-      student,
-      ...position,
-    })
-  })
-
-  const nodesByStudentId = new Map(nodes.map((node) => [node.id, node]))
+  const nodesByStudentId = new Map(normalizedNodes.map((node) => [node.id, node]))
   const links = filteredRelations
     .map((relation) => {
       const source = nodesByStudentId.get(relation.sourceStudentId)
       const target = nodesByStudentId.get(relation.targetStudentId)
       if (!source || !target) return null
       const typeMeta = getRelationTypeMeta(relation.type)
+      const targetEndpoint = getSociogramLinkEndpoint(source, target)
       return {
         ...relation,
         category: getRelationCategory(relation.type),
+        context: getSociogramRelationContext(relation),
         isSelectedLink: relation.sourceStudentId === selectedId || relation.targetStudentId === selectedId,
+        reciprocal: isSociogramReciprocalRelation(relation, validRelations),
         source,
         target,
+        targetEndpoint,
         typeMeta,
       }
     })
@@ -1143,8 +1816,9 @@ function buildTutorialSociogramMap({
   return {
     filteredCount: filteredRelations.length,
     links,
-    nodes,
-    relatedCount: relatedStudents.length,
+    nodes: normalizedNodes,
+    relatedCount: selectedRelationStudentIds.size,
+    rings,
     selectedNode: nodesByStudentId.get(selectedId) || null,
   }
 }
@@ -1206,50 +1880,6 @@ function summarizeTutorialGroup({ recordRowsByStudent, tutorialRecordSummary, tu
     studentsWithData: studentsWithData.size,
     totalRecords,
   }
-}
-
-function getStudentCooperativeProfile({ profile, recordRow, relationRow, roleRow }) {
-  const recordSeverity =
-    (recordRow?.agenda || 0) +
-    (recordRow?.incident || 0) * 2 +
-    (recordRow?.classroomExpulsion || 0) * 3 +
-    (recordRow?.centerExpulsion || 0) * 4
-  const academicRisk =
-    profile.evaluatedCount > 0 && (profile.averageScore <= 2 || profile.notDevelopedPercent >= 30)
-  const priorityScore =
-    profile.notDevelopedCount * 2 +
-    (profile.notDevelopedPercent >= 30 ? 2 : 0) +
-    (profile.averageScore > 0 && profile.averageScore <= 2 ? 2 : 0) +
-    recordSeverity
-  const performanceLevel =
-    profile.averageScore >= 3.25
-      ? 'alt'
-      : profile.averageScore > 0 && profile.averageScore <= 2
-        ? 'baix'
-        : 'mitjà'
-
-  return {
-    academicRisk,
-    avoidCount: relationRow?.avoidCount || 0,
-    halfGroup: profile.student.halfGroup || 'Sense mig grup',
-    isConflict: Boolean(roleRow?.conflict),
-    isStar: Boolean(roleRow?.star),
-    performanceLevel,
-    priorityScore,
-    recordSeverity,
-    relationCount: relationRow?.total || 0,
-    student: profile.student,
-    supportiveCount: relationRow?.supportiveCount || 0,
-    tutorialProfile: profile,
-  }
-}
-
-function relationBetween(relations, studentIdA, studentIdB) {
-  return relations.find(
-    (relation) =>
-      (relation.sourceStudentId === studentIdA && relation.targetStudentId === studentIdB) ||
-      (relation.sourceStudentId === studentIdB && relation.targetStudentId === studentIdA),
-  )
 }
 
 function buildTutorialRoleRows(students, roles) {
@@ -1351,225 +1981,92 @@ function getHalfGroupClassName(halfGroup) {
   return 'half-none'
 }
 
-function getCooperativePlacementScore({ candidate, group, groupSize, prioritizeHalfGroups, relations, strategy }) {
-  if (group.members.length >= groupSize) return Number.POSITIVE_INFINITY
-  if (candidate.isConflict && group.members.some((member) => member.isConflict)) return Number.POSITIVE_INFINITY
-  if (
-    prioritizeHalfGroups &&
-    group.members.some((member) => member.halfGroup && member.halfGroup !== candidate.halfGroup)
-  ) {
-    return Number.POSITIVE_INFINITY
-  }
-
-  let score = group.members.length * 8
-  const nextMembers = [...group.members, candidate]
-  const averagePerformance =
-    nextMembers.reduce((total, member) => total + (member.tutorialProfile.averageScore || 2.5), 0) / nextMembers.length
-  score += Math.abs(averagePerformance - 2.7) * 10
-
-  const riskCount = group.members.filter((member) => member.priorityScore >= 4).length
-  if (candidate.priorityScore >= 4) score += riskCount * 18
-
-  const sameHalfGroupCount = group.members.filter((member) => member.halfGroup === candidate.halfGroup).length
-  const differentHalfGroupCount = group.members.filter((member) => member.halfGroup !== candidate.halfGroup).length
-  if (prioritizeHalfGroups) {
-    score += differentHalfGroupCount * 28
-    score -= sameHalfGroupCount * 8
-  } else {
-    score += sameHalfGroupCount * 2
-  }
-
-  group.members.forEach((member) => {
-    const relation = relationBetween(relations, candidate.student.id, member.student.id)
-    if (!relation) return
-    if (relation.type === 'avoid') score += strategy === 'calm' ? 120 : 90
-    if (relation.type === 'positive') score -= strategy === 'supportive' ? 18 : 10
-    if (relation.type === 'friendship') score -= strategy === 'supportive' ? 10 : 5
-  })
-
-  const hasAcademicRisk = group.members.some((member) => member.academicRisk)
-  const hasStarPeer = group.members.some((member) => member.isStar)
-  if (candidate.academicRisk && hasStarPeer) score -= strategy === 'supportive' ? 32 : 22
-  if (candidate.isStar && hasAcademicRisk) score -= strategy === 'supportive' ? 32 : 22
-
-  if (strategy === 'calm') score += candidate.avoidCount * 2
-  if (strategy === 'supportive' && candidate.academicRisk) {
-    const hasStrongPeer = group.members.some((member) => member.performanceLevel === 'alt' && member.priorityScore <= 2)
-    score += hasStrongPeer ? -16 : 8
-  }
-
-  return score
-}
-
-function enrichCooperativeGroups(groups, relations) {
-  return groups.map((group) => {
-    const avoidRelations = []
-    const supportiveRelations = []
-    group.members.forEach((member, memberIndex) => {
-      group.members.slice(memberIndex + 1).forEach((otherMember) => {
-        const relation = relationBetween(relations, member.student.id, otherMember.student.id)
-        if (!relation) return
-        const typeMeta = getRelationTypeMeta(relation.type)
-        const row = {
-          label: `${member.student.name} / ${otherMember.student.name}`,
-          note: relation.note,
-          type: relation.type,
-          typeMeta,
-        }
-        if (relation.type === 'avoid') avoidRelations.push(row)
-        if (relation.type === 'positive' || relation.type === 'friendship') supportiveRelations.push(row)
-      })
-    })
-    const averageScore = average(group.members.map((member) => member.tutorialProfile.averageScore || 0))
-    const priorityMembers = group.members.filter((member) => member.priorityScore >= 4)
-    const highPerformanceCount = group.members.filter((member) => member.performanceLevel === 'alt').length
-    const lowPerformanceCount = group.members.filter((member) => member.performanceLevel === 'baix').length
-
-    return {
-      ...group,
-      averageScore,
-      avoidRelations,
-      highPerformanceCount,
-      lowPerformanceCount,
-      priorityMembers,
-      supportiveRelations,
-    }
-  })
-}
-
-function moveCooperativeMemberToGroup(groups, studentId, targetGroupId, relations) {
-  if (!studentId || !targetGroupId) return groups
-  let movingMember = null
-  const nextGroups = groups.map((group) => {
-    const remainingMembers = group.members.filter((member) => {
-      const isMoving = member.student.id === studentId
-      if (isMoving) movingMember = member
-      return !isMoving
-    })
-    return { ...group, members: remainingMembers }
-  })
-
-  if (!movingMember) return groups
-
-  return enrichCooperativeGroups(
-    nextGroups.map((group) =>
-      group.id === targetGroupId ? { ...group, members: [...group.members, movingMember] } : group,
-    ),
-    relations,
-  )
-}
-
-function buildCooperativeGroups({
-  groupSize,
-  prioritizeHalfGroups,
-  profiles,
-  recordRowsByStudent,
-  relationRowsByStudent,
-  relations,
-  roleRowsByStudent,
-  strategy,
-}) {
-  const cleanGroupSize = Math.min(6, Math.max(2, Number(groupSize) || 4))
-  const students = profiles
-    .map((profile) =>
-      getStudentCooperativeProfile({
-        profile,
-        recordRow: recordRowsByStudent.get(profile.student.id),
-        relationRow: relationRowsByStudent.get(profile.student.id),
-        roleRow: roleRowsByStudent?.get(profile.student.id),
-      }),
-    )
-    .sort((a, b) => {
-      if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore
-      if ((b.tutorialProfile.averageScore || 0) !== (a.tutorialProfile.averageScore || 0)) {
-        return (a.tutorialProfile.averageScore || 0) - (b.tutorialProfile.averageScore || 0)
-      }
-      return a.student.name.localeCompare(b.student.name, 'ca')
-    })
-
-  if (prioritizeHalfGroups) {
-    const studentsByHalfGroup = new Map()
-    students.forEach((student) => {
-      const key = student.halfGroup || 'Sense mig grup'
-      studentsByHalfGroup.set(key, [...(studentsByHalfGroup.get(key) || []), student])
-    })
-
-    let globalIndex = 0
-    const halfGroupGroups = []
-    studentsByHalfGroup.forEach((halfGroupStudents, halfGroupName) => {
-      const localGroupCount = Math.max(1, Math.ceil(halfGroupStudents.length / cleanGroupSize))
-      const localGroups = Array.from({ length: localGroupCount }, () => {
-        globalIndex += 1
-        return {
-          halfGroupName,
-          id: `group_${globalIndex}`,
-          members: [],
-          name: `Grup ${globalIndex} · ${halfGroupName}`,
-        }
-      })
-
-      halfGroupStudents.forEach((student) => {
-        const bestGroup = localGroups
-          .map((group) => ({
-            group,
-            score: getCooperativePlacementScore({
-              candidate: student,
-              group,
-              groupSize: cleanGroupSize,
-              prioritizeHalfGroups: false,
-              relations,
-              strategy,
-            }),
-          }))
-          .sort((a, b) => a.score - b.score || a.group.members.length - b.group.members.length)[0]?.group
-
-        bestGroup?.members.push(student)
-      })
-      halfGroupGroups.push(...localGroups)
-    })
-
-    return enrichCooperativeGroups(halfGroupGroups, relations)
-  }
-
-  const groupCount = Math.max(1, Math.ceil(students.length / cleanGroupSize))
-  const groups = Array.from({ length: groupCount }, (_, index) => ({
-    id: `group_${index + 1}`,
-    members: [],
-    name: `Grup ${index + 1}`,
-  }))
-
-  students.forEach((student) => {
-    const bestGroup = groups
-      .map((group) => ({
-        group,
-        score: getCooperativePlacementScore({
-          candidate: student,
-          group,
-          groupSize: cleanGroupSize,
-          prioritizeHalfGroups,
-          relations,
-          strategy,
-        }),
-      }))
-      .sort((a, b) => a.score - b.score || a.group.members.length - b.group.members.length)[0]?.group
-
-    bestGroup?.members.push(student)
-  })
-
-  return enrichCooperativeGroups(groups, relations)
-}
-
-function isSeatAdjacent(seatA, seatB) {
-  if (!seatA || !seatB) return false
-  return getSeatDistance(seatA, seatB) <= 1
-}
-
 function getSeatDistance(seatA, seatB) {
   if (!seatA || !seatB) return Number.POSITIVE_INFINITY
   return Math.abs((seatA.x ?? 0) - (seatB.x ?? 0)) + Math.abs((seatA.y ?? 0) - (seatB.y ?? 0))
 }
 
+function getSeatingZoneLabel(seat, rows = SEATING_GRID_ROWS) {
+  if (!seat) return 'sense lloc'
+  if (seat.y <= Math.max(1, Math.floor(rows / 3) - 1)) return 'zona davantera'
+  if (seat.y >= Math.max(2, rows - Math.ceil(rows / 3))) return 'zona posterior'
+  return 'zona central'
+}
+
+function getSeatingZoneId(seat, rows = SEATING_GRID_ROWS) {
+  const label = getSeatingZoneLabel(seat, rows)
+  if (label === 'zona davantera') return 'front'
+  if (label === 'zona posterior') return 'back'
+  return 'center'
+}
+
+function hasSeatingPair(pairs, studentIdA, studentIdB) {
+  return (pairs || []).some(
+    (pair) =>
+      (pair.studentId === studentIdA && pair.targetStudentId === studentIdB) ||
+      (pair.studentId === studentIdB && pair.targetStudentId === studentIdA),
+  )
+}
+
+function getSeatingPlacementContext({ placement, plan, prioritizeHalfGroups, relations }) {
+  if (!placement) {
+    return {
+      alerts: [],
+      nearby: [],
+      reasons: ['Aquest alumne està pendent de col·locar. Activa “Moure alumne” i tria una taula lliure.'],
+      zoneLabel: 'Pendent de col·locar',
+    }
+  }
+
+  const profile = placement.student
+  const nearby = (plan?.placements || [])
+    .filter((candidate) => candidate.studentId !== placement.studentId)
+    .map((candidate) => ({
+      distance: getSeatDistance(placement.seat, candidate.seat),
+      pair: summarizeCooperativePair(relations, placement.studentId, candidate.studentId),
+      placement: candidate,
+    }))
+    .filter((item) => item.distance <= 2)
+    .sort((a, b) => a.distance - b.distance || a.placement.student.student.name.localeCompare(b.placement.student.student.name, 'ca'))
+
+  const reasons = []
+  const alerts = []
+  const zoneLabel = getSeatingZoneLabel(placement.seat, plan?.rows)
+  if (prioritizeHalfGroups) reasons.push(`Manté el bloc de ${placement.halfGroup || 'mig grup'}.`)
+  if (profile.priorityScore >= 4 && placement.seat.y <= 1) {
+    reasons.push('Està davant perquè és un perfil prioritari i facilita el seguiment docent.')
+  } else if (profile.academicRisk && placement.seat.y <= 2) {
+    reasons.push('La posició facilita supervisió i suport acadèmic.')
+  }
+  if (placement.isStar) reasons.push('La zona central aprofita el seu potencial de suport i influència positiva.')
+  if (profile.supportLabel) reasons.push(`Perfil que demana ${profile.supportLabel.toLocaleLowerCase('ca')}.`)
+
+  const workNearby = nearby.filter((item) => item.pair.workInfluence > 0)
+  const supportiveNearby = nearby.filter((item) => item.pair.supportiveInfluence > 0)
+  if (workNearby.length > 0) reasons.push(`Té ${workNearby.length} vincle/s de treball útil/s a prop.`)
+  if (supportiveNearby.length > 0) reasons.push(`Té ${supportiveNearby.length} suport/s relacional/s proper/s.`)
+
+  nearby.forEach((item) => {
+    if (item.distance <= 1 && item.pair.hasAvoid) {
+      alerts.push(`Massa a prop de ${item.placement.student.student.name}, amb una relació a evitar.`)
+    }
+    if (item.distance <= 2 && placement.isConflict && item.placement.isConflict) {
+      alerts.push(`Proximitat amb ${item.placement.student.student.name}, també marcat per control de conducta.`)
+    }
+  })
+
+  if (reasons.length === 0) reasons.push(`Posició equilibrada a la ${zoneLabel}.`)
+
+  return {
+    alerts: [...new Set(alerts)],
+    nearby: nearby.slice(0, 4),
+    reasons: [...new Set(reasons)].slice(0, 4),
+    zoneLabel,
+  }
+}
+
 function buildTutorialSeatingPlan({
+  blockedSeatIds = [],
   layout,
   lockedStudentIds = [],
   manualEmptySeatIds = [],
@@ -1578,6 +2075,7 @@ function buildTutorialSeatingPlan({
   prioritizeHalfGroups,
   profilesByStudentId,
   relations,
+  restrictions = {},
   students,
   unseatedStudentIds = [],
   variant,
@@ -1585,6 +2083,7 @@ function buildTutorialSeatingPlan({
   const cleanLayout = normalizeSeatingLayout(layout)
   const activeSeatIds = new Set(cleanLayout.activeSeatIds)
   const manualEmptySeats = new Set(manualEmptySeatIds)
+  const blockedSeats = new Set(blockedSeatIds)
   const forcedUnseated = new Set(unseatedStudentIds)
   const lockedStudents = new Set(lockedStudentIds)
   const seats = []
@@ -1628,7 +2127,7 @@ function buildTutorialSeatingPlan({
     if (forcedUnseated.has(studentId)) return
     const student = profilesByStudentId.get(studentId)
     const seat = activeSeatMap.get(seatId)
-    if (!student || !seat || placed.some((placement) => placement.seat.id === seat.id)) return
+    if (!student || !seat || blockedSeats.has(seat.id) || placed.some((placement) => placement.seat.id === seat.id)) return
     placed.push({
       halfGroup: student.halfGroup,
       isConflict: student.isConflict,
@@ -1646,6 +2145,7 @@ function buildTutorialSeatingPlan({
     const availableSeats = seats.filter(
       (seat) =>
         seat.enabled &&
+        !blockedSeats.has(seat.id) &&
         !manualEmptySeats.has(seat.id) &&
         !placed.some((placement) => placement.seat.id === seat.id),
     )
@@ -1656,26 +2156,55 @@ function buildTutorialSeatingPlan({
           seat.y * 0.9 +
           ((seat.x + variantOffset * 2) % 5) * 0.3
         if (problemSeatsByStudentId[student.student.id] === seat.id) score += 1500
+        const preferredZone = restrictions.preferredZoneByStudentId?.[student.student.id]
+        const avoidedZone = restrictions.avoidedZoneByStudentId?.[student.student.id]
+        const seatZoneId = getSeatingZoneId(seat, cleanLayout.rows)
+        if (preferredZone) score += preferredZone === seatZoneId ? -90 : 65
+        if (avoidedZone === seatZoneId) score += 240
         if (prioritizeHalfGroups) {
           score += seat.zone === halfGroupZone.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
         }
         if (student.academicRisk && !student.isStar) score += seat.y * 1.1
+        if (student.priorityScore >= 4 || ['Aïllat', 'Rebutjat'].includes(student.sociometricCategory)) {
+          score += seat.y * 1.8
+        }
         if (student.isStar) score += Math.abs(seat.x - 4) * 0.55
+        if (student.sociometricCategory === 'Líder') score += Math.abs(seat.x - 4) * 0.35
         placed.forEach((placement) => {
           const distance = getSeatDistance(seat, placement.seat)
           const adjacent = distance <= 1
           const near = distance <= 2
-          const relation = relationBetween(relations, student.student.id, placement.student.student.id)
+          const pairSummary = summarizeCooperativePair(relations, student.student.id, placement.student.student.id)
+          const mustSeparate = hasSeatingPair(
+            restrictions.neverNearPairs,
+            student.student.id,
+            placement.student.student.id,
+          )
+          const shouldBeNear = hasSeatingPair(
+            restrictions.preferNearPairs,
+            student.student.id,
+            placement.student.student.id,
+          )
           const isAcademicSupportPair =
             (student.isStar && placement.student.academicRisk) ||
             (placement.student.isStar && student.academicRisk)
+          const isVulnerablePair = isVulnerableSeatingProfile(student) || isVulnerableSeatingProfile(placement.student)
+          const isSupportPair = isSupportiveSeatingProfile(student) || isSupportiveSeatingProfile(placement.student)
           if (student.isConflict && placement.student.isConflict && near) score += 10000
-          if (relation?.type === 'avoid') score += near ? 700 : 90
-          if (adjacent && relation?.type === 'friendship') score += 10
-          if (near && relation?.type === 'positive') {
-            score -= relation.isSynthetic ? (isAcademicSupportPair ? 32 : 0) : 12
+          if (mustSeparate && near) score += 20000
+          if (shouldBeNear) score += adjacent ? -150 : near ? -90 : 55
+          if (pairSummary.hasAvoid) score += near ? 700 + pairSummary.avoidInfluence * 90 : 90
+          if (adjacent && pairSummary.socialInfluence > 0 && pairSummary.workInfluence === 0) score += 10
+          if (near && pairSummary.workInfluence > 0) {
+            score -= isAcademicSupportPair ? 28 : 14
+          }
+          if (near && pairSummary.supportiveInfluence > 0 && isVulnerablePair && isSupportPair) {
+            score -= adjacent ? 42 : 24
           }
           if (isAcademicSupportPair) score -= adjacent ? 58 : near ? 28 : 8
+          if (adjacent && isInfluentialSeatingProfile(student) && isInfluentialSeatingProfile(placement.student)) {
+            score += 26
+          }
         })
         score += (getStableStudentNumber(`${student.student.id}_${seat.id}`, variantOffset) % 11) * 0.08
         return { score, seat }
@@ -1708,8 +2237,34 @@ function buildTutorialSeatingPlan({
     warnings.push('No s’ha pogut mantenir algun alumne dins del bloc del seu mig grup.')
   }
   placed.forEach((placement, index) => {
+    const preferredZone = restrictions.preferredZoneByStudentId?.[placement.studentId]
+    const avoidedZone = restrictions.avoidedZoneByStudentId?.[placement.studentId]
+    const actualZone = getSeatingZoneId(placement.seat, cleanLayout.rows)
+    if (preferredZone && preferredZone !== actualZone) {
+      warnings.push(`${placement.student.student.name} no ha quedat a la seva zona preferent.`)
+    }
+    if (avoidedZone && avoidedZone === actualZone) {
+      warnings.push(`${placement.student.student.name} ha quedat en una zona que cal evitar.`)
+    }
     placed.slice(index + 1).forEach((otherPlacement) => {
-      if (!isSeatAdjacent(placement.seat, otherPlacement.seat)) return
+      const distance = getSeatDistance(placement.seat, otherPlacement.seat)
+      if (
+        hasSeatingPair(restrictions.neverNearPairs, placement.studentId, otherPlacement.studentId) &&
+        distance <= 2
+      ) {
+        warnings.push(
+          `${placement.student.student.name} i ${otherPlacement.student.student.name} tenen una restricció de “mai a prop”.`,
+        )
+      }
+      if (
+        hasSeatingPair(restrictions.preferNearPairs, placement.studentId, otherPlacement.studentId) &&
+        distance > 2
+      ) {
+        warnings.push(
+          `${placement.student.student.name} i ${otherPlacement.student.student.name} haurien d’estar més a prop.`,
+        )
+      }
+      if (distance > 1) return
       const relation = relationBetween(relations, placement.student.student.id, otherPlacement.student.student.id)
       if (relation?.type === 'avoid') {
         warnings.push(
@@ -2559,7 +3114,7 @@ function TutorialSubjectAverageChart({ subjects }) {
   )
 }
 
-function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow }) {
+function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow, sociometricReport }) {
   const [tutorComment, setTutorComment] = useState('')
   const [reportAreaFilter, setReportAreaFilter] = useState('all')
   const [reportSubjectFilter, setReportSubjectFilter] = useState('all')
@@ -2570,6 +3125,7 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
     trackingSummary: true,
     trackingEvidence: true,
     tutorComment: true,
+    sociometric: true,
   })
   if (!profile) return null
 
@@ -2691,6 +3247,14 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
                 type="checkbox"
               />
               Comentari del tutor
+            </label>
+            <label>
+              <input
+                checked={printSections.sociometric}
+                onChange={() => togglePrintSection('sociometric')}
+                type="checkbox"
+              />
+              Sociometria
             </label>
           </div>
           <div className="tutorial-report-filter-grid">
@@ -2892,6 +3456,13 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
           </section>
         )}
 
+        {printSections.sociometric && (
+          <section className="tutorial-profile-sociometric-section">
+            <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+            <SociometricStudentInsightCard report={sociometricReport} />
+          </section>
+        )}
+
         {printSections.competencyDetail && (
           <section>
             <h3 className="tutorial-profile-section-title">Detall de competències</h3>
@@ -3057,7 +3628,7 @@ export function TutoringView() {
     sourceStudentId: '',
     targetStudentId: '',
     type: 'positive',
-    strength: '2',
+    strength: '3',
     note: '',
   })
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
@@ -3065,7 +3636,17 @@ export function TutoringView() {
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
   const [sociometricPasteText, setSociometricPasteText] = useState('')
   const [sociometricImportMessage, setSociometricImportMessage] = useState('')
+  const [sociometricSurveyMessage, setSociometricSurveyMessage] = useState('')
+  const [sociometricSurveyBusy, setSociometricSurveyBusy] = useState('')
+  const [sociometricResponseCounts, setSociometricResponseCounts] = useState({})
+  const [selectedSociometricReportType, setSelectedSociometricReportType] = useState('quick')
+  const [selectedSociometricReportStudentId, setSelectedSociometricReportStudentId] = useState('')
+  const [selectedSociometricComparisonEnd, setSelectedSociometricComparisonEnd] = useState('current')
+  const [selectedSociometricComparisonStart, setSelectedSociometricComparisonStart] = useState('')
+  const [sociometricReportSections, setSociometricReportSections] = useState(DEFAULT_SOCIOMETRIC_REPORT_SECTIONS.quick)
+  const [selectedSociometricReportStudentIds, setSelectedSociometricReportStudentIds] = useState([])
   const [sociogramFilter, setSociogramFilter] = useState('all')
+  const [sociogramOnlyReciprocal, setSociogramOnlyReciprocal] = useState(false)
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
@@ -3085,6 +3666,18 @@ export function TutoringView() {
   const [seatingPlanName, setSeatingPlanName] = useState('')
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
+  const [selectedSeatingStudentId, setSelectedSeatingStudentId] = useState('')
+  const [seatingMoveStudentId, setSeatingMoveStudentId] = useState('')
+  const [seatingBlockSeatMode, setSeatingBlockSeatMode] = useState(false)
+  const [seatingRestrictionTargetId, setSeatingRestrictionTargetId] = useState('')
+  const [seatingQualityBaseline, setSeatingQualityBaseline] = useState(null)
+  const [seatingRestrictions, setSeatingRestrictions] = useState({
+    avoidedZoneByStudentId: {},
+    blockedSeatIds: [],
+    neverNearPairs: [],
+    preferredZoneByStudentId: {},
+    preferNearPairs: [],
+  })
   const [shareTutoringEmail, setShareTutoringEmail] = useState('')
   const [shareTutoringMessage, setShareTutoringMessage] = useState('')
   const [shareTutoringBusy, setShareTutoringBusy] = useState('')
@@ -3100,7 +3693,9 @@ export function TutoringView() {
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
   const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
+  const sociometricSurveys = useAvaluaproStore((state) => state.sociometricSurveys)
   const tutorialGroupSets = useAvaluaproStore((state) => state.tutorialGroupSets)
+  const tutorialSociometricMoments = useAvaluaproStore((state) => state.tutorialSociometricMoments)
   const tutorialSociogramLayouts = useAvaluaproStore((state) => state.tutorialSociogramLayouts)
   const tutorialStudentRoles = useAvaluaproStore((state) => state.tutorialStudentRoles)
   const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
@@ -3111,6 +3706,10 @@ export function TutoringView() {
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
   const importTutorialRelations = useAvaluaproStore((state) => state.importTutorialRelations)
+  const createSociometricSurvey = useAvaluaproStore((state) => state.createSociometricSurvey)
+  const setSociometricSurveyStatus = useAvaluaproStore((state) => state.setSociometricSurveyStatus)
+  const syncSociometricSurveyResponses = useAvaluaproStore((state) => state.syncSociometricSurveyResponses)
+  const captureTutorialSociometricMoment = useAvaluaproStore((state) => state.captureTutorialSociometricMoment)
   const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
   const upsertTutorialSociogramLayout = useAvaluaproStore((state) => state.upsertTutorialSociogramLayout)
@@ -3134,6 +3733,29 @@ export function TutoringView() {
     () => tutorialRelations.filter((relation) => relation.classId === activeClassId),
     [activeClassId, tutorialRelations],
   )
+  const classSociometricSurveys = useMemo(
+    () =>
+      (sociometricSurveys || [])
+        .filter((survey) => survey.classId === activeClassId)
+        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
+    [activeClassId, sociometricSurveys],
+  )
+  const classTutorialSociometricMoments = useMemo(
+    () =>
+      (tutorialSociometricMoments || [])
+        .filter((moment) => moment.classId === activeClassId)
+        .sort((a, b) => String(a.capturedAt || a.createdAt || '').localeCompare(String(b.capturedAt || b.createdAt || ''))),
+    [activeClassId, tutorialSociometricMoments],
+  )
+  const activeSociometricSurvey =
+    classSociometricSurveys.find((survey) => survey.status === 'active') || classSociometricSurveys[0] || null
+  const activeSociometricSurveyUrl = activeSociometricSurvey
+    ? `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${activeSociometricSurvey.id}`
+    : ''
+  const activeSociometricResponseCount =
+    activeSociometricSurvey?.id && Object.prototype.hasOwnProperty.call(sociometricResponseCounts, activeSociometricSurvey.id)
+      ? sociometricResponseCounts[activeSociometricSurvey.id]
+      : activeSociometricSurvey?.responseCount || 0
   const classTutorialStudentRoles = useMemo(
     () => (tutorialStudentRoles || []).filter((role) => role.classId === activeClassId),
     [activeClassId, tutorialStudentRoles],
@@ -3389,6 +4011,115 @@ export function TutoringView() {
     () => summarizeSociometricMetrics({ students: classStudents, relations: classTutorialRelations }),
     [classStudents, classTutorialRelations],
   )
+  const sociometricComparisonMomentsById = useMemo(
+    () => new Map(classTutorialSociometricMoments.map((moment) => [moment.id, moment])),
+    [classTutorialSociometricMoments],
+  )
+  const sociometricComparisonOptions = useMemo(() => {
+    if (classTutorialSociometricMoments.length > 0) {
+      return classTutorialSociometricMoments.map((moment, index) => ({
+        count: moment.relationCount || moment.relationsSnapshot?.length || 0,
+        label: `${index === 0 ? 'Primer moment' : `Moment ${index + 1}`} · ${formatShortDate(
+          String(moment.capturedAt || moment.createdAt || '').slice(0, 10),
+        )} · ${moment.label || 'Moment guardat'} · ${moment.relationCount || moment.relationsSnapshot?.length || 0} rel.`,
+        source: moment.source || 'manual',
+        timestamp: moment.capturedAt || moment.createdAt || '',
+        value: `moment:${moment.id}`,
+      }))
+    }
+
+    const timestampMap = new Map()
+    classTutorialRelations.forEach((relation) => {
+      const timestamp = getSociometricRelationTimestamp(relation)
+      if (!timestamp) return
+      const current = timestampMap.get(timestamp) || {
+        count: 0,
+        label: formatShortDate(timestamp.slice(0, 10)),
+        timestamp,
+        value: timestamp,
+      }
+      current.count += 1
+      timestampMap.set(timestamp, current)
+    })
+
+    return [...timestampMap.values()]
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+      .map((item, index) => ({
+        ...item,
+        isLegacy: true,
+        label: `${index === 0 ? 'Primer moment' : `Moment ${index + 1}`} · ${item.label} · ${item.count} rel.`,
+        value: `legacy:${item.value}`,
+      }))
+  }, [classTutorialRelations, classTutorialSociometricMoments])
+  const effectiveSociometricComparisonStart =
+    selectedSociometricComparisonStart || sociometricComparisonOptions[0]?.value || 'current'
+  const effectiveSociometricComparisonEnd =
+    selectedSociometricComparisonEnd === 'current'
+      ? 'current'
+      : selectedSociometricComparisonEnd || sociometricComparisonOptions.at(-1)?.value || 'current'
+  const sociometricComparisonStartRelations = useMemo(
+    () =>
+      getSociometricComparisonRelations({
+        currentRelations: classTutorialRelations,
+        momentsById: sociometricComparisonMomentsById,
+        value: effectiveSociometricComparisonStart,
+      }),
+    [classTutorialRelations, effectiveSociometricComparisonStart, sociometricComparisonMomentsById],
+  )
+  const sociometricComparisonEndRelations = useMemo(
+    () =>
+      getSociometricComparisonRelations({
+        currentRelations: classTutorialRelations,
+        momentsById: sociometricComparisonMomentsById,
+        value: effectiveSociometricComparisonEnd,
+      }),
+    [classTutorialRelations, effectiveSociometricComparisonEnd, sociometricComparisonMomentsById],
+  )
+  const sociometricComparisonStartMetrics = useMemo(
+    () => summarizeSociometricMetrics({ students: classStudents, relations: sociometricComparisonStartRelations }),
+    [classStudents, sociometricComparisonStartRelations],
+  )
+  const sociometricComparisonEndMetrics = useMemo(
+    () => summarizeSociometricMetrics({ students: classStudents, relations: sociometricComparisonEndRelations }),
+    [classStudents, sociometricComparisonEndRelations],
+  )
+  const sociometricComparativeReport = useMemo(
+    () =>
+      buildSociometricComparisonReport({
+        endMetrics: sociometricComparisonEndMetrics,
+        startMetrics: sociometricComparisonStartMetrics,
+        students: classStudents,
+      }),
+    [classStudents, sociometricComparisonEndMetrics, sociometricComparisonStartMetrics],
+  )
+  const sociometricImpactReport = useMemo(
+    () =>
+      buildSociometricImpactReport({
+        comparisonReport: sociometricComparativeReport,
+        endTimestamp: getSociometricComparisonOptionTimestamp(
+          effectiveSociometricComparisonEnd,
+          sociometricComparisonMomentsById,
+        ),
+        groupSets: classTutorialGroupSets,
+        relations: classTutorialRelations,
+        seatingPlans: classTutorialSeatingPlans,
+        startTimestamp: getSociometricComparisonOptionTimestamp(
+          effectiveSociometricComparisonStart,
+          sociometricComparisonMomentsById,
+        ),
+        tutorialRecords: classTutorialRecords,
+      }),
+    [
+      classTutorialGroupSets,
+      classTutorialRecords,
+      classTutorialRelations,
+      classTutorialSeatingPlans,
+      effectiveSociometricComparisonEnd,
+      effectiveSociometricComparisonStart,
+      sociometricComparisonMomentsById,
+      sociometricComparativeReport,
+    ],
+  )
   const tutorialRecordRowsByStudent = useMemo(
     () => new Map(tutorialRecordSummary.studentRows.map((row) => [row.student.id, row])),
     [tutorialRecordSummary.studentRows],
@@ -3406,6 +4137,10 @@ export function TutoringView() {
       }),
     [diagnosisSummary, tutorialRecordRowsByStudent, tutorialRecordSummary],
   )
+  const sociometricRowsByStudentId = useMemo(
+    () => new Map(sociometricMetrics.rows.map((row) => [row.student.id, row])),
+    [sociometricMetrics.rows],
+  )
   const cooperativeProfilesByStudentId = useMemo(
     () =>
       new Map(
@@ -3416,10 +4151,17 @@ export function TutoringView() {
             recordRow: tutorialRecordRowsByStudent.get(profile.student.id),
             relationRow: tutorialRelationRowsByStudent.get(profile.student.id),
             roleRow: tutorialRoleRowsByStudent.get(profile.student.id),
+            sociometricRow: sociometricRowsByStudentId.get(profile.student.id),
           }),
         ]),
       ),
-    [tutorialRecordRowsByStudent, tutorialRelationRowsByStudent, tutorialRoleRowsByStudent, tutorialSummary.studentProfiles],
+    [
+      sociometricRowsByStudentId,
+      tutorialRecordRowsByStudent,
+      tutorialRelationRowsByStudent,
+      tutorialRoleRowsByStudent,
+      tutorialSummary.studentProfiles,
+    ],
   )
   const selectedTutorialProfile = tutorialSummary.studentProfiles.find(
     (profile) => profile.student.id === selectedTutorialProfileId,
@@ -3436,10 +4178,274 @@ export function TutoringView() {
   const selectedRelationRow =
     tutorialRelationSummary.studentRows.find((row) => row.student.id === selectedRelationStudentId) ||
     tutorialRelationSummary.studentRows[0]
-  const sociometricRowsByStudentId = useMemo(
-    () => new Map(sociometricMetrics.rows.map((row) => [row.student.id, row])),
-    [sociometricMetrics.rows],
+  const selectedSociometricReportTypeMeta =
+    SOCIOMETRIC_REPORT_TYPES.find((reportType) => reportType.id === selectedSociometricReportType) ||
+    SOCIOMETRIC_REPORT_TYPES[0]
+  const SelectedSociometricReportIcon = selectedSociometricReportTypeMeta.icon
+  const sociometricReportDate = getTodayDateInput()
+  const sociometricReportSnapshot = useMemo(() => {
+    const rows = sociometricMetrics.rows || []
+    const rejectedRows = rows
+      .filter((row) => row.category === 'Rebutjat')
+      .sort((a, b) => b.avoidReceived - a.avoidReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const isolatedRows = rows
+      .filter((row) => row.category === 'Aïllat')
+      .sort((a, b) => a.positiveReceived - b.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const leaderRows = rows
+      .filter((row) => row.category === 'Líder')
+      .sort((a, b) => b.positiveReceived - a.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const priorityNames = [...rejectedRows, ...isolatedRows].slice(0, 4).map((row) => row.student.name)
+
+    return {
+      leaderCount: leaderRows.length,
+      priorityCount: rejectedRows.length + isolatedRows.length,
+      priorityNames,
+      relationCount: classTutorialRelations.length,
+    }
+  }, [classTutorialRelations.length, sociometricMetrics.rows])
+  const sociometricQuickReport = useMemo(() => {
+    const rows = sociometricMetrics.rows || []
+    const rejectedRows = rows
+      .filter((row) => row.category === 'Rebutjat')
+      .sort((a, b) => b.avoidReceived - a.avoidReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const isolatedRows = rows
+      .filter((row) => row.category === 'Aïllat')
+      .sort((a, b) => a.positiveReceived - b.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const leaderRows = rows
+      .filter((row) => row.category === 'Líder')
+      .sort((a, b) => b.positiveReceived - a.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const riskLeaderRows = rows
+      .filter(
+        (row) =>
+          row.category === 'Controvertit' ||
+          (row.positiveReceived >= 2 && row.avoidReceived > 0 && row.category !== 'Rebutjat'),
+      )
+      .sort((a, b) => b.avoidReceived - a.avoidReceived || b.positiveReceived - a.positiveReceived)
+    const hasData = classTutorialRelations.length > 0
+    const healthScore = Math.round(
+      sociometricMetrics.inclusion * 0.35 +
+        sociometricMetrics.positivity * 0.25 +
+        sociometricMetrics.moreno * 0.2 +
+        Math.max(0, 100 - sociometricMetrics.rejectionDensity * 4) * 0.2,
+    )
+    const healthTone = !hasData ? 'neutral' : healthScore >= 70 ? 'positive' : healthScore >= 45 ? 'warning' : 'danger'
+    const healthLabel = !hasData
+      ? 'Pendent de dades'
+      : healthTone === 'positive'
+        ? 'Estable'
+        : healthTone === 'warning'
+          ? 'A revisar'
+          : 'Prioritari'
+    const actions = []
+
+    if (!hasData) {
+      actions.push('Envia el qüestionari sociomètric i sincronitza respostes abans de prendre decisions de grup.')
+    }
+    if (rejectedRows.length > 0) {
+      actions.push(`Contrasta el cas de ${rejectedRows[0].student.name} abans de fer grups o canvis de lloc.`)
+    }
+    if (isolatedRows.length > 0) {
+      actions.push(`Assigna una parella pont a ${isolatedRows[0].student.name} en una activitat curta i observada.`)
+    }
+    if (riskLeaderRows.length > 0) {
+      actions.push(`Canalitza el lideratge de ${riskLeaderRows[0].student.name} amb una responsabilitat constructiva.`)
+    }
+    if (leaderRows.length > 0) {
+      actions.push(`Fes servir ${leaderRows[0].student.name} com a suport positiu sense exposar-lo com a “ajudant oficial”.`)
+    }
+    if (sociometricMetrics.moreno < 20 && hasData) {
+      actions.push('Programa una dinàmica breu per augmentar reciprocitats: parelles rotatives o tasca cooperativa guiada.')
+    }
+    if (sociometricMetrics.workRelationCount === 0) {
+      actions.push('Afegeix criteri docent de treball per separar el mapa social de les parelles que funcionen a classe.')
+    }
+    actions.push('Revisa el sociograma després de dues setmanes per comprovar si baixen els rebuigs i augmenta la inclusió.')
+
+    return {
+      actions: actions.slice(0, 3),
+      hasData,
+      healthLabel,
+      healthScore,
+      healthTone,
+      isolatedRows,
+      leaderRows,
+      rejectedRows,
+      riskLeaderRows,
+    }
+  }, [classTutorialRelations.length, sociometricMetrics])
+  const sociometricCompleteReport = useMemo(() => {
+    const rows = sociometricMetrics.rows || []
+    const hasData = classTutorialRelations.length > 0
+    const rejectedRows = rows
+      .filter((row) => row.category === 'Rebutjat')
+      .sort((a, b) => b.avoidReceived - a.avoidReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const isolatedRows = rows
+      .filter((row) => row.category === 'Aïllat')
+      .sort((a, b) => a.positiveReceived - b.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const acceptedRows = rows
+      .filter((row) => row.category === 'Acceptat')
+      .sort((a, b) => b.positiveReceived - a.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const leaderRows = rows
+      .filter((row) => row.category === 'Líder')
+      .sort((a, b) => b.positiveReceived - a.positiveReceived || a.student.name.localeCompare(b.student.name, 'ca'))
+    const riskLeaderRows = rows
+      .filter(
+        (row) =>
+          row.category === 'Controvertit' ||
+          (row.positiveReceived >= 2 && row.avoidReceived > 0 && row.category !== 'Rebutjat'),
+      )
+      .sort((a, b) => b.avoidReceived - a.avoidReceived || b.positiveReceived - a.positiveReceived)
+    const workRows = tutorialRelationSummary.studentRows
+      .filter((row) => row.workPositiveCount > 0)
+      .sort((a, b) => b.workPositiveCount - a.workPositiveCount || a.student.name.localeCompare(b.student.name, 'ca'))
+    const alertItems = []
+
+    if (!hasData) {
+      alertItems.push({
+        tone: 'warning',
+        title: 'Encara falten dades sociomètriques',
+        text: 'Comparteix el qüestionari o registra observacions docents abans de tancar conclusions.',
+      })
+    }
+    if (rejectedRows.length > 0) {
+      alertItems.push({
+        tone: 'danger',
+        title: `${rejectedRows.length} alumne/s amb rebuig significatiu`,
+        text: rejectedRows.slice(0, 3).map((row) => row.student.name).join(', '),
+      })
+    }
+    if (isolatedRows.length > 0) {
+      alertItems.push({
+        tone: 'warning',
+        title: `${isolatedRows.length} alumne/s amb poca connexió`,
+        text: isolatedRows.slice(0, 3).map((row) => row.student.name).join(', '),
+      })
+    }
+    if (riskLeaderRows.length > 0) {
+      alertItems.push({
+        tone: 'warning',
+        title: 'Lideratges que convé canalitzar',
+        text: riskLeaderRows.slice(0, 3).map((row) => row.student.name).join(', '),
+      })
+    }
+    if (sociometricMetrics.workRelationCount === 0) {
+      alertItems.push({
+        tone: 'neutral',
+        title: 'Mapa de treball pendent',
+        text: 'Afegeix criteri docent per diferenciar amistat, bon funcionament a classe i incompatibilitats.',
+      })
+    }
+    if (alertItems.length === 0) {
+      alertItems.push({
+        tone: 'positive',
+        title: 'Sense alertes crítiques',
+        text: 'Mantén observació ordinària i revisa el mapa després de les properes activitats cooperatives.',
+      })
+    }
+
+    const socialReading =
+      !hasData
+        ? 'Encara no hi ha prou dades per interpretar el mapa social del grup.'
+        : rejectedRows.length > 0
+          ? 'El grup té alguns vincles de rebuig que cal tractar abans de fer agrupaments sensibles.'
+          : isolatedRows.length > 0
+            ? 'La lectura principal és la inclusió: hi ha alumnes amb poques connexions visibles.'
+            : sociometricMetrics.inclusion >= 70
+              ? 'El grup mostra una xarxa social prou integrada i sense senyals extremes dominants.'
+              : 'La xarxa encara és feble: cal augmentar oportunitats de relació segura i estructurada.'
+    const workReading =
+      sociometricMetrics.workRelationCount === 0
+        ? 'No hi ha prou criteri docent de treball. El sociograma social pot servir, però no substitueix saber qui treballa bé amb qui.'
+        : `Hi ha ${sociometricMetrics.workRelationCount} relacions de treball registrades. Són especialment útils per formar parelles pont i grups cooperatius.`
+    const interventionPlan = [
+      rejectedRows.length > 0
+        ? `Contrastar el cas de ${rejectedRows[0].student.name} amb observacions d’aula i evitar exposicions públiques.`
+        : 'Mantenir agrupaments diversos sense convertir el sociograma en una etiqueta fixa.',
+      isolatedRows.length > 0
+        ? `Crear una parella pont per a ${isolatedRows[0].student.name} en una tasca curta i observable.`
+        : 'Fer rotació de parelles breu per conservar connexions positives.',
+      riskLeaderRows.length > 0
+        ? `Donar a ${riskLeaderRows[0].student.name} una responsabilitat positiva i acotada.`
+        : 'Reforçar lideratges positius sense assenyalar alumnes davant del grup.',
+      sociometricMetrics.workRelationCount === 0
+        ? 'Registrar 5-8 relacions de treball des del criteri docent abans de preparar grups estables.'
+        : 'Fer servir el mapa de treball per decidir suports, no només amistats.',
+    ]
+
+    return {
+      acceptedRows,
+      alertItems,
+      hasData,
+      interventionPlan,
+      isolatedRows,
+      leaderRows,
+      rejectedRows,
+      riskLeaderRows,
+      socialReading,
+      workReading,
+      workRows,
+    }
+  }, [classTutorialRelations.length, sociometricMetrics, tutorialRelationSummary.studentRows])
+  const sociometricIndividualReports = useMemo(() => {
+    return buildSociometricStudentReports({
+      categoryMetaByName: SOCIOMETRIC_CATEGORY_META,
+      relations: tutorialRelationSummary.enrichedRelations,
+      sociometricRows: sociometricMetrics.rows,
+      students: classStudents,
+      tutorialRelationRowsByStudent,
+    })
+  }, [classStudents, sociometricMetrics.rows, tutorialRelationRowsByStudent, tutorialRelationSummary.enrichedRelations])
+  const sociometricIndividualReportsByStudentId = useMemo(
+    () => new Map(sociometricIndividualReports.map((report) => [report.student.id, report])),
+    [sociometricIndividualReports],
   )
+  const selectedSociometricIndividualReportIds = new Set(selectedSociometricReportStudentIds)
+  const visibleSociometricIndividualReports =
+    selectedSociometricReportStudentIds.length > 0
+      ? sociometricIndividualReports.filter((report) => selectedSociometricIndividualReportIds.has(report.student.id))
+      : sociometricIndividualReports
+  const selectedSociometricIndividualPreviewReport =
+    visibleSociometricIndividualReports.find((report) => report.student.id === selectedSociometricReportStudentId) ||
+    visibleSociometricIndividualReports[0]
+  const activeSociometricReportSections = SOCIOMETRIC_REPORT_SECTIONS.filter(
+    (section) => sociometricReportSections[section.id],
+  )
+  const estimatedSociometricReportPages =
+    selectedSociometricReportType === 'individual'
+      ? Math.max(1, visibleSociometricIndividualReports.length)
+      : Math.max(
+          1,
+          activeSociometricReportSections.reduce((total, section) => total + section.pages, 0),
+        )
+  const handleSelectSociometricReportType = (reportTypeId) => {
+    setSelectedSociometricReportType(reportTypeId)
+    setSociometricReportSections(DEFAULT_SOCIOMETRIC_REPORT_SECTIONS[reportTypeId] || DEFAULT_SOCIOMETRIC_REPORT_SECTIONS.quick)
+  }
+  const handleToggleSociometricReportSection = (section) => {
+    if (section.required) return
+    setSociometricReportSections((current) => ({
+      ...current,
+      [section.id]: !current[section.id],
+    }))
+  }
+  const handleToggleSociometricReportStudent = (studentId) => {
+    setSelectedSociometricReportStudentIds((current) => {
+      const baseSelection = current.length > 0 ? current : sociometricIndividualReports.map((report) => report.student.id)
+      return baseSelection.includes(studentId)
+        ? baseSelection.filter((id) => id !== studentId)
+        : [...baseSelection, studentId]
+    })
+  }
+  const handleSelectPriorityReportStudents = () => {
+    const priorityIds = sociometricIndividualReports
+      .filter((report) => ['Rebutjat', 'Aïllat', 'Controvertit'].includes(report.category))
+      .map((report) => report.student.id)
+    setSelectedSociometricReportStudentIds(priorityIds.length > 0 ? priorityIds : sociometricIndividualReports.slice(0, 6).map((report) => report.student.id))
+  }
+  const printSelectedSociometricStudentReport = () => {
+    if (!selectedSociometricIndividualPreviewReport) return
+    printSociometricReport('sociometric-single-student-printing')
+  }
   const selectedSociometricRow = selectedRelationRow
     ? sociometricRowsByStudentId.get(selectedRelationRow.student.id)
     : null
@@ -3447,10 +4453,12 @@ export function TutoringView() {
     () =>
       buildTutorialSociogramMap({
         filter: sociogramFilter,
+        onlyReciprocal: sociogramOnlyReciprocal,
         positionsByStudentId: sociogramPositionsByStudentId,
         relations: tutorialRelationSummary.enrichedRelations,
         roleRowsByStudent: tutorialRoleRowsByStudent,
         selectedStudentId: selectedRelationRow?.student.id,
+        sociometricRows: sociometricMetrics.rows,
         studentRows: tutorialRelationSummary.studentRows,
         students: classStudents,
       }),
@@ -3458,7 +4466,9 @@ export function TutoringView() {
       classStudents,
       selectedRelationRow?.student.id,
       sociogramFilter,
+      sociogramOnlyReciprocal,
       sociogramPositionsByStudentId,
+      sociometricMetrics.rows,
       tutorialRelationSummary.enrichedRelations,
       tutorialRoleRowsByStudent,
       tutorialRelationSummary.studentRows,
@@ -3474,6 +4484,7 @@ export function TutoringView() {
         relationRowsByStudent: tutorialRelationRowsByStudent,
         relations: effectiveTutorialRelations,
         roleRowsByStudent: tutorialRoleRowsByStudent,
+        sociometricRowsByStudentId,
         strategy: cooperativeStrategy,
       }),
     [
@@ -3481,6 +4492,7 @@ export function TutoringView() {
       cooperativeStrategy,
       effectiveTutorialRelations,
       prioritizeHalfGroups,
+      sociometricRowsByStudentId,
       tutorialRecordRowsByStudent,
       tutorialRelationRowsByStudent,
       tutorialRoleRowsByStudent,
@@ -3520,6 +4532,7 @@ export function TutoringView() {
   const generatedSeatingPlan = useMemo(
     () =>
       buildTutorialSeatingPlan({
+        blockedSeatIds: seatingRestrictions.blockedSeatIds,
         layout: seatingLayout,
         lockedStudentIds: seatingLockedStudentIds,
         manualEmptySeatIds: seatingManualEmptySeatIds,
@@ -3528,6 +4541,7 @@ export function TutoringView() {
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
+        restrictions: seatingRestrictions,
         students: classStudents,
         unseatedStudentIds: seatingUnseatedStudentIds,
         variant: seatingVariant,
@@ -3542,6 +4556,7 @@ export function TutoringView() {
       seatingManualEmptySeatIds,
       seatingManualSeatByStudentId,
       seatingPrioritizeHalfGroups,
+      seatingRestrictions,
       seatingUnseatedStudentIds,
       seatingVariant,
     ],
@@ -3551,6 +4566,16 @@ export function TutoringView() {
   const visibleSeatingPlan = selectedSeatingPlan
     ? materializeSavedSeatingPlan({ plan: selectedSeatingPlan, profilesByStudentId: cooperativeProfilesByStudentId })
     : generatedSeatingPlan
+  const seatingPlanAnalysis = useMemo(
+    () =>
+      analyzeTutorialSeatingPlan({
+        getSeatDistance,
+        plan: visibleSeatingPlan,
+        relations: effectiveTutorialRelations,
+        restrictions: seatingRestrictions,
+      }),
+    [effectiveTutorialRelations, seatingRestrictions, visibleSeatingPlan],
+  )
   const seatingCapacity = getSeatingCapacity(seatingLayout)
   const hasRelationChangesAfterSeatingSave = Boolean(
     classTutorialSeatingPlan &&
@@ -3559,6 +4584,46 @@ export function TutoringView() {
       ),
   )
   const seatingReviewRows = visibleSeatingPlan.placements.filter((placement) => seatingProblemSeats[placement.studentId])
+  const selectedSeatingProfile = selectedSeatingStudentId
+    ? cooperativeProfilesByStudentId.get(selectedSeatingStudentId) || null
+    : null
+  const selectedSeatingPlacement =
+    visibleSeatingPlan.placements.find((placement) => placement.studentId === selectedSeatingStudentId) || null
+  const selectedSeatingIsLocked = Boolean(
+    selectedSeatingPlacement?.isLocked || seatingLockedStudentIds.includes(selectedSeatingStudentId),
+  )
+  const selectedSeatingNeedsReview = Boolean(seatingProblemSeats[selectedSeatingStudentId])
+  const selectedPreferredZone = seatingRestrictions.preferredZoneByStudentId[selectedSeatingStudentId] || ''
+  const selectedAvoidedZone = seatingRestrictions.avoidedZoneByStudentId[selectedSeatingStudentId] || ''
+  const selectedNeverNearIds = seatingRestrictions.neverNearPairs
+    .filter((pair) => pair.studentId === selectedSeatingStudentId || pair.targetStudentId === selectedSeatingStudentId)
+    .map((pair) => (pair.studentId === selectedSeatingStudentId ? pair.targetStudentId : pair.studentId))
+  const selectedPreferNearIds = seatingRestrictions.preferNearPairs
+    .filter((pair) => pair.studentId === selectedSeatingStudentId || pair.targetStudentId === selectedSeatingStudentId)
+    .map((pair) => (pair.studentId === selectedSeatingStudentId ? pair.targetStudentId : pair.studentId))
+  const seatingRestrictionCount =
+    seatingRestrictions.neverNearPairs.length +
+    seatingRestrictions.preferNearPairs.length +
+    Object.keys(seatingRestrictions.preferredZoneByStudentId).length +
+    Object.keys(seatingRestrictions.avoidedZoneByStudentId).length +
+    seatingLockedStudentIds.length +
+    seatingRestrictions.blockedSeatIds.length
+  const seatingQualityComparison = seatingQualityBaseline
+    ? {
+        conflictDelta: seatingPlanAnalysis.conflicts.length - seatingQualityBaseline.conflictCount,
+        scoreDelta: seatingPlanAnalysis.score - seatingQualityBaseline.score,
+      }
+    : null
+  const selectedSeatingContext = useMemo(
+    () =>
+      getSeatingPlacementContext({
+        placement: selectedSeatingPlacement,
+        plan: visibleSeatingPlan,
+        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
+        relations: effectiveTutorialRelations,
+      }),
+    [effectiveTutorialRelations, seatingPrioritizeHalfGroups, selectedSeatingPlacement, visibleSeatingPlan],
+  )
   const filteredTutorialProfiles = useMemo(
     () =>
       tutorialSummary.studentProfiles
@@ -3619,6 +4684,8 @@ export function TutoringView() {
     await upsertTutorialRelation({
       classId: activeClassId,
       note: relationForm.note,
+      source: TEACHER_OBSERVATION_RELATION_SOURCE,
+      sourceLabel: 'Criteri docent',
       sourceStudentId,
       strength: relationForm.strength,
       targetStudentId,
@@ -3649,6 +4716,107 @@ export function TutoringView() {
     setSociometricImportMessage('Plantilla descarregada. Pots obrir-la amb Excel, Numbers o Google Sheets.')
   }
 
+  const handleCreateSociometricSurvey = async () => {
+    setSociometricSurveyBusy('create')
+    setSociometricSurveyMessage('')
+    try {
+      const survey = await createSociometricSurvey({ classId: activeClassId })
+      const surveyUrl = `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${survey.id}`
+      try {
+        await navigator.clipboard.writeText(surveyUrl)
+        setSociometricSurveyMessage('Qüestionari creat i enllaç copiat. Ja el pots enviar als alumnes.')
+      } catch {
+        setSociometricSurveyMessage('Qüestionari creat. Copia l’enllaç manualment per enviar-lo als alumnes.')
+      }
+      setSociometricResponseCounts((current) => ({ ...current, [survey.id]: survey.responseCount || 0 }))
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’ha pogut crear el qüestionari sociomètric.')
+    } finally {
+      setSociometricSurveyBusy('')
+    }
+  }
+
+  const handleCopySociometricSurveyLink = async () => {
+    if (!activeSociometricSurveyUrl) return
+    try {
+      await navigator.clipboard.writeText(activeSociometricSurveyUrl)
+      setSociometricSurveyMessage('Enllaç copiat. Envia’l als alumnes perquè responguin el qüestionari.')
+    } catch {
+      setSociometricSurveyMessage('No s’ha pogut copiar automàticament. Pots seleccionar i copiar l’enllaç.')
+    }
+  }
+
+  const handleOpenSociometricSurveyLink = () => {
+    if (!activeSociometricSurveyUrl) return
+    window.open(activeSociometricSurveyUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleRefreshSociometricResponses = async () => {
+    if (!activeSociometricSurvey?.id) return
+    setSociometricSurveyBusy('responses')
+    setSociometricSurveyMessage('')
+    try {
+      const responses = await listSociometricSurveyResponses(activeSociometricSurvey.id)
+      setSociometricResponseCounts((current) => ({ ...current, [activeSociometricSurvey.id]: responses.length }))
+      setSociometricSurveyMessage(`S’han detectat ${responses.length} resposta/es del qüestionari.`)
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’han pogut carregar les respostes del qüestionari.')
+    } finally {
+      setSociometricSurveyBusy('')
+    }
+  }
+
+  const handleSyncSociometricSurveyResponses = async () => {
+    if (!activeSociometricSurvey?.id) return
+    setSociometricSurveyBusy('sync')
+    setSociometricSurveyMessage('')
+    try {
+      const stats = await syncSociometricSurveyResponses(activeSociometricSurvey.id)
+      setSociometricResponseCounts((current) => ({
+        ...current,
+        [activeSociometricSurvey.id]: stats.responseCount,
+      }))
+      setSociometricSurveyMessage(
+        [
+          `Sincronitzades ${stats.importedRelationCount} relacions de ${stats.responseCount} resposta/es.`,
+          stats.momentId ? 'S’ha guardat un moment sociomètric nou per a la comparativa.' : '',
+          stats.createdCount > 0 ? `${stats.createdCount} noves.` : '',
+          stats.updatedCount > 0 ? `${stats.updatedCount} actualitzades.` : '',
+          stats.skippedExistingManualCount > 0
+            ? `${stats.skippedExistingManualCount} ja existien com a relacions manuals i s’han respectat.`
+            : '',
+          stats.skippedCount > 0 ? `${stats.skippedCount} resposta/es tenien alumnes no trobats.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
+      setActiveRelationshipTool('sociogram')
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’han pogut sincronitzar les respostes amb el sociograma.')
+    } finally {
+      setSociometricSurveyBusy('')
+    }
+  }
+
+  const handleToggleSociometricSurveyStatus = async () => {
+    if (!activeSociometricSurvey?.id) return
+    const nextStatus = activeSociometricSurvey.status === 'active' ? 'closed' : 'active'
+    setSociometricSurveyBusy('status')
+    setSociometricSurveyMessage('')
+    try {
+      await setSociometricSurveyStatus(activeSociometricSurvey.id, nextStatus)
+      setSociometricSurveyMessage(
+        nextStatus === 'active'
+          ? 'Qüestionari reobert. L’enllaç torna a acceptar respostes.'
+          : 'Qüestionari tancat. L’enllaç ja no acceptarà respostes.',
+      )
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’ha pogut canviar l’estat del qüestionari.')
+    } finally {
+      setSociometricSurveyBusy('')
+    }
+  }
+
   const handleImportSociometricResponses = async () => {
     if (!activeClassId || sociometricPreview.relations.length === 0) return
 
@@ -3658,11 +4826,30 @@ export function TutoringView() {
         classId: activeClassId,
       })),
     )
+    await captureTutorialSociometricMoment({
+      classId: activeClassId,
+      label: `Importació manual · ${getTodayDateInput()}`,
+      source: 'manual-import',
+    })
     setSociometricImportMessage(
-      `Importades ${sociometricPreview.positiveCount} eleccions i ${sociometricPreview.avoidCount} rebuigs. Revisa el sociograma.`,
+      `Importades ${sociometricPreview.positiveCount} eleccions i ${sociometricPreview.avoidCount} rebuigs. També s’ha guardat un moment sociomètric. Revisa el sociograma.`,
     )
     setSociometricPasteText('')
     setActiveRelationshipTool('sociogram')
+  }
+
+  const handleCaptureSociometricMoment = async () => {
+    if (!activeClassId) return
+    try {
+      await captureTutorialSociometricMoment({
+        classId: activeClassId,
+        label: `Captura docent · ${getTodayDateInput()}`,
+        source: 'manual',
+      })
+      setSociometricSurveyMessage('Moment sociomètric guardat. Ja el pots fer servir a l’informe comparatiu.')
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’ha pogut guardar aquest moment sociomètric.')
+    }
   }
 
   const handleRelationSearchChange = (field, value) => {
@@ -3676,7 +4863,18 @@ export function TutoringView() {
     }
   }
 
+  const captureSeatingQualityBaseline = (reason) => {
+    if (selectedSeatingPlan) return
+    setSeatingQualityBaseline({
+      conflictCount: seatingPlanAnalysis.conflicts.length,
+      label: seatingPlanAnalysis.quality.label,
+      reason,
+      score: seatingPlanAnalysis.score,
+    })
+  }
+
   const resetSeatingManualChanges = () => {
+    captureSeatingQualityBaseline('Abans de netejar els canvis manuals')
     setSeatingManualSeatByStudentId((current) =>
       Object.fromEntries(Object.entries(current).filter(([studentId]) => seatingLockedStudentIds.includes(studentId))),
     )
@@ -3684,9 +4882,11 @@ export function TutoringView() {
     setSeatingProblemSeats({})
     setSeatingAppliedProblemSeats({})
     setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
+    setSeatingBlockSeatMode(false)
   }
 
   const handleGenerateSeatingVariant = () => {
+    captureSeatingQualityBaseline('Proposta anterior')
     setSelectedSeatingPlanId('')
     const reviewSeatEntries = Object.entries(seatingProblemSeats).filter(([, seatId]) => Boolean(seatId))
     const reviewedStudentIds = new Set(reviewSeatEntries.map(([studentId]) => studentId))
@@ -3711,8 +4911,14 @@ export function TutoringView() {
     setSeatingVariant((current) => current + 1)
   }
 
+  const handleToggleSeatingHalfGroups = () => {
+    captureSeatingQualityBaseline('Abans de canviar el criteri de mig grup')
+    setSeatingPrioritizeHalfGroups((current) => !current)
+  }
+
   const toggleSeatingGridSeat = (seat, placement) => {
     if (selectedSeatingPlan) return
+    captureSeatingQualityBaseline('Abans de modificar la matriu')
     setSelectedSeatingPlanId('')
     if (placement?.studentId) {
       if (seatingLockedStudentIds.includes(placement.studentId)) return
@@ -3736,6 +4942,74 @@ export function TutoringView() {
     setSeatingManualEmptySeatIds((current) => current.filter((seatId) => seatId !== seat.id))
   }
 
+  const handleSeatingSeatClick = (seat, placement) => {
+    if (seatingBlockSeatMode) {
+      if (!seat?.enabled || placement || selectedSeatingPlan) return
+      captureSeatingQualityBaseline('Abans de bloquejar el seient')
+      setSeatingRestrictions((current) => ({
+        ...current,
+        blockedSeatIds: current.blockedSeatIds.includes(seat.id)
+          ? current.blockedSeatIds.filter((seatId) => seatId !== seat.id)
+          : [...current.blockedSeatIds, seat.id],
+      }))
+      setSeatingManualEmptySeatIds((current) => current.filter((seatId) => seatId !== seat.id))
+      return
+    }
+
+    if (placement?.studentId && !seatingMoveStudentId) {
+      setSelectedSeatingStudentId(placement.studentId)
+      setSeatingMoveStudentId('')
+      return
+    }
+
+    if (!seatingMoveStudentId) {
+      toggleSeatingGridSeat(seat, placement)
+      return
+    }
+
+    if (
+      selectedSeatingPlan ||
+      !seat?.enabled ||
+      seatingRestrictions.blockedSeatIds.includes(seat.id) ||
+      seatingLockedStudentIds.includes(seatingMoveStudentId)
+    ) {
+      return
+    }
+    if (placement?.studentId === seatingMoveStudentId) {
+      setSeatingMoveStudentId('')
+      return
+    }
+
+    const sourcePlacement = generatedSeatingPlan.placements.find(
+      (candidate) => candidate.studentId === seatingMoveStudentId,
+    )
+    if (seatingLockedStudentIds.includes(placement?.studentId)) return
+
+    captureSeatingQualityBaseline('Abans del moviment manual')
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId((current) => {
+      const next = { ...current, [seatingMoveStudentId]: seat.id }
+      if (placement?.studentId) {
+        if (sourcePlacement?.seat?.id) next[placement.studentId] = sourcePlacement.seat.id
+        else delete next[placement.studentId]
+      }
+      return next
+    })
+    setSeatingManualEmptySeatIds((current) => {
+      const next = new Set(current)
+      next.delete(seat.id)
+      if (sourcePlacement?.seat?.id && !placement) next.add(sourcePlacement.seat.id)
+      if (placement && sourcePlacement?.seat?.id) next.delete(sourcePlacement.seat.id)
+      return [...next]
+    })
+    setSeatingUnseatedStudentIds((current) => {
+      const next = new Set(current.filter((studentId) => studentId !== seatingMoveStudentId))
+      if (placement?.studentId && !sourcePlacement?.seat?.id) next.add(placement.studentId)
+      return [...next]
+    })
+    setSeatingMoveStudentId('')
+  }
+
   const toggleSeatingLockedStudent = (placement) => {
     if (!placement?.studentId || !placement?.seat?.id) return
     setSelectedSeatingPlanId('')
@@ -3750,6 +5024,41 @@ export function TutoringView() {
         ? current.filter((studentId) => studentId !== placement.studentId)
         : [...current, placement.studentId],
     )
+  }
+
+  const handleRegenerateWithSelectedStudentLocked = () => {
+    if (!selectedSeatingPlacement?.studentId || !selectedSeatingPlacement?.seat?.id || selectedSeatingPlan) return
+    captureSeatingQualityBaseline('Proposta anterior')
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId((current) => ({
+      ...current,
+      [selectedSeatingPlacement.studentId]: selectedSeatingPlacement.seat.id,
+    }))
+    setSeatingLockedStudentIds((current) =>
+      current.includes(selectedSeatingPlacement.studentId)
+        ? current
+        : [...current, selectedSeatingPlacement.studentId],
+    )
+    setSeatingManualEmptySeatIds((current) =>
+      current.filter((seatId) => seatId !== selectedSeatingPlacement.seat.id),
+    )
+    setSeatingUnseatedStudentIds((current) =>
+      current.filter((studentId) => studentId !== selectedSeatingPlacement.studentId),
+    )
+    setSeatingVariant((current) => current + 1)
+  }
+
+  const handleUnseatSelectedStudent = () => {
+    if (!selectedSeatingPlacement || selectedSeatingIsLocked || selectedSeatingPlan) return
+    captureSeatingQualityBaseline('Abans de deixar l’alumne pendent')
+    setSeatingUnseatedStudentIds((current) => [...new Set([...current, selectedSeatingPlacement.studentId])])
+    setSeatingManualEmptySeatIds((current) => [...new Set([...current, selectedSeatingPlacement.seat.id])])
+    setSeatingManualSeatByStudentId((current) => {
+      const next = { ...current }
+      delete next[selectedSeatingPlacement.studentId]
+      return next
+    })
+    setSeatingMoveStudentId(selectedSeatingPlacement.studentId)
   }
 
   const toggleSeatingProblemSeat = (placement) => {
@@ -3774,6 +5083,80 @@ export function TutoringView() {
     }
   }
 
+  const toggleSeatingPairRestriction = (type) => {
+    if (!selectedSeatingStudentId || !seatingRestrictionTargetId) return
+    if (selectedSeatingStudentId === seatingRestrictionTargetId) return
+    captureSeatingQualityBaseline('Abans de modificar les restriccions')
+    const key = type === 'never' ? 'neverNearPairs' : 'preferNearPairs'
+    const otherKey = type === 'never' ? 'preferNearPairs' : 'neverNearPairs'
+    setSeatingRestrictions((current) => {
+      const exists = hasSeatingPair(current[key], selectedSeatingStudentId, seatingRestrictionTargetId)
+      return {
+        ...current,
+        [key]: exists
+          ? current[key].filter(
+              (pair) =>
+                !(
+                  (pair.studentId === selectedSeatingStudentId &&
+                    pair.targetStudentId === seatingRestrictionTargetId) ||
+                  (pair.studentId === seatingRestrictionTargetId &&
+                    pair.targetStudentId === selectedSeatingStudentId)
+                ),
+            )
+          : [
+              ...current[key],
+              { studentId: selectedSeatingStudentId, targetStudentId: seatingRestrictionTargetId },
+            ],
+        [otherKey]: current[otherKey].filter(
+          (pair) =>
+            !(
+              (pair.studentId === selectedSeatingStudentId &&
+                pair.targetStudentId === seatingRestrictionTargetId) ||
+              (pair.studentId === seatingRestrictionTargetId &&
+                pair.targetStudentId === selectedSeatingStudentId)
+            ),
+        ),
+      }
+    })
+  }
+
+  const setSelectedSeatingZoneRestriction = (type, zone) => {
+    if (!selectedSeatingStudentId) return
+    captureSeatingQualityBaseline('Abans de modificar les zones')
+    const key = type === 'preferred' ? 'preferredZoneByStudentId' : 'avoidedZoneByStudentId'
+    const otherKey = type === 'preferred' ? 'avoidedZoneByStudentId' : 'preferredZoneByStudentId'
+    setSeatingRestrictions((current) => {
+      const nextZones = { ...current[key] }
+      const nextOtherZones = { ...current[otherKey] }
+      if (zone) nextZones[selectedSeatingStudentId] = zone
+      else delete nextZones[selectedSeatingStudentId]
+      if (zone && nextOtherZones[selectedSeatingStudentId] === zone) delete nextOtherZones[selectedSeatingStudentId]
+      return { ...current, [key]: nextZones, [otherKey]: nextOtherZones }
+    })
+  }
+
+  const clearSelectedSeatingRestrictions = () => {
+    if (!selectedSeatingStudentId) return
+    captureSeatingQualityBaseline('Abans de netejar les restriccions')
+    setSeatingRestrictions((current) => {
+      const preferredZoneByStudentId = { ...current.preferredZoneByStudentId }
+      const avoidedZoneByStudentId = { ...current.avoidedZoneByStudentId }
+      delete preferredZoneByStudentId[selectedSeatingStudentId]
+      delete avoidedZoneByStudentId[selectedSeatingStudentId]
+      return {
+        ...current,
+        avoidedZoneByStudentId,
+        neverNearPairs: current.neverNearPairs.filter(
+          (pair) => pair.studentId !== selectedSeatingStudentId && pair.targetStudentId !== selectedSeatingStudentId,
+        ),
+        preferredZoneByStudentId,
+        preferNearPairs: current.preferNearPairs.filter(
+          (pair) => pair.studentId !== selectedSeatingStudentId && pair.targetStudentId !== selectedSeatingStudentId,
+        ),
+      }
+    })
+  }
+
   const handleSeatingDragStart = (event, placement) => {
     if (selectedSeatingPlan || !placement?.studentId) return
     if (seatingLockedStudentIds.includes(placement.studentId)) return
@@ -3791,7 +5174,13 @@ export function TutoringView() {
 
   const handleSeatingDrop = (event, targetSeat, targetPlacement) => {
     event.preventDefault()
-    if (selectedSeatingPlan || !targetSeat?.enabled) return
+    if (
+      selectedSeatingPlan ||
+      !targetSeat?.enabled ||
+      seatingRestrictions.blockedSeatIds.includes(targetSeat.id)
+    ) {
+      return
+    }
     const draggedStudentId = event.dataTransfer.getData('text/plain') || draggingSeatingStudentId
     if (!draggedStudentId) return
     if (seatingLockedStudentIds.includes(draggedStudentId) || seatingLockedStudentIds.includes(targetPlacement?.studentId)) {
@@ -3801,6 +5190,7 @@ export function TutoringView() {
     const sourcePlacement = generatedSeatingPlan.placements.find((placement) => placement.studentId === draggedStudentId)
     if (targetPlacement?.studentId === draggedStudentId) return
 
+    captureSeatingQualityBaseline('Abans del moviment manual')
     setSelectedSeatingPlanId('')
     setSeatingManualSeatByStudentId((current) => {
       const next = { ...current, [draggedStudentId]: targetSeat.id }
@@ -3831,6 +5221,7 @@ export function TutoringView() {
       classId: activeClassId,
       layout: {
         ...generatedSeatingPlan.layout,
+        seatingRestrictions,
         lockedStudentIds: seatingLockedStudentIds,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
       },
@@ -4844,8 +6235,13 @@ export function TutoringView() {
             <div className="tutorial-relationship-summary">
               <article className="green">
                 <HeartHandshake size={19} />
-                <strong>{tutorialRelationSummary.positiveCount}</strong>
-                <span>relacions positives</span>
+                <strong>{tutorialRelationSummary.workPositiveCount}</strong>
+                <span>treball positives</span>
+              </article>
+              <article className="blue">
+                <UsersRound size={19} />
+                <strong>{tutorialRelationSummary.socialPositiveCount}</strong>
+                <span>afinitats socials</span>
               </article>
               <article className="red">
                 <UserX size={19} />
@@ -4884,7 +6280,12 @@ export function TutoringView() {
             <button data-tour="tutoring-tool-survey" onClick={() => setActiveRelationshipTool('survey')} type="button">
               <ClipboardList size={25} />
               <strong>Qüestionari sociomètric</strong>
-              <span>Importa respostes de Forms/Excel i crea relacions reals.</span>
+              <span>Crea un enllaç propi d’Avaluapro i recull respostes del grup.</span>
+            </button>
+            <button data-tour="tutoring-tool-reports" onClick={() => setActiveRelationshipTool('reports')} type="button">
+              <FileText size={25} />
+              <strong>Informes sociomètrics</strong>
+              <span>Converteix el sociograma en lectura docent, prioritats i accions.</span>
             </button>
           </section>
 
@@ -4899,31 +6300,143 @@ export function TutoringView() {
                   <ClipboardList size={17} />
                   Qüestionari sociomètric
                 </span>
-                <h2>Importar respostes del grup</h2>
+                <h2>Crear qüestionari per al grup</h2>
                 <p>
-                  Enganxa les respostes d’un Google Forms o d’un full de càlcul. Avaluapro les converteix en afinitats
-                  i incompatibilitats del sociograma.
+                  Flux recomanat: crea un enllaç propi d’Avaluapro, envia’l als alumnes i recull les respostes sense
+                  Google Forms ni fulls de càlcul.
                 </p>
               </div>
               <div className="sociometric-import-actions">
                 <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
                   Tornar a eines
                 </button>
-                <button className="secondary-action compact" onClick={handleCopySociometricTemplate} type="button">
-                  <Clipboard size={16} />
-                  Copiar plantilla
-                </button>
-                <button className="secondary-action compact" onClick={handleDownloadSociometricTemplate} type="button">
-                  <FileDown size={16} />
-                  Descarregar plantilla
-                </button>
               </div>
             </header>
+
+            <div className="sociometric-survey-manager">
+              <article className="sociometric-survey-hero">
+                <span className="sociometric-survey-icon">
+                  <ClipboardList size={28} />
+                </span>
+                <div>
+                  <h3>Qüestionari públic d’Avaluapro</h3>
+                  <p>
+                    L’alumne tria el seu nom, marca {SOCIOMETRIC_POSITIVE_LIMIT} companys/companyes amb qui li agrada
+                    estar o relacionar-se i {SOCIOMETRIC_AVOID_LIMIT} amb qui li costa més. Les respostes queden a
+                    Firebase com a afinitats socials del sociograma.
+                  </p>
+                </div>
+              </article>
+
+              <div className="sociometric-survey-status-grid">
+                <article>
+                  <span>Estat</span>
+                  <strong className={activeSociometricSurvey?.status === 'active' ? 'positive' : ''}>
+                    {activeSociometricSurvey
+                      ? activeSociometricSurvey.status === 'active'
+                        ? 'Actiu'
+                        : 'Tancat'
+                      : 'No creat'}
+                  </strong>
+                </article>
+                <article>
+                  <span>Alumnes</span>
+                  <strong>{classStudents.length}</strong>
+                </article>
+                <article>
+                  <span>Respostes</span>
+                  <strong>{activeSociometricResponseCount}</strong>
+                </article>
+                <article>
+                  <span>Última sinc.</span>
+                  <strong>{activeSociometricSurvey?.lastSyncedAt ? formatShortDate(activeSociometricSurvey.lastSyncedAt) : 'Pendent'}</strong>
+                </article>
+              </div>
+
+              {activeSociometricSurveyUrl ? (
+                <label className="sociometric-survey-link">
+                  Enllaç per als alumnes
+                  <input readOnly value={activeSociometricSurveyUrl} />
+                </label>
+              ) : (
+                <div className="sociometric-survey-empty">
+                  <strong>Encara no hi ha cap qüestionari per aquesta classe.</strong>
+                  <span>Cal iniciar sessió amb Google i tenir alumnes carregats abans de crear l’enllaç.</span>
+                </div>
+              )}
+
+              {sociometricSurveyMessage && <div className="sociometric-import-message">{sociometricSurveyMessage}</div>}
+
+              <div className="sociometric-survey-actions">
+                <button
+                  className="primary-action"
+                  disabled={!cloud.user || classStudents.length === 0 || sociometricSurveyBusy === 'create'}
+                  onClick={handleCreateSociometricSurvey}
+                  type="button"
+                >
+                  {sociometricSurveyBusy === 'create' ? <Loader2 size={17} /> : <Plus size={17} />}
+                  Crear qüestionari
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={!activeSociometricSurveyUrl}
+                  onClick={handleCopySociometricSurveyLink}
+                  type="button"
+                >
+                  <Clipboard size={17} />
+                  Copiar enllaç
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={!activeSociometricSurveyUrl}
+                  onClick={handleOpenSociometricSurveyLink}
+                  type="button"
+                >
+                  <ExternalLink size={17} />
+                  Obrir enllaç
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={!activeSociometricSurvey?.id || sociometricSurveyBusy === 'responses'}
+                  onClick={handleRefreshSociometricResponses}
+                  type="button"
+                >
+                  {sociometricSurveyBusy === 'responses' ? <Loader2 size={17} /> : <RefreshCw size={17} />}
+                  Refrescar respostes
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={!activeSociometricSurvey?.id || sociometricSurveyBusy === 'sync'}
+                  onClick={handleSyncSociometricSurveyResponses}
+                  type="button"
+                >
+                  {sociometricSurveyBusy === 'sync' ? <Loader2 size={17} /> : <Network size={17} />}
+                  Sincronitzar sociograma
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={!activeSociometricSurvey?.id || sociometricSurveyBusy === 'status'}
+                  onClick={handleToggleSociometricSurveyStatus}
+                  type="button"
+                >
+                  <Lock size={17} />
+                  {activeSociometricSurvey?.status === 'active' ? 'Tancar' : 'Reobrir'}
+                </button>
+              </div>
+
+              <div className="sociometric-survey-sync-note">
+                <AlertTriangle size={18} />
+                <span>
+                  En sincronitzar, Avaluapro crea relacions d’origen “Qüestionari públic”. Si ja hi ha una relació
+                  de treball marcada pel docent amb la mateixa parella, la conserva com a criteri docent independent.
+                </span>
+              </div>
+            </div>
 
             <div className="sociometric-import-layout">
               <article className="sociometric-import-help">
                 <FileSpreadsheet size={24} />
-                <h3>Format recomanat</h3>
+                <h3>Pla B: importar des d’un full</h3>
                 <p>
                   Una fila per alumne. La primera columna és qui respon. Després, 4 eleccions positives i 3 rebuigs.
                 </p>
@@ -4933,6 +6446,16 @@ export function TutoringView() {
                   Forms i la columna “Alumne” no és la primera. Els noms poden tenir accents diferents o formes curtes:
                   Avaluapro intentarà fer coincidència aproximada.
                 </small>
+                <div className="sociometric-import-actions compact-inline">
+                  <button className="secondary-action compact" onClick={handleCopySociometricTemplate} type="button">
+                    <Clipboard size={16} />
+                    Copiar plantilla
+                  </button>
+                  <button className="secondary-action compact" onClick={handleDownloadSociometricTemplate} type="button">
+                    <FileDown size={16} />
+                    Descarregar plantilla
+                  </button>
+                </div>
               </article>
 
               <label className="sociometric-import-textarea">
@@ -5030,6 +6553,1002 @@ export function TutoringView() {
           </section>
 
           <section
+            className={`sociometric-reports-panel relationship-tool-panel ${
+              activeRelationshipTool === 'reports' ? 'active' : ''
+            }`}
+          >
+            <header>
+              <div>
+                <span className="section-kicker">
+                  <FileText size={17} />
+                  Informes sociomètrics
+                </span>
+                <h2>Generador d’informes</h2>
+                <p>
+                  Tria el tipus d’informe, activa les seccions que necessites i desa la vista com a PDF des del diàleg
+                  d’impressió del navegador.
+                </p>
+              </div>
+              <div className="sociometric-import-actions">
+                <button
+                  className="primary-action compact"
+                  disabled={!['quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
+                  onClick={printSociometricReport}
+                  type="button"
+                >
+                  <FileDown size={16} />
+                  Imprimir / guardar PDF
+                </button>
+                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                  Tornar a eines
+                </button>
+              </div>
+            </header>
+
+            <div className="sociometric-reports-overview">
+              <article>
+                <span>Alumnes</span>
+                <strong>{classStudents.length}</strong>
+                <small>base de l’informe</small>
+              </article>
+              <article>
+                <span>Relacions</span>
+                <strong>{sociometricReportSnapshot.relationCount}</strong>
+                <small>socials, treball i rebuigs</small>
+              </article>
+              <article>
+                <span>Prioritaris</span>
+                <strong>{sociometricReportSnapshot.priorityCount}</strong>
+                <small>aïllats o rebutjats</small>
+              </article>
+              <article>
+                <span>Líders</span>
+                <strong>{sociometricReportSnapshot.leaderCount}</strong>
+                <small>possibles suports positius</small>
+              </article>
+            </div>
+
+            <div className="sociometric-report-type-grid">
+              {SOCIOMETRIC_REPORT_TYPES.map((reportType) => {
+                const Icon = reportType.icon
+                const isActive = selectedSociometricReportType === reportType.id
+                const isDeferred = false
+
+                return (
+                  <button
+                    className={`${isActive ? 'active' : ''} ${isDeferred ? 'deferred' : ''}`}
+                    key={reportType.id}
+                    onClick={() => handleSelectSociometricReportType(reportType.id)}
+                    type="button"
+                  >
+                    <Icon size={27} />
+                    <div>
+                      <strong>{reportType.title}</strong>
+                      <p>{reportType.description}</p>
+                    </div>
+                    <footer>
+                      <span>{reportType.estimate}</span>
+                      <em>{reportType.status}</em>
+                    </footer>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="sociometric-report-workspace">
+              <article className="sociometric-report-selected">
+                <span className="section-kicker">
+                  <SelectedSociometricReportIcon size={17} />
+                  Tipus seleccionat
+                </span>
+                <h3>{selectedSociometricReportTypeMeta.title}</h3>
+                <p>{selectedSociometricReportTypeMeta.description}</p>
+                <div className="sociometric-report-next-steps">
+                  <span>{selectedSociometricReportTypeMeta.estimate}</span>
+                  <span>{selectedSociometricReportTypeMeta.status}</span>
+                </div>
+                <div className="sociometric-report-priority-list">
+                  <strong>Primera lectura del grup</strong>
+                  {sociometricReportSnapshot.priorityNames.length > 0 ? (
+                    <p>Alumnes a revisar primer: {sociometricReportSnapshot.priorityNames.join(', ')}.</p>
+                  ) : (
+                    <p>No hi ha alumnes classificats com a rebutjats o aïllats amb les dades actuals.</p>
+                  )}
+                </div>
+              </article>
+
+              <article className="sociometric-report-sections">
+                <header>
+                  <div>
+                    <span className="section-kicker">
+                      <ClipboardList size={17} />
+                      Seccions
+                    </span>
+                    <h3>Blocs preparats per a les fases següents</h3>
+                  </div>
+                  <small>Configuració visual inicial</small>
+                </header>
+                <div>
+                  {SOCIOMETRIC_REPORT_SECTIONS.map((section) => (
+                    <button
+                      className={`${section.required ? 'required' : ''} ${
+                        sociometricReportSections[section.id] ? 'active' : ''
+                      }`}
+                      key={section.id}
+                      onClick={() => handleToggleSociometricReportSection(section)}
+                      type="button"
+                    >
+                      <CheckCircle2 size={17} />
+                      <span>{section.label}</span>
+                      {section.required && <em>Obligatori</em>}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <section className="sociometric-report-config">
+              <article>
+                <span>Seccions actives</span>
+                <strong>{activeSociometricReportSections.length}</strong>
+                <small>{activeSociometricReportSections.map((section) => section.label).join(' · ')}</small>
+              </article>
+              <article>
+                <span>Estimació</span>
+                <strong>{estimatedSociometricReportPages}</strong>
+                <small>{selectedSociometricReportType === 'individual' ? 'fitxa/es' : 'pàgina/es aproximades'}</small>
+              </article>
+              <article>
+                <span>Alumnes</span>
+                <strong>
+                  {selectedSociometricReportType === 'individual'
+                    ? visibleSociometricIndividualReports.length
+                    : classStudents.length}
+                </strong>
+                <small>{selectedSociometricReportType === 'individual' ? 'seleccionats per fitxa' : 'inclòs tot el grup'}</small>
+              </article>
+            </section>
+
+            {selectedSociometricReportType === 'individual' && (
+              <section className="sociometric-report-student-selector">
+                <header>
+                  <div>
+                    <span className="section-kicker">
+                      <UsersRound size={17} />
+                      Selector d’alumnes
+                    </span>
+                    <h3>Fitxes que entraran a la vista prèvia</h3>
+                  </div>
+                  <div>
+                    <button className="secondary-action compact" onClick={handleSelectPriorityReportStudents} type="button">
+                      Prioritaris
+                    </button>
+                    <button
+                      className="secondary-action compact"
+                      onClick={() => setSelectedSociometricReportStudentIds(sociometricIndividualReports.map((report) => report.student.id))}
+                      type="button"
+                    >
+                      Tots
+                    </button>
+                    <button
+                      className="secondary-action compact"
+                      onClick={() => setSelectedSociometricReportStudentIds([])}
+                      type="button"
+                    >
+                      Sense filtre
+                    </button>
+                  </div>
+                </header>
+                <div>
+                  {sociometricIndividualReports.map((report) => {
+                    const isSelected =
+                      selectedSociometricReportStudentIds.length === 0 ||
+                      selectedSociometricReportStudentIds.includes(report.student.id)
+
+                    return (
+                      <button
+                        className={isSelected ? 'active' : ''}
+                        key={report.student.id}
+                        onClick={() => handleToggleSociometricReportStudent(report.student.id)}
+                        type="button"
+                      >
+                        <span className={`sociometric-mini-dot ${report.categoryMeta.tone}`}>
+                          {report.studentCode}
+                        </span>
+                        <strong>{report.student.name}</strong>
+                        <small>{report.category}</small>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+            {selectedSociometricReportType === 'comparative' && (
+              <SociometricComparisonSelector
+                comparisonOptions={sociometricComparisonOptions}
+                currentRelationCount={classTutorialRelations.length}
+                detectedMomentsLabel={
+                  classTutorialSociometricMoments.length > 0
+                    ? `${classTutorialSociometricMoments.length} moment/s guardats`
+                    : `${sociometricComparisonOptions.length} moment/s detectats a partir de les relacions guardades`
+                }
+                endValue={effectiveSociometricComparisonEnd}
+                onCaptureMoment={handleCaptureSociometricMoment}
+                onChangeEnd={setSelectedSociometricComparisonEnd}
+                onChangeStart={setSelectedSociometricComparisonStart}
+                startValue={effectiveSociometricComparisonStart}
+              />
+            )}
+
+            <div className="sociometric-report-preview-title">
+              <span className="section-kicker">
+                <Eye size={17} />
+                Vista prèvia
+              </span>
+              <h3>{selectedSociometricReportTypeMeta.title}</h3>
+            </div>
+
+            <header className="sociometric-report-print-header">
+              <span>AvaluaPro · Informe sociomètric</span>
+              <h2>{selectedSociometricReportTypeMeta.title}</h2>
+              <p>
+                {activeClass?.name || linkedClass?.name || 'Classe sense nom'} · {classStudents.length} alumnes · Generat el{' '}
+                {formatLongDate(sociometricReportDate)}
+              </p>
+            </header>
+
+            {selectedSociometricReportType === 'quick' ? (
+              <section className="sociometric-quick-report" aria-label="Informe ràpid del grup">
+                <header>
+                  <div>
+                    <span className={`sociometric-report-status ${sociometricQuickReport.healthTone}`}>
+                      {sociometricQuickReport.healthLabel}
+                    </span>
+                    <h3>Informe ràpid del grup</h3>
+                    <p>
+                      Lectura d’una pàgina per decidir què revisar primer abans de formar grups, canviar llocs o iniciar
+                      una intervenció tutorial.
+                    </p>
+                  </div>
+                  <div className="sociometric-report-score">
+                    <strong>{sociometricQuickReport.hasData ? sociometricQuickReport.healthScore : '—'}</strong>
+                    <span>índex de lectura</span>
+                  </div>
+                </header>
+
+                <div className="sociometric-quick-metrics">
+                  <article>
+                    <span>Cohesió</span>
+                    <strong>{sociometricMetrics.density}%</strong>
+                    <small>Densitat de relacions registrades.</small>
+                  </article>
+                  <article>
+                    <span>Inclusió</span>
+                    <strong>{sociometricMetrics.inclusion}%</strong>
+                    <small>Alumnes amb almenys una afinitat.</small>
+                  </article>
+                  <article>
+                    <span>Positivitat</span>
+                    <strong>{sociometricMetrics.positivity}%</strong>
+                    <small>Pes de les eleccions positives.</small>
+                  </article>
+                  <article>
+                    <span>Rebuig</span>
+                    <strong>{sociometricMetrics.rejectionDensity}%</strong>
+                    <small>Densitat de vincles a evitar.</small>
+                  </article>
+                  <article>
+                    <span>Reciprocitat</span>
+                    <strong>{sociometricMetrics.reciprocalPairCount}</strong>
+                    <small>Parelles socials mútues.</small>
+                  </article>
+                </div>
+
+                <div className="sociometric-quick-body">
+                  <article className="sociometric-category-distribution">
+                    <header>
+                      <span className="section-kicker">
+                        <BarChart3 size={17} />
+                        Distribució
+                      </span>
+                      <h4>Categories socials</h4>
+                    </header>
+                    <div>
+                      {sociometricMetrics.categoryCounts.map((item) => {
+                        const categoryMeta = SOCIOMETRIC_CATEGORY_META[item.category] || SOCIOMETRIC_CATEGORY_META.Promig
+                        const percentage =
+                          classStudents.length > 0 ? Math.round((item.count / classStudents.length) * 100) : 0
+
+                        return (
+                          <div className={`sociometric-category-row ${categoryMeta.tone}`} key={item.category}>
+                            <span>{item.category}</span>
+                            <div aria-hidden="true">
+                              <i style={{ width: `${percentage}%` }} />
+                            </div>
+                            <strong>{item.count}</strong>
+                            <em>{percentage}%</em>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </article>
+
+                  <article className="sociometric-priority-panel">
+                    <header>
+                      <span className="section-kicker">
+                        <AlertTriangle size={17} />
+                        Prioritats
+                      </span>
+                      <h4>Alumnes a mirar primer</h4>
+                    </header>
+                    <div className="sociometric-priority-grid">
+                      <section>
+                        <strong>Rebuig</strong>
+                        {sociometricQuickReport.rejectedRows.length > 0 ? (
+                          sociometricQuickReport.rejectedRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>
+                              {row.student.name}
+                              <span>{row.avoidReceived} rebuig/s</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense casos destacats.</p>
+                        )}
+                      </section>
+                      <section>
+                        <strong>Aïllament</strong>
+                        {sociometricQuickReport.isolatedRows.length > 0 ? (
+                          sociometricQuickReport.isolatedRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>
+                              {row.student.name}
+                              <span>{row.positiveReceived} elecció/ns</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense casos destacats.</p>
+                        )}
+                      </section>
+                      <section>
+                        <strong>Lideratge positiu</strong>
+                        {sociometricQuickReport.leaderRows.length > 0 ? (
+                          sociometricQuickReport.leaderRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>
+                              {row.student.name}
+                              <span>{row.positiveReceived} elecció/ns</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="empty">Encara no destaca cap líder.</p>
+                        )}
+                      </section>
+                      <section>
+                        <strong>Lideratge amb risc</strong>
+                        {sociometricQuickReport.riskLeaderRows.length > 0 ? (
+                          sociometricQuickReport.riskLeaderRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>
+                              {row.student.name}
+                              <span>{row.avoidReceived} rebuig/s</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense senyal clara.</p>
+                        )}
+                      </section>
+                    </div>
+                  </article>
+                </div>
+
+                <article className="sociometric-quick-actions">
+                  <header>
+                    <span className="section-kicker">
+                      <CheckCircle2 size={17} />
+                      Primeres accions
+                    </span>
+                    <h4>Què faria el tutor ara?</h4>
+                  </header>
+                  <ol>
+                    {sociometricQuickReport.actions.map((action) => (
+                      <li key={action}>{action}</li>
+                    ))}
+                  </ol>
+                </article>
+              </section>
+            ) : selectedSociometricReportType === 'complete' ? (
+              <section className="sociometric-complete-report" aria-label="Informe docent complet">
+                <header>
+                  <div>
+                    <span className={`sociometric-report-status ${sociometricQuickReport.healthTone}`}>
+                      {sociometricQuickReport.healthLabel}
+                    </span>
+                    <h3>Informe docent complet</h3>
+                    <p>
+                      Lectura ampliada del sociograma per passar de les dades a decisions de tutoria, agrupaments i
+                      intervenció pedagògica.
+                    </p>
+                  </div>
+                  <div className="sociometric-report-score">
+                    <strong>{sociometricQuickReport.hasData ? sociometricQuickReport.healthScore : '—'}</strong>
+                    <span>índex global</span>
+                  </div>
+                </header>
+
+                {sociometricReportSections.summary && (
+                  <section className="sociometric-complete-section sociometric-complete-hero">
+                    <header>
+                      <span className="section-kicker">
+                        <FileText size={17} />
+                        Resum executiu
+                      </span>
+                      <h4>Lectura curta per al tutor</h4>
+                    </header>
+                    <p>{sociometricCompleteReport.socialReading}</p>
+                    <div className="sociometric-complete-metric-strip">
+                      <article>
+                        <span>Alumnes</span>
+                        <strong>{classStudents.length}</strong>
+                      </article>
+                      <article>
+                        <span>Relacions</span>
+                        <strong>{classTutorialRelations.length}</strong>
+                      </article>
+                      <article>
+                        <span>Prioritaris</span>
+                        <strong>
+                          {sociometricCompleteReport.rejectedRows.length + sociometricCompleteReport.isolatedRows.length}
+                        </strong>
+                      </article>
+                      <article>
+                        <span>Líders</span>
+                        <strong>{sociometricCompleteReport.leaderRows.length}</strong>
+                      </article>
+                    </div>
+                  </section>
+                )}
+
+                {sociometricReportSections.contexts && (
+                  <div className="sociometric-complete-grid">
+                    <section className="sociometric-complete-section">
+                      <header>
+                        <span className="section-kicker">
+                          <UsersRound size={17} />
+                          Lectura social
+                        </span>
+                        <h4>Com es relaciona el grup</h4>
+                      </header>
+                      <p>{sociometricCompleteReport.socialReading}</p>
+                      <ul className="sociometric-complete-facts">
+                        <li>
+                          <strong>{sociometricMetrics.inclusion}%</strong>
+                          <span>inclusió</span>
+                        </li>
+                        <li>
+                          <strong>{sociometricMetrics.positivity}%</strong>
+                          <span>positivitat</span>
+                        </li>
+                        <li>
+                          <strong>{sociometricMetrics.rejectionDensity}%</strong>
+                          <span>rebuig</span>
+                        </li>
+                      </ul>
+                    </section>
+
+                    <section className="sociometric-complete-section">
+                      <header>
+                        <span className="section-kicker">
+                          <HeartHandshake size={17} />
+                          Relacions de treball
+                        </span>
+                        <h4>Amb qui funciona millor a classe</h4>
+                      </header>
+                      <p>{sociometricCompleteReport.workReading}</p>
+                      <div className="sociometric-complete-mini-list">
+                        {sociometricCompleteReport.workRows.length > 0 ? (
+                          sociometricCompleteReport.workRows.slice(0, 4).map((row) => (
+                            <p key={row.student.id}>
+                              {row.student.name}
+                              <span>{row.workPositiveCount} vincle/s de treball</span>
+                            </p>
+                          ))
+                        ) : (
+                          <p className="empty">Encara no hi ha relacions de treball registrades pel docent.</p>
+                        )}
+                      </div>
+                    </section>
+                  </div>
+                )}
+
+                {sociometricReportSections.sociogram && (
+                  <section className="sociometric-complete-section sociometric-complete-sociogram">
+                    <header>
+                      <span className="section-kicker">
+                        <Network size={17} />
+                        Sociograma visual
+                      </span>
+                      <h4>Mapa que s’inclourà a l’informe</h4>
+                    </header>
+                    <div>
+                      <Network size={34} />
+                      <p>
+                        Inclou el mapa actual amb colors per categoria, fletxes de direcció, relacions socials, de
+                        treball i rebuigs. A la F6 aquesta vista quedarà preparada per imprimir o guardar en PDF.
+                      </p>
+                    </div>
+                  </section>
+                )}
+
+                {sociometricReportSections.priority && (
+                  <section className="sociometric-complete-section">
+                    <header>
+                      <span className="section-kicker">
+                        <AlertTriangle size={17} />
+                        Alumnes prioritaris
+                      </span>
+                      <h4>On mirar primer</h4>
+                    </header>
+                    <div className="sociometric-complete-priority-list">
+                      <article>
+                        <strong>Rebuig</strong>
+                        {sociometricCompleteReport.rejectedRows.length > 0 ? (
+                          sociometricCompleteReport.rejectedRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>{row.student.name}</p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense casos destacats.</p>
+                        )}
+                      </article>
+                      <article>
+                        <strong>Aïllament</strong>
+                        {sociometricCompleteReport.isolatedRows.length > 0 ? (
+                          sociometricCompleteReport.isolatedRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>{row.student.name}</p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense casos destacats.</p>
+                        )}
+                      </article>
+                      <article>
+                        <strong>Lideratge</strong>
+                        {sociometricCompleteReport.leaderRows.length > 0 ? (
+                          sociometricCompleteReport.leaderRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>{row.student.name}</p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense líder clar.</p>
+                        )}
+                      </article>
+                      <article>
+                        <strong>Risc</strong>
+                        {sociometricCompleteReport.riskLeaderRows.length > 0 ? (
+                          sociometricCompleteReport.riskLeaderRows.slice(0, 3).map((row) => (
+                            <p key={row.student.id}>{row.student.name}</p>
+                          ))
+                        ) : (
+                          <p className="empty">Sense senyal clara.</p>
+                        )}
+                      </article>
+                    </div>
+                  </section>
+                )}
+
+                {sociometricReportSections.alerts && (
+                  <section className="sociometric-complete-section">
+                    <header>
+                      <span className="section-kicker">
+                        <ShieldAlert size={17} />
+                        Alertes pedagògiques
+                      </span>
+                      <h4>Senyals que demanen decisió</h4>
+                    </header>
+                    <div className="sociometric-complete-alert-list">
+                      {sociometricCompleteReport.alertItems.map((alert) => (
+                        <article className={alert.tone} key={alert.title}>
+                          <strong>{alert.title}</strong>
+                          <p>{alert.text}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {sociometricReportSections.interventions && (
+                  <section className="sociometric-complete-section sociometric-complete-plan">
+                    <header>
+                      <span className="section-kicker">
+                        <CheckCircle2 size={17} />
+                        Pla d’intervenció
+                      </span>
+                      <h4>Accions concretes per començar</h4>
+                    </header>
+                    <ol>
+                      {sociometricCompleteReport.interventionPlan.map((action) => (
+                        <li key={action}>{action}</li>
+                      ))}
+                    </ol>
+                  </section>
+                )}
+
+                {sociometricReportSections.technical && (
+                  <section className="sociometric-complete-section sociometric-complete-annex">
+                    <header>
+                      <span className="section-kicker">
+                        <SlidersHorizontal size={17} />
+                        Annex tècnic
+                      </span>
+                      <h4>Com s’ha llegit el mapa</h4>
+                    </header>
+                    <p>
+                      Les categories socials es calculen combinant eleccions rebudes, rebuigs, reciprocitat i posició
+                      dins la xarxa. Les relacions socials provenen sobretot del qüestionari de l’alumnat; les relacions
+                      de treball incorporen criteri docent i es llegeixen com a informació pedagògica diferent.
+                    </p>
+                  </section>
+                )}
+              </section>
+            ) : selectedSociometricReportType === 'comparative' ? (
+              <section className="sociometric-comparative-report" aria-label="Informe comparatiu sociomètric">
+                <header>
+                  <div>
+                    <span className="sociometric-report-status positive">Comparativa activa</span>
+                    <h3>Informe comparatiu</h3>
+                    <p>
+                      Lectura de l’evolució del grup entre dos moments: què ha millorat, què demana atenció i quines
+                      accions convé mantenir.
+                    </p>
+                  </div>
+                  <div className="sociometric-report-score">
+                    <strong>{sociometricComparativeReport.metricRows.filter((metric) => metric.tone === 'positive').length}</strong>
+                    <span>millores</span>
+                  </div>
+                </header>
+
+                {sociometricReportSections.summary && (
+                  <section className="sociometric-comparison-summary">
+                    <span className="section-kicker">
+                      <FileText size={17} />
+                      Resum comparatiu
+                    </span>
+                    <h4>{sociometricComparativeReport.summary}</h4>
+                    <p>
+                      Moment inicial: {sociometricComparisonStartRelations.length} relacions · Moment final:{' '}
+                      {sociometricComparisonEndRelations.length} relacions.
+                    </p>
+                  </section>
+                )}
+
+                <div className="sociometric-comparison-metrics">
+                  {sociometricComparativeReport.metricRows.map((metric) => (
+                    <article className={metric.tone} key={metric.label}>
+                      <span>{metric.label}</span>
+                      <strong>
+                        {metric.start}
+                        {metric.suffix} → {metric.end}
+                        {metric.suffix}
+                      </strong>
+                      <em>
+                        {metric.delta > 0 ? '+' : ''}
+                        {metric.delta}
+                        {metric.suffix}
+                      </em>
+                      <small>{metric.description}</small>
+                    </article>
+                  ))}
+                </div>
+
+                {sociometricReportSections.priority && (
+                  <div className="sociometric-comparison-grid">
+                    <section>
+                      <header>
+                        <span className="section-kicker">
+                          <CheckCircle2 size={17} />
+                          Alumnes que milloren
+                        </span>
+                        <h4>Canvis positius</h4>
+                      </header>
+                      {sociometricComparativeReport.improvedStudents.length > 0 ? (
+                        sociometricComparativeReport.improvedStudents.slice(0, 5).map((item) => (
+                          <p key={item.student.id}>
+                            {item.student.name}
+                            <span>
+                              {item.startCategory} → {item.endCategory} · +{item.positiveDelta} positives ·{' '}
+                              {item.rejectionDelta > 0 ? '+' : ''}
+                              {item.rejectionDelta} rebuigs
+                            </span>
+                          </p>
+                        ))
+                      ) : (
+                        <p className="empty">Encara no hi ha millores individuals destacades.</p>
+                      )}
+                    </section>
+
+                    <section>
+                      <header>
+                        <span className="section-kicker">
+                          <AlertTriangle size={17} />
+                          Alumnes a revisar
+                        </span>
+                        <h4>Canvis sensibles</h4>
+                      </header>
+                      {sociometricComparativeReport.worsenedStudents.length > 0 ? (
+                        sociometricComparativeReport.worsenedStudents.slice(0, 5).map((item) => (
+                          <p key={item.student.id}>
+                            {item.student.name}
+                            <span>
+                              {item.startCategory} → {item.endCategory} · {item.rejectionDelta > 0 ? '+' : ''}
+                              {item.rejectionDelta} rebuigs
+                            </span>
+                          </p>
+                        ))
+                      ) : (
+                        <p className="empty">Sense empitjoraments individuals destacats.</p>
+                      )}
+                    </section>
+                  </div>
+                )}
+
+                {sociometricReportSections.contexts && (
+                  <div className="sociometric-comparison-grid">
+                    <section>
+                      <header>
+                        <span className="section-kicker">
+                          <Star size={17} />
+                          Nous lideratges
+                        </span>
+                        <h4>Suports emergents</h4>
+                      </header>
+                      {sociometricComparativeReport.newLeaders.length > 0 ? (
+                        sociometricComparativeReport.newLeaders.slice(0, 5).map((item) => (
+                          <p key={item.student.id}>
+                            {item.student.name}
+                            <span>{item.startCategory || 'Sense dades'} → Líder</span>
+                          </p>
+                        ))
+                      ) : (
+                        <p className="empty">No apareixen nous líders en aquesta comparativa.</p>
+                      )}
+                    </section>
+
+                    <section>
+                      <header>
+                        <span className="section-kicker">
+                          <UsersRound size={17} />
+                          Prioritats resoltes
+                        </span>
+                        <h4>Casos que surten de zona sensible</h4>
+                      </header>
+                      {sociometricComparativeReport.resolvedPriorityStudents.length > 0 ? (
+                        sociometricComparativeReport.resolvedPriorityStudents.slice(0, 5).map((item) => (
+                          <p key={item.student.id}>
+                            {item.student.name}
+                            <span>
+                              {item.startCategory} → {item.endCategory}
+                            </span>
+                          </p>
+                        ))
+                      ) : (
+                        <p className="empty">Encara no hi ha prioritats resoltes de manera clara.</p>
+                      )}
+                    </section>
+                  </div>
+                )}
+
+                {sociometricReportSections.interventions && (
+                  <section className="sociometric-comparison-actions">
+                    <header>
+                      <span className="section-kicker">
+                        <CheckCircle2 size={17} />
+                        Accions després de comparar
+                      </span>
+                      <h4>Què mantindria o ajustaria el tutor?</h4>
+                    </header>
+                    <ol>
+                      {sociometricComparativeReport.actions.map((action) => (
+                        <li key={action}>{action}</li>
+                      ))}
+                    </ol>
+
+                    <div className="sociometric-impact-strip">
+                      <article>
+                        <span>Intervencions</span>
+                        <strong>{sociometricImpactReport.interventions.length}</strong>
+                      </article>
+                      <article>
+                        <span>Observacions docents</span>
+                        <strong>{sociometricImpactReport.observationCount}</strong>
+                      </article>
+                      <article>
+                        <span>Registres tutorials</span>
+                        <strong>{sociometricImpactReport.recordCount}</strong>
+                      </article>
+                    </div>
+                  </section>
+                )}
+
+                <div className="sociometric-comparison-grid sociometric-impact-grid">
+                  <section>
+                    <header>
+                      <span className="section-kicker">
+                        <CalendarDays size={17} />
+                        Què hi ha hagut entremig
+                      </span>
+                      <h4>Intervencions registrades</h4>
+                    </header>
+                    {sociometricImpactReport.interventions.length > 0 ? (
+                      sociometricImpactReport.interventions.map((item) => (
+                        <p key={`${item.type}_${item.date}_${item.title}`}>
+                          {item.title}
+                          <span>
+                            {item.type === 'groups'
+                              ? 'Grups cooperatius'
+                              : item.type === 'seating'
+                                ? 'Disposició d’aula'
+                                : 'Intervenció'}{' '}
+                            · {item.detail} · {formatShortDate(String(item.date || '').slice(0, 10))}
+                          </span>
+                        </p>
+                      ))
+                    ) : (
+                      <p className="empty">Encara no hi ha grups o disposicions guardades entre aquests dos moments.</p>
+                    )}
+                  </section>
+
+                  <section>
+                    <header>
+                      <span className="section-kicker">
+                        <BarChart3 size={17} />
+                        Lectura d’impacte
+                      </span>
+                      <h4>Coincidències útils per interpretar</h4>
+                    </header>
+                    {sociometricImpactReport.signals.length > 0 ? (
+                      <div className="sociometric-impact-signal-list">
+                        {sociometricImpactReport.signals.map((signal) => (
+                          <article className={signal.tone} key={signal.title}>
+                            <strong>{signal.title}</strong>
+                            <p>{signal.text}</p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="empty">Encara no hi ha prou senyals per fer una lectura d’impacte amb context.</p>
+                    )}
+                  </section>
+                </div>
+
+                {sociometricComparisonOptions.length < 2 && (
+                  <div className="sociometric-comparison-note">
+                    <AlertTriangle size={18} />
+                    <span>
+                      Hi ha pocs moments diferenciats. La comparativa serà més potent quan es passin dos qüestionaris
+                      en dates diferents o es registrin noves observacions després d’una intervenció.
+                    </span>
+                  </div>
+                )}
+              </section>
+            ) : selectedSociometricReportType === 'individual' ? (
+              <section className="sociometric-individual-report" aria-label="Fitxes individuals sociomètriques">
+                <header>
+                  <div>
+                    <span className="sociometric-report-status positive">Fitxes actives</span>
+                    <h3>Fitxes individuals</h3>
+                    <p>
+                      Lectura breu per alumne amb categoria social, lectura de treball, relacions clau i recomanacions
+                      per a tutoria.
+                    </p>
+                  </div>
+                  <div className="sociometric-report-score">
+                    <strong>{visibleSociometricIndividualReports.length}</strong>
+                    <span>fitxes disponibles</span>
+                  </div>
+                </header>
+
+                <div className="sociometric-individual-layout">
+                  <aside className="sociometric-student-picker">
+                    <header>
+                      <span className="section-kicker">
+                        <UsersRound size={17} />
+                        Alumnes
+                      </span>
+                      <strong>{visibleSociometricIndividualReports.length} fitxes</strong>
+                    </header>
+                    <div>
+                      {visibleSociometricIndividualReports.map((report) => (
+                        <button
+                          className={selectedSociometricIndividualPreviewReport?.student.id === report.student.id ? 'active' : ''}
+                          key={report.student.id}
+                          onClick={() => setSelectedSociometricReportStudentId(report.student.id)}
+                          type="button"
+                        >
+                          <span className={`sociometric-mini-dot ${report.categoryMeta.tone}`}>
+                            {report.studentCode}
+                          </span>
+                          <div>
+                            <strong>{report.student.name}</strong>
+                            <small>{report.category} · {report.workCategory}</small>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </aside>
+
+                  {selectedSociometricIndividualPreviewReport ? (
+                    <article className="sociometric-student-report-card">
+                      <SociometricStudentInsightCard report={selectedSociometricIndividualPreviewReport} />
+                      <footer className="sociometric-student-report-actions">
+                        <button className="primary-action compact" onClick={printSelectedSociometricStudentReport} type="button">
+                          <FileDown size={16} />
+                          Descarregar només aquest alumne
+                        </button>
+                        <button className="secondary-action compact" onClick={() => printSociometricReport()} type="button">
+                          <UsersRound size={16} />
+                          Descarregar fitxes seleccionades
+                        </button>
+                      </footer>
+                    </article>
+                  ) : (
+                    <div className="empty-state compact">Afegeix alumnes per generar fitxes individuals.</div>
+                  )}
+                </div>
+
+                <div className="sociometric-individual-print-stack">
+                  {visibleSociometricIndividualReports.map((report) => (
+                    <article
+                      className={`sociometric-student-report-card ${
+                        selectedSociometricIndividualPreviewReport?.student.id === report.student.id ? 'single-print-target' : ''
+                      }`}
+                      key={report.student.id}
+                    >
+                      <SociometricStudentInsightCard report={report} />
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <section className="sociometric-report-placeholder">
+                <FileText size={24} />
+                <div>
+                  <strong>{selectedSociometricReportTypeMeta.title}</strong>
+                  <p>Aquesta opció queda preparada per a {selectedSociometricReportTypeMeta.status.toLowerCase()}.</p>
+                </div>
+              </section>
+            )}
+
+            <footer className="sociometric-report-print-footer">
+              Informe orientatiu generat amb AvaluaPro. Les dades sociomètriques s’han d’interpretar dins del context
+              educatiu del grup i contrastar-les amb l’observació docent.
+            </footer>
+
+            <footer className="sociometric-report-footer">
+              <p>
+                {selectedSociometricReportType === 'quick'
+                  ? 'L’informe ràpid ja es calcula amb les dades actuals del sociograma i es pot imprimir o guardar com a PDF.'
+                  : selectedSociometricReportType === 'complete'
+                    ? 'L’informe docent complet respecta les seccions actives i es pot imprimir o guardar com a PDF.'
+                    : selectedSociometricReportType === 'comparative'
+                      ? 'L’informe comparatiu reconstrueix dos moments amb les relacions guardades i es pot imprimir o guardar com a PDF.'
+                      : selectedSociometricReportType === 'individual'
+                        ? 'Les fitxes individuals ja es calculen amb les dades actuals i es poden imprimir o guardar com a PDF.'
+                        : 'Aquesta opció queda preparada per a una fase posterior del generador d’informes.'}
+              </p>
+              <button
+                className="primary-action"
+                disabled={!['quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
+                onClick={printSociometricReport}
+                type="button"
+              >
+                <FileDown size={17} />
+                {selectedSociometricReportType === 'individual'
+                  ? 'Imprimir fitxes'
+                  : selectedSociometricReportType === 'complete'
+                    ? 'Imprimir informe complet'
+                    : selectedSociometricReportType === 'comparative'
+                      ? 'Imprimir informe comparatiu'
+                      : 'Imprimir informe ràpid'}
+              </button>
+            </footer>
+          </section>
+
+          <section
             className={`tutorial-sociogram-visual-card relationship-tool-panel ${
               activeRelationshipTool === 'sociogram' ? 'active' : ''
             }`}
@@ -5042,8 +7561,8 @@ export function TutoringView() {
                 </span>
                 <h2>Mapa de relacions</h2>
                 <p>
-                  Clica un alumne per posar-lo al centre i veure ràpidament afinitats, incompatibilitats i alumnes sense
-                  connexions registrades.
+                  Mapa radial estable: els casos més integrats queden cap al centre i els alumnes aïllats o rebutjats
+                  cap a l’exterior. Clica un alumne per enfocar les seves relacions.
                 </p>
               </div>
               <div className="tutorial-sociogram-actions">
@@ -5062,6 +7581,14 @@ export function TutoringView() {
                     </button>
                   ))}
                 </div>
+                <label className="tutorial-sociogram-toggle">
+                  <input
+                    checked={sociogramOnlyReciprocal}
+                    onChange={(event) => setSociogramOnlyReciprocal(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Només recíproques
+                </label>
                 <button
                   className="secondary-action compact"
                   disabled={!classTutorialSociogramLayout && Object.keys(sociogramDraftPositions).length === 0}
@@ -5076,24 +7603,34 @@ export function TutoringView() {
 
             <div className="tutorial-sociogram-insight-grid">
               <article>
-                <span>Densitat de xarxa</span>
+                <span>Cohesió</span>
                 <strong>{sociometricMetrics.density}%</strong>
-                <small>Connexions registrades respecte al total possible.</small>
+                <small>Densitat social registrada.</small>
               </article>
               <article>
                 <span>Inclusió</span>
                 <strong>{sociometricMetrics.inclusion}%</strong>
-                <small>Alumnes amb almenys una relació positiva.</small>
+                <small>Amb almenys una afinitat.</small>
               </article>
               <article>
-                <span>Positivitat</span>
-                <strong>{sociometricMetrics.positivity}%</strong>
-                <small>Pes de les eleccions positives respecte als rebuigs.</small>
+                <span>Recíproques</span>
+                <strong>{sociometricMetrics.reciprocalPairCount}</strong>
+                <small>Parelles socials mútues.</small>
               </article>
               <article>
-                <span>Reciprocitat</span>
-                <strong>{sociometricMetrics.moreno}%</strong>
-                <small>Eleccions positives que són mútues.</small>
+                <span>Rebuig</span>
+                <strong>{sociometricMetrics.rejectionDensity}%</strong>
+                <small>Densitat de rebuig social.</small>
+              </article>
+              <article>
+                <span>Subgrups</span>
+                <strong>{sociometricMetrics.meaningfulSubgroupCount}</strong>
+                <small>Components amb 2+ alumnes.</small>
+              </article>
+              <article>
+                <span>Treball</span>
+                <strong>{sociometricMetrics.workRelationCount}</strong>
+                <small>Relacions docents d’aula.</small>
               </article>
             </div>
 
@@ -5107,29 +7644,77 @@ export function TutoringView() {
               >
                 <svg aria-hidden="true" className="tutorial-sociogram-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
                   <defs>
-                    <marker id="sociogram-arrow-green" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
-                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    <marker
+                      id="sociogram-arrow-green"
+                      markerHeight="10"
+                      markerWidth="10"
+                      orient="auto"
+                      refX="8"
+                      refY="5"
+                    >
+                      <path d="M0,0 L10,5 L0,10 Z" />
                     </marker>
-                    <marker id="sociogram-arrow-blue" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
-                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    <marker
+                      id="sociogram-arrow-blue"
+                      markerHeight="10"
+                      markerWidth="10"
+                      orient="auto"
+                      refX="8"
+                      refY="5"
+                    >
+                      <path d="M0,0 L10,5 L0,10 Z" />
                     </marker>
-                    <marker id="sociogram-arrow-red" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
-                      <path d="M0,0 L7,3.5 L0,7 Z" />
+                    <marker
+                      id="sociogram-arrow-red"
+                      markerHeight="10"
+                      markerWidth="10"
+                      orient="auto"
+                      refX="8"
+                      refY="5"
+                    >
+                      <path d="M0,0 L10,5 L0,10 Z" />
                     </marker>
                   </defs>
+                  {tutorialSociogramMap.rings.map((ring) => (
+                    <ellipse
+                      className={`tutorial-sociogram-ring ring-${ring.categoryId}`}
+                      cx="50"
+                      cy="50"
+                      key={ring.categoryId}
+                      rx={ring.radius}
+                      ry={ring.radius * 0.86}
+                    >
+                      <title>{ring.label}</title>
+                    </ellipse>
+                  ))}
+                  {tutorialSociogramMap.rings.map((ring) => (
+                    <text
+                      className={`tutorial-sociogram-ring-label ring-${ring.categoryId}`}
+                      key={`${ring.categoryId}_label`}
+                      textAnchor="middle"
+                      x="50"
+                      y={Math.max(6, 50 - ring.radius * 0.86 - 1.8)}
+                    >
+                      {ring.label}
+                    </text>
+                  ))}
                   {tutorialSociogramMap.links.map((link) => (
                     <line
-                      className={`tutorial-sociogram-link ${link.typeMeta.tone} ${
+                      className={`tutorial-sociogram-link ${link.typeMeta.tone} ${link.context} ${
+                        link.reciprocal ? 'reciprocal' : ''
+                      } ${
                         link.isSelectedLink ? 'selected' : 'muted'
                       }`}
                       key={link.id}
-                      markerEnd={`url(#sociogram-arrow-${link.typeMeta.tone})`}
-                      strokeWidth={1 + Number(link.strength || 2) * 0.45}
+                      markerEnd={`url(#sociogram-arrow-${
+                        link.context === 'social' ? 'green' : link.context === 'work' ? 'blue' : 'red'
+                      })`}
+                      strokeWidth={1 + getRelationInfluence(link) * 0.55}
                       vectorEffect="non-scaling-stroke"
                       x1={link.source.x}
-                      x2={link.target.x}
+                      x2={link.targetEndpoint.x}
                       y1={link.source.y}
-                      y2={link.target.y}
+                      y2={link.targetEndpoint.y}
                     >
                       <title>
                         {link.source.student.name} → {link.target.student.name}: {link.typeMeta.shortLabel}
@@ -5141,12 +7726,7 @@ export function TutoringView() {
                   {tutorialSociogramMap.nodes.map((node) => {
                     const sociometricRow = sociometricRowsByStudentId.get(node.id)
                     const categoryId = sociometricRow?.categoryMeta?.id || 'average'
-                    const sizeClass =
-                      (sociometricRow?.positiveReceived || 0) >= 4
-                        ? 'node-large'
-                        : (sociometricRow?.positiveReceived || 0) >= 2
-                          ? 'node-medium'
-                          : 'node-small'
+                    const sizeClass = sociometricRow?.nodeSizeClass || 'node-small'
 
                     return (
                       <button
@@ -5165,21 +7745,7 @@ export function TutoringView() {
                         title={`${node.student.name} · ${sociometricRow?.category || 'Promig'}`}
                         type="button"
                       >
-                        {node.student.photoUrl ? (
-                          <img
-                            alt=""
-                            className="tutorial-sociogram-node-photo"
-                            draggable="false"
-                            src={node.student.photoUrl}
-                          />
-                        ) : (
-                          <span>{node.initials}</span>
-                        )}
-                        <strong>{node.student.name}</strong>
-                        <small>
-                          {sociometricRow?.category || 'Promig'} · {sociometricRow?.positiveReceived || 0} reb. ·{' '}
-                          {sociometricRow?.avoidReceived || 0} rebuigs
-                        </small>
+                        <span>{node.code || node.initials}</span>
                       </button>
                     )
                   })}
@@ -5218,14 +7784,33 @@ export function TutoringView() {
             )}
 
             <footer className="tutorial-sociogram-legend">
-              <span className="green">Afinitat / treballa bé</span>
-              <span className="blue">Relació habitual</span>
-              <span className="red">Evitar de moment</span>
-              <span className="gray">Mida = eleccions rebudes</span>
-              <strong>
-                {tutorialSociogramMap.selectedNode?.student.name || 'Sense alumne seleccionat'} ·{' '}
-                {tutorialSociogramMap.relatedCount} relació/ns visibles
-              </strong>
+              <section>
+                <strong>Nodes</strong>
+                <span className="legend-dot green">Líder</span>
+                <span className="legend-dot blue">Promig</span>
+                <span className="legend-dot cyan">Acceptat</span>
+                <span className="legend-dot violet">Controvertit</span>
+                <span className="legend-dot gray">Aïllat</span>
+                <span className="legend-dot red">Rebutjat</span>
+                <span className="legend-outline yellow">Estrella</span>
+              </section>
+              <section>
+                <strong>Línies</strong>
+                <span className="legend-line green">Afinitat social</span>
+                <span className="legend-line blue">Relació de treball</span>
+                <span className="legend-line red">Rebuig</span>
+                <span className="legend-line dark">Recíproca</span>
+              </section>
+              <section>
+                <strong>Mida</strong>
+                <span className="legend-size large">Molts vots</span>
+                <span className="legend-size medium">Alguns vots</span>
+                <span className="legend-size small">Pocs vots</span>
+              </section>
+              <section className="legend-summary">
+                <strong>{tutorialSociogramMap.selectedNode?.student.name || 'Sense alumne seleccionat'}</strong>
+                <span>{tutorialSociogramMap.relatedCount} relació/ns visibles</span>
+              </section>
             </footer>
           </section>
 
@@ -5283,6 +7868,10 @@ export function TutoringView() {
                       </option>
                     ))}
                   </select>
+                  <small>
+                    {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.description ||
+                      'Combina rendiment, seguiment i sociometria.'}
+                  </small>
                 </label>
                 <label className="cooperative-toggle-control">
                   Mig grup
@@ -5387,7 +7976,7 @@ export function TutoringView() {
               <div className="cooperative-group-grid">
                 {visibleCooperativeGroups.map((group) => (
                   <article
-                    className={`cooperative-group-card ${group.avoidRelations.length > 0 ? 'warning' : ''}`}
+                    className={`cooperative-group-card ${group.alertTone || ''}`}
                     key={group.id}
                   >
                     <header>
@@ -5406,6 +7995,7 @@ export function TutoringView() {
                             <span>
                               {member.halfGroup} · {member.performanceLevel}
                               {member.priorityScore >= 4 ? ' · prioritat' : ''}
+                              {member.supportLabel ? ` · ${member.supportLabel}` : ''}
                             </span>
                           </div>
                           <label>
@@ -5429,11 +8019,24 @@ export function TutoringView() {
                       <span>{group.highPerformanceCount} alt rendiment</span>
                       <span>{group.lowPerformanceCount} reforç</span>
                       <span>{group.priorityMembers.length} prioritaris</span>
+                      <span>{group.workRelations.length} vincles de treball</span>
+                      <span>{group.socialRelations.length} vincles socials</span>
+                      {group.alerts.length > 0 ? <span>{group.alerts.length} alertes</span> : null}
                     </div>
 
-                    {(group.supportiveRelations.length > 0 || group.avoidRelations.length > 0) && (
+                    {(group.supportiveRelations.length > 0 || group.avoidRelations.length > 0 || group.alerts.length > 0) && (
                       <div className="cooperative-group-evidence">
-                        {group.supportiveRelations.slice(0, 3).map((relation) => (
+                        {group.workRelations.slice(0, 2).map((relation) => (
+                          <p className="work" key={`${group.id}_${relation.label}_${relation.type}_work`}>
+                            Treball: {relation.label}
+                          </p>
+                        ))}
+                        {group.socialRelations.slice(0, 2).map((relation) => (
+                          <p className="social" key={`${group.id}_${relation.label}_${relation.type}_social`}>
+                            Social: {relation.label}
+                          </p>
+                        ))}
+                        {group.supportiveRelations.slice(0, 1).map((relation) => (
                           <p className="positive" key={`${group.id}_${relation.label}_${relation.type}`}>
                             {relation.typeMeta.shortLabel}: {relation.label}
                           </p>
@@ -5441,6 +8044,11 @@ export function TutoringView() {
                         {group.avoidRelations.slice(0, 3).map((relation) => (
                           <p className="warning" key={`${group.id}_${relation.label}_${relation.type}`}>
                             Revisar: {relation.label}
+                          </p>
+                        ))}
+                        {group.alerts.slice(0, 4).map((alert, index) => (
+                          <p className={`alert ${alert.tone}`} key={`${group.id}_alert_${index}`}>
+                            Alerta: {alert.text}
                           </p>
                         ))}
                       </div>
@@ -5473,7 +8081,7 @@ export function TutoringView() {
                   Mig grup
                   <button
                     className={seatingPrioritizeHalfGroups ? 'active' : ''}
-                    onClick={() => setSeatingPrioritizeHalfGroups((current) => !current)}
+                    onClick={handleToggleSeatingHalfGroups}
                     type="button"
                   >
                     {seatingPrioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
@@ -5538,6 +8146,125 @@ export function TutoringView() {
               ))}
             </div>
 
+            <div className="tutorial-seating-restriction-bar">
+              <div>
+                <SlidersHorizontal aria-hidden="true" size={17} />
+                <span>
+                  <strong>{seatingRestrictionCount}</strong> restriccions actives
+                </span>
+              </div>
+              <button
+                className={seatingBlockSeatMode ? 'active' : ''}
+                disabled={Boolean(selectedSeatingPlan)}
+                onClick={() => {
+                  setSeatingBlockSeatMode((current) => !current)
+                  setSeatingMoveStudentId('')
+                }}
+                type="button"
+              >
+                <Ban aria-hidden="true" size={15} />
+                {seatingBlockSeatMode ? 'Cancel·lar bloqueig' : 'Bloquejar seient'}
+              </button>
+              {seatingBlockSeatMode && <p>Selecciona una taula lliure per bloquejar-la o desbloquejar-la.</p>}
+            </div>
+
+            <section className={`tutorial-seating-quality-panel ${seatingPlanAnalysis.quality.tone}`}>
+              <div className="tutorial-seating-quality-score">
+                <span>Qualitat global</span>
+                <strong>
+                  {seatingPlanAnalysis.score}
+                  <small>/100</small>
+                </strong>
+                <em>{seatingPlanAnalysis.quality.label}</em>
+              </div>
+
+              <div className="tutorial-seating-quality-summary">
+                <div>
+                  <strong>Lectura de la proposta</strong>
+                  <p>{seatingPlanAnalysis.summary}</p>
+                </div>
+                {seatingPlanAnalysis.strengths.length > 0 && (
+                  <ul>
+                    {seatingPlanAnalysis.strengths.map((strength) => (
+                      <li key={strength}>
+                        <CheckCircle2 aria-hidden="true" size={15} />
+                        {strength}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="tutorial-seating-quality-conflicts">
+                <header>
+                  <strong>Conflictes detectats</strong>
+                  <span>{seatingPlanAnalysis.conflicts.length}</span>
+                </header>
+                {seatingPlanAnalysis.conflicts.length > 0 ? (
+                  <div>
+                    {seatingPlanAnalysis.conflicts.slice(0, 3).map((conflict, index) => (
+                      <article className={conflict.severity} key={`${conflict.title}_${conflict.text}_${index}`}>
+                        <AlertTriangle aria-hidden="true" size={14} />
+                        <p>
+                          <strong>{conflict.title}</strong>
+                          <span>{conflict.text}</span>
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty">
+                    <CheckCircle2 aria-hidden="true" size={15} />
+                    Cap conflicte rellevant.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {seatingQualityComparison && (
+              <div
+                className={`tutorial-seating-quality-comparison ${
+                  seatingQualityComparison.scoreDelta > 0
+                    ? 'improved'
+                    : seatingQualityComparison.scoreDelta < 0
+                      ? 'worsened'
+                      : 'stable'
+                }`}
+              >
+                {seatingQualityComparison.scoreDelta > 0 ? (
+                  <TrendingUp aria-hidden="true" size={19} />
+                ) : seatingQualityComparison.scoreDelta < 0 ? (
+                  <TrendingDown aria-hidden="true" size={19} />
+                ) : (
+                  <BarChart3 aria-hidden="true" size={19} />
+                )}
+                <div>
+                  <strong>
+                    {seatingQualityComparison.scoreDelta > 0
+                      ? `El canvi millora ${seatingQualityComparison.scoreDelta} punts`
+                      : seatingQualityComparison.scoreDelta < 0
+                        ? `El canvi empitjora ${Math.abs(seatingQualityComparison.scoreDelta)} punts`
+                        : 'El canvi manté la mateixa puntuació'}
+                  </strong>
+                  <p>
+                    {seatingQualityBaseline.reason}: {seatingQualityBaseline.score}/100 ({seatingQualityBaseline.label}).
+                    Ara: {seatingPlanAnalysis.score}/100 ({seatingPlanAnalysis.quality.label}).
+                    {seatingQualityComparison.conflictDelta !== 0
+                      ? ` ${
+                          seatingQualityComparison.conflictDelta > 0
+                            ? `S’han afegit ${seatingQualityComparison.conflictDelta} conflicte/s.`
+                            : `S’han resolt ${Math.abs(seatingQualityComparison.conflictDelta)} conflicte/s.`
+                        }`
+                      : ' El nombre de conflictes no ha canviat.'}
+                  </p>
+                </div>
+                <button onClick={() => setSeatingQualityBaseline(null)} type="button">
+                  <X aria-hidden="true" size={15} />
+                  <span className="sr-only">Tancar comparació</span>
+                </button>
+              </div>
+            )}
+
             {(generatedSeatingPlan.warnings.length > 0 || hasRelationChangesAfterSeatingSave) && (
               <div className="tutorial-seating-warning">
                 <AlertTriangle size={18} />
@@ -5563,6 +8290,48 @@ export function TutoringView() {
                 <div>
                   {seatingReviewRows.map((placement) => (
                     <span key={placement.studentId}>{placement.student.student.name}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="tutorial-seating-insight-grid">
+              <article>
+                <strong>Incompatibilitats a prop</strong>
+                <span>{seatingPlanAnalysis.adjacentAvoidPairs.length}</span>
+                <p>Alumnes amb rebuig o tensió que han quedat massa a prop.</p>
+              </article>
+              <article>
+                <strong>Suports clars</strong>
+                <span>
+                  {Math.max(
+                    0,
+                    seatingPlanAnalysis.vulnerablePlacements.length - seatingPlanAnalysis.vulnerableWithoutSupport.length,
+                  )}
+                  /{seatingPlanAnalysis.vulnerablePlacements.length}
+                </span>
+                <p>Perfils vulnerables que sí que tenen algun suport proper.</p>
+              </article>
+              <article>
+                <strong>Prioritaris davant</strong>
+                <span>
+                  {seatingPlanAnalysis.priorityInFront.length}/{seatingPlanAnalysis.priorityPlacements.length}
+                </span>
+                <p>Alumnes delicats situats en zones de seguiment més fàcil.</p>
+              </article>
+              <article>
+                <strong>Parelles de treball</strong>
+                <span>{seatingPlanAnalysis.adjacentWorkPairs.length}</span>
+                <p>Vincles de treball útils que han quedat a prop dins l’aula.</p>
+              </article>
+            </div>
+
+            {seatingPlanAnalysis.recommendations.length > 0 && (
+              <div className="tutorial-seating-recommendations">
+                <strong>Recomanacions automàtiques</strong>
+                <div>
+                  {seatingPlanAnalysis.recommendations.map((recommendation) => (
+                    <p key={recommendation}>{recommendation}</p>
                   ))}
                 </div>
               </div>
@@ -5607,99 +8376,453 @@ export function TutoringView() {
               </div>
             )}
 
-            <div className="tutorial-seating-board-grid">
-              {visibleSeatingPlan.seats.map((seat) => {
-                const placement = visibleSeatingPlan.placements.find((item) => item.seat.id === seat.id)
-                const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
-                const isLocked = Boolean(placement?.isLocked || seatingLockedStudentIds.includes(placement?.studentId))
-                return (
-                  <div
-                    className={`tutorial-seat-card ${seat.enabled ? 'active-table' : 'disabled'} ${
-                      placement?.isStar ? 'star' : ''
-                    } ${placement?.isConflict ? 'conflict' : ''} ${
-                      placement ? getHalfGroupClassName(placement.halfGroup) : ''
-                    } ${seatingProblemSeats[placement?.studentId] ? 'problem' : ''} ${
-                      isLocked ? 'locked' : ''
-                    } ${
-                      draggingSeatingStudentId ? 'drop-ready' : ''
-                    }`}
-                    draggable={Boolean(placement && !selectedSeatingPlan && !isLocked)}
-                    key={seat.id}
-                    onClick={() => toggleSeatingGridSeat(seat, placement)}
-                    onDragEnd={() => setDraggingSeatingStudentId('')}
-                    onDragOver={(event) => {
-                      if (seat.enabled && !selectedSeatingPlan) event.preventDefault()
-                    }}
-                    onDragStart={(event) => handleSeatingDragStart(event, placement)}
-                    onDrop={(event) => handleSeatingDrop(event, seat, placement)}
-                    role="button"
-                    tabIndex={0}
-                    title={
-                      placement
-                        ? isLocked
-                          ? 'Aquest alumne està fixat en aquest lloc.'
-                          : 'Clica per deixar aquesta taula buida. Arrossega per intercanviar lloc.'
-                        : seat.enabled
-                          ? 'Clica per deixar aquest espai buit.'
-                          : 'Clica per crear una taula.'
-                    }
-                  >
-                    {!seat.enabled ? (
-                      <span className="empty">Espai</span>
-                    ) : placement ? (
-                      <>
-                        <div className="tutorial-seat-student-media">
-                          {placement.student.student.photoUrl ? (
-                            <img alt="" draggable="false" src={placement.student.student.photoUrl} />
-                          ) : (
-                            <span>{getSociogramInitials(placement.student.student.name)}</span>
-                          )}
-                        </div>
-                        <div className="tutorial-seat-student-copy">
-                          <strong>
-                            {placement.student.student.name}
-                            {placement.isStar ? <Star size={14} /> : null}
-                            {placement.isConflict ? <i aria-label="conflictiu" /> : null}
-                          </strong>
-                          <small>
-                            {placement.halfGroup}
-                            {seatingProblemSeats[placement.studentId]
-                              ? ' · revisar lloc'
-                              : ''}
-                          </small>
-                        </div>
-                        {!selectedSeatingPlan && (
-                          <div className="tutorial-seat-actions">
-                            <button
-                              className={`tutorial-seat-lock-button ${isLocked ? 'active' : ''}`}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                toggleSeatingLockedStudent(placement)
-                              }}
-                              title={isLocked ? 'Desfixar aquest lloc' : 'Fixar aquest alumne en aquest lloc'}
-                              type="button"
-                            >
-                              <Lock size={13} />
-                            </button>
-                            <button
-                              className="tutorial-seat-problem-button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                toggleSeatingProblemSeat(placement)
-                              }}
-                              type="button"
-                            >
-                              Revisar
-                            </button>
+            <div className={`tutorial-seating-workspace ${selectedSeatingProfile ? 'has-panel' : ''}`}>
+              <div
+                className={`tutorial-seating-board-grid ${seatingMoveStudentId ? 'move-mode' : ''} ${
+                  seatingBlockSeatMode ? 'block-mode' : ''
+                }`}
+              >
+                {visibleSeatingPlan.seats.map((seat) => {
+                  const placement = visibleSeatingPlan.placements.find((item) => item.seat.id === seat.id)
+                  const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
+                  const isLocked = Boolean(placement?.isLocked || seatingLockedStudentIds.includes(placement?.studentId))
+                  const isSelected = placement?.studentId === selectedSeatingStudentId
+                  const isBlocked = seatingRestrictions.blockedSeatIds.includes(seat.id)
+                  return (
+                    <div
+                      aria-pressed={isSelected}
+                      className={`tutorial-seat-card ${seat.enabled ? 'active-table' : 'disabled'} ${
+                        placement?.isStar ? 'star' : ''
+                      } ${placement?.isConflict ? 'conflict' : ''} ${
+                        placement ? getHalfGroupClassName(placement.halfGroup) : ''
+                      } ${seatingProblemSeats[placement?.studentId] ? 'problem' : ''} ${
+                        isLocked ? 'locked' : ''
+                      } ${isBlocked ? 'blocked-seat' : ''} ${isSelected ? 'selected' : ''} ${
+                        draggingSeatingStudentId || seatingMoveStudentId ? 'drop-ready' : ''
+                      }`}
+                      draggable={Boolean(placement && !selectedSeatingPlan && !isLocked && !isBlocked)}
+                      key={seat.id}
+                      onClick={() => handleSeatingSeatClick(seat, placement)}
+                      onDragEnd={() => setDraggingSeatingStudentId('')}
+                      onDragOver={(event) => {
+                        if (seat.enabled && !isBlocked && !selectedSeatingPlan) event.preventDefault()
+                      }}
+                      onDragStart={(event) => handleSeatingDragStart(event, placement)}
+                      onDrop={(event) => handleSeatingDrop(event, seat, placement)}
+                      onKeyDown={(event) => {
+                        if (event.currentTarget !== event.target || !['Enter', ' '].includes(event.key)) return
+                        event.preventDefault()
+                        handleSeatingSeatClick(seat, placement)
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={
+                        seatingBlockSeatMode
+                          ? placement
+                            ? 'Només es poden bloquejar taules lliures.'
+                            : 'Bloquejar o desbloquejar aquest seient.'
+                          : seatingMoveStudentId
+                          ? seat.enabled
+                            ? 'Col·locar aquí l’alumne seleccionat.'
+                            : 'Aquest espai no té taula activa.'
+                          : placement
+                            ? 'Seleccionar alumne. També pots arrossegar-lo per intercanviar el lloc.'
+                            : seat.enabled
+                              ? 'Clica per deixar aquest espai buit.'
+                              : 'Clica per crear una taula.'
+                      }
+                    >
+                      {!seat.enabled ? (
+                        <span className="empty">Espai</span>
+                      ) : isBlocked ? (
+                        <span className="empty blocked">
+                          <Ban aria-hidden="true" size={16} />
+                          Bloquejat
+                        </span>
+                      ) : placement ? (
+                        <>
+                          <div className="tutorial-seat-student-media">
+                            {placement.student.student.photoUrl ? (
+                              <img alt="" draggable="false" src={placement.student.student.photoUrl} />
+                            ) : (
+                              <span>{getSociogramInitials(placement.student.student.name)}</span>
+                            )}
                           </div>
+                          <div className="tutorial-seat-student-copy">
+                            <strong title={placement.student.student.name}>
+                              {getSeatingShortName(placement.student.student.name)}
+                            </strong>
+                            <small>
+                              <span aria-hidden="true" />
+                              {placement.halfGroup}
+                            </small>
+                          </div>
+                          <div className="tutorial-seat-statuses">
+                            {placement.isStar ? (
+                              <span className="star" title="Alumne estrella">
+                                <Star aria-hidden="true" size={13} />
+                                <span className="sr-only">Alumne estrella</span>
+                              </span>
+                            ) : null}
+                            {placement.isConflict ? (
+                              <span className="conflict" title="Requereix control de proximitats">
+                                <ShieldAlert aria-hidden="true" size={13} />
+                                <span className="sr-only">Requereix control de proximitats</span>
+                              </span>
+                            ) : null}
+                            {placement.student.supportLabel ? (
+                              <span className="support" title={placement.student.supportLabel}>
+                                <HeartHandshake aria-hidden="true" size={13} />
+                                <span className="sr-only">{placement.student.supportLabel}</span>
+                              </span>
+                            ) : null}
+                          </div>
+                          {!selectedSeatingPlan && (
+                            <div className="tutorial-seat-actions">
+                              <button
+                                aria-label={isLocked ? 'Desfixar aquest lloc' : 'Fixar aquest alumne en aquest lloc'}
+                                className={`tutorial-seat-lock-button ${isLocked ? 'active' : ''}`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setSelectedSeatingStudentId(placement.studentId)
+                                  toggleSeatingLockedStudent(placement)
+                                }}
+                                title={isLocked ? 'Desfixar aquest lloc' : 'Fixar aquest alumne en aquest lloc'}
+                                type="button"
+                              >
+                                <Lock aria-hidden="true" size={13} />
+                              </button>
+                              <button
+                                aria-label={
+                                  seatingProblemSeats[placement.studentId]
+                                    ? `Deixar de revisar el lloc de ${placement.student.student.name}`
+                                    : `Revisar el lloc de ${placement.student.student.name}`
+                                }
+                                className={`tutorial-seat-problem-button ${
+                                  seatingProblemSeats[placement.studentId] ? 'active' : ''
+                                }`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setSelectedSeatingStudentId(placement.studentId)
+                                  toggleSeatingProblemSeat(placement)
+                                }}
+                                title={
+                                  seatingProblemSeats[placement.studentId]
+                                    ? 'Deixar de revisar aquest lloc'
+                                    : 'Marcar aquest lloc per revisar'
+                                }
+                                type="button"
+                              >
+                                <Eye aria-hidden="true" size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="empty">{isManualEmpty ? 'Buida' : 'Taula lliure'}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {selectedSeatingProfile && (
+                <aside className="tutorial-seating-student-panel" aria-label="Detall de l’alumne seleccionat">
+                  <header>
+                    <div className="tutorial-seating-panel-identity">
+                      <div className="tutorial-seating-panel-avatar">
+                        {selectedSeatingProfile.student.photoUrl ? (
+                          <img alt="" src={selectedSeatingProfile.student.photoUrl} />
+                        ) : (
+                          <span>{getSociogramInitials(selectedSeatingProfile.student.name)}</span>
                         )}
-                      </>
-                    ) : (
-                      <span className="empty">{isManualEmpty ? 'Buida' : 'Taula lliure'}</span>
-                    )}
+                      </div>
+                      <div>
+                        <span>{selectedSeatingProfile.halfGroup}</span>
+                        <h3>{selectedSeatingProfile.student.name}</h3>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Tancar el panell de l’alumne"
+                      onClick={() => {
+                        setSelectedSeatingStudentId('')
+                        setSeatingMoveStudentId('')
+                      }}
+                      title="Tancar"
+                      type="button"
+                    >
+                      <X aria-hidden="true" size={17} />
+                    </button>
+                  </header>
+
+                  <div className="tutorial-seating-position">
+                    <MapPin aria-hidden="true" size={17} />
+                    <div>
+                      <strong>{selectedSeatingContext.zoneLabel}</strong>
+                      <span>
+                        {selectedSeatingPlacement
+                          ? `Fila ${selectedSeatingPlacement.seat.y + 1} · columna ${selectedSeatingPlacement.seat.x + 1}`
+                          : 'Encara no té una taula assignada'}
+                      </span>
+                    </div>
                   </div>
-                )
-              })}
+
+                  <div className="tutorial-seating-profile-metrics">
+                    <div>
+                      <span>Rendiment</span>
+                      <strong>{formatAverageGrade(selectedSeatingProfile.tutorialProfile.averageScore)}</strong>
+                    </div>
+                    <div>
+                      <span>Prioritat</span>
+                      <strong>{selectedSeatingProfile.priorityScore > 0 ? `P${selectedSeatingProfile.priorityScore}` : 'OK'}</strong>
+                    </div>
+                    <div>
+                      <span>Sociometria</span>
+                      <strong>{selectedSeatingProfile.sociometricCategory}</strong>
+                    </div>
+                    <div>
+                      <span>Seguiment</span>
+                      <strong>{selectedSeatingProfile.recordSeverity || 0}</strong>
+                    </div>
+                  </div>
+
+                  <section>
+                    <strong>Per què és aquí</strong>
+                    <ul>
+                      {selectedSeatingContext.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  {selectedSeatingContext.alerts.length > 0 && (
+                    <section className="risk">
+                      <strong>Cal revisar</strong>
+                      <ul>
+                        {selectedSeatingContext.alerts.map((alert) => (
+                          <li key={alert}>{alert}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {selectedSeatingContext.nearby.length > 0 && (
+                    <section>
+                      <strong>Alumnes propers</strong>
+                      <div className="tutorial-seating-nearby-list">
+                        {selectedSeatingContext.nearby.map((item) => {
+                          const relationLabel = item.pair.hasAvoid
+                            ? 'Evitar'
+                            : item.pair.workInfluence > 0
+                              ? 'Treball'
+                              : item.pair.socialInfluence > 0
+                                ? 'Social'
+                                : item.pair.supportiveInfluence > 0
+                                  ? 'Suport'
+                                  : 'Proximitat'
+                          return (
+                            <div key={item.placement.studentId}>
+                              <span>{item.placement.student.student.name}</span>
+                              <strong className={item.pair.hasAvoid ? 'risk' : ''}>
+                                {relationLabel} · {item.distance <= 1 ? 'al costat' : 'a prop'}
+                              </strong>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  )}
+
+                  {!selectedSeatingPlan && (
+                    <section className="tutorial-seating-restrictions-panel">
+                      <div className="tutorial-seating-restrictions-heading">
+                        <strong>Restriccions pedagògiques</strong>
+                        {(selectedNeverNearIds.length > 0 ||
+                          selectedPreferNearIds.length > 0 ||
+                          selectedPreferredZone ||
+                          selectedAvoidedZone) && (
+                          <button onClick={clearSelectedSeatingRestrictions} type="button">
+                            Netejar
+                          </button>
+                        )}
+                      </div>
+
+                      <label>
+                        Relació amb un altre alumne
+                        <select
+                          onChange={(event) => setSeatingRestrictionTargetId(event.target.value)}
+                          value={seatingRestrictionTargetId}
+                        >
+                          <option value="">Selecciona alumne</option>
+                          {classStudents
+                            .filter((student) => student.id !== selectedSeatingStudentId)
+                            .map((student) => (
+                              <option key={student.id} value={student.id}>
+                                {student.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <div className="tutorial-seating-pair-actions">
+                        <button
+                          className={
+                            seatingRestrictionTargetId &&
+                            selectedNeverNearIds.includes(seatingRestrictionTargetId)
+                              ? 'never active'
+                              : 'never'
+                          }
+                          disabled={!seatingRestrictionTargetId}
+                          onClick={() => toggleSeatingPairRestriction('never')}
+                          type="button"
+                        >
+                          <Ban aria-hidden="true" size={14} />
+                          Mai a prop
+                        </button>
+                        <button
+                          className={
+                            seatingRestrictionTargetId &&
+                            selectedPreferNearIds.includes(seatingRestrictionTargetId)
+                              ? 'near active'
+                              : 'near'
+                          }
+                          disabled={!seatingRestrictionTargetId}
+                          onClick={() => toggleSeatingPairRestriction('near')}
+                          type="button"
+                        >
+                          <HeartHandshake aria-hidden="true" size={14} />
+                          Millor a prop
+                        </button>
+                      </div>
+
+                      <div className="tutorial-seating-zone-controls">
+                        <label>
+                          Zona preferent
+                          <select
+                            onChange={(event) =>
+                              setSelectedSeatingZoneRestriction('preferred', event.target.value)
+                            }
+                            value={selectedPreferredZone}
+                          >
+                            <option value="">Sense preferència</option>
+                            <option value="front">Davant</option>
+                            <option value="center">Centre</option>
+                            <option value="back">Darrere</option>
+                          </select>
+                        </label>
+                        <label>
+                          Zona a evitar
+                          <select
+                            onChange={(event) => setSelectedSeatingZoneRestriction('avoided', event.target.value)}
+                            value={selectedAvoidedZone}
+                          >
+                            <option value="">Cap zona</option>
+                            <option value="front">Davant</option>
+                            <option value="center">Centre</option>
+                            <option value="back">Darrere</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="tutorial-seating-restriction-chips">
+                        {selectedNeverNearIds.map((studentId) => (
+                          <span className="never" key={`never_${studentId}`}>
+                            Mai: {getSeatingShortName(classStudents.find((student) => student.id === studentId)?.name)}
+                          </span>
+                        ))}
+                        {selectedPreferNearIds.map((studentId) => (
+                          <span className="near" key={`near_${studentId}`}>
+                            A prop: {getSeatingShortName(classStudents.find((student) => student.id === studentId)?.name)}
+                          </span>
+                        ))}
+                        {selectedPreferredZone && (
+                          <span>
+                            Preferent:{' '}
+                            {selectedPreferredZone === 'front'
+                              ? 'davant'
+                              : selectedPreferredZone === 'back'
+                                ? 'darrere'
+                                : 'centre'}
+                          </span>
+                        )}
+                        {selectedAvoidedZone && (
+                          <span className="never">
+                            Evitar:{' '}
+                            {selectedAvoidedZone === 'front'
+                              ? 'davant'
+                              : selectedAvoidedZone === 'back'
+                                ? 'darrere'
+                                : 'centre'}
+                          </span>
+                        )}
+                        {selectedSeatingIsLocked && <span>Alumne fix</span>}
+                      </div>
+                    </section>
+                  )}
+
+                  {seatingMoveStudentId === selectedSeatingStudentId && (
+                    <div className="tutorial-seating-move-notice">
+                      <Move aria-hidden="true" size={17} />
+                      <span>Tria una taula activa. Si està ocupada, intercanviarem els alumnes.</span>
+                    </div>
+                  )}
+
+                  {!selectedSeatingPlan ? (
+                    <div className="tutorial-seating-panel-actions">
+                      <button
+                        className={seatingMoveStudentId === selectedSeatingStudentId ? 'active' : ''}
+                        onClick={() =>
+                          setSeatingMoveStudentId((current) =>
+                            current === selectedSeatingStudentId ? '' : selectedSeatingStudentId,
+                          )
+                        }
+                        type="button"
+                      >
+                        <Move aria-hidden="true" size={16} />
+                        {selectedSeatingPlacement ? 'Moure alumne' : 'Triar un lloc'}
+                      </button>
+                      <button
+                        className={selectedSeatingIsLocked ? 'active' : ''}
+                        disabled={!selectedSeatingPlacement}
+                        onClick={() => toggleSeatingLockedStudent(selectedSeatingPlacement)}
+                        type="button"
+                      >
+                        <Lock aria-hidden="true" size={16} />
+                        {selectedSeatingIsLocked ? 'Desfixar lloc' : 'Fixar lloc'}
+                      </button>
+                      <button
+                        className={selectedSeatingNeedsReview ? 'review-active' : ''}
+                        disabled={!selectedSeatingPlacement}
+                        onClick={() => toggleSeatingProblemSeat(selectedSeatingPlacement)}
+                        type="button"
+                      >
+                        <Eye aria-hidden="true" size={16} />
+                        {selectedSeatingNeedsReview ? 'Revisió marcada' : 'Marcar per revisar'}
+                      </button>
+                      <button
+                        disabled={!selectedSeatingPlacement}
+                        onClick={handleRegenerateWithSelectedStudentLocked}
+                        type="button"
+                      >
+                        <Shuffle aria-hidden="true" size={16} />
+                        Regenerar mantenint-lo
+                      </button>
+                      <button
+                        className="danger"
+                        disabled={!selectedSeatingPlacement || selectedSeatingIsLocked}
+                        onClick={handleUnseatSelectedStudent}
+                        type="button"
+                      >
+                        <UserX aria-hidden="true" size={16} />
+                        Deixar pendent
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="tutorial-seating-readonly-note">
+                      Estàs consultant una disposició guardada. Torna a la proposta actual per editar-la.
+                    </p>
+                  )}
+                </aside>
+              )}
             </div>
           </section>
 
@@ -5973,7 +9096,8 @@ export function TutoringView() {
                           {isOutgoing ? 'Cap a' : 'Rep de'} {otherStudent?.name || 'Alumne no trobat'}
                         </strong>
                         <span>
-                          {typeMeta.shortLabel} · intensitat {relation.strength || 2}
+                          {typeMeta.shortLabel} · intensitat {relation.strength || 2} ·{' '}
+                          {relation.sourceLabel || 'Criteri docent'}
                         </span>
                         {relation.note && <p>{relation.note}</p>}
                       </article>
@@ -6135,6 +9259,7 @@ export function TutoringView() {
           onDeleteRecord={deleteTutorialRecord}
           profile={selectedTutorialProfile}
           recordRow={tutorialRecordRowsByStudent.get(selectedTutorialProfile.student.id)}
+          sociometricReport={sociometricIndividualReportsByStudentId.get(selectedTutorialProfile.student.id)}
         />
       )}
 

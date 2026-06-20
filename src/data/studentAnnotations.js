@@ -1,7 +1,12 @@
 export const DIAGNOSIS_OPTIONS = [
   {
     id: 'dyslexia',
-    label: 'Dislèxia / Discalcúlia',
+    label: 'Dislèxia',
+    color: 'blue',
+  },
+  {
+    id: 'dyscalculia',
+    label: 'Discalcúlia',
     color: 'blue',
   },
   {

@@ -15,11 +15,13 @@ export const COLLECTIONS = [
   'tutorialMarks',
   'tutorialRelations',
   'tutorialGroupSets',
+  'tutorialSociometricMoments',
   'tutorialSociogramLayouts',
   'tutorialStudentRoles',
   'tutorialSeatingPlans',
   'seatingCharts',
   'studentAntecedents',
+  'sociometricSurveys',
 ]
 
 export const EMPTY_DATASET = COLLECTIONS.reduce(
@@ -484,9 +486,11 @@ export const seedDataset = {
   tutorialMarks: [],
   tutorialRelations: [],
   tutorialGroupSets: [],
+  tutorialSociometricMoments: [],
   tutorialSociogramLayouts: [],
   tutorialStudentRoles: [],
   tutorialSeatingPlans: [],
   seatingCharts: [],
   studentAntecedents: [],
+  sociometricSurveys: [],
 }

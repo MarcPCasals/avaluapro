@@ -1,5 +1,6 @@
 import {
   Camera,
+  FileDown,
   FileClock,
   MessageCircle,
   MessageSquareText,
@@ -9,7 +10,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_LIBRARY } from '../../data/diagnosisLibrary'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
@@ -22,9 +23,26 @@ import {
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { SociometricStudentInsightCard } from '../tutoring/SociometricStudentInsightCard'
+import { buildSociometricStudentReportsFromRelations } from '../tutoring/sociometricStudentProfileUtils'
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString('ca-ES')
+}
+
+function formatLongDate(date) {
+  return new Date(date).toLocaleDateString('ca-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function printStudentProfileSheet() {
+  document.body.classList.add('student-profile-printing')
+  const clearPrintClass = () => document.body.classList.remove('student-profile-printing')
+  window.addEventListener('afterprint', clearPrintClass, { once: true })
+  window.print()
 }
 
 function StudentNoteHistoryModal({ notes, onClose, onDelete, onSave, title, tone }) {
@@ -208,6 +226,14 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const subjectCompetencies = getSubjectStructure(studentClass?.subject || state.profile.defaultSubject) || []
   const classTasks = state.tasks.filter((task) => task.classId === student?.classId)
   const classBehaviorEvents = state.behaviorEvents.filter((event) => event.classId === student?.classId)
+  const classStudents = useMemo(
+    () => state.students.filter((item) => item.classId === student?.classId),
+    [state.students, student?.classId],
+  )
+  const classTutorialRelations = useMemo(
+    () => state.tutorialRelations.filter((relation) => relation.classId === student?.classId),
+    [state.tutorialRelations, student?.classId],
+  )
   const currentEvaluation = student
     ? getStudentEvaluationScore(student.id, state)
     : { grade: '', score: 0 }
@@ -280,6 +306,28 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const [showPtiLinkModal, setShowPtiLinkModal] = useState(false)
   const [ptiLinkDraft, setPtiLinkDraft] = useState(student?.ptiUrl || '')
   const [historyModalType, setHistoryModalType] = useState('')
+  const sociometricReport = useMemo(
+    () =>
+      buildSociometricStudentReportsFromRelations({
+        relations: classTutorialRelations,
+        students: classStudents,
+      }).find((report) => report.student.id === studentId) || null,
+    [classStudents, classTutorialRelations, studentId],
+  )
+  const activeDiagnosisLabels = diagnoses
+    .map((diagnosisId) => DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)?.label)
+    .filter(Boolean)
+  const printDate = useMemo(() => formatLongDate(new Date()), [])
+  const studentPrintSummary = {
+    evaluation: currentEvaluation.grade || '-',
+    incidents: currentIncidents,
+    records: agendaNotes.length,
+    redPoints: currentRedPointCount,
+    tracking:
+      currentTracking.hasTrackingData
+        ? `${currentTracking.consistency}% · ${currentTracking.total} tasques`
+        : 'Sense dades encara',
+  }
 
   if (!student) return null
 
@@ -425,12 +473,108 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             <span>{student.halfGroup || 'Sense mig grup assignat'}</span>
             <small>{mode === 'tracking' ? 'Perfil personal des del seguiment' : 'Perfil personal des de l’avaluació'}</small>
           </div>
-          {onOpenAnnotations && (
-            <button className="secondary-action" onClick={() => onOpenAnnotations(studentId)} type="button">
-              <MessageCircle size={16} />
-              Obrir resum i anotacions
+          <div className="student-profile-print-actions">
+            {onOpenAnnotations && (
+              <button className="secondary-action" onClick={() => onOpenAnnotations(studentId)} type="button">
+                <MessageCircle size={16} />
+                Obrir resum i anotacions
+              </button>
+            )}
+            <button className="secondary-action" onClick={printStudentProfileSheet} type="button">
+              <FileDown size={16} />
+              Imprimir resum PDF
             </button>
-          )}
+          </div>
+        </section>
+
+        <section className="student-profile-print-sheet">
+          <header className="student-profile-print-header">
+            <div>
+              <span>AvaluaPro · Perfil individual</span>
+              <h3>{student.name}</h3>
+              <p>
+                {studentClass?.name || 'Classe sense nom'} · Generat el {printDate}
+              </p>
+            </div>
+            <div className="student-profile-print-badges">
+              <span className={`student-profile-print-pill ${currentProfileSnapshot.tone}`}>{currentProfileSnapshot.label}</span>
+              {sociometricReport ? (
+                <span className={`student-profile-print-pill ${sociometricReport.categoryMeta.tone}`}>
+                  {sociometricReport.category}
+                </span>
+              ) : null}
+            </div>
+          </header>
+
+          <div className="student-profile-print-metrics">
+            <article>
+              <span>Nota actual</span>
+              <strong>{studentPrintSummary.evaluation}</strong>
+            </article>
+            <article>
+              <span>Constància</span>
+              <strong>{studentPrintSummary.tracking}</strong>
+            </article>
+            <article>
+              <span>Registres</span>
+              <strong>{studentPrintSummary.records}</strong>
+            </article>
+            <article>
+              <span>Incidències</span>
+              <strong>{studentPrintSummary.incidents}</strong>
+            </article>
+          </div>
+
+          <div className="student-profile-print-grid">
+            <article className="student-profile-print-card">
+              <strong>Lectura actual</strong>
+              <p>{currentProfileSnapshot.text}</p>
+              <ul>
+                <li>Punts vermells estimats: {studentPrintSummary.redPoints}</li>
+                <li>
+                  Antecedents:{' '}
+                  {antecedentReading || 'encara no hi ha comparativa prèvia disponible per aquest alumne'}
+                </li>
+              </ul>
+            </article>
+
+            <article className="student-profile-print-card">
+              <strong>Seguiment docent</strong>
+              <p>
+                {teamNote || tutoringNote
+                  ? 'Ja hi ha observacions registrades que poden contextualitzar la lectura acadèmica i relacional.'
+                  : 'Encara no hi ha observacions qualitatives guardades en aquest perfil.'}
+              </p>
+              <ul>
+                <li>Equip educatiu: {teamNote ? 'sí' : 'no'}</li>
+                <li>Tutoria: {tutoringNote ? 'sí' : 'no'}</li>
+                <li>Diagnòstics actius: {activeDiagnosisLabels.length > 0 ? activeDiagnosisLabels.join(', ') : 'cap'}</li>
+              </ul>
+            </article>
+          </div>
+
+          <section className="tutorial-profile-sociometric-section student-profile-print-sociometric">
+            <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+            <SociometricStudentInsightCard
+              emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per generar el resum relacional."
+              report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
+              showSupportLabel
+            />
+          </section>
+
+          <footer className="student-profile-print-footer">
+            Resum orientatiu per a seguiment docent. Cal interpretar-lo amb el context real d’aula i contrastar-lo amb
+            observació i evidències recents.
+          </footer>
+        </section>
+
+        <section className="tutorial-profile-sociometric-section">
+          <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+          <SociometricStudentInsightCard
+            emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per mostrar aquesta lectura."
+            report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
+            showSupportLabel
+          />
         </section>
 
         <section className="annotation-section" data-tour="annotation-diagnosis">

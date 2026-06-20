@@ -15,14 +15,20 @@ import {
   listReceivedTutoringInvitations,
   listSentTeacherGradePackages,
   listSentTutoringInvitationUpdates,
+  createSociometricSurveyDocument,
   listCloudBackups,
+  listSociometricSurveyResponses,
   listTutoringSpacesForUser,
+  leaveTutoringSpace,
   loadCloudBackup,
   loadCloudDataset,
   loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
+  removeTutoringSpaceMember,
   respondTutoringInvitation,
+  updateSociometricSurveyDocumentStatus,
+  updateSociometricSurveySyncMeta,
   saveCloudBackup,
   saveCloudCollections,
   saveTutoringSpace,
@@ -30,7 +36,9 @@ import {
   sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
+  tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
+import { mergeSharedRows } from '../lib/sharedTutoringRows'
 
 const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
@@ -41,6 +49,14 @@ const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
 const SHARED_TUTORING_SYNC_COLLECTIONS = new Set([...SHARED_TUTORING_COLLECTIONS, 'classes'])
+const SOCIOMETRIC_SURVEY_STATUS = {
+  ACTIVE: 'active',
+  CLOSED: 'closed',
+}
+const SOCIOMETRIC_DEFAULT_POSITIVE_LIMIT = 4
+const SOCIOMETRIC_DEFAULT_AVOID_LIMIT = 3
+const SOCIOMETRIC_PUBLIC_FORM_SOURCE = 'sociometric-public-form'
+const TEACHER_OBSERVATION_RELATION_SOURCE = 'teacher-observation'
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
@@ -179,6 +195,46 @@ function formatStudentNameForDisplay(rawName = '') {
   return `${toTitleCase(surnames)}, ${toTitleCase(rest.join(',').trim())}`.trim()
 }
 
+function normalizeStudentOption(option = {}) {
+  return {
+    id: String(option.id || option.studentId || '').trim(),
+    name: formatStudentNameForDisplay(option.name || option.studentName || ''),
+  }
+}
+
+function normalizeSociometricSurvey(survey = {}) {
+  const now = new Date().toISOString()
+  const status = Object.values(SOCIOMETRIC_SURVEY_STATUS).includes(survey.status)
+    ? survey.status
+    : SOCIOMETRIC_SURVEY_STATUS.ACTIVE
+  const studentOptions = (Array.isArray(survey.studentOptions) ? survey.studentOptions : [])
+    .map(normalizeStudentOption)
+    .filter((option) => option.id && option.name)
+
+  return {
+    id: String(survey.id || createId('survey')).replaceAll('/', '_'),
+    avoidLimit: Math.max(0, Number(survey.avoidLimit) || SOCIOMETRIC_DEFAULT_AVOID_LIMIT),
+    classId: String(survey.classId || '').trim(),
+    className: String(survey.className || '').trim(),
+    createdAt: survey.createdAt || now,
+    importedRelationCount: Math.max(0, Number(survey.importedRelationCount) || 0),
+    lastSyncedAt: survey.lastSyncedAt || '',
+    memberUids: Array.isArray(survey.memberUids)
+      ? survey.memberUids.map((uid) => String(uid || '').trim()).filter(Boolean)
+      : [],
+    ownerEmailLower: normalizeEmail(survey.ownerEmailLower || survey.ownerEmail || ''),
+    ownerUid: String(survey.ownerUid || '').trim(),
+    positiveLimit: Math.max(0, Number(survey.positiveLimit) || SOCIOMETRIC_DEFAULT_POSITIVE_LIMIT),
+    responseCount: Math.max(0, Number(survey.responseCount) || 0),
+    status,
+    studentOptionIds: Array.isArray(survey.studentOptionIds)
+      ? survey.studentOptionIds.map((studentId) => String(studentId || '').trim()).filter(Boolean)
+      : studentOptions.map((option) => option.id),
+    studentOptions,
+    updatedAt: survey.updatedAt || survey.createdAt || now,
+  }
+}
+
 function normalizeDataset(dataset) {
   let normalizedDataset = { ...dataset }
   normalizedDataset = COLLECTIONS.reduce(
@@ -212,6 +268,7 @@ function normalizeDataset(dataset) {
       ...student,
       name: formatStudentNameForDisplay(student.name),
     })),
+    sociometricSurveys: normalizedDataset.sociometricSurveys.map(normalizeSociometricSurvey),
     uts: normalizedDataset.uts.filter((ut) => ut.name !== 'Transversals' || usedUtIds.has(ut.id)),
   }
 
@@ -513,43 +570,6 @@ function normalizeName(value = '') {
     .toLowerCase()
 }
 
-function getSharedRowVersion(row = {}) {
-  return [row.sharedUpdatedAt, row.updatedAt, row.createdAt]
-    .map((value) => String(value || ''))
-    .filter(Boolean)
-    .sort()
-    .at(-1) || ''
-}
-
-function mergeSharedRows(localRows = [], incomingRows = []) {
-  const rowsById = new Map()
-
-  localRows.forEach((row) => {
-    if (!row?.id) return
-    rowsById.set(row.id, row)
-  })
-
-  incomingRows.forEach((row) => {
-    if (!row?.id) return
-    const current = rowsById.get(row.id)
-    if (!current) {
-      rowsById.set(row.id, row)
-      return
-    }
-
-    const currentVersion = getSharedRowVersion(current)
-    const incomingVersion = getSharedRowVersion(row)
-    rowsById.set(
-      row.id,
-      incomingVersion && (!currentVersion || incomingVersion >= currentVersion)
-        ? { ...current, ...row }
-        : { ...row, ...current },
-    )
-  })
-
-  return Array.from(rowsById.values())
-}
-
 function getTutorialMarkKey(mark) {
   return [mark.classId, mark.studentId, mark.subject, mark.competencyKey || mark.criterionKey || ''].join('::')
 }
@@ -626,6 +646,61 @@ function mergeSharedTutorialMarks(baseMarks = [], autoLinkedMarks = []) {
   return Array.from(marksByKey.values())
 }
 
+function buildSociometricPublicRelations({ responses = [], students = [], survey }) {
+  const studentIds = new Set(students.map((student) => student.id))
+  const classId = survey?.classId || ''
+  const importedAt = new Date().toISOString()
+  const relationDrafts = []
+  const skipped = []
+
+  responses.forEach((response) => {
+    const sourceStudentId = String(response.studentId || '').trim()
+    if (!sourceStudentId || !studentIds.has(sourceStudentId)) {
+      skipped.push({ reason: 'source-not-found', responseId: response.id || response.responseId || '' })
+      return
+    }
+
+    const avoidIds = new Set(
+      (Array.isArray(response.avoidStudentIds) ? response.avoidStudentIds : [])
+        .map((studentId) => String(studentId || '').trim())
+        .filter((studentId) => studentId && studentId !== sourceStudentId && studentIds.has(studentId)),
+    )
+    const positiveIds = new Set(
+      (Array.isArray(response.positiveStudentIds) ? response.positiveStudentIds : [])
+        .map((studentId) => String(studentId || '').trim())
+        .filter((studentId) => studentId && studentId !== sourceStudentId && studentIds.has(studentId) && !avoidIds.has(studentId)),
+    )
+
+    positiveIds.forEach((targetStudentId) => {
+      relationDrafts.push({
+        classId,
+        importedAt,
+        source: SOCIOMETRIC_PUBLIC_FORM_SOURCE,
+        sourceLabel: 'Qüestionari públic',
+        sourceStudentId,
+        strength: 2,
+        targetStudentId,
+        type: 'friendship',
+      })
+    })
+
+    avoidIds.forEach((targetStudentId) => {
+      relationDrafts.push({
+        classId,
+        importedAt,
+        source: SOCIOMETRIC_PUBLIC_FORM_SOURCE,
+        sourceLabel: 'Qüestionari públic',
+        sourceStudentId,
+        strength: 2,
+        targetStudentId,
+        type: 'avoid',
+      })
+    })
+  })
+
+  return { relationDrafts, skipped }
+}
+
 function getSharedTutoringDatasetForClass(state, classId) {
   const targetClass = state.classes.find((classItem) => classItem.id === classId)
   const rosterClassId = targetClass?.tutorialLinkedClassId || classId
@@ -649,6 +724,7 @@ function getSharedTutoringDatasetForClass(state, classId) {
         studentIds.has(relation.targetStudentId),
     ),
     tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId === classId),
+    tutorialSociometricMoments: (state.tutorialSociometricMoments || []).filter((moment) => moment.classId === classId),
     tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId === classId),
     tutorialStudentRoles: (state.tutorialStudentRoles || []).filter(
       (role) => role.classId === classId || studentIds.has(role.studentId),
@@ -660,6 +736,30 @@ function getSharedTutoringDatasetForClass(state, classId) {
   }
 }
 
+function getSharedTutoringClassForRow(state, classId) {
+  if (!classId) return null
+
+  return state.classes.find(
+    (classItem) =>
+      classItem.sharedTutoringSpaceId &&
+      (classItem.id === classId || classItem.tutorialLinkedClassId === classId),
+  ) || null
+}
+
+async function tombstoneSharedRowIfNeeded(state, collectionName, row) {
+  if (!state.cloud.user || !row?.id) return null
+  const sharedClass = getSharedTutoringClassForRow(state, row.classId)
+  if (!sharedClass?.sharedTutoringSpaceId) return null
+
+  return tombstoneTutoringSpaceRow({
+    classId: sharedClass.id,
+    collectionName,
+    documentId: row.id,
+    spaceId: sharedClass.sharedTutoringSpaceId,
+    user: state.cloud.user,
+  })
+}
+
 function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, rosterClassId = classId) {
   return {
     students: (sharedCollections.students || []).map((student) => ({ ...student, classId: rosterClassId })),
@@ -667,10 +767,67 @@ function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, roster
     tutorialMarks: (sharedCollections.tutorialMarks || []).map((mark) => ({ ...mark, classId })),
     tutorialRelations: (sharedCollections.tutorialRelations || []).map((relation) => ({ ...relation, classId })),
     tutorialGroupSets: (sharedCollections.tutorialGroupSets || []).map((groupSet) => ({ ...groupSet, classId })),
+    tutorialSociometricMoments: (sharedCollections.tutorialSociometricMoments || []).map((moment) => ({ ...moment, classId })),
     tutorialSociogramLayouts: (sharedCollections.tutorialSociogramLayouts || []).map((layout) => ({ ...layout, classId })),
     tutorialStudentRoles: (sharedCollections.tutorialStudentRoles || []).map((role) => ({ ...role, classId })),
     tutorialSeatingPlans: (sharedCollections.tutorialSeatingPlans || []).map((plan) => ({ ...plan, classId })),
     studentAntecedents: (sharedCollections.studentAntecedents || []).map((antecedent) => ({ ...antecedent, classId })),
+  }
+}
+
+function buildTutorialSociometricMoment({
+  capturedAt = new Date().toISOString(),
+  classId,
+  label = '',
+  relations = [],
+  source = 'manual',
+  sourceSurveyId = '',
+  students = [],
+}) {
+  const cleanRelations = (relations || [])
+    .filter((relation) => relation.classId === classId)
+    .map((relation) => ({
+      classId,
+      createdAt: relation.createdAt || '',
+      id: relation.id || '',
+      importedAt: relation.importedAt || '',
+      note: relation.note || '',
+      source: relation.source || '',
+      sourceLabel: relation.sourceLabel || '',
+      sourceStudentId: relation.sourceStudentId || '',
+      strength: Number(relation.strength) || 2,
+      targetStudentId: relation.targetStudentId || '',
+      type: relation.type || '',
+      updatedAt: relation.updatedAt || '',
+    }))
+  const studentIds = new Set((students || []).map((student) => student.id))
+  const relationCount = cleanRelations.length
+  const responseLikeCount = new Set(
+    cleanRelations
+      .filter((relation) => relation.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE)
+      .map((relation) => relation.sourceStudentId)
+      .filter(Boolean),
+  ).size
+  const dayLabel = capturedAt.slice(0, 10)
+
+  return {
+    capturedAt,
+    classId,
+    createdAt: capturedAt,
+    id: createId('smoment'),
+    label:
+      String(label || '').trim() ||
+      (source === 'survey-sync'
+        ? `Qüestionari sincronitzat · ${dayLabel}`
+        : `Moment sociomètric · ${dayLabel}`),
+    relationCount,
+    relationsSnapshot: cleanRelations,
+    responseCount: responseLikeCount,
+    rosterCount: studentIds.size,
+    source,
+    sourceSurveyId: String(sourceSurveyId || '').trim(),
+    studentIds: [...studentIds],
+    updatedAt: capturedAt,
   }
 }
 
@@ -701,7 +858,8 @@ function parseBackupDataset(backup) {
           collection === 'tutorialSociogramLayouts' ||
           collection === 'tutorialStudentRoles' ||
           collection === 'tutorialSeatingPlans' ||
-          collection === 'studentAntecedents') &&
+          collection === 'studentAntecedents' ||
+          collection === 'sociometricSurveys') &&
         source[collection] === undefined
       ) {
         return { ...dataset, [collection]: [] }
@@ -1678,6 +1836,7 @@ export const useAvaluaproStore = create((set, get) => ({
           !studentIds.has(relation.targetStudentId),
       ),
       tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId !== classId),
+      tutorialSociometricMoments: (state.tutorialSociometricMoments || []).filter((moment) => moment.classId !== classId),
       tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
       tutorialStudentRoles: (state.tutorialStudentRoles || []).filter(
         (role) => role.classId !== classId && !studentIds.has(role.studentId),
@@ -1687,6 +1846,7 @@ export const useAvaluaproStore = create((set, get) => ({
       studentAntecedents: state.studentAntecedents.filter(
         (antecedent) => antecedent.classId !== classId && !studentIds.has(antecedent.studentId),
       ),
+      sociometricSurveys: (state.sociometricSurveys || []).filter((survey) => survey.classId !== classId),
       ui,
     })
     writePreferences({ ...readPreferences(), ...ui })
@@ -1796,6 +1956,17 @@ export const useAvaluaproStore = create((set, get) => ({
   updateTutorialMark: async ({ classId, studentId, subject, competencyKey, criterionKey, value }) => {
     const targetKey = competencyKey || criterionKey
     if (!classId || !studentId || !subject || !targetKey) return
+    const state = get()
+    const existingMark = state.tutorialMarks.find(
+      (mark) =>
+        mark.classId === classId &&
+        mark.studentId === studentId &&
+        mark.subject === subject &&
+        (mark.competencyKey === targetKey || (!competencyKey && mark.criterionKey === targetKey)),
+    )
+    if (!value && existingMark) {
+      await tombstoneSharedRowIfNeeded(state, 'tutorialMarks', existingMark)
+    }
 
     set((state) => {
       const existing = state.tutorialMarks.find(
@@ -2311,6 +2482,96 @@ export const useAvaluaproStore = create((set, get) => ({
     }))
   },
 
+  removeSharedTutoringMember: async ({ classId = get().ui.activeClassId, memberEmail }) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió amb Google abans de retirar un cotutor.')
+    if (!classItem?.sharedTutoringSpaceId) throw new Error('Aquesta classe no té cap cotutoria compartida.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'saving' },
+    }))
+
+    try {
+      const space = await removeTutoringSpaceMember({
+        memberEmail,
+        spaceId: classItem.sharedTutoringSpaceId,
+        user,
+      })
+      set((current) => ({
+        classes: current.classes.map((item) =>
+          item.id === classId ? { ...item, sharedTutoringMemberEmails: space.memberEmails || [] } : item,
+        ),
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: '',
+          sharedTutoringSpaces: current.cloud.sharedTutoringSpaces.map((item) =>
+            item.id === space.id ? space : item,
+          ),
+          sharedTutoringStatus: 'saved',
+        },
+      }))
+      await persistCollections(set, get, ['classes'])
+      await get().loadSharedTutoringSpaces()
+      return space
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’ha pogut retirar aquest cotutor.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
+  leaveSharedTutoringSpace: async (classId = get().ui.activeClassId) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió amb Google abans d’abandonar una cotutoria.')
+    if (!classItem?.sharedTutoringSpaceId) throw new Error('Aquesta classe no té cap cotutoria compartida.')
+
+    set((current) => ({
+      cloud: { ...current.cloud, sharedTutoringError: '', sharedTutoringStatus: 'saving' },
+    }))
+
+    try {
+      const spaceId = classItem.sharedTutoringSpaceId
+      await leaveTutoringSpace({ spaceId, user })
+      set((current) => ({
+        classes: current.classes.map((item) =>
+          item.id === classId
+            ? {
+                ...item,
+                sharedTutoringMemberEmails: [],
+                sharedTutoringSpaceId: '',
+              }
+            : item,
+        ),
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: '',
+          sharedTutoringSpaces: current.cloud.sharedTutoringSpaces.filter((space) => space.id !== spaceId),
+          sharedTutoringStatus: 'left',
+        },
+      }))
+      await persistCollections(set, get, ['classes'])
+      await get().loadSharedTutoringSpaces()
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          sharedTutoringError: error.message || 'No s’ha pogut abandonar aquesta cotutoria.',
+          sharedTutoringStatus: 'error',
+        },
+      }))
+      throw error
+    }
+  },
+
   linkClassToSharedTutoringSpace: async ({ classId = get().ui.activeClassId, spaceId }) => {
     const state = get()
     const user = state.cloud.user
@@ -2350,6 +2611,10 @@ export const useAvaluaproStore = create((set, get) => ({
         tutorialRecords: mergeSharedRows(current.tutorialRecords, mappedDataset.tutorialRecords),
         tutorialRelations: mergeSharedRows(current.tutorialRelations, mappedDataset.tutorialRelations),
         tutorialSeatingPlans: mergeSharedRows(current.tutorialSeatingPlans, mappedDataset.tutorialSeatingPlans),
+        tutorialSociometricMoments: mergeSharedRows(
+          current.tutorialSociometricMoments,
+          mappedDataset.tutorialSociometricMoments,
+        ),
         tutorialSociogramLayouts: mergeSharedRows(current.tutorialSociogramLayouts, mappedDataset.tutorialSociogramLayouts),
         tutorialStudentRoles: mergeSharedRows(current.tutorialStudentRoles, mappedDataset.tutorialStudentRoles),
         cloud: {
@@ -2478,14 +2743,26 @@ export const useAvaluaproStore = create((set, get) => ({
 
   deleteTutorialRecord: async (recordId) => {
     if (!recordId) return
+    const state = get()
+    const record = state.tutorialRecords.find((item) => item.id === recordId)
+    await tombstoneSharedRowIfNeeded(state, 'tutorialRecords', record)
 
-    set((state) => ({
-      tutorialRecords: state.tutorialRecords.filter((record) => record.id !== recordId),
+    set((current) => ({
+      tutorialRecords: current.tutorialRecords.filter((item) => item.id !== recordId),
     }))
     await persistCollections(set, get, ['tutorialRecords'])
   },
 
-  upsertTutorialRelation: async ({ classId, sourceStudentId, targetStudentId, type, strength = 2, note }) => {
+  upsertTutorialRelation: async ({
+    classId,
+    source = TEACHER_OBSERVATION_RELATION_SOURCE,
+    sourceLabel = 'Criteri docent',
+    sourceStudentId,
+    targetStudentId,
+    type,
+    strength = 3,
+    note,
+  }) => {
     if (!classId || !sourceStudentId || !targetStudentId || !type || sourceStudentId === targetStudentId) return
 
     const cleanNote = String(note || '').trim()
@@ -2510,6 +2787,8 @@ export const useAvaluaproStore = create((set, get) => ({
           createdAt: now,
         }),
         note: cleanNote,
+        source,
+        sourceLabel,
         strength: cleanStrength,
         updatedAt: now,
       }
@@ -2584,11 +2863,225 @@ export const useAvaluaproStore = create((set, get) => ({
 
   deleteTutorialRelation: async (relationId) => {
     if (!relationId) return
+    const state = get()
+    const relation = state.tutorialRelations.find((item) => item.id === relationId)
+    await tombstoneSharedRowIfNeeded(state, 'tutorialRelations', relation)
 
-    set((state) => ({
-      tutorialRelations: state.tutorialRelations.filter((relation) => relation.id !== relationId),
+    set((current) => ({
+      tutorialRelations: current.tutorialRelations.filter((item) => item.id !== relationId),
     }))
     await persistCollections(set, get, ['tutorialRelations'])
+  },
+
+  createSociometricSurvey: async ({
+    avoidLimit = SOCIOMETRIC_DEFAULT_AVOID_LIMIT,
+    classId = get().ui.activeClassId,
+    positiveLimit = SOCIOMETRIC_DEFAULT_POSITIVE_LIMIT,
+  } = {}) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!classItem) throw new Error('No s’ha trobat aquesta classe.')
+    if (!user?.uid || !user?.email) {
+      throw new Error('Cal iniciar sessió amb Google abans de crear un qüestionari sociomètric.')
+    }
+
+    const now = new Date().toISOString()
+    const studentOptions = getTutoringRosterStudents(state, classId).map((student) => ({
+      id: student.id,
+      name: student.name,
+    }))
+    const memberUids = Array.from(
+      new Set([
+        user.uid,
+        ...(Array.isArray(classItem.sharedTutoringMemberUids) ? classItem.sharedTutoringMemberUids : []),
+      ]),
+    ).filter(Boolean)
+    const survey = normalizeSociometricSurvey({
+      id: createId('survey'),
+      avoidLimit,
+      classId,
+      className: classItem.name,
+      createdAt: now,
+      lastSyncedAt: '',
+      memberUids,
+      ownerEmailLower: normalizeEmail(user.email),
+      ownerUid: user.uid,
+      positiveLimit,
+      responseCount: 0,
+      status: SOCIOMETRIC_SURVEY_STATUS.ACTIVE,
+      studentOptionIds: studentOptions.map((student) => student.id),
+      studentOptions,
+      updatedAt: now,
+    })
+
+    await createSociometricSurveyDocument({ survey, user })
+    set((current) => ({
+      sociometricSurveys: [survey, ...(current.sociometricSurveys || [])],
+    }))
+    await persistCollections(set, get, ['sociometricSurveys'])
+    return survey
+  },
+
+  setSociometricSurveyStatus: async (surveyId, status) => {
+    if (!surveyId || !Object.values(SOCIOMETRIC_SURVEY_STATUS).includes(status)) return null
+
+    const now = new Date().toISOString()
+    let updatedSurvey = null
+    set((state) => ({
+      sociometricSurveys: (state.sociometricSurveys || []).map((survey) => {
+        if (survey.id !== surveyId) return survey
+        updatedSurvey = normalizeSociometricSurvey({ ...survey, status, updatedAt: now })
+        return updatedSurvey
+      }),
+    }))
+    if (updatedSurvey) {
+      await updateSociometricSurveyDocumentStatus({ status, surveyId })
+    }
+    await persistCollections(set, get, ['sociometricSurveys'])
+    return updatedSurvey
+  },
+
+  captureTutorialSociometricMoment: async ({
+    classId = get().ui.activeClassId,
+    label = '',
+    relations = null,
+    source = 'manual',
+    sourceSurveyId = '',
+  } = {}) => {
+    if (!classId) return null
+
+    const state = get()
+    const classRelations = Array.isArray(relations)
+      ? relations.filter((relation) => relation.classId === classId)
+      : (state.tutorialRelations || []).filter((relation) => relation.classId === classId)
+    const classStudents = getTutoringRosterStudents(state, classId)
+    const moment = buildTutorialSociometricMoment({
+      capturedAt: new Date().toISOString(),
+      classId,
+      label,
+      relations: classRelations,
+      source,
+      sourceSurveyId,
+      students: classStudents,
+    })
+
+    set((current) => ({
+      tutorialSociometricMoments: [moment, ...(current.tutorialSociometricMoments || [])],
+    }))
+    await persistCollections(set, get, ['tutorialSociometricMoments'])
+    return moment
+  },
+
+  syncSociometricSurveyResponses: async (surveyId) => {
+    const state = get()
+    const survey = (state.sociometricSurveys || []).find((item) => item.id === surveyId)
+    if (!survey) throw new Error('No s’ha trobat aquest qüestionari sociomètric.')
+
+    const responses = await listSociometricSurveyResponses(survey.id)
+    const students = getTutoringRosterStudents(state, survey.classId)
+    const { relationDrafts, skipped } = buildSociometricPublicRelations({ responses, students, survey })
+    const now = new Date().toISOString()
+    const legacyPublicPositiveKeys = new Set(
+      relationDrafts
+        .filter((relation) => relation.type === 'friendship' && relation.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE)
+        .map((relation) => `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_positive`),
+    )
+    const baseRelations = state.tutorialRelations.filter((relation) => {
+      const key = `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_${relation.type}`
+      return !(relation.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE && legacyPublicPositiveKeys.has(key))
+    })
+    const indexByKey = new Map(
+      baseRelations.map((relation, index) => [
+        `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_${relation.type}`,
+        index,
+      ]),
+    )
+    const nextRelations = [...baseRelations]
+    const stats = {
+      createdCount: 0,
+      importedRelationCount: 0,
+      responseCount: responses.length,
+      skippedCount: skipped.length,
+      skippedExistingManualCount: 0,
+      updatedCount: 0,
+    }
+
+    relationDrafts.forEach((relation) => {
+      const key = `${relation.classId}_${relation.sourceStudentId}_${relation.targetStudentId}_${relation.type}`
+      const existingIndex = indexByKey.get(key)
+      const nextRelation = {
+        ...relation,
+        importedAt: relation.importedAt || now,
+        updatedAt: now,
+      }
+
+      if (existingIndex >= 0) {
+        const existingRelation = nextRelations[existingIndex]
+        if (existingRelation.source && existingRelation.source !== SOCIOMETRIC_PUBLIC_FORM_SOURCE) {
+          stats.skippedExistingManualCount += 1
+          return
+        }
+        if (!existingRelation.source) {
+          stats.skippedExistingManualCount += 1
+          return
+        }
+
+        nextRelations[existingIndex] = {
+          ...existingRelation,
+          ...nextRelation,
+          createdAt: existingRelation.createdAt || now,
+        }
+        stats.updatedCount += 1
+        stats.importedRelationCount += 1
+        return
+      }
+
+      indexByKey.set(key, nextRelations.length)
+      nextRelations.push({
+        id: createId('trel'),
+        createdAt: now,
+        ...nextRelation,
+      })
+      stats.createdCount += 1
+      stats.importedRelationCount += 1
+    })
+
+    const nextMoment = buildTutorialSociometricMoment({
+      capturedAt: now,
+      classId: survey.classId,
+      label: `${survey.className || 'Qüestionari'} · ${now.slice(0, 10)}`,
+      relations: nextRelations,
+      source: 'survey-sync',
+      sourceSurveyId: survey.id,
+      students,
+    })
+
+    await updateSociometricSurveySyncMeta({
+      importedRelationCount: stats.importedRelationCount,
+      lastSyncedAt: now,
+      responseCount: stats.responseCount,
+      surveyId: survey.id,
+    })
+
+    set((current) => ({
+      sociometricSurveys: (current.sociometricSurveys || []).map((item) =>
+        item.id === survey.id
+          ? normalizeSociometricSurvey({
+              ...item,
+              importedRelationCount: stats.importedRelationCount,
+              lastSyncedAt: now,
+              responseCount: stats.responseCount,
+              updatedAt: now,
+            })
+          : item,
+      ),
+      tutorialSociometricMoments: [nextMoment, ...(current.tutorialSociometricMoments || [])],
+      tutorialRelations: nextRelations,
+    }))
+    await persistCollections(set, get, ['sociometricSurveys', 'tutorialRelations', 'tutorialSociometricMoments'])
+
+    return { ...stats, momentId: nextMoment.id }
   },
 
   saveTutorialGroupSet: async ({ classId, name, groupSize, prioritizeHalfGroups, strategy, groups }) => {
@@ -2625,9 +3118,12 @@ export const useAvaluaproStore = create((set, get) => ({
 
   deleteTutorialGroupSet: async (groupSetId) => {
     if (!groupSetId) return
+    const state = get()
+    const groupSet = (state.tutorialGroupSets || []).find((item) => item.id === groupSetId)
+    await tombstoneSharedRowIfNeeded(state, 'tutorialGroupSets', groupSet)
 
-    set((state) => ({
-      tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.id !== groupSetId),
+    set((current) => ({
+      tutorialGroupSets: (current.tutorialGroupSets || []).filter((item) => item.id !== groupSetId),
     }))
     await persistCollections(set, get, ['tutorialGroupSets'])
   },
@@ -2665,9 +3161,16 @@ export const useAvaluaproStore = create((set, get) => ({
 
   resetTutorialSociogramLayout: async (classId) => {
     if (!classId) return
+    const state = get()
+    const layouts = (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId === classId)
+    await Promise.all(
+      layouts.map((layout) => tombstoneSharedRowIfNeeded(state, 'tutorialSociogramLayouts', layout)),
+    )
 
-    set((state) => ({
-      tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId !== classId),
+    set((current) => ({
+      tutorialSociogramLayouts: (current.tutorialSociogramLayouts || []).filter(
+        (layout) => layout.classId !== classId,
+      ),
     }))
     await persistCollections(set, get, ['tutorialSociogramLayouts'])
   },
@@ -2676,6 +3179,14 @@ export const useAvaluaproStore = create((set, get) => ({
     if (!classId || !studentId || !role) return
 
     const now = new Date().toISOString()
+    const state = get()
+    const existingRole = (state.tutorialStudentRoles || []).find(
+      (item) => item.classId === classId && item.studentId === studentId && item.role === role,
+    )
+    if (existingRole) {
+      await tombstoneSharedRowIfNeeded(state, 'tutorialStudentRoles', existingRole)
+    }
+
     set((state) => {
       const existing = (state.tutorialStudentRoles || []).find(
         (item) => item.classId === classId && item.studentId === studentId && item.role === role,
@@ -3243,30 +3754,123 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   deleteStudentAntecedent: async (studentId) => {
-    set((state) => ({
-      studentAntecedents: state.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
+    const state = get()
+    const antecedents = state.studentAntecedents.filter((antecedent) => antecedent.studentId === studentId)
+    await Promise.all(
+      antecedents.map((antecedent) => tombstoneSharedRowIfNeeded(state, 'studentAntecedents', antecedent)),
+    )
+
+    set((current) => ({
+      studentAntecedents: current.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
     }))
     await persistCollections(set, get, ['studentAntecedents'])
   },
 
   deleteStudent: async (studentId) => {
-    set((state) => ({
-      students: state.students.filter((student) => student.id !== studentId),
-      marks: state.marks.filter((mark) => mark.studentId !== studentId),
-      taskRecords: state.taskRecords.filter((record) => record.studentId !== studentId),
-      behaviorEvents: state.behaviorEvents.filter((event) => event.studentId !== studentId),
-      agendaNotes: state.agendaNotes.filter((note) => note.studentId !== studentId),
-      studentAntecedents: state.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
-      tutorialGroupSets: (state.tutorialGroupSets || []).map((groupSet) => ({
+    const state = get()
+    const student = state.students.find((item) => item.id === studentId)
+    if (!student) return
+
+    const activeSurveysWithStudent = (state.sociometricSurveys || []).filter(
+      (survey) =>
+        survey.status === SOCIOMETRIC_SURVEY_STATUS.ACTIVE &&
+        (survey.studentOptionIds || survey.studentOptions?.map((option) => option.id) || []).includes(studentId),
+    )
+    const publicActiveSurveys = activeSurveysWithStudent.filter((survey) => survey.ownerUid)
+    if (publicActiveSurveys.length > 0 && !state.cloud.user) {
+      throw new Error(
+        'Aquest alumne apareix en un qüestionari sociomètric públic actiu. Inicia sessió per tancar-lo abans d’eliminar l’alumne.',
+      )
+    }
+    await Promise.all(
+      publicActiveSurveys.map((survey) =>
+        updateSociometricSurveyDocumentStatus({
+          status: SOCIOMETRIC_SURVEY_STATUS.CLOSED,
+          surveyId: survey.id,
+        }),
+      ),
+    )
+
+    const sharedRows = [
+      ['students', student],
+      ...state.studentAntecedents
+        .filter((antecedent) => antecedent.studentId === studentId)
+        .map((row) => ['studentAntecedents', row]),
+      ...state.tutorialRecords
+        .filter((record) => record.studentId === studentId)
+        .map((row) => ['tutorialRecords', row]),
+      ...state.tutorialMarks
+        .filter((mark) => mark.studentId === studentId)
+        .map((row) => ['tutorialMarks', row]),
+      ...state.tutorialRelations
+        .filter((relation) => relation.sourceStudentId === studentId || relation.targetStudentId === studentId)
+        .map((row) => ['tutorialRelations', row]),
+      ...(state.tutorialStudentRoles || [])
+        .filter((role) => role.studentId === studentId)
+        .map((row) => ['tutorialStudentRoles', row]),
+    ]
+    await Promise.all(
+      sharedRows.map(([collectionName, row]) => tombstoneSharedRowIfNeeded(state, collectionName, row)),
+    )
+
+    const now = new Date().toISOString()
+    set((current) => ({
+      students: current.students.filter((item) => item.id !== studentId),
+      marks: current.marks.filter((mark) => mark.studentId !== studentId),
+      taskRecords: current.taskRecords.filter((record) => record.studentId !== studentId),
+      behaviorEvents: current.behaviorEvents.filter((event) => event.studentId !== studentId),
+      agendaNotes: current.agendaNotes.filter((note) => note.studentId !== studentId),
+      studentAntecedents: current.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
+      tutorialRecords: current.tutorialRecords.filter((record) => record.studentId !== studentId),
+      tutorialMarks: current.tutorialMarks.filter((mark) => mark.studentId !== studentId),
+      tutorialRelations: current.tutorialRelations.filter(
+        (relation) => relation.sourceStudentId !== studentId && relation.targetStudentId !== studentId,
+      ),
+      tutorialStudentRoles: (current.tutorialStudentRoles || []).filter((role) => role.studentId !== studentId),
+      tutorialGroupSets: (current.tutorialGroupSets || []).map((groupSet) => ({
         ...groupSet,
         groups: (groupSet.groups || []).map((group) => ({
           ...group,
           memberIds: (group.memberIds || []).filter((memberId) => memberId !== studentId),
         })),
+        updatedAt: now,
       })),
-      tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).map((layout) => ({
+      tutorialSociometricMoments: (current.tutorialSociometricMoments || []).map((moment) => {
+        const relationsSnapshot = (moment.relationsSnapshot || []).filter(
+          (relation) => relation.sourceStudentId !== studentId && relation.targetStudentId !== studentId,
+        )
+        const studentIds = (moment.studentIds || []).filter((id) => id !== studentId)
+        return {
+          ...moment,
+          relationCount: relationsSnapshot.length,
+          relationsSnapshot,
+          rosterCount: studentIds.length,
+          studentIds,
+          updatedAt: now,
+        }
+      }),
+      tutorialSociogramLayouts: (current.tutorialSociogramLayouts || []).map((layout) => ({
         ...layout,
         positions: (layout.positions || []).filter((position) => position.studentId !== studentId),
+        updatedAt: now,
+      })),
+      tutorialSeatingPlans: (current.tutorialSeatingPlans || []).map((plan) => ({
+        ...plan,
+        layout: {
+          ...(plan.layout || {}),
+          lockedStudentIds: (plan.layout?.lockedStudentIds || []).filter((id) => id !== studentId),
+        },
+        seats: (plan.seats || []).filter((seat) => seat.studentId !== studentId),
+        updatedAt: now,
+      })),
+      sociometricSurveys: (current.sociometricSurveys || []).map((survey) => ({
+        ...survey,
+        status: activeSurveysWithStudent.some((item) => item.id === survey.id)
+          ? SOCIOMETRIC_SURVEY_STATUS.CLOSED
+          : survey.status,
+        studentOptionIds: (survey.studentOptionIds || []).filter((id) => id !== studentId),
+        studentOptions: (survey.studentOptions || []).filter((option) => option.id !== studentId),
+        updatedAt: now,
       })),
     }))
     await persistCollections(set, get, [
@@ -3276,8 +3880,15 @@ export const useAvaluaproStore = create((set, get) => ({
       'behaviorEvents',
       'agendaNotes',
       'studentAntecedents',
+      'tutorialRecords',
+      'tutorialMarks',
+      'tutorialRelations',
       'tutorialGroupSets',
+      'tutorialSociometricMoments',
       'tutorialSociogramLayouts',
+      'tutorialStudentRoles',
+      'tutorialSeatingPlans',
+      'sociometricSurveys',
     ])
   },
 

@@ -8,7 +8,15 @@ Les rutes indicades són les carpetes i fitxers dins del repositori GitHub:
 
 ## Lectura recomanada principal
 
-### 1. Fitxa tècnica per a Direcció i Ministeri
+### 1. Full de ruta institucional, empresarial i de protecció de dades
+
+Ruta: `docs/full-de-ruta-institucional-i-empresa.md`
+
+Document mestre de projecte. Ordena cronològicament els passos per passar del quadern docent personal a un producte institucional, i diferencia les tasques fetes, parcials, pendents i ajornades.
+
+També recull els dubtes que s'han de resoldre amb el Ministeri, l'OMPA, l'assessor de protecció de dades, la gestoria i els possibles proveïdors d'infraestructura.
+
+### 2. Fitxa tècnica per a Direcció i Ministeri
 
 Ruta: `docs/fitxa-tecnica-direccio-ministeri.md`
 
@@ -16,7 +24,7 @@ Document principal de presentació. Resumeix què és Avaluapro, com està const
 
 És el primer document que cal llegir si es vol una visió general seriosa i presentable.
 
-### 2. Protecció de dades Avaluapro
+### 3. Protecció de dades Avaluapro
 
 Ruta: `docs/proteccio-dades-avaluapro.md`
 
@@ -24,7 +32,7 @@ Explica com Avaluapro tracta les dades personals i educatives: autenticació, se
 
 És el document més adequat per parlar amb direcció, responsables de centre o persones encarregades de revisar privacitat.
 
-### 3. Mapa de dades
+### 4. Mapa de dades
 
 Ruta: `docs/mapa-dades.md`
 
@@ -32,7 +40,7 @@ Enumera les dades que pot guardar Avaluapro: alumnes, notes, seguiment, diagnòs
 
 També classifica el risc de cada tipus de dada i justifica si cal guardar-la.
 
-### 4. Firebase i accés
+### 5. Firebase i accés
 
 Ruta: `docs/firebase-acces.md`
 
@@ -40,7 +48,7 @@ Detalla com funciona l'autenticació amb Google, la separació de dades per usua
 
 És útil si una persona tècnica vol entendre com s'impedeix que un usuari vegi dades d'un altre.
 
-### 5. Compartició entre docents
+### 6. Compartició entre docents
 
 Ruta: `docs/comparticio-docents.md`
 
@@ -48,7 +56,15 @@ Explica el sistema de paquets de notes, l'enviament voluntari de dades entre doc
 
 És important si es vol presentar Avaluapro com una eina col·laborativa i no només com un quadern personal del docent.
 
-### 6. Checklist final de seguretat
+### 7. Auditoria de compartició i permisos
+
+Ruta: `docs/auditoria-comparticio-permisos.md`
+
+Compara els permisos actuals amb el model recomanat i identifica els riscos crítics de cotutories, membres, eliminacions i qüestionaris sociomètrics.
+
+Aquest document és intern i no s'ha de presentar com una certificació de seguretat. Serveix per dirigir les correccions pendents.
+
+### 8. Checklist final de seguretat
 
 Ruta: `docs/checklist-final-seguretat.md`
 
@@ -122,12 +138,14 @@ Configuració de Firebase Hosting i deploy.
 ## Ordre recomanat per presentar-ho
 
 1. Obrir l'aplicació: `https://avaluapro.web.app`
-2. Llegir o ensenyar: `docs/fitxa-tecnica-direccio-ministeri.md`
-3. Si preocupa la protecció de dades: `docs/proteccio-dades-avaluapro.md`
-4. Si volen saber quines dades es guarden: `docs/mapa-dades.md`
-5. Si ho revisa una persona tècnica: `docs/firebase-acces.md` i `firestore.rules`
-6. Si interessa el treball entre docents: `docs/comparticio-docents.md`
-7. Per tancar: `docs/checklist-final-seguretat.md`
+2. Situar l'estat i els passos futurs: `docs/full-de-ruta-institucional-i-empresa.md`
+3. Llegir o ensenyar: `docs/fitxa-tecnica-direccio-ministeri.md`
+4. Si preocupa la protecció de dades: `docs/proteccio-dades-avaluapro.md`
+5. Si volen saber quines dades es guarden: `docs/mapa-dades.md`
+6. Si ho revisa una persona tècnica: `docs/firebase-acces.md` i `firestore.rules`
+7. Si interessa el treball entre docents: `docs/comparticio-docents.md`
+8. Per revisar riscos pendents: `docs/auditoria-comparticio-permisos.md`
+9. Per tancar: `docs/checklist-final-seguretat.md`
 
 ## Nota important
 

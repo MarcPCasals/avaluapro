@@ -50,12 +50,14 @@ L'acces al nuvol es fa amb autenticacio de Google. Cada docent autenticat te un 
 
 Les regles de Firestore fan que un usuari nomes pugui llegir i escriure les dades del seu propi espai. Aixo reforca el model actual d'Avaluapro com a quadern docent personal.
 
-Els paquets de notes entre docents son una excepcio controlada:
+Les dades privades continuen separades per `uid`, pero ara existeixen diversos fluxos compartits que requereixen controls especifics:
 
-- l'emissor crea el paquet;
-- nomes l'emissor i el correu destinatari poden llegir-lo;
-- el destinatari nomes pot marcar-lo com a importat;
-- el destinatari no pot modificar el contingut del paquet.
+- paquets puntuals de notes entre emissor i destinatari;
+- espais persistents de cotutoria amb dades tutorials;
+- safates d'invitacions de cotutoria;
+- qüestionaris sociometrics actius amb formulari public.
+
+La cotutoria compartida pot incloure perfils d'alumnes, registres, notes tutorials, relacions, sociograma, rols, agrupaments, disposicions i antecedents. Per aquest motiu, aquesta part no es considera institucionalment validada fins que es completi l'auditoria definida a `docs/comparticio-docents.md`.
 
 ## 5. Mesures tecniques aplicades
 
@@ -65,7 +67,7 @@ Avaluapro incorpora aquestes mesures:
 - separacio de dades per usuari a Firestore;
 - rules de Firestore per impedir accessos entre usuaris;
 - espai separat per a copies al nuvol;
-- rules especifiques per als paquets de notes entre docents;
+- rules especifiques per als paquets de notes, cotutories, invitacions i qüestionaris sociometrics;
 - copies locals amb IndexedDB per evitar perdua de dades per problemes de connexio;
 - copies manuals exportables en JSON;
 - registre de l'ultima sincronitzacio i de les darreres copies al nuvol;
@@ -161,4 +163,4 @@ Per tant, Avaluapro esta preparat per treballar amb criteris de seguretat i mini
 
 Avaluapro protegeix les dades mitjancant autenticacio Google, separacio per usuari, rules de Firestore, copies de seguretat controlades, avisos d'us responsable i criteris de minimitzacio. Les dades mes sensibles son diagnostics, comentaris tutorials, DOIPs, comportament, fotos, sociograma i copies de seguretat.
 
-L'aplicacio esta dissenyada com a quadern docent personal amb dades separades per usuari. Per a un us institucional ampli, caldria completar la validacio legal, definir el contracte d'encarrec de tractament i valorar mesures futures com Firebase Storage i App Check.
+L'aplicacio combina un quadern docent personal amb funcionalitats compartides. L'espai privat continua separat per usuari, pero les cotutories i la sociometria necessiten una nova auditoria de permisos, revocacio, eliminacio, autoria i exposicio publica abans d'un us institucional. Tambe cal completar la validacio legal, definir el contracte d'encarrec de tractament i valorar mesures futures com Firebase Storage i App Check.

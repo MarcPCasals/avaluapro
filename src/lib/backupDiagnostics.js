@@ -17,6 +17,7 @@ const IMPORTANT_COLLECTIONS = [
   ['tutorialSociogramLayouts', 'mapes de sociograma'],
   ['seatingCharts', 'llocs fixos'],
   ['studentAntecedents', 'antecedents acadèmics'],
+  ['sociometricSurveys', 'qüestionaris sociomètrics'],
 ]
 
 function getCollectionsFromBackup(backup) {

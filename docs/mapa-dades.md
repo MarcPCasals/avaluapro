@@ -19,6 +19,9 @@ Cal evitar escriure informacio medica, familiar o personal que no sigui estricta
 | Firestore `users/{uid}/...` | Dades personals del docent sincronitzades al nuvol | Les rules actuals fan que cada usuari nomes pugui llegir i escriure el seu propi espai. |
 | Firestore `users/{uid}/cloudBackups/...` | Copies de seguretat al nuvol | Guardades per usuari. Cada copia separa les col.leccions en subcol.leccions. |
 | Firestore `teacherGradePackages` | Enviament de notes entre docents | Espai compartit controlat per emissor i correu destinatari. Requereix especial cura. |
+| Firestore `tutoringSpaces` | Cotutories persistents entre docents | Pot replicar perfils, registres, notes tutorials, relacions, sociograma, rols, disposicions i antecedents. Risc molt alt. |
+| Firestore `tutoringInvitationInbox/Outbox` | Invitacions i respostes de cotutoria | Conté correus, uid, classe, estat i dates de resposta. |
+| Firestore `sociometricSurveys` | Formularis sociometrics i respostes | Un qüestionari actiu pot ser consultat publicament mitjancant el seu identificador. Requereix revisio especifica. |
 | Fitxers JSON descarregats | Copies manuals al dispositiu | El fitxer queda fora d'Avaluapro i passa a dependre de la custodia del docent. |
 | Firebase Storage | Encara no s'utilitza | Recomanat per a fotos i imatges grans en una fase posterior. |
 
@@ -39,6 +42,8 @@ Cal evitar escriure informacio medica, familiar o personal que no sigui estricta
 | Disposicio d'aula | Matriu de taules, alumnes assignats, taules lliures, alumnes bloquejats, alumnes a revisar, versions guardades | `tutorialSeatingPlans` | IndexedDB, Firestore, backups | Proposar i conservar disposicions d'aula | Alta | Combina foto, mig grup, rol, notes i relacions. Convindria no exportar-ho sense necessitat. |
 | Copies de seguretat | Export complet o parcial de dades del docent, metadades de copia, data, usuari, col.leccions | Fitxers JSON, `cloudBackups` | Dispositiu local i Firestore | Recuperar dades, canviar dispositiu, conservar final de curs | Molt alta | Un backup pot contenir gairebe totes les dades. Cal explicar custodia, descarrega i eliminacio. |
 | Enviament de notes entre docents | Paquets de notes per classe/materia, emissor, destinatari, estat d'importacio, errors d'alumnes no trobats | `teacherGradePackages` | Firestore global amb rules especifiques | Enviar notes d'assignatura al tutor sense copiar manualment | Alta | Requereix registre clar, destinatari correcte i missatges d'error quan no coincideixen alumnes o classes. |
+| Cotutoria compartida | Perfils, registres, notes, relacions, grups, sociograma, rols, disposicions i antecedents | `tutoringSpaces` i subcol.leccions | Firestore compartit entre membres | Permetre treball tutorial conjunt | Molt alta | Cal auditar rols, revocacio, eliminacio, autoria i minim privilegi abans d'un pilot institucional. |
+| Qüestionari sociometric public | Llista d'alumnes, alumne que respon, eleccions positives i alumnes a evitar | `sociometricSurveys` i `responses` | Firestore; lectura/escriptura parcial publica mentre esta actiu | Recollir relacions sociometriques | Molt alta | Cal revisar noms visibles, suplantacio, duplicats, caducitat, informacio als alumnes i conservacio. |
 | Antecedents academics | Ultima mirada del curs anterior per competencia, perfil anterior, diagnostics opcionals, observacions inicials | `studentAntecedents` | IndexedDB, Firestore, backups | Comencar curs amb context pedagogic i comparar evolucio | Molt alta | Ha de ser portable pero minim. Evitar incloure classe antiga o dades no necessaries. |
 | Perfil docent i configuracio | Materia principal, classes, colors, ordre, tutor, preferencies UI, ultima pantalla oberta | `classes`, `ui` local, `teacherProfile` o camps similars | IndexedDB, Firestore, localStorage per preferencies petites | Personalitzar Avaluapro i recuperar l'estat de treball | Baixa-mitjana | No es tan sensible, pero identifica docent i organitzacio del curs. |
 
@@ -151,6 +156,9 @@ Les rules de Firestore separen tres espais principals:
 | `users/{uid}/...` | Nomes `request.auth.uid == uid` pot llegir, crear, editar o esborrar | Correcte per a un model de quadern docent personal. |
 | `users/{uid}/cloudBackups/...` | Mateixa separacio per usuari | Correcte. Les copies al nuvol no son globals. |
 | `teacherGradePackages/{packageId}` | Emissor i destinatari poden llegir el paquet | Correcte, pero es l'espai mes delicat perque es compartit entre docents. |
+| `tutoringSpaces/{spaceId}` i subcol.leccions | Membres de la cotutoria poden accedir a l'espai | Molt delicat: falta auditar permisos granulars, revocacio i eliminacio. |
+| Safates d'invitacions | Emissor i destinatari segons estat i operacio | Cal provar casos limits i coherencia entre safata d'entrada i sortida. |
+| `sociometricSurveys` i respostes | Membres docents; part publica mentre el qüestionari esta actiu | Molt delicat: cal revisar noms visibles, suplantacio, duplicats i caducitat. |
 
 Canvi aplicat el 4 de juny de 2026: les rules dels paquets entre docents s'han fet mes estrictes. El destinatari ja no pot modificar el contingut del paquet, l'emissor ni el destinatari; nomes pot marcar el paquet com a importat i deixar constancia de data, correu i uid d'importacio. L'emissor pot crear i esborrar el paquet que ha enviat.
 
@@ -164,7 +172,11 @@ La separacio tecnica principal es aquesta:
 
 Aixo reforca l'escenari actual: Avaluapro com a eina personal del docent.
 
-### Paquets compartits entre docents
+### Fluxos compartits entre docents
+
+La descripcio original dels paquets continua sent valida per a `teacherGradePackages`, pero ja no cobreix tota la comparticio. Les cotutories persistents i els qüestionaris sociometrics es documenten a `docs/comparticio-docents.md` i s'han de considerar pendents d'auditoria institucional.
+
+#### Paquets de notes
 
 Els paquets de notes son una excepcio controlada:
 
