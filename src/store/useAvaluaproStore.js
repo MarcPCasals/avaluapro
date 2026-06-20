@@ -16,6 +16,7 @@ import {
   listSentTeacherGradePackages,
   listSentTutoringInvitationUpdates,
   createSociometricSurveyDocument,
+  deleteSociometricSurveyDocument,
   listCloudBackups,
   listSociometricSurveyResponses,
   listTutoringSpacesForUser,
@@ -53,6 +54,7 @@ const SOCIOMETRIC_SURVEY_STATUS = {
   ACTIVE: 'active',
   CLOSED: 'closed',
 }
+const SOCIOMETRIC_SURVEY_DURATION_MS = 24 * 60 * 60 * 1000
 const SOCIOMETRIC_DEFAULT_POSITIVE_LIMIT = 4
 const SOCIOMETRIC_DEFAULT_AVOID_LIMIT = 3
 const SOCIOMETRIC_PUBLIC_FORM_SOURCE = 'sociometric-public-form'
@@ -212,11 +214,20 @@ function normalizeSociometricSurvey(survey = {}) {
     .filter((option) => option.id && option.name)
 
   return {
+    accessTokens: (Array.isArray(survey.accessTokens) ? survey.accessTokens : [])
+      .map((access) => ({
+        studentId: String(access.studentId || '').trim(),
+        studentName: formatStudentNameForDisplay(access.studentName || ''),
+        token: String(access.token || '').trim(),
+      }))
+      .filter((access) => access.studentId && access.studentName && access.token),
     id: String(survey.id || createId('survey')).replaceAll('/', '_'),
     avoidLimit: Math.max(0, Number(survey.avoidLimit) || SOCIOMETRIC_DEFAULT_AVOID_LIMIT),
     classId: String(survey.classId || '').trim(),
     className: String(survey.className || '').trim(),
     createdAt: survey.createdAt || now,
+    expiresAt: survey.expiresAt || '',
+    expiresAtEpochMs: Number(survey.expiresAtEpochMs) || 0,
     importedRelationCount: Math.max(0, Number(survey.importedRelationCount) || 0),
     lastSyncedAt: survey.lastSyncedAt || '',
     memberUids: Array.isArray(survey.memberUids)
@@ -546,6 +557,13 @@ function getDatasetFromState(state) {
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] || [] }),
     {},
   )
+}
+
+function getBackupDatasetFromState(state) {
+  return {
+    ...getDatasetFromState(state),
+    sociometricSurveys: [],
+  }
 }
 
 function getTutoringRosterStudents(state, classId) {
@@ -1646,7 +1664,7 @@ export const useAvaluaproStore = create((set, get) => ({
     exportedAt: new Date().toISOString(),
     profile: get().profile,
     preferences: readPreferences(),
-    collections: getDatasetFromState(get()),
+    collections: getBackupDatasetFromState(get()),
   }),
 
   restoreBackup: async (backup, meta = {}) => {
@@ -1769,6 +1787,26 @@ export const useAvaluaproStore = create((set, get) => ({
     const state = get()
     const classToDelete = state.classes.find((classItem) => classItem.id === classId)
     if (!classToDelete) return
+
+    const ownedSociometricSurveys = (state.sociometricSurveys || []).filter(
+      (survey) => survey.classId === classId && survey.ownerUid,
+    )
+    if (ownedSociometricSurveys.length > 0 && !state.cloud.user?.uid) {
+      throw new Error(
+        'Aquesta classe té qüestionaris sociomètrics al núvol. Inicia sessió per eliminar-los abans d’eliminar la classe.',
+      )
+    }
+    const surveysOwnedByAnotherUser = ownedSociometricSurveys.filter(
+      (survey) => survey.ownerUid !== state.cloud.user?.uid,
+    )
+    if (surveysOwnedByAnotherUser.length > 0) {
+      throw new Error(
+        'Aquesta classe conté qüestionaris creats per un altre docent. El propietari els ha d’eliminar abans.',
+      )
+    }
+    for (const survey of ownedSociometricSurveys) {
+      await deleteSociometricSurveyDocument({ surveyId: survey.id, user: state.cloud.user })
+    }
 
     const studentIds = new Set(state.students.filter((student) => student.classId === classId).map((student) => student.id))
     const utIds = new Set(state.uts.filter((ut) => ut.classId === classId).map((ut) => ut.id))
@@ -2886,10 +2924,18 @@ export const useAvaluaproStore = create((set, get) => ({
       throw new Error('Cal iniciar sessió amb Google abans de crear un qüestionari sociomètric.')
     }
 
-    const now = new Date().toISOString()
+    const nowDate = new Date()
+    const now = nowDate.toISOString()
+    const expiresAtEpochMs = nowDate.getTime() + SOCIOMETRIC_SURVEY_DURATION_MS
+    const expiresAt = new Date(expiresAtEpochMs).toISOString()
     const studentOptions = getTutoringRosterStudents(state, classId).map((student) => ({
       id: student.id,
       name: student.name,
+    }))
+    const accessTokens = studentOptions.map((student) => ({
+      studentId: student.id,
+      studentName: student.name,
+      token: Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
     }))
     const memberUids = Array.from(
       new Set([
@@ -2898,11 +2944,14 @@ export const useAvaluaproStore = create((set, get) => ({
       ]),
     ).filter(Boolean)
     const survey = normalizeSociometricSurvey({
+      accessTokens,
       id: createId('survey'),
       avoidLimit,
       classId,
       className: classItem.name,
       createdAt: now,
+      expiresAt,
+      expiresAtEpochMs,
       lastSyncedAt: '',
       memberUids,
       ownerEmailLower: normalizeEmail(user.email),
@@ -2926,20 +2975,52 @@ export const useAvaluaproStore = create((set, get) => ({
   setSociometricSurveyStatus: async (surveyId, status) => {
     if (!surveyId || !Object.values(SOCIOMETRIC_SURVEY_STATUS).includes(status)) return null
 
-    const now = new Date().toISOString()
+    const nowDate = new Date()
+    const now = nowDate.toISOString()
+    const expiresAtEpochMs =
+      status === SOCIOMETRIC_SURVEY_STATUS.ACTIVE ? nowDate.getTime() + SOCIOMETRIC_SURVEY_DURATION_MS : 0
+    const expiresAt = expiresAtEpochMs ? new Date(expiresAtEpochMs).toISOString() : ''
     let updatedSurvey = null
     set((state) => ({
       sociometricSurveys: (state.sociometricSurveys || []).map((survey) => {
         if (survey.id !== surveyId) return survey
-        updatedSurvey = normalizeSociometricSurvey({ ...survey, status, updatedAt: now })
+        updatedSurvey = normalizeSociometricSurvey({
+          ...survey,
+          ...(status === SOCIOMETRIC_SURVEY_STATUS.ACTIVE ? { expiresAt, expiresAtEpochMs } : {}),
+          status,
+          updatedAt: now,
+        })
         return updatedSurvey
       }),
     }))
     if (updatedSurvey) {
-      await updateSociometricSurveyDocumentStatus({ status, surveyId })
+      await updateSociometricSurveyDocumentStatus({
+        accessTokens: updatedSurvey.accessTokens,
+        expiresAt: updatedSurvey.expiresAt,
+        expiresAtEpochMs: updatedSurvey.expiresAtEpochMs,
+        status,
+        surveyId,
+      })
     }
     await persistCollections(set, get, ['sociometricSurveys'])
     return updatedSurvey
+  },
+
+  deleteSociometricSurvey: async (surveyId) => {
+    if (!surveyId) return false
+    const state = get()
+    const survey = (state.sociometricSurveys || []).find((item) => item.id === surveyId)
+    if (!survey) return false
+    if (survey.ownerUid !== state.cloud.user?.uid) {
+      throw new Error('Només el docent propietari pot eliminar les dades brutes del qüestionari.')
+    }
+
+    await deleteSociometricSurveyDocument({ surveyId, user: state.cloud.user })
+    set((current) => ({
+      sociometricSurveys: (current.sociometricSurveys || []).filter((item) => item.id !== surveyId),
+    }))
+    await persistCollections(set, get, ['sociometricSurveys'])
+    return true
   },
 
   captureTutorialSociometricMoment: async ({
@@ -3211,23 +3292,90 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialStudentRoles'])
   },
 
-  saveTutorialSeatingPlan: async ({ classId, layout, seats, title }) => {
+  saveTutorialSeatingPlan: async ({
+    classId,
+    contentUpdatedAt,
+    isActive = false,
+    layout,
+    observation = '',
+    qualitySnapshot = null,
+    seats,
+    title,
+  }) => {
     if (!classId || !layout || !Array.isArray(seats)) return
 
     const now = new Date().toISOString()
+    const nextPlan = {
+      id: createId('tseat'),
+      classId,
+      contentUpdatedAt: contentUpdatedAt || now,
+      createdAt: now,
+      isActive: Boolean(isActive),
+      layout,
+      observation: String(observation || '').trim(),
+      qualitySnapshot,
+      seats,
+      title: String(title || '').trim() || 'Disposició recomanada',
+      updatedAt: now,
+    }
     set((state) => {
-      const nextPlan = {
-        id: createId('tseat'),
-        classId,
-        createdAt: now,
-        layout,
-        seats,
-        title: String(title || '').trim() || 'Disposició recomanada',
-        updatedAt: now,
-      }
-
       return {
-        tutorialSeatingPlans: [nextPlan, ...(state.tutorialSeatingPlans || [])],
+        tutorialSeatingPlans: [
+          nextPlan,
+          ...(state.tutorialSeatingPlans || []).map((plan) =>
+            isActive && plan.classId === classId ? { ...plan, isActive: false, updatedAt: now } : plan,
+          ),
+        ],
+      }
+    })
+    await persistCollections(set, get, ['tutorialSeatingPlans'])
+    return nextPlan
+  },
+
+  updateTutorialSeatingPlan: async (planId, patch) => {
+    if (!planId || !patch) return
+    const now = new Date().toISOString()
+    set((state) => {
+      const target = (state.tutorialSeatingPlans || []).find((plan) => plan.id === planId)
+      if (!target) return {}
+      return {
+        tutorialSeatingPlans: (state.tutorialSeatingPlans || []).map((plan) => {
+          if (patch.isActive && plan.classId === target.classId && plan.id !== planId) {
+            return { ...plan, isActive: false, updatedAt: now }
+          }
+          if (plan.id !== planId) return plan
+          return {
+            ...plan,
+            ...patch,
+            observation:
+              patch.observation === undefined ? plan.observation : String(patch.observation || '').trim(),
+            title: patch.title === undefined ? plan.title : String(patch.title || '').trim() || plan.title,
+            updatedAt: now,
+          }
+        }),
+      }
+    })
+    await persistCollections(set, get, ['tutorialSeatingPlans'])
+  },
+
+  deleteTutorialSeatingPlan: async (planId) => {
+    if (!planId) return
+    const state = get()
+    const plan = (state.tutorialSeatingPlans || []).find((item) => item.id === planId)
+    if (!plan) return
+    await tombstoneSharedRowIfNeeded(state, 'tutorialSeatingPlans', plan)
+    set((current) => {
+      const remainingPlans = (current.tutorialSeatingPlans || []).filter((item) => item.id !== planId)
+      if (!plan.isActive) return { tutorialSeatingPlans: remainingPlans }
+      const fallbackActivePlan = remainingPlans
+        .filter((item) => item.classId === plan.classId)
+        .sort((a, b) =>
+          String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')),
+        )[0]
+      return {
+        tutorialSeatingPlans: remainingPlans.map((item) =>
+          item.id === fallbackActivePlan?.id ? { ...item, isActive: true, updatedAt: new Date().toISOString() } : item,
+        ),
       }
     })
     await persistCollections(set, get, ['tutorialSeatingPlans'])

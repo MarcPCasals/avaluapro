@@ -15,6 +15,7 @@ import {
   FileText,
   GraduationCap,
   HeartHandshake,
+  History,
   Layers3,
   LayoutGrid,
   Loader2,
@@ -50,6 +51,16 @@ import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
+import {
+  getSavedSeatingAssignments,
+  getUnseatedStudentIds,
+  normalizeSavedSeatingRestrictions,
+} from './seatingPlanHistoryUtils'
+import {
+  getSeatingObjectiveWeights,
+  getSeatingZoneIterationState,
+  selectBestSeatingCandidate,
+} from './seatingIterationUtils'
 import { buildSociometricStudentReports } from './sociometricStudentProfileUtils'
 
 const TUTORING_RECORD_TYPES = [
@@ -82,6 +93,18 @@ const COOPERATIVE_GROUP_STRATEGIES = [
   { id: 'balanced', label: 'Equilibrat', description: 'Barreja rendiment, seguiment i sociometria.' },
   { id: 'supportive', label: 'Suportiu', description: 'Prioritza integrar alumnes vulnerables amb vincles segurs.' },
   { id: 'calm', label: 'Treball eficient', description: 'Prioritza relacions positives de treball i evita tensions.' },
+]
+const SEATING_ITERATION_OBJECTIVES = [
+  { id: 'balanced', label: 'Equilibri general', description: 'Compensa tots els criteris pedagògics.' },
+  { id: 'calm', label: 'Més calma', description: 'Separa tensions, conflictes i influències difícils.' },
+  { id: 'support', label: 'Més suport', description: 'Acosta perfils vulnerables a referents útils.' },
+  { id: 'work', label: 'Millor treball', description: 'Afavoreix vincles de treball fiables.' },
+  { id: 'supervision', label: 'Més supervisió', description: 'Prioritza el seguiment docent dels alumnes delicats.' },
+]
+const SEATING_ZONE_OPTIONS = [
+  { id: 'front', label: 'Zona davantera' },
+  { id: 'center', label: 'Zona central' },
+  { id: 'back', label: 'Zona posterior' },
 ]
 const SOCIOGRAM_FILTERS = [
   { id: 'all', label: 'Tot' },
@@ -2008,6 +2031,16 @@ function hasSeatingPair(pairs, studentIdA, studentIdB) {
   )
 }
 
+function getEmptySeatingRestrictions() {
+  return {
+    avoidedZoneByStudentId: {},
+    blockedSeatIds: [],
+    neverNearPairs: [],
+    preferredZoneByStudentId: {},
+    preferNearPairs: [],
+  }
+}
+
 function getSeatingPlacementContext({ placement, plan, prioritizeHalfGroups, relations }) {
   if (!placement) {
     return {
@@ -2071,6 +2104,7 @@ function buildTutorialSeatingPlan({
   lockedStudentIds = [],
   manualEmptySeatIds = [],
   manualSeatByStudentId = {},
+  objective = 'balanced',
   problemSeatsByStudentId = {},
   prioritizeHalfGroups,
   profilesByStudentId,
@@ -2101,6 +2135,7 @@ function buildTutorialSeatingPlan({
   })
 
   const variantOffset = Number(variant || 0)
+  const objectiveWeights = getSeatingObjectiveWeights(objective)
   const studentsToPlace = students
     .map((student) => profilesByStudentId.get(student.id))
     .filter(Boolean)
@@ -2190,22 +2225,36 @@ function buildTutorialSeatingPlan({
             (placement.student.isStar && student.academicRisk)
           const isVulnerablePair = isVulnerableSeatingProfile(student) || isVulnerableSeatingProfile(placement.student)
           const isSupportPair = isSupportiveSeatingProfile(student) || isSupportiveSeatingProfile(placement.student)
-          if (student.isConflict && placement.student.isConflict && near) score += 10000
-          if (mustSeparate && near) score += 20000
+          if (student.isConflict && placement.student.isConflict && near) {
+            score += 10000 * objectiveWeights.conflict
+          }
+          if (mustSeparate && near) score += 20000 * objectiveWeights.conflict
           if (shouldBeNear) score += adjacent ? -150 : near ? -90 : 55
-          if (pairSummary.hasAvoid) score += near ? 700 + pairSummary.avoidInfluence * 90 : 90
+          if (pairSummary.hasAvoid) {
+            score += near
+              ? (700 + pairSummary.avoidInfluence * 90) * objectiveWeights.avoid
+              : 90 * objectiveWeights.avoid
+          }
           if (adjacent && pairSummary.socialInfluence > 0 && pairSummary.workInfluence === 0) score += 10
           if (near && pairSummary.workInfluence > 0) {
-            score -= isAcademicSupportPair ? 28 : 14
+            score -= (isAcademicSupportPair ? 28 : 14) * objectiveWeights.work
           }
           if (near && pairSummary.supportiveInfluence > 0 && isVulnerablePair && isSupportPair) {
-            score -= adjacent ? 42 : 24
+            score -= (adjacent ? 42 : 24) * objectiveWeights.support
           }
-          if (isAcademicSupportPair) score -= adjacent ? 58 : near ? 28 : 8
+          if (isAcademicSupportPair) {
+            score -= (adjacent ? 58 : near ? 28 : 8) * objectiveWeights.support
+          }
           if (adjacent && isInfluentialSeatingProfile(student) && isInfluentialSeatingProfile(placement.student)) {
             score += 26
           }
         })
+        if (
+          objectiveWeights.supervision > 0 &&
+          (student.priorityScore >= 4 || student.academicRisk || ['Aïllat', 'Rebutjat'].includes(student.sociometricCategory))
+        ) {
+          score += seat.y * objectiveWeights.supervision
+        }
         score += (getStableStudentNumber(`${student.student.id}_${seat.id}`, variantOffset) % 11) * 0.08
         return { score, seat }
       })
@@ -3659,25 +3708,26 @@ export function TutoringView() {
   const [seatingManualEmptySeatIds, setSeatingManualEmptySeatIds] = useState([])
   const [seatingLockedStudentIds, setSeatingLockedStudentIds] = useState([])
   const [seatingVariant, setSeatingVariant] = useState(0)
+  const [seatingIterationObjective, setSeatingIterationObjective] = useState('balanced')
+  const [seatingIterationZone, setSeatingIterationZone] = useState('front')
+  const [seatingIterationMessage, setSeatingIterationMessage] = useState('')
   const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
   const [seatingAppliedProblemSeats, setSeatingAppliedProblemSeats] = useState({})
   const [seatingUnseatedStudentIds, setSeatingUnseatedStudentIds] = useState([])
   const [seatingPlanName, setSeatingPlanName] = useState('')
+  const [seatingPlanObservation, setSeatingPlanObservation] = useState('')
+  const [seatingSaveAsActive, setSeatingSaveAsActive] = useState(false)
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
+  const [loadedSeatingPlanId, setLoadedSeatingPlanId] = useState('')
+  const [comparisonSeatingPlanId, setComparisonSeatingPlanId] = useState('')
   const [selectedSeatingStudentId, setSelectedSeatingStudentId] = useState('')
   const [seatingMoveStudentId, setSeatingMoveStudentId] = useState('')
   const [seatingBlockSeatMode, setSeatingBlockSeatMode] = useState(false)
   const [seatingRestrictionTargetId, setSeatingRestrictionTargetId] = useState('')
   const [seatingQualityBaseline, setSeatingQualityBaseline] = useState(null)
-  const [seatingRestrictions, setSeatingRestrictions] = useState({
-    avoidedZoneByStudentId: {},
-    blockedSeatIds: [],
-    neverNearPairs: [],
-    preferredZoneByStudentId: {},
-    preferNearPairs: [],
-  })
+  const [seatingRestrictions, setSeatingRestrictions] = useState(getEmptySeatingRestrictions)
   const [shareTutoringEmail, setShareTutoringEmail] = useState('')
   const [shareTutoringMessage, setShareTutoringMessage] = useState('')
   const [shareTutoringBusy, setShareTutoringBusy] = useState('')
@@ -3707,6 +3757,7 @@ export function TutoringView() {
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
   const importTutorialRelations = useAvaluaproStore((state) => state.importTutorialRelations)
   const createSociometricSurvey = useAvaluaproStore((state) => state.createSociometricSurvey)
+  const deleteSociometricSurvey = useAvaluaproStore((state) => state.deleteSociometricSurvey)
   const setSociometricSurveyStatus = useAvaluaproStore((state) => state.setSociometricSurveyStatus)
   const syncSociometricSurveyResponses = useAvaluaproStore((state) => state.syncSociometricSurveyResponses)
   const captureTutorialSociometricMoment = useAvaluaproStore((state) => state.captureTutorialSociometricMoment)
@@ -3716,6 +3767,8 @@ export function TutoringView() {
   const resetTutorialSociogramLayout = useAvaluaproStore((state) => state.resetTutorialSociogramLayout)
   const toggleTutorialStudentRole = useAvaluaproStore((state) => state.toggleTutorialStudentRole)
   const saveTutorialSeatingPlan = useAvaluaproStore((state) => state.saveTutorialSeatingPlan)
+  const updateTutorialSeatingPlan = useAvaluaproStore((state) => state.updateTutorialSeatingPlan)
+  const deleteTutorialSeatingPlan = useAvaluaproStore((state) => state.deleteTutorialSeatingPlan)
   const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
   const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
@@ -3749,9 +3802,18 @@ export function TutoringView() {
   )
   const activeSociometricSurvey =
     classSociometricSurveys.find((survey) => survey.status === 'active') || classSociometricSurveys[0] || null
-  const activeSociometricSurveyUrl = activeSociometricSurvey
-    ? `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${activeSociometricSurvey.id}`
-    : ''
+  const activeSociometricSurveyLinks = useMemo(
+    () =>
+      (activeSociometricSurvey?.accessTokens || []).map((access) => ({
+        ...access,
+        url: `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${activeSociometricSurvey.id}&token=${access.token}`,
+      })),
+    [activeSociometricSurvey],
+  )
+  const activeSociometricSurveyUrl = activeSociometricSurveyLinks[0]?.url || ''
+  const activeSociometricSurveyLinksText = activeSociometricSurveyLinks
+    .map((access) => `${access.studentName}\t${access.url}`)
+    .join('\n')
   const activeSociometricResponseCount =
     activeSociometricSurvey?.id && Object.prototype.hasOwnProperty.call(sociometricResponseCounts, activeSociometricSurvey.id)
       ? sociometricResponseCounts[activeSociometricSurvey.id]
@@ -3785,11 +3847,12 @@ export function TutoringView() {
     [activeClassId, tutorialSociogramLayouts],
   )
   const classTutorialSeatingPlan = useMemo(
-    () =>
-      (tutorialSeatingPlans || [])
+    () => {
+      const sortedPlans = (tutorialSeatingPlans || [])
         .filter((plan) => plan.classId === activeClassId)
-        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))[0] ||
-      null,
+        .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+      return sortedPlans.find((plan) => plan.isActive) || sortedPlans[0] || null
+    },
     [activeClassId, tutorialSeatingPlans],
   )
   const classTutorialSeatingPlans = useMemo(
@@ -4537,6 +4600,7 @@ export function TutoringView() {
         lockedStudentIds: seatingLockedStudentIds,
         manualEmptySeatIds: seatingManualEmptySeatIds,
         manualSeatByStudentId: seatingManualSeatByStudentId,
+        objective: seatingIterationObjective,
         problemSeatsByStudentId: seatingAppliedProblemSeats,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
@@ -4555,6 +4619,7 @@ export function TutoringView() {
       seatingLockedStudentIds,
       seatingManualEmptySeatIds,
       seatingManualSeatByStudentId,
+      seatingIterationObjective,
       seatingPrioritizeHalfGroups,
       seatingRestrictions,
       seatingUnseatedStudentIds,
@@ -4563,6 +4628,12 @@ export function TutoringView() {
   )
   const selectedSeatingPlan =
     classTutorialSeatingPlans.find((plan) => plan.id === selectedSeatingPlanId) || null
+  const loadedSeatingPlan =
+    classTutorialSeatingPlans.find((plan) => plan.id === loadedSeatingPlanId) || null
+  const comparisonSeatingPlan =
+    classTutorialSeatingPlans.find((plan) => plan.id === comparisonSeatingPlanId) || null
+  const visibleSeatingRestrictions =
+    selectedSeatingPlan?.layout?.seatingRestrictions || seatingRestrictions
   const visibleSeatingPlan = selectedSeatingPlan
     ? materializeSavedSeatingPlan({ plan: selectedSeatingPlan, profilesByStudentId: cooperativeProfilesByStudentId })
     : generatedSeatingPlan
@@ -4572,15 +4643,47 @@ export function TutoringView() {
         getSeatDistance,
         plan: visibleSeatingPlan,
         relations: effectiveTutorialRelations,
+        restrictions: visibleSeatingRestrictions,
+      }),
+    [effectiveTutorialRelations, visibleSeatingPlan, visibleSeatingRestrictions],
+  )
+  const generatedSeatingPlanAnalysis = useMemo(
+    () =>
+      analyzeTutorialSeatingPlan({
+        getSeatDistance,
+        plan: generatedSeatingPlan,
+        relations: effectiveTutorialRelations,
         restrictions: seatingRestrictions,
       }),
-    [effectiveTutorialRelations, seatingRestrictions, visibleSeatingPlan],
+    [effectiveTutorialRelations, generatedSeatingPlan, seatingRestrictions],
+  )
+  const comparisonSeatingPlanAnalysis = useMemo(
+    () =>
+      comparisonSeatingPlan
+        ? analyzeTutorialSeatingPlan({
+            getSeatDistance,
+            plan: materializeSavedSeatingPlan({
+              plan: comparisonSeatingPlan,
+              profilesByStudentId: cooperativeProfilesByStudentId,
+            }),
+            relations: effectiveTutorialRelations,
+            restrictions: comparisonSeatingPlan.layout?.seatingRestrictions || getEmptySeatingRestrictions(),
+          })
+        : null,
+    [comparisonSeatingPlan, cooperativeProfilesByStudentId, effectiveTutorialRelations],
   )
   const seatingCapacity = getSeatingCapacity(seatingLayout)
   const hasRelationChangesAfterSeatingSave = Boolean(
     classTutorialSeatingPlan &&
       classTutorialRelations.some(
-        (relation) => String(relation.updatedAt || relation.createdAt || '') > String(classTutorialSeatingPlan.updatedAt || ''),
+        (relation) =>
+          String(relation.updatedAt || relation.createdAt || '') >
+          String(
+            classTutorialSeatingPlan.contentUpdatedAt ||
+              classTutorialSeatingPlan.createdAt ||
+              classTutorialSeatingPlan.updatedAt ||
+              '',
+          ),
       ),
   )
   const seatingReviewRows = visibleSeatingPlan.placements.filter((placement) => seatingProblemSeats[placement.studentId])
@@ -4721,12 +4824,19 @@ export function TutoringView() {
     setSociometricSurveyMessage('')
     try {
       const survey = await createSociometricSurvey({ classId: activeClassId })
-      const surveyUrl = `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${survey.id}`
+      const surveyLinks = (survey.accessTokens || [])
+        .map(
+          (access) =>
+            `${access.studentName}\t${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${survey.id}&token=${access.token}`,
+        )
+        .join('\n')
       try {
-        await navigator.clipboard.writeText(surveyUrl)
-        setSociometricSurveyMessage('Qüestionari creat i enllaç copiat. Ja el pots enviar als alumnes.')
+        await navigator.clipboard.writeText(surveyLinks)
+        setSociometricSurveyMessage(
+          'Qüestionari creat. S’han copiat els enllaços individuals, un per alumne; caduquen al cap de 24 hores.',
+        )
       } catch {
-        setSociometricSurveyMessage('Qüestionari creat. Copia l’enllaç manualment per enviar-lo als alumnes.')
+        setSociometricSurveyMessage('Qüestionari creat. Descarrega la llista d’enllaços individuals per repartir-los.')
       }
       setSociometricResponseCounts((current) => ({ ...current, [survey.id]: survey.responseCount || 0 }))
     } catch (error) {
@@ -4737,13 +4847,22 @@ export function TutoringView() {
   }
 
   const handleCopySociometricSurveyLink = async () => {
-    if (!activeSociometricSurveyUrl) return
+    if (!activeSociometricSurveyLinksText) return
     try {
-      await navigator.clipboard.writeText(activeSociometricSurveyUrl)
-      setSociometricSurveyMessage('Enllaç copiat. Envia’l als alumnes perquè responguin el qüestionari.')
+      await navigator.clipboard.writeText(activeSociometricSurveyLinksText)
+      setSociometricSurveyMessage('Enllaços individuals copiats. Cada alumne ha de rebre només el seu.')
     } catch {
       setSociometricSurveyMessage('No s’ha pogut copiar automàticament. Pots seleccionar i copiar l’enllaç.')
     }
+  }
+
+  const handleDownloadSociometricSurveyLinks = () => {
+    if (!activeSociometricSurveyLinksText) return
+    const blob = new Blob([`Alumne\tEnllaç individual\n${activeSociometricSurveyLinksText}`], {
+      type: 'text/tab-separated-values;charset=utf-8',
+    })
+    downloadBlob(blob, `avaluapro-enllacos-sociometria-${activeClass?.name || 'classe'}-${getTodaySlug()}.tsv`)
+    setSociometricSurveyMessage('Llista d’enllaços individuals descarregada.')
   }
 
   const handleOpenSociometricSurveyLink = () => {
@@ -4807,11 +4926,47 @@ export function TutoringView() {
       await setSociometricSurveyStatus(activeSociometricSurvey.id, nextStatus)
       setSociometricSurveyMessage(
         nextStatus === 'active'
-          ? 'Qüestionari reobert. L’enllaç torna a acceptar respostes.'
-          : 'Qüestionari tancat. L’enllaç ja no acceptarà respostes.',
+          ? 'Qüestionari reobert durant 24 hores. Els enllaços individuals tornen a acceptar respostes.'
+          : 'Qüestionari tancat. Els enllaços ja no acceptaran respostes.',
       )
     } catch (error) {
       setSociometricSurveyMessage(error.message || 'No s’ha pogut canviar l’estat del qüestionari.')
+    } finally {
+      setSociometricSurveyBusy('')
+    }
+  }
+
+  const handleDeleteSociometricSurvey = async () => {
+    if (!activeSociometricSurvey?.id) return
+    const confirmed = window.confirm(
+      [
+        'Això eliminarà definitivament de Firebase:',
+        '',
+        '• el qüestionari',
+        '• els tokens i enllaços individuals',
+        '• totes les respostes brutes',
+        '',
+        'Les relacions i el moment sociomètric ja sincronitzats a Avaluapro es conservaran.',
+        '',
+        'Vols continuar?',
+      ].join('\n'),
+    )
+    if (!confirmed) return
+
+    setSociometricSurveyBusy('delete')
+    setSociometricSurveyMessage('')
+    try {
+      await deleteSociometricSurvey(activeSociometricSurvey.id)
+      setSociometricResponseCounts((current) => {
+        const next = { ...current }
+        delete next[activeSociometricSurvey.id]
+        return next
+      })
+      setSociometricSurveyMessage(
+        'Dades brutes eliminades. Es conserven únicament les relacions i els moments ja sincronitzats.',
+      )
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’han pogut eliminar les dades brutes del qüestionari.')
     } finally {
       setSociometricSurveyBusy('')
     }
@@ -4873,6 +5028,39 @@ export function TutoringView() {
     })
   }
 
+  const getLockedSeatingAssignments = (plan = generatedSeatingPlan) =>
+    Object.fromEntries(
+      plan.placements
+        .filter((placement) => seatingLockedStudentIds.includes(placement.studentId))
+        .map((placement) => [placement.studentId, placement.seat.id]),
+    )
+
+  const buildSeatingIterationCandidate = ({ manualAssignments, variant }) => {
+    const plan = buildTutorialSeatingPlan({
+      blockedSeatIds: seatingRestrictions.blockedSeatIds,
+      layout: seatingLayout,
+      lockedStudentIds: seatingLockedStudentIds,
+      manualEmptySeatIds: [],
+      manualSeatByStudentId: manualAssignments,
+      objective: seatingIterationObjective,
+      problemSeatsByStudentId: seatingAppliedProblemSeats,
+      prioritizeHalfGroups: seatingPrioritizeHalfGroups,
+      profilesByStudentId: cooperativeProfilesByStudentId,
+      relations: effectiveTutorialRelations,
+      restrictions: seatingRestrictions,
+      students: classStudents,
+      unseatedStudentIds: [],
+      variant,
+    })
+    const analysis = analyzeTutorialSeatingPlan({
+      getSeatDistance,
+      plan,
+      relations: effectiveTutorialRelations,
+      restrictions: seatingRestrictions,
+    })
+    return { analysis, plan, variant }
+  }
+
   const resetSeatingManualChanges = () => {
     captureSeatingQualityBaseline('Abans de netejar els canvis manuals')
     setSeatingManualSeatByStudentId((current) =>
@@ -4883,6 +5071,7 @@ export function TutoringView() {
     setSeatingAppliedProblemSeats({})
     setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
     setSeatingBlockSeatMode(false)
+    setSeatingIterationMessage('')
   }
 
   const handleGenerateSeatingVariant = () => {
@@ -4890,9 +5079,7 @@ export function TutoringView() {
     setSelectedSeatingPlanId('')
     const reviewSeatEntries = Object.entries(seatingProblemSeats).filter(([, seatId]) => Boolean(seatId))
     const reviewedStudentIds = new Set(reviewSeatEntries.map(([studentId]) => studentId))
-    const lockedAssignments = Object.fromEntries(
-      Object.entries(seatingManualSeatByStudentId).filter(([studentId]) => seatingLockedStudentIds.includes(studentId)),
-    )
+    const lockedAssignments = getLockedSeatingAssignments()
 
     setSeatingAppliedProblemSeats(Object.fromEntries(reviewSeatEntries))
     setSeatingManualSeatByStudentId(() => {
@@ -4907,8 +5094,78 @@ export function TutoringView() {
 
       return { ...stableAssignments, ...lockedAssignments }
     })
-    setSeatingUnseatedStudentIds((current) => current.filter((studentId) => seatingLockedStudentIds.includes(studentId)))
+    setSeatingManualEmptySeatIds([])
+    setSeatingUnseatedStudentIds([])
     setSeatingVariant((current) => current + 1)
+    setSeatingIterationMessage(
+      reviewedStudentIds.size > 0
+        ? `S’han recalculat els ${reviewedStudentIds.size} alumne/s marcats per revisar.`
+        : `Proposta nova amb ${seatingLockedStudentIds.length} alumne/s fixats.`,
+    )
+  }
+
+  const handleGenerateSeatingAlternative = () => {
+    captureSeatingQualityBaseline('Proposta anterior')
+    setSelectedSeatingPlanId('')
+    const reviewSeatEntries = Object.entries(seatingProblemSeats).filter(([, seatId]) => Boolean(seatId))
+    setSeatingAppliedProblemSeats(Object.fromEntries(reviewSeatEntries))
+    setSeatingManualSeatByStudentId(getLockedSeatingAssignments())
+    setSeatingManualEmptySeatIds([])
+    setSeatingUnseatedStudentIds([])
+    setSeatingVariant((current) => current + 1)
+    setSeatingIterationMessage(
+      `Alternativa nova amb focus “${
+        SEATING_ITERATION_OBJECTIVES.find((item) => item.id === seatingIterationObjective)?.label
+      }”. S’han mantingut ${seatingLockedStudentIds.length} alumne/s fixats.`,
+    )
+  }
+
+  const handleImproveSeatingPlan = () => {
+    if (selectedSeatingPlan) return
+    captureSeatingQualityBaseline('Proposta anterior')
+    const lockedAssignments = getLockedSeatingAssignments()
+    const candidates = Array.from({ length: 16 }, (_, index) =>
+      buildSeatingIterationCandidate({
+        manualAssignments: lockedAssignments,
+        variant: seatingVariant + index + 1,
+      }),
+    )
+    const bestCandidate = selectBestSeatingCandidate(candidates)
+    if (!bestCandidate) return
+
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId(lockedAssignments)
+    setSeatingManualEmptySeatIds([])
+    setSeatingUnseatedStudentIds([])
+    setSeatingVariant(bestCandidate.variant)
+    setSeatingIterationMessage(
+      `Millor alternativa trobada entre 16 opcions: ${bestCandidate.analysis.score}/100, amb focus “${
+        SEATING_ITERATION_OBJECTIVES.find((item) => item.id === seatingIterationObjective)?.label
+      }”.`,
+    )
+  }
+
+  const handleRecalculateSeatingZone = () => {
+    if (selectedSeatingPlan) return
+    captureSeatingQualityBaseline('Abans de recalcular la zona')
+    const zoneIteration = getSeatingZoneIterationState({
+      getZoneId: (seat) => getSeatingZoneId(seat, generatedSeatingPlan.rows),
+      lockedStudentIds: seatingLockedStudentIds,
+      placements: generatedSeatingPlan.placements,
+      seats: generatedSeatingPlan.seats,
+      zoneId: seatingIterationZone,
+    })
+
+    setSelectedSeatingPlanId('')
+    setSeatingManualSeatByStudentId(zoneIteration.stableAssignments)
+    setSeatingManualEmptySeatIds(zoneIteration.outsideFreeSeatIds)
+    setSeatingUnseatedStudentIds([])
+    setSeatingVariant((current) => current + 1)
+    setSeatingIterationMessage(
+      `S’ha recalculat només ${
+        SEATING_ZONE_OPTIONS.find((zone) => zone.id === seatingIterationZone)?.label.toLocaleLowerCase('ca')
+      }: ${zoneIteration.recalculatedStudentIds.length} alumne/s podien canviar de lloc.`,
+    )
   }
 
   const handleToggleSeatingHalfGroups = () => {
@@ -5217,13 +5474,21 @@ export function TutoringView() {
 
   const handleSaveTutorialSeatingPlan = async () => {
     const fallbackName = `Disposició ${formatShortDate(getTodayDateInput())}`
-    await saveTutorialSeatingPlan({
+    const savedPlan = await saveTutorialSeatingPlan({
       classId: activeClassId,
+      isActive: seatingSaveAsActive,
       layout: {
         ...generatedSeatingPlan.layout,
+        iterationObjective: seatingIterationObjective,
         seatingRestrictions,
         lockedStudentIds: seatingLockedStudentIds,
         prioritizeHalfGroups: seatingPrioritizeHalfGroups,
+      },
+      observation: seatingPlanObservation,
+      qualitySnapshot: {
+        conflictCount: generatedSeatingPlanAnalysis.conflicts.length,
+        label: generatedSeatingPlanAnalysis.quality.label,
+        score: generatedSeatingPlanAnalysis.score,
       },
       seats: generatedSeatingPlan.placements.map((placement) => ({
         halfGroup: placement.halfGroup,
@@ -5233,11 +5498,76 @@ export function TutoringView() {
         studentId: placement.studentId,
         x: placement.seat.x,
           y: placement.seat.y,
-        })),
+      })),
       title: seatingPlanName.trim() || fallbackName,
     })
     setSeatingPlanName('')
+    setSeatingPlanObservation('')
+    setSeatingSaveAsActive(false)
+    setLoadedSeatingPlanId(savedPlan?.id || '')
     setSelectedSeatingPlanId('')
+  }
+
+  const handleLoadTutorialSeatingPlan = (plan) => {
+    if (!plan) return
+    const cleanLayout = normalizeSeatingLayout(plan.layout)
+    const savedRestrictions = normalizeSavedSeatingRestrictions(plan.layout?.seatingRestrictions)
+    const seatAssignments = getSavedSeatingAssignments(plan, getGridSeatId)
+
+    setSeatingLayout(cleanLayout)
+    setSeatingManualSeatByStudentId(seatAssignments)
+    setSeatingManualEmptySeatIds([])
+    setSeatingLockedStudentIds([...(plan.layout?.lockedStudentIds || [])])
+    setSeatingIterationObjective(plan.layout?.iterationObjective || 'balanced')
+    setSeatingPrioritizeHalfGroups(plan.layout?.prioritizeHalfGroups !== false)
+    setSeatingRestrictions(savedRestrictions)
+    setSeatingUnseatedStudentIds(
+      getUnseatedStudentIds(
+        classStudents.map((student) => student.id),
+        seatAssignments,
+      ),
+    )
+    setSeatingProblemSeats({})
+    setSeatingAppliedProblemSeats({})
+    setSeatingPlanName(`${plan.title || 'Disposició'} · nova versió`)
+    setSeatingPlanObservation(plan.observation || '')
+    setSeatingSaveAsActive(Boolean(plan.isActive))
+    setLoadedSeatingPlanId(plan.id)
+    setSelectedSeatingPlanId('')
+    setSelectedSeatingStudentId('')
+    setSeatingMoveStudentId('')
+    setSeatingBlockSeatMode(false)
+    setSeatingQualityBaseline(null)
+  }
+
+  const handleDuplicateTutorialSeatingPlan = async (plan) => {
+    if (!plan) return
+    const duplicatedPlan = await saveTutorialSeatingPlan({
+      classId: plan.classId,
+      contentUpdatedAt: plan.contentUpdatedAt || plan.createdAt,
+      isActive: false,
+      layout: plan.layout,
+      observation: plan.observation,
+      qualitySnapshot: plan.qualitySnapshot || null,
+      seats: plan.seats || [],
+      title: `${plan.title || 'Disposició'} · còpia`,
+    })
+    setLoadedSeatingPlanId(duplicatedPlan?.id || '')
+  }
+
+  const handleSetActiveTutorialSeatingPlan = async (plan) => {
+    if (!plan || plan.isActive) return
+    await updateTutorialSeatingPlan(plan.id, { isActive: true })
+  }
+
+  const handleDeleteTutorialSeatingPlan = async (plan) => {
+    if (!plan) return
+    const shouldDelete = window.confirm(`Vols eliminar la versió “${plan.title || 'Disposició guardada'}”?`)
+    if (!shouldDelete) return
+    await deleteTutorialSeatingPlan(plan.id)
+    if (selectedSeatingPlanId === plan.id) setSelectedSeatingPlanId('')
+    if (loadedSeatingPlanId === plan.id) setLoadedSeatingPlanId('')
+    if (comparisonSeatingPlanId === plan.id) setComparisonSeatingPlanId('')
   }
 
   const persistSociogramPosition = async (studentId, position) => {
@@ -6355,8 +6685,11 @@ export function TutoringView() {
 
               {activeSociometricSurveyUrl ? (
                 <label className="sociometric-survey-link">
-                  Enllaç per als alumnes
-                  <input readOnly value={activeSociometricSurveyUrl} />
+                  Enllaços individuals
+                  <input
+                    readOnly
+                    value={`${activeSociometricSurveyLinks.length} enllaços · caducitat ${formatShortDate(activeSociometricSurvey.expiresAt)}`}
+                  />
                 </label>
               ) : (
                 <div className="sociometric-survey-empty">
@@ -6384,7 +6717,16 @@ export function TutoringView() {
                   type="button"
                 >
                   <Clipboard size={17} />
-                  Copiar enllaç
+                  Copiar enllaços
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={!activeSociometricSurveyUrl}
+                  onClick={handleDownloadSociometricSurveyLinks}
+                  type="button"
+                >
+                  <FileDown size={17} />
+                  Descarregar llista
                 </button>
                 <button
                   className="secondary-action"
@@ -6393,7 +6735,7 @@ export function TutoringView() {
                   type="button"
                 >
                   <ExternalLink size={17} />
-                  Obrir enllaç
+                  Obrir mostra
                 </button>
                 <button
                   className="secondary-action"
@@ -6421,6 +6763,19 @@ export function TutoringView() {
                 >
                   <Lock size={17} />
                   {activeSociometricSurvey?.status === 'active' ? 'Tancar' : 'Reobrir'}
+                </button>
+                <button
+                  className="danger-action"
+                  disabled={
+                    !activeSociometricSurvey?.id ||
+                    activeSociometricSurvey.ownerUid !== cloud.user?.uid ||
+                    sociometricSurveyBusy === 'delete'
+                  }
+                  onClick={handleDeleteSociometricSurvey}
+                  type="button"
+                >
+                  {sociometricSurveyBusy === 'delete' ? <Loader2 size={17} /> : <Trash2 size={17} />}
+                  Eliminar dades brutes
                 </button>
               </div>
 
@@ -8146,6 +8501,36 @@ export function TutoringView() {
               ))}
             </div>
 
+            <div className="tutorial-seating-save-details">
+              <label>
+                Observació de la versió
+                <textarea
+                  onChange={(event) => setSeatingPlanObservation(event.target.value)}
+                  placeholder="Ex: després del canvi de trimestre; prioritzar calma i seguiment."
+                  rows={2}
+                  value={seatingPlanObservation}
+                />
+              </label>
+              <label className="tutorial-seating-active-toggle">
+                <input
+                  checked={seatingSaveAsActive}
+                  onChange={(event) => setSeatingSaveAsActive(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Marcar com a disposició activa</strong>
+                  <small>Serà la versió de referència actual de la classe.</small>
+                </span>
+              </label>
+              {loadedSeatingPlan && (
+                <p>
+                  <History aria-hidden="true" size={15} />
+                  Editant una còpia carregada de <strong>{loadedSeatingPlan.title}</strong>. En guardar es crearà una
+                  versió nova.
+                </p>
+              )}
+            </div>
+
             <div className="tutorial-seating-restriction-bar">
               <div>
                 <SlidersHorizontal aria-hidden="true" size={17} />
@@ -8167,6 +8552,116 @@ export function TutoringView() {
               </button>
               {seatingBlockSeatMode && <p>Selecciona una taula lliure per bloquejar-la o desbloquejar-la.</p>}
             </div>
+
+            <section className="tutorial-seating-iteration-panel">
+              <header>
+                <div>
+                  <RefreshCw aria-hidden="true" size={18} />
+                  <div>
+                    <strong>Iteració intel·ligent</strong>
+                    <span>Ajusta la proposta sense començar de zero.</span>
+                  </div>
+                </div>
+                <label>
+                  Objectiu
+                  <select
+                    disabled={Boolean(selectedSeatingPlan)}
+                    onChange={(event) => {
+                      setSeatingIterationObjective(event.target.value)
+                      setSeatingIterationMessage('')
+                    }}
+                    value={seatingIterationObjective}
+                  >
+                    {SEATING_ITERATION_OBJECTIVES.map((objective) => (
+                      <option key={objective.id} value={objective.id}>
+                        {objective.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </header>
+
+              <p>
+                {SEATING_ITERATION_OBJECTIVES.find((objective) => objective.id === seatingIterationObjective)?.description}
+              </p>
+
+              <div className="tutorial-seating-iteration-actions">
+                <button
+                  disabled={Boolean(selectedSeatingPlan)}
+                  onClick={handleGenerateSeatingAlternative}
+                  type="button"
+                >
+                  <Shuffle aria-hidden="true" size={16} />
+                  <span>
+                    <strong>Generar alternativa</strong>
+                    <small>Manté els alumnes fixats.</small>
+                  </span>
+                </button>
+                <button
+                  className="primary"
+                  disabled={Boolean(selectedSeatingPlan)}
+                  onClick={handleImproveSeatingPlan}
+                  type="button"
+                >
+                  <TrendingUp aria-hidden="true" size={16} />
+                  <span>
+                    <strong>Millorar proposta</strong>
+                    <small>Tria la millor de 16 opcions.</small>
+                  </span>
+                </button>
+                <div className="tutorial-seating-zone-iteration">
+                  <select
+                    aria-label="Zona que es vol recalcular"
+                    disabled={Boolean(selectedSeatingPlan)}
+                    onChange={(event) => setSeatingIterationZone(event.target.value)}
+                    value={seatingIterationZone}
+                  >
+                    {SEATING_ZONE_OPTIONS.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={Boolean(selectedSeatingPlan)}
+                    onClick={handleRecalculateSeatingZone}
+                    type="button"
+                  >
+                    <RefreshCw aria-hidden="true" size={15} />
+                    Recalcular zona
+                  </button>
+                </div>
+              </div>
+
+              <div className="tutorial-seating-kept-students">
+                <strong>{seatingLockedStudentIds.length} alumne/s es mantindran igual</strong>
+                {seatingLockedStudentIds.length > 0 ? (
+                  <div>
+                    {seatingLockedStudentIds.map((studentId) => (
+                      <span key={studentId}>
+                        {getSeatingShortName(classStudents.find((student) => student.id === studentId)?.name)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p>Fixa alumnes amb el candau de la seva targeta o del panell lateral.</p>
+                )}
+              </div>
+
+              {seatingIterationMessage && (
+                <div className="tutorial-seating-iteration-result">
+                  <CheckCircle2 aria-hidden="true" size={16} />
+                  <span>{seatingIterationMessage}</span>
+                  <button
+                    aria-label="Tancar resultat de la iteració"
+                    onClick={() => setSeatingIterationMessage('')}
+                    type="button"
+                  >
+                    <X aria-hidden="true" size={14} />
+                  </button>
+                </div>
+              )}
+            </section>
 
             <section className={`tutorial-seating-quality-panel ${seatingPlanAnalysis.quality.tone}`}>
               <div className="tutorial-seating-quality-score">
@@ -8337,26 +8832,136 @@ export function TutoringView() {
               </div>
             )}
 
-            {classTutorialSeatingPlans.length > 0 && (
-              <div className="tutorial-seating-saved-list">
-                {classTutorialSeatingPlans.slice(0, 5).map((plan) => (
-                  <button
-                    className={selectedSeatingPlanId === plan.id ? 'active' : ''}
-                    key={plan.id}
-                    onClick={() => setSelectedSeatingPlanId(plan.id)}
-                    type="button"
-                  >
-                    <strong>{plan.title || 'Disposició guardada'}</strong>
-                    <span>{formatShortDate(plan.updatedAt?.slice(0, 10))}</span>
-                  </button>
-                ))}
+            <section className="tutorial-seating-history">
+              <header>
+                <div>
+                  <History aria-hidden="true" size={18} />
+                  <div>
+                    <strong>Historial de disposicions</strong>
+                    <span>{classTutorialSeatingPlans.length} versió/ns guardada/es</span>
+                  </div>
+                </div>
                 {selectedSeatingPlan && (
                   <button className="secondary-action compact" onClick={() => setSelectedSeatingPlanId('')} type="button">
                     Tornar a proposta actual
                   </button>
                 )}
-              </div>
-            )}
+              </header>
+
+              {comparisonSeatingPlan && comparisonSeatingPlanAnalysis && (
+                <div className="tutorial-seating-history-comparison">
+                  <div>
+                    <span>Proposta actual</span>
+                    <strong>{generatedSeatingPlanAnalysis.score}/100</strong>
+                    <small>{generatedSeatingPlanAnalysis.quality.label}</small>
+                  </div>
+                  <BarChart3 aria-hidden="true" size={19} />
+                  <div>
+                    <span>{comparisonSeatingPlan.title}</span>
+                    <strong>{comparisonSeatingPlanAnalysis.score}/100</strong>
+                    <small>{comparisonSeatingPlanAnalysis.quality.label}</small>
+                  </div>
+                  <p>
+                    {generatedSeatingPlanAnalysis.score === comparisonSeatingPlanAnalysis.score
+                      ? 'Tenen la mateixa puntuació global.'
+                      : generatedSeatingPlanAnalysis.score > comparisonSeatingPlanAnalysis.score
+                        ? `La proposta actual millora ${generatedSeatingPlanAnalysis.score - comparisonSeatingPlanAnalysis.score} punts.`
+                        : `La versió guardada supera l’actual en ${comparisonSeatingPlanAnalysis.score - generatedSeatingPlanAnalysis.score} punts.`}
+                  </p>
+                  <button onClick={() => setComparisonSeatingPlanId('')} title="Tancar comparació" type="button">
+                    <X aria-hidden="true" size={15} />
+                  </button>
+                </div>
+              )}
+
+              {classTutorialSeatingPlans.length > 0 ? (
+                <div className="tutorial-seating-history-list">
+                  {classTutorialSeatingPlans.map((plan) => (
+                    <article
+                      className={`${plan.isActive ? 'active' : ''} ${
+                        selectedSeatingPlanId === plan.id ? 'previewing' : ''
+                      }`}
+                      key={plan.id}
+                    >
+                      <div className="tutorial-seating-history-copy">
+                        <div>
+                          <strong>{plan.title || 'Disposició guardada'}</strong>
+                          {plan.isActive && <span className="active-badge">Activa</span>}
+                        </div>
+                        <small>
+                          {formatShortDate((plan.createdAt || plan.updatedAt)?.slice(0, 10))} ·{' '}
+                          {plan.seats?.length || 0} alumnes
+                          {plan.qualitySnapshot?.score !== undefined
+                            ? ` · ${plan.qualitySnapshot.score}/100`
+                            : ''}
+                        </small>
+                        {plan.observation && <p>{plan.observation}</p>}
+                      </div>
+                      <div className="tutorial-seating-history-actions">
+                        <button
+                          aria-label={`Veure ${plan.title || 'disposició guardada'}`}
+                          onClick={() => setSelectedSeatingPlanId(plan.id)}
+                          title="Veure versió"
+                          type="button"
+                        >
+                          <Eye aria-hidden="true" size={15} />
+                        </button>
+                        <button
+                          aria-label={`Carregar ${plan.title || 'disposició guardada'} per editar`}
+                          onClick={() => handleLoadTutorialSeatingPlan(plan)}
+                          title="Carregar per editar"
+                          type="button"
+                        >
+                          <History aria-hidden="true" size={15} />
+                        </button>
+                        <button
+                          aria-label={`Duplicar ${plan.title || 'disposició guardada'}`}
+                          onClick={() => handleDuplicateTutorialSeatingPlan(plan)}
+                          title="Duplicar"
+                          type="button"
+                        >
+                          <Clipboard aria-hidden="true" size={15} />
+                        </button>
+                        <button
+                          aria-label={`Comparar ${plan.title || 'disposició guardada'} amb la proposta actual`}
+                          className={comparisonSeatingPlanId === plan.id ? 'active' : ''}
+                          onClick={() => setComparisonSeatingPlanId(plan.id)}
+                          title="Comparar amb la proposta actual"
+                          type="button"
+                        >
+                          <BarChart3 aria-hidden="true" size={15} />
+                        </button>
+                        <button
+                          aria-label={
+                            plan.isActive
+                              ? `${plan.title || 'Disposició guardada'} és activa`
+                              : `Marcar ${plan.title || 'disposició guardada'} com a activa`
+                          }
+                          className={plan.isActive ? 'active-plan' : ''}
+                          disabled={Boolean(plan.isActive)}
+                          onClick={() => handleSetActiveTutorialSeatingPlan(plan)}
+                          title={plan.isActive ? 'Disposició activa' : 'Marcar com a activa'}
+                          type="button"
+                        >
+                          <CheckCircle2 aria-hidden="true" size={15} />
+                        </button>
+                        <button
+                          aria-label={`Eliminar ${plan.title || 'disposició guardada'}`}
+                          className="danger"
+                          onClick={() => handleDeleteTutorialSeatingPlan(plan)}
+                          title="Eliminar versió"
+                          type="button"
+                        >
+                          <Trash2 aria-hidden="true" size={15} />
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty">Encara no hi ha cap versió guardada per a aquesta classe.</p>
+              )}
+            </section>
 
             {generatedSeatingPlan.unplacedProfiles.length > 0 && !selectedSeatingPlan && (
               <div className="tutorial-seating-pending-list">
@@ -8387,7 +8992,7 @@ export function TutoringView() {
                   const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
                   const isLocked = Boolean(placement?.isLocked || seatingLockedStudentIds.includes(placement?.studentId))
                   const isSelected = placement?.studentId === selectedSeatingStudentId
-                  const isBlocked = seatingRestrictions.blockedSeatIds.includes(seat.id)
+                  const isBlocked = visibleSeatingRestrictions.blockedSeatIds?.includes(seat.id)
                   return (
                     <div
                       aria-pressed={isSelected}

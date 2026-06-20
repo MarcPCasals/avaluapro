@@ -381,7 +381,7 @@ El docent pot iterar sense començar de zero cada vegada.
 
 ## Estat Actual D'aquest Bloc
 
-Fases 1, 2, 3 i 4 implementades.
+Fases 1, 2, 3, 4, 5 i 6 implementades.
 
 Completat:
 
@@ -413,11 +413,34 @@ Completat:
 - penalització reforçada dels conflictes crítics, com ara una relació de rebuig forta o una restricció `mai a prop` incomplerta;
 - comparació automàtica abans/després dels canvis manuals, amb diferència de puntuació i conflictes resolts o afegits;
 - comprovació del motor amb casos favorables i crítics, `lint` i build de producció el 20 de juny de 2026;
-- validació visual específica de la Fase 4 pendent perquè el navegador integrat no s’ha pogut iniciar en aquesta sessió.
+- guardat de versions amb nom, observació, data, puntuació i nombre d’alumnes;
+- historial complet de disposicions per classe, ordenat de la més recent a la més antiga;
+- previsualització d’una versió històrica sense modificar-la;
+- càrrega completa d’una versió guardada a l’editor, incloent matriu, assignacions, alumnes fixats, restriccions i seients bloquejats;
+- guardat posterior de la versió carregada com una versió nova, sense sobreescriure l’original;
+- duplicació directa de versions;
+- disposició activa identificada visualment i editable des de l’historial;
+- promoció automàtica de la següent versió més recent si s’elimina la disposició activa;
+- comparació de puntuació entre la proposta actual i qualsevol versió guardada;
+- eliminació de versions integrada amb la sincronització compartida i els tombstones.
+- proves automatitzades de recuperació d’assignacions modernes i antigues, restriccions i alumnes pendents;
+- `lint`, build de producció, 8 proves unitàries/sincronització i 23 proves de regles de Firestore superades el 20 de juny de 2026;
+- generació d’alternatives que conserva tots els alumnes fixats;
+- cinc objectius pedagògics d’iteració: equilibri general, calma, suport, treball i supervisió;
+- pesos reals del motor adaptats a cada objectiu;
+- cerca automàtica de la millor proposta entre 16 alternatives;
+- selecció de la millor alternativa per puntuació i, en cas d’empat, per menor nombre de conflictes;
+- recalcul exclusiu de la zona davantera, central o posterior;
+- congelació automàtica dels alumnes de fora de la zona recalculada;
+- respecte dels alumnes fixats encara que siguin dins de la zona recalculada;
+- resum visible del resultat de cada iteració i dels alumnes que es mantindran;
+- objectiu d’iteració inclòs en les versions guardades i recuperat amb l’historial;
+- proves automatitzades dels pesos pedagògics, la selecció de variants i el recalcul parcial.
+- `lint`, build de producció i 11 proves d’iteració, historial i sincronització superades el 20 de juny de 2026.
 
 Següent pas pendent:
 
-- Fase 5: guardat, historial i recuperació.
+- Cap. El bloc de disposició d’aula queda completat.
 
 ## Ordre Recomanat De Treball
 
@@ -425,11 +448,11 @@ Següent pas pendent:
 2. Fase 2: panell lateral d'alumne i accions ràpides. Completada.
 3. Fase 3: restriccions pedagògiques de seating. Completada.
 4. Fase 4: explicació i validació de propostes. Completada.
-5. Fase 5: guardat, historial i recuperació. Següent.
-6. Fase 6: iteració intel·ligent.
+5. Fase 5: guardat, historial i recuperació. Completada.
+6. Fase 6: iteració intel·ligent. Completada.
 
 ## Missatge Recomanat Per Continuar
 
 ```text
-Llegeix docs/dev/FLUX-DE-TREBALL-CHECKPOINT.md i continua amb la Fase 5 del bloc de disposició d'aula. No rellegeixis tota la conversa antiga.
+Llegeix docs/dev/FLUX-DE-TREBALL-CHECKPOINT.md, confirma que el bloc de disposició d’aula està complet i proposa quin bloc funcional convé treballar després. No rellegeixis tota la conversa antiga.
 ```
