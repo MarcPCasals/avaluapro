@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   Ban,
   BarChart3,
   BookOpenCheck,
@@ -6607,11 +6608,6 @@ export function TutoringView() {
               <strong>Disposició d’aula</strong>
               <span>Matriu flexible de taules i cadires.</span>
             </button>
-            <button data-tour="tutoring-tool-survey" onClick={() => setActiveRelationshipTool('survey')} type="button">
-              <ClipboardList size={25} />
-              <strong>Qüestionari sociomètric</strong>
-              <span>Crea un enllaç propi d’Avaluapro i recull respostes del grup.</span>
-            </button>
             <button data-tour="tutoring-tool-reports" onClick={() => setActiveRelationshipTool('reports')} type="button">
               <FileText size={25} />
               <strong>Informes sociomètrics</strong>
@@ -6637,8 +6633,13 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="sociometric-import-actions">
-                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
-                  Tornar a eines
+                <button
+                  className="tool-back-button contextual"
+                  onClick={() => setActiveRelationshipTool('sociogram')}
+                  type="button"
+                >
+                  <ArrowLeft aria-hidden="true" size={17} />
+                  Tornar al sociograma
                 </button>
               </div>
             </header>
@@ -6934,7 +6935,8 @@ export function TutoringView() {
                   <FileDown size={16} />
                   Imprimir / guardar PDF
                 </button>
-                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
+                  <ArrowLeft aria-hidden="true" size={17} />
                   Tornar a eines
                 </button>
               </div>
@@ -7921,8 +7923,17 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="tutorial-sociogram-actions">
-                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
+                  <ArrowLeft aria-hidden="true" size={17} />
                   Tornar a eines
+                </button>
+                <button
+                  className="sociogram-survey-action"
+                  onClick={() => setActiveRelationshipTool('survey')}
+                  type="button"
+                >
+                  <ClipboardList aria-hidden="true" size={16} />
+                  Qüestionari sociomètric
                 </button>
                 <div className="tutorial-sociogram-filter-tabs" aria-label="Filtre del sociograma">
                   {SOCIOGRAM_FILTERS.map((filter) => (
@@ -8187,7 +8198,8 @@ export function TutoringView() {
                 </p>
               </div>
               <div className="cooperative-generator-controls">
-                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
+                  <ArrowLeft aria-hidden="true" size={17} />
                   Tornar a eines
                 </button>
                 <label>
@@ -8429,7 +8441,8 @@ export function TutoringView() {
                 <p>Matriu editable amb mig grup, relacions i llocs fixats.</p>
               </div>
               <div className="tutorial-seating-controls">
-                <button className="secondary-action compact" onClick={() => setActiveRelationshipTool('')} type="button">
+                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
+                  <ArrowLeft aria-hidden="true" size={17} />
                   Tornar a eines
                 </button>
                 <label className="cooperative-toggle-control">
