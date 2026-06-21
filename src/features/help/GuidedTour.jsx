@@ -520,7 +520,7 @@ const tutoringTourSteps = [
   {
     target: 'tutoring-tool-groups',
     title: '14. Grups cooperatius',
-    text: 'Avaluapro proposa grups combinant notes, perfil, mitjos grups i relacions. Després pots editar alumnes concrets sense refer tota la proposta.',
+    text: 'La vista general només mostra els grups, els alumnes i si cal revisar-los. Entra a “Detall i modificació” per consultar els motius, moure o intercanviar alumnes, bloquejar elements i guardar versions.',
     mode: 'tutoring',
   },
   {

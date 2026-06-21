@@ -1,9 +1,31 @@
-import { getSociometricRuntimeMeta } from './sociometricStudentProfileUtils'
+import { getSociometricRuntimeMeta } from './sociometricStudentProfileUtils.js'
 
 function average(values) {
   const cleanValues = values.filter((value) => Number.isFinite(value) && value > 0)
   if (cleanValues.length === 0) return 0
   return cleanValues.reduce((total, value) => total + value, 0) / cleanValues.length
+}
+
+const COOPERATIVE_STRATEGY_META = {
+  balanced: {
+    label: 'Equilibri general',
+    summary: 'Combina rendiment, seguiment tutorial i relacions entre alumnes.',
+  },
+  calm: {
+    label: 'Treball eficient',
+    summary: 'Prioritza vincles de treball útils i penalitza especialment les incompatibilitats.',
+  },
+  supportive: {
+    label: 'Suport i inclusió',
+    summary: 'Prioritza que els perfils vulnerables o amb dificultats quedin acompanyats per referents segurs.',
+  },
+}
+
+function getCooperativeQuality(score) {
+  if (score >= 85) return { label: 'Sòlid', tone: 'positive' }
+  if (score >= 70) return { label: 'Correcte', tone: 'good' }
+  if (score >= 50) return { label: 'A revisar', tone: 'warning' }
+  return { label: 'Crític', tone: 'danger' }
 }
 
 export function createCooperativeSociometricHelpers({ getRelationInfluence, getRelationTypeMeta }) {
@@ -35,6 +57,31 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       workPositiveCount: relationRow?.workPositiveCount || 0,
     })
 
+    const pedagogicalLabels = [
+      {
+        id: `performance-${performanceLevel}`,
+        label:
+          performanceLevel === 'alt'
+            ? 'Rendiment alt'
+            : performanceLevel === 'baix'
+              ? 'Necessita reforç'
+              : 'Rendiment mitjà',
+        tone: performanceLevel === 'alt' ? 'positive' : performanceLevel === 'baix' ? 'danger' : 'warning',
+      },
+    ]
+    if (priorityScore >= 4) {
+      pedagogicalLabels.push({ id: 'priority', label: 'Seguiment prioritari', tone: 'danger' })
+    }
+    if (runtimeMeta.isSociometricVulnerable) {
+      pedagogicalLabels.push({ id: 'vulnerable', label: 'Vulnerabilitat relacional', tone: 'warning' })
+    }
+    if (runtimeMeta.isSupportiveReference) {
+      pedagogicalLabels.push({ id: 'support', label: 'Referent de suport', tone: 'positive' })
+    }
+    if (runtimeMeta.isInfluential) {
+      pedagogicalLabels.push({ id: 'influential', label: 'Perfil influent', tone: 'blue' })
+    }
+
     return {
       academicRisk,
       avoidCount: relationRow?.avoidCount || 0,
@@ -42,6 +89,7 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       isConflict: Boolean(roleRow?.conflict),
       isStar: Boolean(roleRow?.star),
       ...runtimeMeta,
+      pedagogicalLabels,
       performanceLevel,
       priorityScore,
       recordSeverity,
@@ -225,8 +273,12 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       const averageScore = average(group.members.map((member) => member.tutorialProfile.averageScore || 0))
       const priorityMembers = group.members.filter((member) => member.priorityScore >= 4)
       const highPerformanceCount = group.members.filter((member) => member.performanceLevel === 'alt').length
+      const mediumPerformanceCount = group.members.filter((member) => member.performanceLevel === 'mitjà').length
       const lowPerformanceCount = group.members.filter((member) => member.performanceLevel === 'baix').length
       const starMembers = group.members.filter((member) => member.isStar || member.sociometricCategory === 'Líder')
+      const supportiveMembers = group.members.filter((member) => member.isSupportiveReference)
+      const vulnerableMembers = group.members.filter((member) => member.isSociometricVulnerable)
+      const influentialMembers = group.members.filter((member) => member.isInfluential)
       const alerts = []
 
       if (avoidRelations.length > 0) {
@@ -277,14 +329,74 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
         }
       })
 
+      const targetGroupSize = Number(group.targetGroupSize) || group.members.length
+      const sizeDifference = Math.abs(group.members.length - targetGroupSize)
+      const dangerAlertCount = alerts.filter((alert) => alert.tone === 'danger').length
+      const warningAlertCount = alerts.length - dangerAlertCount
+      const scorePenalty =
+        avoidRelations.length * 24 +
+        dangerAlertCount * 14 +
+        warningAlertCount * 9 +
+        Math.max(0, sizeDifference - 1) * 12 +
+        (group.members.length >= 3 && workRelations.length === 0 ? 5 : 0) +
+        (priorityMembers.length >= 3 ? 8 : 0) +
+        (starMembers.length >= 3 ? 6 : 0)
+      const score = Math.max(0, Math.min(100, 100 - scorePenalty))
+      const quality = getCooperativeQuality(score)
+      const strengths = []
+      if (avoidRelations.length === 0) strengths.push('No hi ha incompatibilitats registrades dins del grup.')
+      if (workRelations.length > 0) {
+        strengths.push(`${workRelations.length} vincle${workRelations.length === 1 ? '' : 's'} de treball útil${workRelations.length === 1 ? '' : 's'}.`)
+      }
+      if (vulnerableMembers.length > 0 && alerts.every((alert) => !alert.text.includes('suport clar'))) {
+        strengths.push('Els perfils vulnerables tenen algun suport clar dins del grup.')
+      }
+      if (highPerformanceCount > 0 && lowPerformanceCount > 0) {
+        strengths.push('La composició acadèmica combina rendiment alt i necessitat de reforç.')
+      }
+      if (sizeDifference <= 1) strengths.push('La mida és coherent amb l’objectiu seleccionat.')
+
+      const compositionParts = []
+      if (highPerformanceCount > 0) compositionParts.push(`${highPerformanceCount} de rendiment alt`)
+      if (mediumPerformanceCount > 0) compositionParts.push(`${mediumPerformanceCount} de rendiment mitjà`)
+      if (lowPerformanceCount > 0) compositionParts.push(`${lowPerformanceCount} que necessita reforç`)
+      if (priorityMembers.length > 0) {
+        compositionParts.push(`${priorityMembers.length} de seguiment prioritari`)
+      }
+      const compositionText =
+        compositionParts.length > 0 ? compositionParts.join(', ') : `${group.members.length} alumnes sense dades acadèmiques suficients`
+      const summary =
+        alerts.length === 0
+          ? `Composició ${compositionText}. No presenta alertes pedagògiques rellevants.`
+          : `Composició ${compositionText}. Cal revisar ${alerts.length} punt${alerts.length === 1 ? '' : 's'} abans de donar-la per bona.`
+
       return {
         ...group,
+        analysis: {
+          composition: {
+            highPerformanceCount,
+            influentialCount: influentialMembers.length,
+            lowPerformanceCount,
+            mediumPerformanceCount,
+            priorityCount: priorityMembers.length,
+            supportiveCount: supportiveMembers.length,
+            vulnerableCount: vulnerableMembers.length,
+          },
+          quality,
+          risks: alerts.map((alert) => alert.text),
+          score,
+          sizeDifference,
+          strengths,
+          summary,
+          targetGroupSize,
+        },
         alerts,
         alertTone: alerts.some((alert) => alert.tone === 'danger') ? 'danger' : alerts.length > 0 ? 'warning' : null,
         averageScore,
         avoidRelations,
         highPerformanceCount,
         lowPerformanceCount,
+        mediumPerformanceCount,
         priorityMembers,
         socialRelations,
         supportiveRelations,
@@ -313,6 +425,114 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       ),
       relations,
     )
+  }
+
+  function swapCooperativeMembers(groups, studentId, targetStudentId, relations) {
+    if (!studentId || !targetStudentId || studentId === targetStudentId) return groups
+
+    const sourceGroup = groups.find((group) => group.members.some((member) => member.student.id === studentId))
+    const targetGroup = groups.find((group) =>
+      group.members.some((member) => member.student.id === targetStudentId),
+    )
+    if (!sourceGroup || !targetGroup || sourceGroup.id === targetGroup.id) return groups
+
+    const sourceMember = sourceGroup.members.find((member) => member.student.id === studentId)
+    const targetMember = targetGroup.members.find((member) => member.student.id === targetStudentId)
+    if (!sourceMember || !targetMember) return groups
+
+    return enrichCooperativeGroups(
+      groups.map((group) => {
+        if (group.id === sourceGroup.id) {
+          return {
+            ...group,
+            members: group.members.map((member) =>
+              member.student.id === studentId ? targetMember : member,
+            ),
+          }
+        }
+        if (group.id === targetGroup.id) {
+          return {
+            ...group,
+            members: group.members.map((member) =>
+              member.student.id === targetStudentId ? sourceMember : member,
+            ),
+          }
+        }
+        return group
+      }),
+      relations,
+    )
+  }
+
+  function analyzeCooperativeGroupSet(groups, options = {}) {
+    const cleanGroups = Array.isArray(groups) ? groups : []
+    const strategyMeta = COOPERATIVE_STRATEGY_META[options.strategy] || COOPERATIVE_STRATEGY_META.balanced
+    const totalStudents = cleanGroups.reduce((total, group) => total + group.members.length, 0)
+    const groupScores = cleanGroups.map((group) => group.analysis?.score).filter(Number.isFinite)
+    const baseScore = groupScores.length > 0 ? Math.round(groupScores.reduce((total, score) => total + score, 0) / groupScores.length) : 0
+    const groupSizes = cleanGroups.map((group) => group.members.length)
+    const sizeSpread = groupSizes.length > 0 ? Math.max(...groupSizes) - Math.min(...groupSizes) : 0
+    const criticalGroups = cleanGroups.filter((group) => group.analysis?.quality?.tone === 'danger')
+    const reviewGroups = cleanGroups.filter((group) => group.analysis?.quality?.tone === 'warning')
+    const solidGroups = cleanGroups.filter((group) =>
+      ['positive', 'good'].includes(group.analysis?.quality?.tone),
+    )
+    const incompatibilityCount = cleanGroups.reduce((total, group) => total + group.avoidRelations.length, 0)
+    const unsupportedStudentIds = new Set()
+    cleanGroups.forEach((group) => {
+      group.members.forEach((member) => {
+        const hasUnsupportedAlert = group.alerts.some(
+          (alert) =>
+            alert.text.startsWith(member.student.name) &&
+            (alert.text.includes('sense vincle positiu clar') || alert.text.includes('no té un suport clar')),
+        )
+        if (hasUnsupportedAlert) unsupportedStudentIds.add(member.student.id)
+      })
+    })
+
+    const score = Math.max(0, Math.min(100, baseScore - Math.max(0, sizeSpread - 1) * 5))
+    const quality = getCooperativeQuality(score)
+    const limitations = []
+    if (incompatibilityCount > 0) {
+      limitations.push(`${incompatibilityCount} incompatibilitat${incompatibilityCount === 1 ? '' : 's'} dins dels grups.`)
+    }
+    if (unsupportedStudentIds.size > 0) {
+      limitations.push(`${unsupportedStudentIds.size} alumne${unsupportedStudentIds.size === 1 ? '' : 's'} sense suport clar.`)
+    }
+    if (sizeSpread > 1) limitations.push(`Hi ha una diferència de fins a ${sizeSpread} alumnes entre grups.`)
+    if (options.prioritizeHalfGroups) {
+      limitations.push('La separació per mig grup limita algunes combinacions possibles.')
+    }
+
+    const summary =
+      criticalGroups.length > 0
+        ? `La proposta necessita canvis: ${criticalGroups.length} grup${criticalGroups.length === 1 ? '' : 's'} presenta risc crític.`
+        : reviewGroups.length > 0
+          ? `La proposta és utilitzable, però convé revisar ${reviewGroups.length} grup${reviewGroups.length === 1 ? '' : 's'}.`
+          : 'La proposta és coherent amb els criteris principals i no presenta riscos rellevants.'
+
+    return {
+      criticalGroupCount: criticalGroups.length,
+      groupCount: cleanGroups.length,
+      incompatibilityCount,
+      limitations,
+      methodology: {
+        dataSources: ['rendiment acadèmic', 'seguiment tutorial', 'relacions de treball', 'relacions socials', 'incompatibilitats'],
+        groupSize: Number(options.groupSize) || null,
+        halfGroups: options.prioritizeHalfGroups ? 'Prioritzats' : 'Es permet barrejar-los',
+        strategy: options.strategy || 'balanced',
+        strategyLabel: strategyMeta.label,
+        strategySummary: strategyMeta.summary,
+      },
+      quality,
+      reviewGroupCount: reviewGroups.length,
+      score,
+      sizeSpread,
+      solidGroupCount: solidGroups.length,
+      summary,
+      totalStudents,
+      unsupportedStudentCount: unsupportedStudentIds.size,
+    }
   }
 
   function buildCooperativeGroups({
@@ -363,6 +583,7 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
             id: `group_${globalIndex}`,
             members: [],
             name: `Grup ${globalIndex} · ${halfGroupName}`,
+            targetGroupSize: cleanGroupSize,
           }
         })
 
@@ -394,6 +615,7 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       id: `group_${index + 1}`,
       members: [],
       name: `Grup ${index + 1}`,
+      targetGroupSize: cleanGroupSize,
     }))
 
     students.forEach((student) => {
@@ -675,6 +897,7 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
   }
 
   return {
+    analyzeCooperativeGroupSet,
     analyzeTutorialSeatingPlan,
     buildCooperativeGroups,
     buildStudentCooperativeProfile,
@@ -688,5 +911,6 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
     moveCooperativeMemberToGroup,
     relationBetween,
     summarizeCooperativePair,
+    swapCooperativeMembers,
   }
 }

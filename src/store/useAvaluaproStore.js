@@ -40,6 +40,10 @@ import {
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
+import {
+  normalizeCooperativeGenerationMeta,
+  normalizeCooperativeQualitySnapshot,
+} from '../features/tutoring/cooperativeGroupHistoryUtils'
 
 const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
@@ -3165,18 +3169,37 @@ export const useAvaluaproStore = create((set, get) => ({
     return { ...stats, momentId: nextMoment.id }
   },
 
-  saveTutorialGroupSet: async ({ classId, name, groupSize, prioritizeHalfGroups, strategy, groups }) => {
+  saveTutorialGroupSet: async ({
+    classId,
+    generationMeta,
+    groups,
+    groupSize,
+    lockedStudentIds,
+    manualChangeCount,
+    name,
+    observation,
+    prioritizeHalfGroups,
+    qualitySnapshot,
+    sourceGroupSetId,
+    sourceType,
+    strategy,
+  }) => {
     if (!classId || !Array.isArray(groups) || groups.length === 0) return
 
     const cleanName = String(name || '').trim() || `Grups cooperatius ${new Date().toISOString().slice(0, 10)}`
     const now = new Date().toISOString()
-    const cleanGroups = groups.map((group, index) => ({
-      id: group.id || `group_${index + 1}`,
-      memberIds: (group.members || [])
+    const cleanGroups = groups.map((group, index) => {
+      const memberIds = (group.members || [])
         .map((member) => member.student?.id || member.studentId || member.id)
-        .filter(Boolean),
-      name: group.name || `Grup ${index + 1}`,
-    }))
+        .filter(Boolean)
+      return {
+        id: group.id || `group_${index + 1}`,
+        locked: Boolean(group.locked),
+        lockedMemberIds: memberIds.filter((memberId) => (lockedStudentIds || []).includes(memberId)),
+        memberIds,
+        name: group.name || `Grup ${index + 1}`,
+      }
+    })
 
     set((state) => ({
       tutorialGroupSets: [
@@ -3184,10 +3207,16 @@ export const useAvaluaproStore = create((set, get) => ({
           id: createId('tgroups'),
           classId,
           createdAt: now,
+          generationMeta: normalizeCooperativeGenerationMeta(generationMeta),
           groupSize: Number(groupSize) || 4,
           groups: cleanGroups,
+          manualChangeCount: Math.max(0, Number(manualChangeCount) || 0),
           name: cleanName,
+          observation: String(observation || '').trim(),
           prioritizeHalfGroups: Boolean(prioritizeHalfGroups),
+          qualitySnapshot: normalizeCooperativeQualitySnapshot(qualitySnapshot),
+          sourceGroupSetId: String(sourceGroupSetId || '').trim(),
+          sourceType: sourceType === 'manual' ? 'manual' : 'automatic',
           strategy: strategy || 'balanced',
           updatedAt: now,
         },
