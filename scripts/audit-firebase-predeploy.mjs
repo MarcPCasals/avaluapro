@@ -28,6 +28,12 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex')
 }
 
+function maskEmail(value) {
+  const [localPart = '', domain = ''] = String(value || '').split('@')
+  if (!localPart || !domain) return ''
+  return `${localPart.slice(0, 1)}***@${domain}`
+}
+
 function decodeFirestoreValue(value) {
   if (!value) return null
   if ('stringValue' in value) return value.stringValue
@@ -109,6 +115,10 @@ async function auditSurveys(token) {
 
     surveys.push({
       ref: shortRef(id),
+      classRef: fields.classId ? shortRef(fields.classId) : '',
+      classLabel: fields.className || '',
+      ownerRef: fields.ownerUid ? shortRef(fields.ownerUid) : '',
+      ownerEmailMasked: maskEmail(fields.ownerEmailLower || fields.ownerEmail),
       status: fields.status || '',
       createdAt: fields.createdAt || '',
       hasExpiry: Number(fields.expiresAtEpochMs) > 0,
@@ -163,7 +173,12 @@ const unexpectedSubcollections = tutoringSpaces.flatMap((space) =>
   })),
 )
 const blockers = []
-if (activeLegacySurveys.length > 0) blockers.push(`${activeLegacySurveys.length} qüestionaris antics actius`)
+const warnings = []
+if (activeLegacySurveys.length > 0) {
+  warnings.push(
+    `${activeLegacySurveys.length} qüestionaris antics actius quedaran inaccessibles quan es despleguin les regles reforçades`,
+  )
+}
 if (unsyncedResponses.length > 0) blockers.push(`${unsyncedResponses.length} qüestionaris amb respostes no sincronitzades`)
 if (unexpectedSubcollections.length > 0) blockers.push('subcol·leccions de cotutoria no previstes')
 
@@ -174,6 +189,7 @@ console.log(
       checkedAt: new Date().toISOString(),
       readyToDeploy: blockers.length === 0,
       blockers,
+      warnings,
       rules: {
         deployedRuleset: release.rulesetName,
         deployedUpdatedAt: release.updateTime,

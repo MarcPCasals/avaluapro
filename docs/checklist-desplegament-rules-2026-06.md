@@ -38,6 +38,16 @@ npm run audit:firebase
 
 L'auditoria ha de deixar de mostrar qüestionaris amb `actualResponseCount` superior a `declaredResponseCount`.
 
+Incidència confirmada el 21 de juny de 2026:
+
+- el qüestionari de `2n B` s'ha actualitzat correctament de 22 a 23 respostes sincronitzades;
+- queda una resposta pendent en un qüestionari de `4t E`;
+- aquest qüestionari pertany a un altre compte docent i la còpia compartida de la classe ja no existeix al compte de Marc;
+- la resposta correspon a alumnat real i s'ha de preservar;
+- el docent propietari ha de refrescar i sincronitzar la resposta 24 abans del desplegament, o cal preparar una recuperació tècnica controlada.
+
+Els qüestionaris antics encara actius es mostren com a avís, no com a bloqueig autònom: les regles reforçades els faran inaccessibles. El bloqueig real és conservar qualsevol resposta encara no sincronitzada.
+
 ## 3. Per què hosting i rules s'han de publicar junts
 
 L'aplicació publicada actual crea qüestionaris sense tokens ni caducitat. Les rules noves ja no ho permeten.

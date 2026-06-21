@@ -265,10 +265,6 @@ function getRecordTypeMeta(type) {
   return TUTORING_RECORD_TYPES.find((item) => item.id === type) || TUTORING_RECORD_TYPES[0]
 }
 
-function getAgendaNoteTypeLabel(type) {
-  return TUTORING_AGENDA_NOTE_TYPES.find((item) => item.id === type)?.label || 'Treball'
-}
-
 function getRelationTypeMeta(type) {
   return TUTORING_RELATION_TYPES.find((item) => item.id === type) || TUTORING_RELATION_TYPES[0]
 }
@@ -390,7 +386,7 @@ function printTutorialProfile() {
   document.body.classList.add('tutorial-profile-printing')
   const clearPrintClass = () => document.body.classList.remove('tutorial-profile-printing')
   window.addEventListener('afterprint', clearPrintClass, { once: true })
-  window.print()
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print()))
   window.setTimeout(clearPrintClass, 1200)
 }
 
@@ -3178,21 +3174,255 @@ function TutorialSubjectAverageChart({ subjects }) {
   )
 }
 
-function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, profile, recordRow, sociometricReport }) {
-  const [tutorComment, setTutorComment] = useState('')
+function TutorialReportDocument({
+  classLabel,
+  executiveSummary,
+  filteredCompetencies,
+  groupedByArea,
+  hasTracking,
+  printSections,
+  profile,
+  profileAreaSummaries,
+  profileSubjectTrackingSummaries,
+  records,
+  reportDate,
+  sociometricReport,
+  strongestSubjects,
+  tutorComment,
+  weakestSubjects,
+}) {
+  return (
+    <article className="tutorial-report-document">
+      <header className="tutorial-print-header">
+        <span>AvaluaPro · Informe tutorial</span>
+        <h2>{profile.student.name}</h2>
+        <p>
+          {classLabel || 'Classe sense nom'} · {formatLongDate(reportDate)}
+        </p>
+      </header>
+
+      {printSections.executiveSummary && (
+        <section className={`tutorial-executive-summary ${executiveSummary.tone}`}>
+          <h3 className="tutorial-profile-section-title">Síntesi tutorial</h3>
+          <strong>{executiveSummary.title}</strong>
+          <ul>
+            {executiveSummary.bullets.map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
+          </ul>
+          <p>{executiveSummary.action}</p>
+        </section>
+      )}
+
+      {printSections.tutorComment && (
+        <section className="tutorial-tutor-comment-section report">
+          <h3 className="tutorial-profile-section-title">Comentari del tutor</h3>
+          <div className={`tutorial-tutor-comment-print ${tutorComment.trim() ? '' : 'empty'}`}>
+            {tutorComment.trim() || 'Sense comentari del tutor afegit.'}
+          </div>
+        </section>
+      )}
+
+      {printSections.performanceSummary && (
+        <section className="tutorial-report-section">
+          <h3 className="tutorial-profile-section-title">Resum acadèmic</h3>
+          <div className="tutorial-profile-summary">
+            <article>
+              <span>Competències avaluades</span>
+              <strong>{profile.evaluatedCount}</strong>
+            </article>
+            <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
+              <span>No assolides</span>
+              <strong>{profile.notDevelopedCount}</strong>
+            </article>
+            <article>
+              <span>% no assolides</span>
+              <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
+            </article>
+            <article>
+              <span>Àrea més delicada</span>
+              <strong>{profile.weakestArea?.name || '-'}</strong>
+            </article>
+          </div>
+          {profileAreaSummaries.length > 0 && (
+            <div className="tutorial-profile-insight-grid report-compact">
+              <article className="wide">
+                <h4>Lectura per àrees</h4>
+                <AreaRadarChart areas={profileAreaSummaries} />
+              </article>
+              <article>
+                <h4>Matèries a prioritzar</h4>
+                {weakestSubjects.length === 0 ? (
+                  <p>No hi ha matèries amb competències no assolides.</p>
+                ) : (
+                  weakestSubjects.map((subject) => (
+                    <div className="tutorial-profile-insight-row risk" key={subject.subject}>
+                      <strong>{subject.subject}</strong>
+                      <span>
+                        {subject.notDeveloped}/{subject.evaluated} no assolides
+                      </span>
+                    </div>
+                  ))
+                )}
+              </article>
+              <article>
+                <h4>Punts forts</h4>
+                {strongestSubjects.length === 0 ? (
+                  <p>Encara no hi ha prou dades per destacar punts forts.</p>
+                ) : (
+                  strongestSubjects.map((subject) => (
+                    <div className="tutorial-profile-insight-row ok" key={subject.subject}>
+                      <strong>{subject.subject}</strong>
+                      <span>Mitjana {subject.averageGrade}</span>
+                    </div>
+                  ))
+                )}
+              </article>
+            </div>
+          )}
+          {profileAreaSummaries.length === 0 && (
+            <p className="tutorial-report-empty-line">Encara no hi ha prou dades acadèmiques per ampliar el resum.</p>
+          )}
+        </section>
+      )}
+
+      {printSections.trackingSummary && (
+        <section className="tutorial-report-section">
+          <h3 className="tutorial-profile-section-title">Resum de seguiment</h3>
+          {hasTracking ? (
+            <>
+              <div className="tutorial-profile-summary tracking">
+                {TUTORING_RECORD_TYPES.map((type) => (
+                  <article className={type.tone} key={type.id}>
+                    <span>{type.label}</span>
+                    <strong>{countByType(records, type.id)}</strong>
+                  </article>
+                ))}
+              </div>
+              {profileSubjectTrackingSummaries.length > 0 && (
+                <div className="tutorial-subject-tracking-summary">
+                  <h4>Constància rebuda per assignatura</h4>
+                  <div>
+                    {profileSubjectTrackingSummaries.map((summary) => (
+                      <article key={summary.subject}>
+                        <strong>{summary.subject}</strong>
+                        <span>{summary.consistency}%</span>
+                        <small>
+                          {summary.profile} · {summary.done} fetes · {summary.late} incompletes · {summary.missing} no fetes
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="tutorial-report-empty-line">Encara no hi ha registres tutorials vinculats.</p>
+          )}
+        </section>
+      )}
+
+      {printSections.sociometric && (
+        <section className="tutorial-profile-sociometric-section">
+          <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+          <SociometricStudentInsightCard report={sociometricReport} />
+        </section>
+      )}
+
+      {printSections.competencyDetail && (
+        <section className="tutorial-report-section tutorial-report-annex">
+          <h3 className="tutorial-profile-section-title">Annex · Detall de competències</h3>
+          {profile.evaluatedCount === 0 ? (
+            <p className="tutorial-report-empty-line">Encara no hi ha notes tutorials per aquest alumne.</p>
+          ) : (
+            <div className="tutorial-profile-area-list">
+              {groupedByArea.map((area) => (
+                <section key={area.name}>
+                  <h3>{area.name}</h3>
+                  {area.rows.map((row) => (
+                    <div
+                      className={`tutorial-profile-row ${row.notDeveloped ? 'risk' : ''}`}
+                      key={`${row.subject}_${row.competencyName}`}
+                    >
+                      <div>
+                        <strong>{row.subject}</strong>
+                        <span>{row.competencyName}</span>
+                      </div>
+                      <span className={gradeClassName(row.grade)}>{row.grade}</span>
+                    </div>
+                  ))}
+                </section>
+              ))}
+              {filteredCompetencies.length === 0 && (
+                <p className="tutorial-report-empty-line">El filtre seleccionat no conté competències.</p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {printSections.trackingEvidence && (
+        <section className="tutorial-profile-record-section tutorial-report-annex">
+          <h3 className="tutorial-profile-section-title">Annex · Evidències de seguiment</h3>
+          {!hasTracking ? (
+            <p className="tutorial-report-empty-line">Encara no hi ha evidències de seguiment.</p>
+          ) : (
+            <div className="tutorial-record-history compact">
+              {records
+                .slice()
+                .sort((a, b) => {
+                  const dateCompare = String(b.date || '').localeCompare(String(a.date || ''))
+                  if (dateCompare !== 0) return dateCompare
+                  return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+                })
+                .map((record) => {
+                  const typeMeta = getRecordTypeMeta(record.type)
+                  return (
+                    <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
+                      <div>
+                        <strong>{typeMeta.label}</strong>
+                        <span>{formatShortDate(record.date)}</span>
+                        <p>{record.note || 'Sense comentari afegit.'}</p>
+                      </div>
+                    </article>
+                  )
+                })}
+            </div>
+          )}
+        </section>
+      )}
+
+      <footer className="tutorial-print-footer">
+        Informe orientatiu generat amb AvaluaPro. Les dades s’han d’interpretar dins del context educatiu de l’alumne.
+      </footer>
+    </article>
+  )
+}
+
+function TutorialStudentProfileModal({
+  classLabel,
+  onClose,
+  onSaveReport,
+  profile,
+  recordRow,
+  sociometricReport,
+}) {
+  const [activeReportStep, setActiveReportStep] = useState('prepare')
+  const [saveStatus, setSaveStatus] = useState('')
+  const [tutorComment, setTutorComment] = useState(profile?.student?.tutorialReportComment || '')
   const [reportAreaFilter, setReportAreaFilter] = useState('all')
   const [reportSubjectFilter, setReportSubjectFilter] = useState('all')
-  const [printSections, setPrintSections] = useState({
-    executiveSummary: true,
-    performanceSummary: true,
-    competencyDetail: true,
-    trackingSummary: true,
-    trackingEvidence: true,
-    tutorComment: true,
-    sociometric: true,
-  })
-  if (!profile) return null
-
+  const [printSections, setPrintSections] = useState(
+    profile?.student?.tutorialReportSections || {
+      executiveSummary: true,
+      performanceSummary: true,
+      competencyDetail: false,
+      trackingSummary: true,
+      trackingEvidence: false,
+      tutorComment: true,
+      sociometric: true,
+    },
+  )
   const records = recordRow?.records || []
   const hasTracking = records.length > 0
   const reportDate = getTodayDateInput()
@@ -3230,381 +3460,308 @@ function TutorialStudentProfileModal({ classLabel, onClose, onDeleteRecord, prof
   const togglePrintSection = (section) => {
     setPrintSections((current) => ({ ...current, [section]: !current[section] }))
   }
+  const saveReportDraft = async () => {
+    setSaveStatus('saving')
+    await onSaveReport({
+      tutorialReportComment: tutorComment,
+      tutorialReportSections: printSections,
+      tutorialReportUpdatedAt: new Date().toISOString(),
+    })
+    setSaveStatus('saved')
+  }
+  const generatePdf = async () => {
+    if (selectedPrintSections === 0) return
+    await saveReportDraft()
+    setActiveReportStep('preview')
+    window.setTimeout(printTutorialProfile, 80)
+  }
 
   return (
     <Modal
       onClose={onClose}
       panelClassName="tutorial-print-panel"
       size="xl"
-      title={`Perfil tutorial: ${profile.student.name}`}
+      title={`Informe tutorial · ${profile.student.name}`}
     >
       <div className="tutorial-profile-modal">
-        <header className="tutorial-print-header">
-          <span>AvaluaPro · Informe tutorial</span>
-          <h2>{profile.student.name}</h2>
-          <p>
-            {classLabel || 'Classe sense nom'} · Generat el {formatLongDate(reportDate)}
-          </p>
-        </header>
-
-        <div className="tutorial-profile-modal-toolbar">
-          <p>
-            Resum combinat de rendiment competencial i seguiment tutorial. Aquest és el punt de partida
-            per preparar una reunió o guardar el perfil com a PDF.
-          </p>
-          <button className="secondary-action compact" onClick={printTutorialProfile} type="button">
-            <FileDown size={16} />
-            Imprimir / desar PDF
-          </button>
+        <div className="tutorial-report-workflow-header">
+          <div className="tutorial-report-step-tabs" aria-label="Passos de l’informe">
+            <button
+              className={activeReportStep === 'prepare' ? 'active' : ''}
+              onClick={() => setActiveReportStep('prepare')}
+              type="button"
+            >
+              1. Preparar
+            </button>
+            <button
+              className={activeReportStep === 'config' ? 'active' : ''}
+              onClick={() => setActiveReportStep('config')}
+              type="button"
+            >
+              2. Configurar
+            </button>
+            <button
+              className={activeReportStep === 'preview' ? 'active' : ''}
+              onClick={() => setActiveReportStep('preview')}
+              type="button"
+            >
+              3. Previsualitzar
+            </button>
+          </div>
+          <div className="tutorial-report-workflow-actions">
+            <span className={saveStatus === 'saved' ? 'saved' : ''}>
+              {saveStatus === 'saving' ? 'Desant…' : saveStatus === 'saved' ? 'Esborrany desat' : 'En preparació'}
+            </span>
+            <button className="secondary-action compact" onClick={saveReportDraft} type="button">
+              <Save size={16} />
+              Desar
+            </button>
+            <button
+              className="primary-action compact"
+              disabled={selectedPrintSections === 0}
+              onClick={generatePdf}
+              type="button"
+            >
+              <FileDown size={16} />
+              Generar PDF
+            </button>
+          </div>
         </div>
 
-        <section className="tutorial-print-options">
-          <div>
-            <h3 className="tutorial-profile-section-title">Seccions de l’informe</h3>
-            <p>Activa només allò que vols incloure quan imprimeixis o desis el perfil com a PDF.</p>
-          </div>
-          <div className="tutorial-print-option-grid">
-            <label>
-              <input
-                checked={printSections.executiveSummary}
-                onChange={() => togglePrintSection('executiveSummary')}
-                type="checkbox"
-              />
-              Resum executiu
-            </label>
-            <label>
-              <input
-                checked={printSections.performanceSummary}
-                onChange={() => togglePrintSection('performanceSummary')}
-                type="checkbox"
-              />
-              Resum de rendiment
-            </label>
-            <label>
-              <input
-                checked={printSections.competencyDetail}
-                onChange={() => togglePrintSection('competencyDetail')}
-                type="checkbox"
-              />
-              Detall de competències
-            </label>
-            <label>
-              <input
-                checked={printSections.trackingSummary}
-                onChange={() => togglePrintSection('trackingSummary')}
-                type="checkbox"
-              />
-              Resum de seguiment
-            </label>
-            <label>
-              <input
-                checked={printSections.trackingEvidence}
-                onChange={() => togglePrintSection('trackingEvidence')}
-                type="checkbox"
-              />
-              Evidències de seguiment
-            </label>
-            <label>
-              <input
-                checked={printSections.tutorComment}
-                onChange={() => togglePrintSection('tutorComment')}
-                type="checkbox"
-              />
-              Comentari del tutor
-            </label>
-            <label>
-              <input
-                checked={printSections.sociometric}
-                onChange={() => togglePrintSection('sociometric')}
-                type="checkbox"
-              />
-              Sociometria
-            </label>
-          </div>
-          <div className="tutorial-report-filter-grid">
-            <label>
-              Àrea del detall
-              <select
-                onChange={(event) => {
-                  setReportAreaFilter(event.target.value)
-                  setReportSubjectFilter('all')
-                }}
-                value={reportAreaFilter}
-              >
-                <option value="all">Totes les àrees</option>
-                {reportAreaOptions.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Assignatura del detall
-              <select onChange={(event) => setReportSubjectFilter(event.target.value)} value={reportSubjectFilter}>
-                <option value="all">Totes les assignatures</option>
-                {reportSubjectOptions.map((subject) => (
-                  <option key={subject} value={subject}>
-                    {subject}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {selectedPrintSections === 0 && (
-            <strong className="tutorial-print-warning">Selecciona almenys una secció abans d’imprimir.</strong>
-          )}
-        </section>
-
-        {printSections.executiveSummary && (
-          <section className={`tutorial-executive-summary ${executiveSummary.tone}`}>
-            <h3 className="tutorial-profile-section-title">Resum executiu</h3>
-            <strong>{executiveSummary.title}</strong>
-            <ul>
-              {executiveSummary.bullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-            <p>{executiveSummary.action}</p>
-          </section>
-        )}
-
-        <section className="tutorial-meeting-dashboard">
-          <article className={executiveSummary.tone}>
-            <span>Mirada de reunió</span>
-            <strong>{executiveSummary.title}</strong>
-            <small>{executiveSummary.action}</small>
-          </article>
-          <article className={profile.weakestArea ? 'warning' : 'ok'}>
-            <span>Focus acadèmic</span>
-            <strong>{profile.weakestArea?.name || 'Sense focus delicat'}</strong>
-            <small>
-              {profile.notDevelopedCount} no assolides · {formatPercent(profile.notDevelopedPercent)}
-            </small>
-          </article>
-          <article className={weakestSubjects.length > 0 ? 'warning' : 'ok'}>
-            <span>Assignatura clau</span>
-            <strong>{weakestSubjects[0]?.subject || strongestSubjects[0]?.subject || '-'}</strong>
-            <small>
-              {weakestSubjects[0]
-                ? `${weakestSubjects[0].notDeveloped}/${weakestSubjects[0].evaluated} no assolides`
-                : 'Cap matèria amb risc destacat'}
-            </small>
-          </article>
-          <article className={hasTracking ? 'amber' : 'ok'}>
-            <span>Seguiment</span>
-            <strong>{records.length}</strong>
-            <small>
-              {hasTracking
-                ? `${countByType(records, 'agenda')} agenda · ${countByType(records, 'incident')} incidències`
-                : 'Sense registres tutorials'}
-            </small>
-          </article>
-        </section>
-
-        {printSections.tutorComment && (
-          <section className="tutorial-tutor-comment-section">
-            <h3 className="tutorial-profile-section-title">Comentari del tutor</h3>
-            <textarea
-              className="tutorial-tutor-comment-editor"
-              maxLength={TUTORING_TEXT_LIMIT}
-              onChange={(event) => setTutorComment(event.target.value)}
-              placeholder="Escriu aquí la síntesi docent: què preocupa, què ha millorat, quin acord proposem o quin seguiment cal fer..."
-              value={tutorComment}
-            />
-            <div className={`tutorial-tutor-comment-print ${tutorComment.trim() ? '' : 'empty'}`}>
-              {tutorComment.trim() || 'Sense comentari del tutor afegit.'}
-            </div>
-          </section>
-        )}
-
-        {printSections.performanceSummary && (
-          <section>
-            <h3 className="tutorial-profile-section-title">Rendiment competencial</h3>
-            <div className="tutorial-profile-summary">
-              <article>
-                <span>Competències avaluades</span>
-                <strong>{profile.evaluatedCount}</strong>
-              </article>
-              <article className={profile.notDevelopedCount > 0 ? 'warning' : 'ok'}>
-                <span>No assolides</span>
-                <strong>{profile.notDevelopedCount}</strong>
-              </article>
-              <article>
-                <span>% no assolides</span>
-                <strong>{formatPercent(profile.notDevelopedPercent)}</strong>
-              </article>
-              <article>
-                <span>Àrea més delicada</span>
-                <strong>{profile.weakestArea?.name || '-'}</strong>
-              </article>
-            </div>
-            <div className="tutorial-profile-insight-grid">
-              <article className="wide">
-                <h4>Diagrama d’estrella per àrees</h4>
-                <AreaRadarChart areas={profileAreaSummaries} />
-              </article>
-              <article>
-                <h4>Àrees del perfil</h4>
-                {profileAreaSummaries.length === 0 ? (
-                  <p>Encara no hi ha prou dades per detectar àrees fortes o delicades.</p>
-                ) : (
-                  profileAreaSummaries.slice(0, 4).map((area) => (
-                    <div className="tutorial-profile-insight-row" key={area.id}>
-                      <strong>{area.name}</strong>
-                      <span>{formatPercent(area.notDevelopedPercent)} no assolides</span>
-                      <small>{area.evaluated} comp. · mitjana {area.averageGrade}</small>
-                    </div>
-                  ))
-                )}
-              </article>
-              <article>
-                <h4>Matèries a prioritzar</h4>
-                {weakestSubjects.length === 0 ? (
-                  <p>No hi ha cap matèria amb competències no assolides registrades.</p>
-                ) : (
-                  weakestSubjects.map((subject) => (
-                    <div className="tutorial-profile-insight-row risk" key={subject.subject}>
-                      <strong>{subject.subject}</strong>
-                      <span>{subject.notDeveloped}/{subject.evaluated} no assolides</span>
-                      <small>{subject.areaName}</small>
-                    </div>
-                  ))
-                )}
-              </article>
-              <article>
-                <h4>Punts forts</h4>
-                {strongestSubjects.length === 0 ? (
-                  <p>Encara no hi ha matèries completament assolides o sense risc.</p>
-                ) : (
-                  strongestSubjects.map((subject) => (
-                    <div className="tutorial-profile-insight-row ok" key={subject.subject}>
-                      <strong>{subject.subject}</strong>
-                      <span>Cap no assolida</span>
-                      <small>Mitjana {subject.averageGrade}</small>
-                    </div>
-                  ))
-                )}
-              </article>
-            </div>
-          </section>
-        )}
-
-        {printSections.trackingSummary && (
-          <section>
-            <h3 className="tutorial-profile-section-title">Seguiment tutorial</h3>
-            <div className="tutorial-profile-summary tracking">
-              {TUTORING_RECORD_TYPES.map((type) => (
-                <article className={type.tone} key={type.id}>
-                  <span>{type.label}</span>
-                  <strong>{countByType(records, type.id)}</strong>
-                </article>
-              ))}
-            </div>
-            {profileSubjectTrackingSummaries.length > 0 && (
-              <div className="tutorial-subject-tracking-summary">
-                <h4>Constància rebuda per assignatura</h4>
+        {activeReportStep === 'prepare' && (
+          <div className="tutorial-report-prepare">
+            <section className={`tutorial-executive-summary ${executiveSummary.tone}`}>
+              <div className="tutorial-report-section-heading">
                 <div>
-                  {profileSubjectTrackingSummaries.map((summary) => (
-                    <article key={summary.subject}>
-                      <strong>{summary.subject}</strong>
-                      <span>{summary.consistency}%</span>
-                      <small>
-                        {summary.profile} · {summary.done} fetes · {summary.late} incompletes · {summary.missing} no fetes
-                      </small>
+                  <span>Síntesi automàtica</span>
+                  <strong>{executiveSummary.title}</strong>
+                </div>
+                <small>{profile.notDevelopedCount} no assolides · {records.length} registres</small>
+              </div>
+              <ul>
+                {executiveSummary.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+              <p>{executiveSummary.action}</p>
+            </section>
+
+            <section className="tutorial-tutor-comment-section">
+              <div className="tutorial-report-section-heading">
+                <div>
+                  <span>Peça principal de l’informe</span>
+                  <strong>Comentari del tutor</strong>
+                </div>
+                <small>{tutorComment.length}/{TUTORING_TEXT_LIMIT}</small>
+              </div>
+              <textarea
+                className="tutorial-tutor-comment-editor"
+                maxLength={TUTORING_TEXT_LIMIT}
+                onChange={(event) => {
+                  setTutorComment(event.target.value)
+                  setSaveStatus('')
+                }}
+                placeholder="Què preocupa? Què ha millorat? Quin acord o seguiment proposem?"
+                value={tutorComment}
+              />
+            </section>
+
+            <div className="tutorial-report-quick-facts">
+              <article>
+                <span>Focus acadèmic</span>
+                <strong>{profile.weakestArea?.name || 'Sense focus delicat'}</strong>
+                <small>{profile.notDevelopedCount} competències no assolides</small>
+              </article>
+              <article>
+                <span>Seguiment</span>
+                <strong>{records.length}</strong>
+                <small>{hasTracking ? 'registres disponibles' : 'sense registres tutorials'}</small>
+              </article>
+              <article>
+                <span>Situació social</span>
+                <strong>{sociometricReport?.category || 'Sense lectura'}</strong>
+                <small>{sociometricReport ? 'lectura sociomètrica disponible' : 'encara sense dades'}</small>
+              </article>
+            </div>
+
+            <div className="tutorial-report-accordions">
+              <details>
+                <summary>
+                  <span>Rendiment acadèmic</span>
+                  <small>{profile.evaluatedCount} avaluades · {profile.notDevelopedCount} no assolides</small>
+                </summary>
+                <div className="tutorial-profile-summary">
+                  <article><span>Avaluades</span><strong>{profile.evaluatedCount}</strong></article>
+                  <article><span>No assolides</span><strong>{profile.notDevelopedCount}</strong></article>
+                  <article><span>Percentatge</span><strong>{formatPercent(profile.notDevelopedPercent)}</strong></article>
+                  <article><span>Àrea delicada</span><strong>{profile.weakestArea?.name || '-'}</strong></article>
+                </div>
+              </details>
+              <details>
+                <summary>
+                  <span>Seguiment tutorial</span>
+                  <small>{records.length} registres</small>
+                </summary>
+                <div className="tutorial-profile-summary tracking">
+                  {TUTORING_RECORD_TYPES.map((type) => (
+                    <article className={type.tone} key={type.id}>
+                      <span>{type.label}</span>
+                      <strong>{countByType(records, type.id)}</strong>
                     </article>
                   ))}
                 </div>
+              </details>
+              <details>
+                <summary>
+                  <span>Lectura sociomètrica</span>
+                  <small>{sociometricReport ? 'Disponible' : 'Sense dades'}</small>
+                </summary>
+                <SociometricStudentInsightCard report={sociometricReport} />
+              </details>
+            </div>
+
+            <button className="tutorial-report-config-summary" onClick={() => setActiveReportStep('config')} type="button">
+              <div>
+                <SlidersHorizontal size={19} />
+                <span>
+                  <strong>{selectedPrintSections} seccions incloses</strong>
+                  <small>Tria l’informe breu o afegeix annexos</small>
+                </span>
               </div>
-            )}
-          </section>
+              <ArrowRightLeft size={18} />
+            </button>
+          </div>
         )}
 
-        {printSections.sociometric && (
-          <section className="tutorial-profile-sociometric-section">
-            <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
-            <SociometricStudentInsightCard report={sociometricReport} />
-          </section>
-        )}
-
-        {printSections.competencyDetail && (
-          <section>
-            <h3 className="tutorial-profile-section-title">Detall de competències</h3>
-            {profile.evaluatedCount === 0 ? (
-              <div className="empty-state compact">Encara no hi ha notes tutorials per aquest alumne.</div>
-            ) : (
-              <div className="tutorial-profile-area-list">
-                {groupedByArea.map((area) => (
-                  <section key={area.name}>
-                    <h3>{area.name}</h3>
-                    {area.rows.map((row) => (
-                      <div
-                        className={`tutorial-profile-row ${row.notDeveloped ? 'risk' : ''}`}
-                        key={`${row.subject}_${row.competencyName}`}
-                      >
-                        <div>
-                          <strong>{row.subject}</strong>
-                          <span>{row.competencyName}</span>
-                        </div>
-                        <span className={gradeClassName(row.grade)}>{row.grade}</span>
-                      </div>
+        {activeReportStep === 'config' && (
+          <section className="tutorial-print-options">
+            <div className="tutorial-report-config-intro">
+              <span>Configuració del document</span>
+              <h3>Què vols incloure?</h3>
+              <p>L’informe breu és la millor opció per a reunions. Els annexos afegeixen el detall complet.</p>
+            </div>
+            <div className="tutorial-print-option-groups">
+              <section>
+                <h4>Informe breu · recomanat</h4>
+                <div className="tutorial-print-option-grid">
+                  {[
+                    ['executiveSummary', 'Síntesi tutorial'],
+                    ['tutorComment', 'Comentari del tutor'],
+                    ['performanceSummary', 'Resum acadèmic'],
+                    ['trackingSummary', 'Resum de seguiment'],
+                    ['sociometric', 'Lectura sociomètrica'],
+                  ].map(([id, label]) => (
+                    <label key={id}>
+                      <input checked={printSections[id]} onChange={() => togglePrintSection(id)} type="checkbox" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section>
+                <h4>Annexos opcionals</h4>
+                <div className="tutorial-print-option-grid">
+                  <label>
+                    <input
+                      checked={printSections.competencyDetail}
+                      onChange={() => togglePrintSection('competencyDetail')}
+                      type="checkbox"
+                    />
+                    Detall de competències
+                  </label>
+                  <label>
+                    <input
+                      checked={printSections.trackingEvidence}
+                      onChange={() => togglePrintSection('trackingEvidence')}
+                      type="checkbox"
+                    />
+                    Evidències completes
+                  </label>
+                </div>
+              </section>
+            </div>
+            {(printSections.competencyDetail || printSections.trackingEvidence) && (
+              <div className="tutorial-report-filter-grid">
+                <label>
+                  Àrea del detall
+                  <select
+                    onChange={(event) => {
+                      setReportAreaFilter(event.target.value)
+                      setReportSubjectFilter('all')
+                    }}
+                    value={reportAreaFilter}
+                  >
+                    <option value="all">Totes les àrees</option>
+                    {reportAreaOptions.map((area) => (
+                      <option key={area.id} value={area.id}>{area.name}</option>
                     ))}
-                  </section>
-                ))}
-                {filteredCompetencies.length === 0 && (
-                  <div className="empty-state compact">Aquest filtre no té competències registrades.</div>
-                )}
+                  </select>
+                </label>
+                <label>
+                  Assignatura del detall
+                  <select onChange={(event) => setReportSubjectFilter(event.target.value)} value={reportSubjectFilter}>
+                    <option value="all">Totes les assignatures</option>
+                    {reportSubjectOptions.map((subject) => (
+                      <option key={subject} value={subject}>{subject}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
+            )}
+            {selectedPrintSections === 0 && (
+              <strong className="tutorial-print-warning">Selecciona almenys una secció.</strong>
             )}
           </section>
         )}
 
-        {printSections.trackingEvidence && (
-          <section className="tutorial-profile-record-section">
-          <h3 className="tutorial-profile-section-title">Evidències de seguiment</h3>
-            {!hasTracking ? (
-              <div className="empty-state compact">Encara no hi ha registres tutorials vinculats a aquest alumne.</div>
-            ) : (
-              <div className="tutorial-record-history compact">
-                {records
-                  .slice()
-                  .sort((a, b) => {
-                    const dateCompare = String(b.date || '').localeCompare(String(a.date || ''))
-                    if (dateCompare !== 0) return dateCompare
-                    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-                  })
-                  .map((record) => {
-                    const typeMeta = getRecordTypeMeta(record.type)
-                    return (
-                      <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
-                        <div>
-                          <strong>{typeMeta.label}</strong>
-                          <span>
-                            {formatShortDate(record.date)}
-                            {record.type === 'agenda' ? ` · ${getAgendaNoteTypeLabel(record.agendaKind)}` : ''}
-                            {record.automatic ? ' · Automàtic' : ''}
-                          </span>
-                          <p>{record.note || 'Sense comentari afegit.'}</p>
-                        </div>
-                        <button
-                          className="icon-button danger subtle"
-                          onClick={() => onDeleteRecord(record.id)}
-                          title="Eliminar registre"
-                          type="button"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </article>
-                    )
-                  })}
-              </div>
-            )}
-          </section>
+        {activeReportStep === 'preview' && (
+          <div className="tutorial-report-preview">
+            <div className="tutorial-report-preview-note">
+              <Eye size={18} />
+              <p>Aquesta és la composició que s’enviarà a la impressió. Revisa-la abans de generar el PDF.</p>
+              <button className="secondary-action compact" onClick={() => setActiveReportStep('prepare')} type="button">
+                Tornar a editar
+              </button>
+            </div>
+            <TutorialReportDocument
+              classLabel={classLabel}
+              executiveSummary={executiveSummary}
+              filteredCompetencies={filteredCompetencies}
+              groupedByArea={groupedByArea}
+              hasTracking={hasTracking}
+              printSections={printSections}
+              profile={profile}
+              profileAreaSummaries={profileAreaSummaries}
+              profileSubjectTrackingSummaries={profileSubjectTrackingSummaries}
+              records={records}
+              reportDate={reportDate}
+              sociometricReport={sociometricReport}
+              strongestSubjects={strongestSubjects}
+              tutorComment={tutorComment}
+              weakestSubjects={weakestSubjects}
+            />
+          </div>
         )}
 
-        <footer className="tutorial-print-footer">
-          Informe orientatiu generat amb AvaluaPro. Les dades s’han d’interpretar dins del context educatiu de l’alumne.
-        </footer>
+        <div className="tutorial-report-print-source" aria-hidden="true">
+          <TutorialReportDocument
+            classLabel={classLabel}
+            executiveSummary={executiveSummary}
+            filteredCompetencies={filteredCompetencies}
+            groupedByArea={groupedByArea}
+            hasTracking={hasTracking}
+            printSections={printSections}
+            profile={profile}
+            profileAreaSummaries={profileAreaSummaries}
+            profileSubjectTrackingSummaries={profileSubjectTrackingSummaries}
+            records={records}
+            reportDate={reportDate}
+            sociometricReport={sociometricReport}
+            strongestSubjects={strongestSubjects}
+            tutorComment={tutorComment}
+            weakestSubjects={weakestSubjects}
+          />
+        </div>
       </div>
     </Modal>
   )
@@ -3668,6 +3825,7 @@ export function TutoringView() {
   const [diagnosisSubjectFilter, setDiagnosisSubjectFilter] = useState('all')
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [profileFilter, setProfileFilter] = useState('priority')
+  const [profileSearch, setProfileSearch] = useState('')
   const [profileAreaFilter, setProfileAreaFilter] = useState('all')
   const [profileSubjectFilter, setProfileSubjectFilter] = useState('all')
   const [subjectFilter, setSubjectFilter] = useState('auto')
@@ -3727,6 +3885,7 @@ export function TutoringView() {
   const [cooperativeRenameDraft, setCooperativeRenameDraft] = useState('')
   const [cooperativeCopyMessage, setCooperativeCopyMessage] = useState('')
   const [showCooperativeProjection, setShowCooperativeProjection] = useState(false)
+  const [cooperativeWorkspacePanel, setCooperativeWorkspacePanel] = useState('')
   const [seatingLayout, setSeatingLayout] = useState({ activeSeatIds: getDefaultSeatingActiveSeatIds(), columns: 9, rows: 5 })
   const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
   const [seatingManualEmptySeatIds, setSeatingManualEmptySeatIds] = useState([])
@@ -4893,13 +5052,21 @@ export function TutoringView() {
           ) ||
           (profileAreaFilter === 'all' && profileSubjectFilter === 'all'),
         )
+        .filter((profile) => profile.student.name.toLocaleLowerCase('ca').includes(profileSearch.trim().toLocaleLowerCase('ca')))
         .sort((a, b) => {
           const priorityA = getTutorialProfilePriority(a, tutorialRecordRowsByStudent.get(a.student.id))
           const priorityB = getTutorialProfilePriority(b, tutorialRecordRowsByStudent.get(b.student.id))
           if (priorityA !== priorityB) return priorityB - priorityA
           return a.student.name.localeCompare(b.student.name, 'ca')
         }),
-    [profileAreaFilter, profileFilter, profileSubjectFilter, tutorialRecordRowsByStudent, tutorialSummary.studentProfiles],
+    [
+      profileAreaFilter,
+      profileFilter,
+      profileSearch,
+      profileSubjectFilter,
+      tutorialRecordRowsByStudent,
+      tutorialSummary.studentProfiles,
+    ],
   )
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
 
@@ -6132,7 +6299,7 @@ export function TutoringView() {
           type="button"
         >
           <UsersRound size={17} />
-          Perfil i PDF
+          Informes tutorials
         </button>
       </div>
 
@@ -6151,7 +6318,7 @@ export function TutoringView() {
                 </p>
               </div>
               <button className="secondary-action compact" onClick={() => setActivePanel('profile')} type="button">
-                Veure perfils
+                Veure informes
               </button>
             </header>
 
@@ -8512,159 +8679,65 @@ export function TutoringView() {
           </section>
 
           <section
-            className={`cooperative-generator-panel relationship-tool-panel ${
+            className={`cooperative-generator-panel cooperative-canvas relationship-tool-panel ${
               activeRelationshipTool === 'groups' ? 'active' : ''
-            }`}
+            } ${selectedCooperativeGroup || cooperativeWorkspacePanel ? 'has-inspector' : ''}`}
           >
-            <header>
-              <div>
-                <span className="section-kicker">
-                  <UsersRound size={17} />
-                  Grups cooperatius
-                </span>
-                <h2>Proposta automàtica</h2>
-                <p>
-                  Combina relacions, incompatibilitats, rendiment i seguiment tutorial per preparar una primera
-                  proposta revisable.
-                </p>
+            <header className="cooperative-canvas-header">
+              <div className="cooperative-canvas-title">
+                <button
+                  aria-label="Tornar a eines"
+                  className="tool-back-button icon-only"
+                  onClick={() => setActiveRelationshipTool('')}
+                  type="button"
+                >
+                  <ArrowLeft aria-hidden="true" size={20} />
+                </button>
+                <UsersRound aria-hidden="true" size={26} />
+                <div>
+                  <h2>Grups cooperatius</h2>
+                  <span>
+                    {cooperativeGroupSetAnalysis.reviewGroupCount + cooperativeGroupSetAnalysis.criticalGroupCount === 0
+                      ? 'Proposta equilibrada'
+                      : `${cooperativeGroupSetAnalysis.reviewGroupCount + cooperativeGroupSetAnalysis.criticalGroupCount} grup/s a revisar`}
+                    {' · '}
+                    {visibleCooperativeGroups.length} grups · {cooperativeGroupSetAnalysis.totalStudents} alumnes
+                  </span>
+                </div>
               </div>
-              <div className="cooperative-generator-controls">
-                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
-                  <ArrowLeft aria-hidden="true" size={17} />
-                  Tornar a eines
+              <div className="cooperative-canvas-actions">
+                <button
+                  className={cooperativeWorkspacePanel === 'config' ? 'secondary-action compact active' : 'secondary-action compact'}
+                  onClick={() => {
+                    setSelectedCooperativeGroupId('')
+                    setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
+                  }}
+                  type="button"
+                >
+                  <SlidersHorizontal size={16} />
+                  Ajustar proposta
                 </button>
-                <label>
-                  Mida
-                  <select
-                    onChange={(event) => {
-                      setCooperativeGroupSize(event.target.value)
-                      resetCooperativeManualEditing()
-                      setSelectedCooperativeGroupSetId('')
-                    }}
-                    value={cooperativeGroupSize}
-                  >
-                    <option value="2">Parelles</option>
-                    <option value="3">Grups de 3</option>
-                    <option value="4">Grups de 4</option>
-                    <option value="5">Grups de 5</option>
-                    <option value="6">Grups de 6</option>
-                  </select>
-                </label>
-                <label>
-                  Criteri
-                  <select
-                    onChange={(event) => {
-                      setCooperativeStrategy(event.target.value)
-                      resetCooperativeManualEditing()
-                      setSelectedCooperativeGroupSetId('')
-                    }}
-                    value={cooperativeStrategy}
-                  >
-                    {COOPERATIVE_GROUP_STRATEGIES.map((strategy) => (
-                      <option key={strategy.id} value={strategy.id}>
-                        {strategy.label}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.description ||
-                      'Combina rendiment, seguiment i sociometria.'}
-                  </small>
-                </label>
-                <label className="cooperative-toggle-control">
-                  Mig grup
-                  <button
-                    className={prioritizeHalfGroups ? 'active' : ''}
-                    onClick={() => {
-                      setPrioritizeHalfGroups((current) => !current)
-                      resetCooperativeManualEditing()
-                      setSelectedCooperativeGroupSetId('')
-                    }}
-                    type="button"
-                  >
-                    {prioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
-                  </button>
-                </label>
-                <label className="wide">
-                  Nom versió
-                  <input
-                    onChange={(event) => setCooperativeGroupSetName(event.target.value)}
-                    placeholder="Ex: Laboratori UT2"
-                    value={cooperativeGroupSetName}
-                  />
-                </label>
-                <label className="wide cooperative-observation-control">
-                  Observació
-                  <textarea
-                    onChange={(event) => setCooperativeGroupSetObservation(event.target.value)}
-                    placeholder="Ex: funciona bé en pràctiques, revisar el grup 3..."
-                    rows="2"
-                    value={cooperativeGroupSetObservation}
-                  />
-                </label>
-                <button className="secondary-action compact" onClick={handleSaveCooperativeGroupSet} type="button">
+                <button
+                  className="primary-action compact"
+                  onClick={() => {
+                    setSelectedCooperativeGroupId('')
+                    setCooperativeWorkspacePanel('save')
+                  }}
+                  type="button"
+                >
                   <Save size={16} />
-                  Guardar versió
-                </button>
-                {manualCooperativeGroups.length > 0 && (
-                  <button
-                    className="secondary-action compact"
-                    onClick={resetCooperativeManualEditing}
-                    type="button"
-                  >
-                    <RotateCcw size={16} />
-                    Tornar a automàtic
-                  </button>
-                )}
-                <button
-                  className="secondary-action compact"
-                  disabled={cooperativeEditHistory.past.length === 0}
-                  onClick={handleUndoCooperativeEdit}
-                  type="button"
-                >
-                  <Undo2 size={16} />
-                  Desfer
+                  Guardar
                 </button>
                 <button
-                  className="secondary-action compact"
-                  disabled={cooperativeEditHistory.future.length === 0}
-                  onClick={handleRedoCooperativeEdit}
+                  className={cooperativeWorkspacePanel === 'share' ? 'secondary-action compact active' : 'secondary-action compact'}
+                  onClick={() => {
+                    setSelectedCooperativeGroupId('')
+                    setCooperativeWorkspacePanel((current) => (current === 'share' ? '' : 'share'))
+                  }}
                   type="button"
                 >
-                  <Redo2 size={16} />
-                  Refer
-                </button>
-                <button
-                  className="secondary-action compact"
-                  onClick={handleCreateCooperativeGroup}
-                  type="button"
-                >
-                  <Plus size={16} />
-                  Crear grup
-                </button>
-                <button
-                  className="secondary-action compact"
-                  onClick={() => handleCopyCooperativeGroups('teacher')}
-                  type="button"
-                >
-                  <Clipboard size={16} />
-                  Copiar per al docent
-                </button>
-                <button
-                  className="secondary-action compact"
-                  onClick={() => handleCopyCooperativeGroups('students')}
-                  type="button"
-                >
-                  <ClipboardList size={16} />
-                  Copiar per a l’alumnat
-                </button>
-                <button
-                  className="secondary-action compact"
-                  onClick={() => setShowCooperativeProjection(true)}
-                  type="button"
-                >
-                  <Eye size={16} />
-                  Projectar grups
+                  <Share2 size={16} />
+                  Compartir
                 </button>
               </div>
             </header>
@@ -8731,42 +8804,272 @@ export function TutoringView() {
               </div>
             )}
 
-            {classTutorialGroupSets.length > 0 && (
-              <div className="cooperative-saved-list">
-                {classTutorialGroupSets.map((groupSet) => (
-                  <article className={selectedCooperativeGroupSetId === groupSet.id ? 'active' : ''} key={groupSet.id}>
-                    <button
-                      onClick={() => {
-                        setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
-                        setSelectedCooperativeGroupId('')
-                        setSelectedCooperativeGroupSetId(groupSet.id)
-                      }}
-                      type="button"
-                    >
-                      <strong>{groupSet.name}</strong>
-                      <span>
-                        {formatShortDate(groupSet.createdAt?.slice(0, 10))} · {groupSet.groups?.length || 0} grups ·{' '}
-                        {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === groupSet.strategy)?.label ||
-                          'Equilibrat'}
-                        {groupSet.qualitySnapshot?.score !== undefined
-                          ? ` · ${groupSet.qualitySnapshot.score}/100`
-                          : ''}
-                        {(Number(groupSet.manualChangeCount) || 0) > 0
-                          ? ` · ${groupSet.manualChangeCount} canvi/s`
-                          : ''}
-                      </span>
-                    </button>
-                    <button
-                      className="icon-button danger subtle"
-                      onClick={() => handleDeleteCooperativeGroupSet(groupSet.id)}
-                      title="Eliminar versió"
-                      type="button"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </article>
-                ))}
-              </div>
+            {cooperativeWorkspacePanel === 'versions' && (
+              <aside className="cooperative-canvas-inspector cooperative-versions-inspector">
+                <header>
+                  <div>
+                    <span>Historial</span>
+                    <h3>Versions guardades</h3>
+                  </div>
+                  <button aria-label="Tancar" onClick={() => setCooperativeWorkspacePanel('')} type="button">
+                    <X aria-hidden="true" size={18} />
+                  </button>
+                </header>
+                {classTutorialGroupSets.length > 0 ? (
+                  <div className="cooperative-saved-list">
+                    {classTutorialGroupSets.map((groupSet) => (
+                      <article className={selectedCooperativeGroupSetId === groupSet.id ? 'active' : ''} key={groupSet.id}>
+                        <button
+                          onClick={() => {
+                            setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
+                            setSelectedCooperativeGroupId('')
+                            setSelectedCooperativeGroupSetId(groupSet.id)
+                          }}
+                          type="button"
+                        >
+                          <strong>{groupSet.name}</strong>
+                          <span>
+                            {formatShortDate(groupSet.createdAt?.slice(0, 10))} · {groupSet.groups?.length || 0} grups ·{' '}
+                            {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === groupSet.strategy)?.label ||
+                              'Equilibrat'}
+                            {groupSet.qualitySnapshot?.score !== undefined
+                              ? ` · ${groupSet.qualitySnapshot.score}/100`
+                              : ''}
+                          </span>
+                        </button>
+                        <button
+                          className="icon-button danger subtle"
+                          onClick={() => handleDeleteCooperativeGroupSet(groupSet.id)}
+                          title="Eliminar versió"
+                          type="button"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state compact">Encara no hi ha cap versió guardada.</div>
+                )}
+              </aside>
+            )}
+
+            <nav aria-label="Eines dels grups cooperatius" className="cooperative-canvas-toolbar">
+              <button
+                className={cooperativeWorkspacePanel === 'config' ? 'active' : ''}
+                onClick={() => {
+                  setSelectedCooperativeGroupId('')
+                  setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
+                }}
+                type="button"
+              >
+                <UsersRound aria-hidden="true" size={22} />
+                <strong>Mida</strong>
+                <span>{cooperativeGroupSize === '2' ? 'Parelles' : `Grups de ${cooperativeGroupSize}`}</span>
+              </button>
+              <button
+                className={cooperativeWorkspacePanel === 'config' ? 'active' : ''}
+                onClick={() => {
+                  setSelectedCooperativeGroupId('')
+                  setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
+                }}
+                type="button"
+              >
+                <SlidersHorizontal aria-hidden="true" size={22} />
+                <strong>Criteri</strong>
+                <span>
+                  {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.label ||
+                    'Equilibrat'}
+                </span>
+              </button>
+              <button
+                className={cooperativeWorkspacePanel === 'config' ? 'active' : ''}
+                onClick={() => {
+                  setSelectedCooperativeGroupId('')
+                  setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
+                }}
+                type="button"
+              >
+                <Layers3 aria-hidden="true" size={22} />
+                <strong>Mig grup</strong>
+                <span>{prioritizeHalfGroups ? 'Prioritzar' : 'Barrejar'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCooperativeWorkspacePanel('')
+                  handleCreateCooperativeGroup()
+                }}
+                type="button"
+              >
+                <Plus aria-hidden="true" size={24} />
+                <strong>Crear grup</strong>
+              </button>
+              <button
+                className={cooperativeWorkspacePanel === 'versions' ? 'active' : ''}
+                onClick={() => {
+                  setSelectedCooperativeGroupId('')
+                  setCooperativeWorkspacePanel((current) => (current === 'versions' ? '' : 'versions'))
+                }}
+                type="button"
+              >
+                <History aria-hidden="true" size={22} />
+                <strong>Versions</strong>
+                <span>{classTutorialGroupSets.length} guardades</span>
+              </button>
+            </nav>
+
+            {cooperativeWorkspacePanel === 'config' && (
+              <aside className="cooperative-canvas-inspector cooperative-config-inspector">
+                <header>
+                  <div>
+                    <span>Configuració</span>
+                    <h3>Ajustar proposta</h3>
+                  </div>
+                  <button
+                    aria-label="Tancar configuració"
+                    onClick={() => setCooperativeWorkspacePanel('')}
+                    type="button"
+                  >
+                    <X aria-hidden="true" size={18} />
+                  </button>
+                </header>
+                <label>
+                  Mida dels grups
+                  <select
+                    onChange={(event) => {
+                      setCooperativeGroupSize(event.target.value)
+                      resetCooperativeManualEditing()
+                      setSelectedCooperativeGroupSetId('')
+                    }}
+                    value={cooperativeGroupSize}
+                  >
+                    <option value="2">Parelles</option>
+                    <option value="3">Grups de 3</option>
+                    <option value="4">Grups de 4</option>
+                    <option value="5">Grups de 5</option>
+                    <option value="6">Grups de 6</option>
+                  </select>
+                </label>
+                <label>
+                  Criteri pedagògic
+                  <select
+                    onChange={(event) => {
+                      setCooperativeStrategy(event.target.value)
+                      resetCooperativeManualEditing()
+                      setSelectedCooperativeGroupSetId('')
+                    }}
+                    value={cooperativeStrategy}
+                  >
+                    {COOPERATIVE_GROUP_STRATEGIES.map((strategy) => (
+                      <option key={strategy.id} value={strategy.id}>
+                        {strategy.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.description}
+                  </small>
+                </label>
+                <button
+                  aria-pressed={prioritizeHalfGroups}
+                  className={`cooperative-inspector-toggle ${prioritizeHalfGroups ? 'active' : ''}`}
+                  onClick={() => {
+                    setPrioritizeHalfGroups((current) => !current)
+                    resetCooperativeManualEditing()
+                    setSelectedCooperativeGroupSetId('')
+                  }}
+                  type="button"
+                >
+                  <Layers3 aria-hidden="true" size={19} />
+                  <span>
+                    <strong>Prioritzar mig grup</strong>
+                    <small>Evita barrejar els dos subgrups sempre que sigui possible.</small>
+                  </span>
+                </button>
+                {manualCooperativeGroups.length > 0 && (
+                  <button className="secondary-action compact" onClick={resetCooperativeManualEditing} type="button">
+                    <RotateCcw size={16} />
+                    Tornar a la proposta automàtica
+                  </button>
+                )}
+              </aside>
+            )}
+
+            {cooperativeWorkspacePanel === 'save' && (
+              <aside className="cooperative-canvas-inspector cooperative-save-inspector">
+                <header>
+                  <div>
+                    <span>Versió nova</span>
+                    <h3>Guardar proposta</h3>
+                  </div>
+                  <button aria-label="Tancar" onClick={() => setCooperativeWorkspacePanel('')} type="button">
+                    <X aria-hidden="true" size={18} />
+                  </button>
+                </header>
+                <label>
+                  Nom de la versió
+                  <input
+                    onChange={(event) => setCooperativeGroupSetName(event.target.value)}
+                    placeholder="Ex: Laboratori UT2"
+                    value={cooperativeGroupSetName}
+                  />
+                </label>
+                <label>
+                  Observació
+                  <textarea
+                    onChange={(event) => setCooperativeGroupSetObservation(event.target.value)}
+                    placeholder="Ex: funciona bé en pràctiques, revisar el grup 3..."
+                    rows="5"
+                    value={cooperativeGroupSetObservation}
+                  />
+                </label>
+                <button
+                  className="primary-action"
+                  onClick={() => {
+                    handleSaveCooperativeGroupSet()
+                    setCooperativeWorkspacePanel('')
+                  }}
+                  type="button"
+                >
+                  <Save size={17} />
+                  Guardar versió
+                </button>
+              </aside>
+            )}
+
+            {cooperativeWorkspacePanel === 'share' && (
+              <aside className="cooperative-canvas-inspector cooperative-share-inspector">
+                <header>
+                  <div>
+                    <span>Sortida</span>
+                    <h3>Compartir grups</h3>
+                  </div>
+                  <button aria-label="Tancar" onClick={() => setCooperativeWorkspacePanel('')} type="button">
+                    <X aria-hidden="true" size={18} />
+                  </button>
+                </header>
+                <button onClick={() => handleCopyCooperativeGroups('teacher')} type="button">
+                  <Clipboard aria-hidden="true" size={19} />
+                  <span>
+                    <strong>Copiar per al docent</strong>
+                    <small>Inclou notes, alertes i lectura pedagògica.</small>
+                  </span>
+                </button>
+                <button onClick={() => handleCopyCooperativeGroups('students')} type="button">
+                  <ClipboardList aria-hidden="true" size={19} />
+                  <span>
+                    <strong>Copiar per a l’alumnat</strong>
+                    <small>Només mostra la composició dels grups.</small>
+                  </span>
+                </button>
+                <button onClick={() => setShowCooperativeProjection(true)} type="button">
+                  <Eye aria-hidden="true" size={19} />
+                  <span>
+                    <strong>Projectar grups</strong>
+                    <small>Obre una vista neta per mostrar a classe.</small>
+                  </span>
+                </button>
+              </aside>
             )}
 
             {classStudents.length < 2 ? (
@@ -8802,8 +9105,11 @@ export function TutoringView() {
                   {manualCooperativeGroups.length > 0 && <em>Editada manualment</em>}
                 </section>
 
-                {selectedCooperativeGroup && (
-                  <section className="cooperative-group-detail" aria-label={`Detall de ${selectedCooperativeGroup.name}`}>
+                {selectedCooperativeGroup && !cooperativeWorkspacePanel && (
+                  <section
+                    className="cooperative-group-detail cooperative-canvas-inspector"
+                    aria-label={`Detall de ${selectedCooperativeGroup.name}`}
+                  >
                     <header>
                       <div>
                         <span className={`cooperative-detail-quality ${selectedCooperativeGroup.analysis?.quality.tone}`}>
@@ -9210,13 +9516,14 @@ export function TutoringView() {
                       <button
                         aria-expanded={selectedCooperativeGroupId === group.id}
                         className="cooperative-group-detail-button"
-                        onClick={() =>
+                        onClick={() => {
+                          setCooperativeWorkspacePanel('')
                           setSelectedCooperativeGroupId((current) => {
                             const nextId = current === group.id ? '' : group.id
                             setCooperativeRenameDraft(nextId ? group.name : '')
                             return nextId
                           })
-                        }
+                        }}
                         type="button"
                       >
                         <Eye aria-hidden="true" size={16} />
@@ -9225,6 +9532,27 @@ export function TutoringView() {
                     </article>
                   ))}
                 </div>
+
+                {(cooperativeEditHistory.past.length > 0 || cooperativeEditHistory.future.length > 0) && (
+                  <div className="cooperative-canvas-history-actions">
+                    <button
+                      disabled={cooperativeEditHistory.past.length === 0}
+                      onClick={handleUndoCooperativeEdit}
+                      type="button"
+                    >
+                      <Undo2 aria-hidden="true" size={18} />
+                      Desfer
+                    </button>
+                    <button
+                      disabled={cooperativeEditHistory.future.length === 0}
+                      onClick={handleRedoCooperativeEdit}
+                      type="button"
+                    >
+                      <Redo2 aria-hidden="true" size={18} />
+                      Refer
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
@@ -10580,14 +10908,20 @@ export function TutoringView() {
         <section className="tutorial-profile-panel" data-tour="tutoring-profile-panel">
           <article className="tutoring-card">
             <div>
-              <UsersRound size={24} />
-              <h2>Perfils tutorials</h2>
+              <FileText size={24} />
+              <h2>Informes tutorials</h2>
             </div>
-            <p>
-              Consulta el resum de cada alumne amb competències no assolides, àrees delicades i evidències
-              preparades per al futur PDF.
-            </p>
-            <div className="tutorial-profile-filter-tabs" aria-label="Filtre de perfils tutorials">
+            <p>Revisa la síntesi de cada alumne, completa el comentari del tutor i prepara el PDF tutorial.</p>
+            <label className="tutorial-report-search">
+              <Search size={17} />
+              <input
+                onChange={(event) => setProfileSearch(event.target.value)}
+                placeholder="Cercar alumne..."
+                type="search"
+                value={profileSearch}
+              />
+            </label>
+            <div className="tutorial-profile-filter-tabs" aria-label="Filtre d’informes tutorials">
               <button
                 className={profileFilter === 'priority' ? 'active' : ''}
                 onClick={() => setProfileFilter('priority')}
@@ -10651,7 +10985,7 @@ export function TutoringView() {
               </label>
             </div>
             {tutorialSummary.studentProfiles.length === 0 ? (
-              <div className="empty-state compact">Afegeix alumnes per començar a preparar perfils tutorials.</div>
+              <div className="empty-state compact">Afegeix alumnes per començar a preparar informes tutorials.</div>
             ) : filteredTutorialProfiles.length === 0 ? (
               <div className="empty-state compact">Aquest filtre no té cap alumne ara mateix.</div>
             ) : (
@@ -10660,6 +10994,9 @@ export function TutoringView() {
                   const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
                   const trackingCount = recordRow?.total || 0
                   const priority = getTutorialProfilePriority(profile, recordRow)
+                  const reportStatus = profile.student.tutorialReportUpdatedAt
+                    ? 'En preparació'
+                    : 'No iniciat'
                   return (
                     <button
                       className={`tutorial-student-profile-row ${
@@ -10672,48 +11009,16 @@ export function TutoringView() {
                       <div>
                         <strong>{profile.student.name}</strong>
                         <small>
-                          {profile.weakestArea?.name || 'Sense àrea delicada detectada'} · {trackingCount} registre/s
+                          {profile.notDevelopedCount} no assolides · {trackingCount} registres · {reportStatus}
                         </small>
                       </div>
-                      <span>{priority > 0 ? `P${priority}` : 'OK'}</span>
-                      <span>{profile.evaluatedCount} comp.</span>
-                      <span>{profile.notDevelopedCount} no assolides</span>
-                      <span>{recordRow?.agenda || 0} agenda</span>
-                      <em>{profile.evaluatedCount > 0 ? formatPercent(profile.notDevelopedPercent) : '-'}</em>
+                      <span className="tutorial-report-row-status">{priority > 0 ? 'Cal revisar' : reportStatus}</span>
+                      <em>Preparar</em>
                     </button>
                   )
                 })}
               </div>
             )}
-          </article>
-
-          <article className="tutoring-card muted tutorial-profile-pdf-card">
-            <div>
-              <FileDown size={24} />
-              <h2>PDF de tutoria</h2>
-            </div>
-            <p>
-              Obre el perfil d’un alumne per revisar rendiment, registres tutorials i evidències. Des d’allà
-              pots imprimir-lo o desar-lo com a PDF.
-            </p>
-            <div className="tutorial-profile-pdf-stats">
-              <span>
-                <strong>{tutorialSummary.studentProfiles.length}</strong>
-                perfils
-              </span>
-              <span>
-                <strong>{tutorialRecordSummary.studentsWithRecords.length}</strong>
-                amb seguiment
-              </span>
-            </div>
-            <button
-              className="secondary-action"
-              disabled={tutorialSummary.studentProfiles.length === 0}
-              onClick={() => setSelectedTutorialProfileId(tutorialSummary.studentProfiles[0]?.student.id || '')}
-              type="button"
-            >
-              Obrir primer perfil
-            </button>
           </article>
         </section>
       )}
@@ -10721,8 +11026,9 @@ export function TutoringView() {
       {selectedTutorialProfile && (
         <TutorialStudentProfileModal
           classLabel={activeClass?.name}
+          key={selectedTutorialProfile.student.id}
           onClose={() => setSelectedTutorialProfileId('')}
-          onDeleteRecord={deleteTutorialRecord}
+          onSaveReport={(patch) => updateStudent(selectedTutorialProfile.student.id, patch)}
           profile={selectedTutorialProfile}
           recordRow={tutorialRecordRowsByStudent.get(selectedTutorialProfile.student.id)}
           sociometricReport={sociometricIndividualReportsByStudentId.get(selectedTutorialProfile.student.id)}
