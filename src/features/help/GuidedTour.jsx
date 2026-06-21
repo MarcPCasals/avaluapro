@@ -450,7 +450,7 @@ const tutoringTourSteps = [
   {
     target: 'tutoring-panel-tabs',
     title: '3. Quatre mirades de tutor',
-    text: 'Avaluació tutorial mira competències de totes les matèries; Seguiment tutorial recull agenda i incidències; Relacions prepara sociograma, grups i aula; Perfil i PDF genera resums individuals.',
+    text: 'Avaluació tutorial mira competències de totes les matèries; Seguiment tutorial recull agenda i incidències; Relacions prepara sociograma, grups i aula; Informes tutorials genera resums individuals.',
     mode: 'tutoring',
   },
   {
@@ -543,9 +543,9 @@ const tutoringTourSteps = [
   },
   {
     target: 'tutoring-panel-tabs',
-    title: '18. Perfil i PDF',
-    text: 'Aquest apartat prepara el perfil individual de l’alumne i el resum descarregable per reunions o seguiment tutorial.',
-    action: 'Clica “Perfil i PDF” quan vulguis revisar perfils individuals.',
+    title: '18. Informes tutorials',
+    text: 'Aquest apartat permet revisar la síntesi de cada alumne, completar el comentari del tutor i generar el PDF tutorial.',
+    action: 'Clica “Informes tutorials” quan vulguis preparar els informes individuals.',
     completeWhen: 'tutoring-profile-open',
     mode: 'tutoring',
   },

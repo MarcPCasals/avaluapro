@@ -298,7 +298,7 @@ export function ClassSettingsModal({ classId, onClose }) {
                       </article>
                       <article>
                         <strong>{sharedSummary.studentsWithProfileCount ?? 0}</strong>
-                        <span>Perfils tutorials</span>
+                        <span>Informes tutorials</span>
                       </article>
                       <article>
                         <strong>{sharedSummary.tutorialRecordCount ?? 0}</strong>
