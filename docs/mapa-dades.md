@@ -1,287 +1,149 @@
 # Mapa de dades d'Avaluapro
 
-Data: 4 de juny de 2026  
-Estat: document viu del Bloc 1 de proteccio de dades
+Data d'actualitzacio: 21 de juny de 2026
+Estat: inventari tecnic actualitzat; decisions juridiques i terminis finals pendents
 
-Aquest document recull quines dades guarda Avaluapro, on es desen i quin nivell de cura requereixen. No substitueix una revisio legal ni un contracte d'encarrec de tractament, pero serveix com a base tecnica i pedagogica per parlar amb direccio, centre o Ministeri.
+Aquest document identifica que tracta Avaluapro, on es guarda, amb qui es comparteix i quin risc presenta. No substitueix el registre d'activitats, l'AIPD ni la validacio institucional.
 
-## Principi general
+## 1. Principi de tractament
 
-Avaluapro ha de funcionar com a quadern docent personal: guarda dades necessaries per avaluar, fer seguiment pedagogic i preparar reunions educatives. Les dades s'han de mantenir separades per usuari, exportables, esborrables i comprensibles per al docent.
+Avaluapro es un quadern docent, no un sistema anonimitzat. Necessita relacionar dades educatives amb alumnes concrets. Els noms, codis, qualificacions i observacions continuen sent dades personals mentre es puguin vincular a una persona.
 
-Cal evitar escriure informacio medica, familiar o personal que no sigui estrictament necessaria per a la feina docent. Quan sigui possible, s'han de preferir etiquetes controlades, dades resumides i observacions pedagogiques accionables.
+El criteri de disseny es:
 
-## On es desen les dades
+- guardar nomes dades necessaries per a una finalitat docent;
+- limitar text lliure, fotos i dades especialment delicades;
+- separar espais privats i compartits;
+- no duplicar calculs regenerables;
+- fer exportables i eliminables les dades;
+- documentar riscos i conservacio.
 
-| Espai | Que guarda | Observacions |
+## 2. Ubicacions
+
+| Ubicacio | Contingut | Risc principal |
 | --- | --- | --- |
-| IndexedDB del navegador | Copia local de les col.leccions principals | Es la base local de treball. Permet continuar treballant encara que la xarxa falli. |
-| Firestore `users/{uid}/...` | Dades personals del docent sincronitzades al nuvol | Les rules actuals fan que cada usuari nomes pugui llegir i escriure el seu propi espai. |
-| Firestore `users/{uid}/cloudBackups/...` | Copies de seguretat al nuvol | Guardades per usuari. Cada copia separa les col.leccions en subcol.leccions. |
-| Firestore `teacherGradePackages` | Enviament de notes entre docents | Espai compartit controlat per emissor i correu destinatari. Requereix especial cura. |
-| Firestore `tutoringSpaces` | Cotutories persistents entre docents | Pot replicar perfils, registres, notes tutorials, relacions, sociograma, rols, disposicions i antecedents. Risc molt alt. |
-| Firestore `tutoringInvitationInbox/Outbox` | Invitacions i respostes de cotutoria | Conté correus, uid, classe, estat i dates de resposta. |
-| Firestore `sociometricSurveys` | Formularis sociometrics, tokens individuals i respostes | El document general no es public. Cada alumne accedeix amb un token individual no enumerable que caduca al cap de 24 hores. |
-| Fitxers JSON descarregats | Copies manuals al dispositiu | El fitxer queda fora d'Avaluapro i passa a dependre de la custodia del docent. |
-| Firebase Storage | Encara no s'utilitza | Recomanat per a fotos i imatges grans en una fase posterior. |
+| IndexedDB | Copia local completa de treball. | Dispositiu compartit, perdut o sense xifratge. |
+| Firestore `users/{uid}` | Dades privades sincronitzades del docent. | Compromis del compte o configuracio incorrecta. |
+| `cloudBackups` | Copies completes o gairebe completes. | Acumulacio i restauracio o exportacio indeguda. |
+| `teacherGradePackages` | Notes enviades a un docent concret. | Destinatari equivocat o conservacio excessiva. |
+| `tutoringSpaces` | Dades tutorials persistents entre membres. | Acces excessiu, revocacio, conflictes i copies locals. |
+| Safates d'invitacions | Correus, UID, classe, estat i dates. | Revelacio de relacions professionals i errors de destinatari. |
+| `sociometricSurveys` | Qüestionari, tokens i respostes brutes temporals. | Relacions socials de menors i accés mitjançant enllac. |
+| JSON descarregat | Backup o exportacio fora de l'app. | La custodia passa al dispositiu i al docent. |
 
-## Mapa principal de dades
+## 3. Col.leccions locals i privades
 
-| Ambit | Dades guardades | Col.leccions o camps principals | On es desa | Finalitat docent | Sensibilitat inicial | Observacions de minimitzacio |
-| --- | --- | --- | --- | --- | --- | --- |
-| Dades d'alumnes | Nom, classe, mig grup, foto, informacio general, enllac personal, diagnostics marcats, intel.ligencies multiples | `students`, camps com `name`, `classId`, `halfGroup`, `photoData`, `diagnoses`, `personalNotes`, `multipleIntelligences` | IndexedDB, Firestore `users/{uid}/students`, backups | Identificar alumnes, organitzar grups i adaptar la mirada docent | Alta | El nom i la foto identifiquen directament menors. Les notes personals han de ser pedagogiques i breus. |
-| Notes i avaluacio | Notes A/B/C/D/NA o `-`, notes per criteri o competencia, competencies modificades, competencies actives per UT | `marks`, `competencies`, `criteria`, `indicators`, `uts`, `semesters`, camps de configuracio de classe | IndexedDB, Firestore, backups, possible enviament entre docents | Registrar assoliment competencial i calcular estadistiques | Alta | Evitar duplicar notes. Si una competencia s'inactiva visualment no s'haurien d'esborrar dades historiques. |
-| Seguiment de tasques | Tasques, dates, estat fet/incomplet/no fet/exempt, recordatoris, informacio de tasca | `tasks`, `taskRecords` | IndexedDB, Firestore, backups | Fer seguiment de constancia i habits de treball | Mitjana-alta | Les dades de tasques poden generar perfils d'habits. Cal distingir "sense dades" de "0%". |
-| Comportament i agenda | Punts vermells, punts negres, entrades de diari, notes a l'agenda, motius i dates | `behaviorEvents`, `agendaNotes`, camps derivats de `taskRecords` | IndexedDB, Firestore, backups | Registrar incidencies pedagogiques i alertes d'intervencio | Molt alta | Camps oberts amb risc de contenir informacio sensible. Recomanat usar llenguatge descriptiu, no clinic ni familiar. |
-| Diagnostics i necessitats educatives | Etiquetes com dislexia/discalculia, TDAH, TEA, QI limit o TDL, alumne de progres, altes capacitats, competencies modificades | `students.diagnoses`, camps de competencies modificades a avaluacio i tutoria | IndexedDB, Firestore, backups | Fer visible informacio pedagogica rellevant per adaptar l'avaluacio i el seguiment | Molt alta | Es una de les dades mes sensibles. Prioritzar etiquetes controlades i evitar detalls medics en text lliure. |
-| DOIPs | Registres de demandes/respostes d'equip educatiu, resum d'informes curts sobre alumnes | `tutorialRecords` amb tipus `doip` o equivalent | IndexedDB, Firestore, backups | Preparar equips educatius i fer seguiment tutorial | Molt alta | Han de contenir informacio pedagogica necessaria, no historials personals extensos. |
-| Comentaris de tutoria i equip educatiu | Entrades datades, ultima entrada destacada, historial d'equips educatius i tutoria | `tutorialRecords`, camps d'anotacions vinculades a alumne | IndexedDB, Firestore, backups | Preparar reunions, recordar acords i fer seguiment d'alumnes | Molt alta | Camps oberts. Cal avisar dins l'app que s'evitin dades mediques/familiars no necessaries. |
-| Fotos i llocs fixos | Fotos d'alumne, imatges de disposicio d'aula o llocs fixos | `students.photoData`, `seatingCharts`, `tutorialSeatingPlans` | Ara: IndexedDB/Firestore/backups. Futur: Firebase Storage | Identificacio visual, disposicio d'aula i gestio tutorial | Alta | Les imatges pesen molt i identifiquen menors. Migrar a Storage amb rules propies quan creixi l'us. |
-| Sociograma | Relacions positives, afinitats, incompatibilitats, posicions del mapa, alumne al centre, rols estrella/conflictiu | `tutorialRelations`, `tutorialSociogramLayouts`, `tutorialStudentRoles` | IndexedDB, Firestore, backups | Entendre relacions socials i prendre decisions de grup o aula | Molt alta | Pot revelar dinamiques socials delicades. Mostrar només a tutors/docents legitimats. |
-| Grups cooperatius | Propostes de grup, rols, criteris de composicio, versions generades | `tutorialGroupSets`, `tutorialStudentRoles`, dades derivades de notes/relacions | IndexedDB, Firestore, backups | Crear grups equilibrats segons criteris academics i socials | Alta | Les propostes deriven de notes i relacions. Cal explicar que son suport docent, no decisio automatica final. |
-| Disposicio d'aula | Matriu de taules, alumnes assignats, taules lliures, alumnes bloquejats, alumnes a revisar, versions guardades | `tutorialSeatingPlans` | IndexedDB, Firestore, backups | Proposar i conservar disposicions d'aula | Alta | Combina foto, mig grup, rol, notes i relacions. Convindria no exportar-ho sense necessitat. |
-| Copies de seguretat | Export complet o parcial de dades del docent, metadades de copia, data, usuari, col.leccions | Fitxers JSON, `cloudBackups` | Dispositiu local i Firestore | Recuperar dades, canviar dispositiu, conservar final de curs | Molt alta | No inclou qüestionaris sociomètrics temporals, tokens ni respostes brutes. La resta del backup continua requerint custòdia estricta. |
-| Enviament de notes entre docents | Paquets de notes per classe/materia, emissor, destinatari, estat d'importacio, errors d'alumnes no trobats | `teacherGradePackages` | Firestore global amb rules especifiques | Enviar notes d'assignatura al tutor sense copiar manualment | Alta | Requereix registre clar, destinatari correcte i missatges d'error quan no coincideixen alumnes o classes. |
-| Cotutoria compartida | Perfils, registres, notes, relacions, grups, sociograma, rols, disposicions i antecedents | `tutoringSpaces` i subcol.leccions | Firestore compartit entre membres | Permetre treball tutorial conjunt | Molt alta | Cal auditar rols, revocacio, eliminacio, autoria i minim privilegi abans d'un pilot institucional. |
-| Qüestionari sociometric public | Llista d'alumnes, alumne que respon, eleccions positives i alumnes a evitar | `sociometricSurveys`, `accessTokens` i `responses` | Firestore; accés temporal amb token individual | Recollir relacions sociometriques | Molt alta | Token d'un sol ús i caducitat de 24 hores. Les dades brutes s'han d'eliminar després de sincronitzar; purga automàtica pendent. |
-| Antecedents academics | Ultima mirada del curs anterior per competencia, perfil anterior, diagnostics opcionals, observacions inicials | `studentAntecedents` | IndexedDB, Firestore, backups | Comencar curs amb context pedagogic i comparar evolucio | Molt alta | Ha de ser portable pero minim. Evitar incloure classe antiga o dades no necessaries. |
-| Perfil docent i configuracio | Materia principal, classes, colors, ordre, tutor, preferencies UI, ultima pantalla oberta | `classes`, `ui` local, `teacherProfile` o camps similars | IndexedDB, Firestore, localStorage per preferencies petites | Personalitzar Avaluapro i recuperar l'estat de treball | Baixa-mitjana | No es tan sensible, pero identifica docent i organitzacio del curs. |
+```text
+classes
+students
+semesters
+uts
+competencies
+criteria
+indicators
+marks
+tasks
+taskRecords
+behaviorEvents
+agendaNotes
+tutorialRecords
+tutorialMarks
+tutorialRelations
+tutorialGroupSets
+tutorialSociometricMoments
+tutorialSociogramLayouts
+tutorialStudentRoles
+tutorialSeatingPlans
+seatingCharts
+studentAntecedents
+sociometricSurveys
+```
 
-## Col.leccions detectades al codi
+## 4. Categories de dades
 
-A data d'aquest document, Avaluapro treballa amb aquestes col.leccions locals principals:
-
-- `classes`
-- `students`
-- `semesters`
-- `uts`
-- `competencies`
-- `criteria`
-- `indicators`
-- `marks`
-- `tasks`
-- `taskRecords`
-- `behaviorEvents`
-- `agendaNotes`
-- `tutorialRecords`
-- `tutorialMarks`
-- `tutorialRelations`
-- `tutorialGroupSets`
-- `tutorialSociogramLayouts`
-- `tutorialStudentRoles`
-- `tutorialSeatingPlans`
-- `seatingCharts`
-- `studentAntecedents`
-
-I amb aquests espais de Firestore especialment rellevants:
-
-- `users/{uid}/{collection}` per a les dades de cada docent.
-- `users/{uid}/cloudBackups/{backupId}` i subcol.leccions per a copies de seguretat al nuvol.
-- `teacherGradePackages/{packageId}` per a enviaments de notes entre docents.
-
-## Punts d'atencio detectats
-
-1. **Fotos i imatges**: ara poden quedar dins Firestore o backups com a dades grans. A mesura que creixi l'us, caldria passar-les a Firebase Storage amb rules propies.
-2. **Camps de text lliure**: comentaris, DOIPs, motius d'incidencies, anotacions personals i tutoria poden contenir dades sensibles. Cal posar avisos d'us responsable dins l'app.
-3. **Diagnostics**: son dades especialment sensibles. Han d'estar en etiquetes controlades i amb el minim text complementari possible.
-4. **Sociograma i relacions**: poden revelar informacio social delicada. Cal tractar-ho com a dada tutorial sensible.
-5. **Copies de seguretat**: una copia pot contenir tot el quadern docent. Cal que el docent entengui que, un cop descarregada, la custodia passa al dispositiu.
-6. **Enviament de notes**: cal validar destinatari, classe i alumnes per evitar que dades vagin al docent equivocat o quedin mal importades.
-
-## Revisio de necessitat docent
-
-Pregunta clau: **aquesta dada es necessaria per a la funcio docent?**
-
-La resposta no ha de ser nomes tecnica. Una dada pot ser facil de guardar, pero no ser convenient. Avaluapro hauria de guardar nomes dades que ajudin clarament a avaluar, fer seguiment, preparar reunions o prendre decisions pedagogiques.
-
-| Dada o ambit | Cal guardar-la? | Motiu docent | Es pot reduir? | Accio recomanada |
+| Ambit | Exemples | Finalitat | Sensibilitat | Criteri |
 | --- | --- | --- | --- | --- |
-| Nom de l'alumne | Si | Necessari per identificar alumnes en taules, informes i seguiment | No gaire, pero es pot normalitzar visualment | Guardar. Evitar duplicats i mantenir format coherent. |
-| Classe i mig grup | Si | Necessari per organitzar avaluacio, seguiment i agrupaments | Si, guardar nomes grup actual i configuracions necessaries | Guardar. Permetre editar/reordenar sense historials innecessaris. |
-| Foto de l'alumne | Opcional | Ajuda en perfil, disposicio d'aula i reconeixement visual | Si, comprimir i guardar una sola foto reutilitzada | Guardar nomes si el docent la necessita. Migrar a Storage quan es consolidi. |
-| Notes competencials | Si | Nucli de l'aplicacio: avaluacio, ultima mirada i estadistiques | Si, guardar notes finals/necessaries i evitar duplicar calculs derivats | Guardar. Els calculs es poden regenerar quan sigui possible. |
-| Criteris i competencies modificades | Si | Necessari per entendre adaptacions i balanc estandard | Si, etiqueta simple millor que text lliure | Guardar com a marca controlada, no com a comentari llarg. |
-| Tasques i estat de tasques | Si | Necessari per constancia, avisos i seguiment d'habits | Si, no guardar dades duplicades ni historials innecessaris | Guardar registres essencials: tasca, data, alumne i estat. |
-| Punts vermells i notes a l'agenda | Si | Necessari per avisos, acumulacions i justificacio de notes a l'agenda | Si, guardar motiu resumit i tasques que l'han generat | Guardar amb registre datat. Reiniciar comptadors sense perdre historial. |
-| Punts negres i incidencies | Si, amb molta cura | Necessari per seguiment conductual i reunions | Si, camps curts i pedagogics | Guardar nomes fets observables i accionables. Evitar judicis personals. |
-| Entrades de diari sense negatiu | Opcional | Pot ajudar a documentar observacions positives o neutres | Si, resum breu i data | Guardar si aporta seguiment real. Evitar convertir-ho en diari extens. |
-| Diagnostics | Si, pero minim | Ajuda a adaptar mirada docent i detectar necessitats | Si, etiquetes controlades i poc text | Guardar nomes categories pedagogicament utilitzades. Evitar detalls medics. |
-| Altes capacitats, alumne de progres i altres etiquetes | Si, si tenen us pedagogic | Permeten visibilitzar necessitats d'acompanyament | Si, etiqueta simple | Guardar com a diagnosi/etiqueta controlada. |
-| DOIPs | Si, per tutors | Necessari per preparar equips educatius i revisar respostes | Si, resum pedagogic de resposta | Guardar en mode tutoria. Evitar copiar documents llargs si no cal. |
-| Comentaris d'equip educatiu | Si | Serveixen per recordar acords i intervencions | Si, entrades datades i resumides | Guardar. Mostrar avisos d'escriptura responsable. |
-| Comentaris de tutoria | Si | Serveixen per reunions, seguiment i comunicacio interna | Si, entrades datades i resumides | Guardar. Separar de diagnostics i perfil general. |
-| Informacio familiar o medica en text lliure | Normalment no | Pot semblar util, pero augmenta molt el risc | Si, evitar-la o substituir-la per indicacio pedagogica | No fomentar-la. Afegir avisos per no escriure-la si no es imprescindible. |
-| Sociograma | Si, si s'activa mode tutoria | Ajuda a entendre relacions, grups i disposicio d'aula | Si, guardar relacions necessaries, no interpretacions llargues | Guardar amb cura i nomes per classes tutorialment justificades. |
-| Rols estrella/conflictiu | Si, amb cura | Ajuda a crear grups i disposicions equilibrades | Si, etiqueta funcional sense exposar explicacions sensibles | Guardar com a rol intern. Evitar que impliqui judicis visibles innecessaris. |
-| Grups cooperatius generats | Si | Permet conservar propostes i versions utilitzades | Si, guardar composicio i criteris basics | Guardar versions escollides. No cal guardar totes les propostes descartades. |
-| Disposicio d'aula | Si | Molt util per tutoria, gestio d'aula i llocs fixos | Si, guardar versions rellevants | Guardar versions amb nom. Evitar exportar imatges si no cal. |
-| Antecedents academics | Si, si venen d'un curs anterior | Donen context inicial i comparativa de progres | Si, nomes ultima mirada i perfil resumit | Guardar per alumne, sense classe antiga ni dades innecessaries. |
-| Intel.ligencies multiples | Opcional | Pot ajudar a perfil de grup si el centre/docent ho usa | Si, desplegable controlat | Guardar nomes si es treballa pedagogicament. No fer-ho obligatori. |
-| Exempcions de materies | Si, en tutoria | Evita comptar com a no assolit el que no s'avalua | Si, marca simple per materia/alumne | Guardar com a configuracio controlada. |
-| Enviament de notes entre docents | Si | Redueix feina al tutor i evita errors manuals | Si, enviar nomes dades necessaries de classe/materia/alumne/competencia | Guardar registre minim d'enviament i importacio. Validar destinatari i coincidencies. |
-| Copies de seguretat locals | Si, manuals | Necessaries per seguretat, canvi de dispositiu i final de curs | Si, permetre triar ambit si cal | Mantenir. Explicar que el fitxer descarregat queda sota responsabilitat del docent. |
-| Copies de seguretat al nuvol | Si | Protegeixen contra perdua local i errors del dispositiu | Si, copies datades i no infinites | Guardar ultim historial limitat. Definir politica de conservacio. |
-| Preferencies UI i ultima pantalla | Si | Milloren us diari sense impacte fort | Si, localStorage nomes per preferencies petites | Guardar localment quan sigui possible. No barrejar amb dades sensibles. |
+| Identificacio | Nom, classe, mig grup, foto | Identificar i organitzar alumnat | Alta | Nom necessari; foto opcional. |
+| Avaluacio | Notes, competencies, criteris, rubriques | Avaluar i preparar retorn | Alta | Evitar duplicar resultats calculables. |
+| Habits | Tasques, lliuraments, constancia | Seguiment de treball | Mitjana-alta | Diferenciar absencia de dades de resultat negatiu. |
+| Conducta | Incidencies, agenda, observacions | Intervencio educativa | Molt alta | Fets observables, breus i accionables. |
+| Necessitats educatives | Diagnostics o etiquetes, adaptacions | Ajustar l'accio docent | Molt alta | Etiquetes controlades; evitar detalls clinics. |
+| Tutoria | DOIPs, acords, registres, antecedents | Seguiment tutorial | Molt alta | No copiar historials extensos ni dades familiars innecessaries. |
+| Sociometria | Afinitats, dificultats, rols, sociograma | Comprendre dinamiques de grup | Molt alta | Acces restringit, temporalitat i explicacio de la finalitat. |
+| Agrupaments | Grups cooperatius i disposicions | Suport a decisions docents | Alta | Recomanacio, no decisio automatica. |
+| Comparticio | Paquets de notes i cotutories | Coordinacio entre docents | Molt alta | Destinatari, rol, revocacio i minim privilegi. |
+| Seguretat | Backups, metadades i dates | Recuperacio i continuitat | Molt alta | Conservacio limitada i prova de restauracio. |
+| Compte docent | Correu, UID, nom i preferencies | Identitat i personalitzacio | Mitjana | No usar el correu com a unica autoritzacio futura. |
 
-### Dades que Avaluapro hauria d'evitar o limitar
+## 5. Dades compartides
 
-- Informacio medica detallada si no es imprescindible per a una decisio docent.
-- Informacio familiar, economica o personal no relacionada directament amb l'aprenentatge.
-- Judicis subjectius sobre l'alumne que no siguin fets observables.
-- Historials massa llargs copiats literalment d'altres documents si un resum pedagogic es suficient.
-- Fotos duplicades o imatges grans guardades en diversos llocs.
-- Backups indefinits sense cap criteri de conservacio.
+### Paquets de notes
 
-### Dades que es poden calcular i no cal duplicar
+Han d'incloure nomes la informacio necessaria per importar notes finals: emissor, destinatari, classe, materia, alumnes i resultats. No han d'incorporar comentaris tutorials o diagnostics.
 
-Sempre que sigui possible, aquestes dades s'haurien de calcular a partir de registres base i no guardar-se duplicades:
+### Cotutories
+
+Poden compartir:
+
+- alumnes;
+- registres i notes tutorials;
+- relacions i moments sociometrics;
+- grups cooperatius;
+- layouts i disposicions;
+- rols;
+- antecedents.
+
+Les eliminacions utilitzen tombstones per sincronitzar la baixa sense conservar el contingut pedagogic sensible. La revocacio talla la sincronitzacio futura, pero no pot retirar copies o exportacions ja obtingudes.
+
+### Sociometria publica temporal
+
+El document general no es public. Cada participant rep un token aleatori que:
+
+- no es pot enumerar;
+- fixa la identitat de resposta;
+- caduca al cap de 24 hores;
+- nomes permet crear una resposta;
+- exigeix acreditar la lectura de l'avís.
+
+Les dades brutes s'han d'eliminar despres de sincronitzar-les. La purga automatica continua pendent.
+
+## 6. Dades que s'han d'evitar
+
+- historial clinic o familiar detallat;
+- situacio economica o personal sense necessitat docent;
+- judicis subjectius o etiquetes estigmatitzants;
+- text lliure extens quan una categoria o resum sigui suficient;
+- fotos duplicades;
+- backups indefinits;
+- respostes sociometriques brutes conservades sense finalitat;
+- dades oficials importades sense acord i font institucional.
+
+## 7. Dades calculables
+
+No cal guardar de manera duplicada:
 
 - mitjanes i percentatges;
-- perfils d'intervencio derivats;
+- perfils i alertes derivades;
+- comparatives entre periodes;
+- recomanacions de grups;
 - estadistiques globals;
-- comparatives entre UTs;
-- deteccio d'alumnes invisibles, risc, millora o regressio;
-- recomanacions de grups o disposicions generades automaticament.
+- indicadors de millora o regressio.
 
-Guardar menys dades duplicades redueix risc, errors i mida de Firestore/backups.
+S'han de poder regenerar a partir dels registres base, sempre que sigui tecnicament raonable.
 
-## Revisio Firebase
+## 8. Conservacio
 
-### Rules actuals
+Els terminis definitius depenen del Ministeri. La proposta preliminar es troba a `docs/politica-conservacio-eliminacio-preliminar.md`.
 
-Les rules de Firestore separen tres espais principals:
+Abans d'un pilot cal decidir, com a minim:
 
-| Espai | Regla principal | Valoracio |
-| --- | --- | --- |
-| `users/{uid}/...` | Nomes `request.auth.uid == uid` pot llegir, crear, editar o esborrar | Correcte per a un model de quadern docent personal. |
-| `users/{uid}/cloudBackups/...` | Mateixa separacio per usuari | Correcte. Les copies al nuvol no son globals. |
-| `teacherGradePackages/{packageId}` | Emissor i destinatari poden llegir el paquet | Correcte, pero es l'espai mes delicat perque es compartit entre docents. |
-| `tutoringSpaces/{spaceId}` i subcol.leccions | Membres de la cotutoria poden accedir a l'espai | Molt delicat: falta auditar permisos granulars, revocacio i eliminacio. |
-| Safates d'invitacions | Emissor i destinatari segons estat i operacio | Cal provar casos limits i coherencia entre safata d'entrada i sortida. |
-| `sociometricSurveys`, tokens i respostes | Membres docents; participant amb token individual vigent | El document general no es public, els tokens no es poden enumerar i només el propietari pot eliminar les dades brutes. |
+- final de curs i canvi de docent;
+- vigencia de paquets i invitacions;
+- retencio de backups;
+- purga de respostes sociometriques;
+- bloqueig per obligacio legal;
+- retorn i eliminacio en acabar el servei.
 
-Canvi aplicat el 4 de juny de 2026: les rules dels paquets entre docents s'han fet mes estrictes. El destinatari ja no pot modificar el contingut del paquet, l'emissor ni el destinatari; nomes pot marcar el paquet com a importat i deixar constancia de data, correu i uid d'importacio. L'emissor pot crear i esborrar el paquet que ha enviat.
+## 9. Conclusio
 
-### Separacio per usuari
-
-La separacio tecnica principal es aquesta:
-
-- cada docent autenticat te el seu espai `users/{uid}`;
-- les dades de classes, alumnes, notes, seguiment, tutoria i backups viuen dins aquest espai;
-- un altre usuari no pot llegir aquest espai si les rules estan publicades correctament a Firebase.
-
-Aixo reforca l'escenari actual: Avaluapro com a eina personal del docent.
-
-### Fluxos compartits entre docents
-
-La descripcio original dels paquets continua sent valida per a `teacherGradePackages`, pero ja no cobreix tota la comparticio. Les cotutories persistents i els qüestionaris sociometrics es documenten a `docs/comparticio-docents.md` i s'han de considerar pendents d'auditoria institucional.
-
-#### Paquets de notes
-
-Els paquets de notes son una excepcio controlada:
-
-- es creen a `teacherGradePackages`;
-- inclouen emissor, destinatari i dades de notes finals de competència;
-- el tutor destinatari pot llegir-los si el seu correu coincideix;
-- el tutor destinatari pot marcar-los com a importats;
-- l'emissor pot veure la confirmacio d'importacio;
-- el contingut del paquet no hauria de poder ser alterat pel destinatari.
-
-Punts d'atencio:
-
-- cal validar be el correu destinatari;
-- cal mostrar errors quan no coincideixen alumnes/classes;
-- cal registrar enviaments i imports correctes;
-- cal evitar enviar criteris interns o comentaris: nomes notes finals de competència.
-
-### Copies al nuvol
-
-Les copies al nuvol viuen a:
-
-`users/{uid}/cloudBackups/{backupId}`
-
-Cada copia guarda metadades i subcol.leccions amb les dades. A l'app ja es mostra:
-
-- ultima copia al nuvol;
-- estat de sincronitzacio;
-- darreres 5 copies;
-- opcio de restaurar;
-- mida aproximada de la copia completa.
-
-La politica de conservacio queda definida a `docs/backups-conservacio.md`.
-
-### Storage per fotos
-
-Firebase Storage encara no s'utilitza. Ara les fotos i imatges poden quedar dins les dades de Firestore/backups com a dades comprimides.
-
-Mesures actuals:
-
-- compressio local abans de guardar;
-- limit de mida per fotos d'alumnes;
-- limit de mida per imatges de llocs fixos;
-- avis si una imatge continua sent massa gran;
-- avis si un document es massa gran per Firestore.
-
-Recomanacio:
-
-- mantenir-ho temporalment mentre l'us sigui petit;
-- migrar fotos d'alumne i imatges grans a Firebase Storage quan es consolidi l'us amb mes docents;
-- crear rules de Storage per usuari;
-- guardar a Firestore nomes la referencia o URL de la imatge.
-
-### App Check
-
-App Check no es imprescindible per al primer pilot, pero pot ser una capa addicional quan Avaluapro creixi:
-
-- ajuda a reduir l'us abusiu de Firebase des de clients no autoritzats;
-- no substitueix les rules de Firestore;
-- pot requerir configuracio addicional per web, domini i desplegament.
-
-Recomanacio actual: no activar-lo encara de manera obligatoria. La decisio i el protocol d'activacio queden definits a `docs/app-check-entorn-public.md`.
-
-## Proteccions dins l'app
-
-Avaluapro ja inclou diverses proteccions i avisos:
-
-| Proteccio | Estat | Observacio |
-| --- | --- | --- |
-| Pantalla de copies i estat | Implementada | Mostra sincronitzacio, copies al nuvol, mida de dades, restauracio i diagnosi de copia. |
-| Botó de copia manual | Implementat | Permet descarregar JSON al dispositiu. Cal recordar que la custodia passa al docent. |
-| Copies al nuvol | Implementades | Manual i automatica diaria quan hi ha sessio iniciada. |
-| Ultima copia al nuvol | Implementada | Visible dins la pantalla de copies i estat. |
-| Darreres 5 copies | Implementades | Es poden revisar i restaurar. |
-| Separacio de copies al nuvol | Implementada | Ruta `users/{uid}/cloudBackups`. |
-| Avisos en camps sensibles | En millora | S'han afegit avisos a diagnostics, informacio personal, equip educatiu, tutoria, antecedents, incidencies, notes de tasques i recordatoris. |
-| Missatges d'errors en backups | Implementats | Informa si no es pot crear/restaurar/sincronitzar. |
-| Paquets entre docents | Implementats | Inclou enviament, recepcio, estat i errors de coincidencia. |
-
-Text de criteri que hauria de guiar els avisos interns:
-
-> Escriu observacions pedagogiques, concretes i necessaries. Evita informacio medica, familiar o personal que no sigui imprescindible per a la funcio docent.
-
-Proteccions pendents o futures:
-
-- avisos mes fins en DOIPs i perfil tutorial;
-- migracio de fotos a Storage;
-- App Check;
-- politica de conservacio de copies;
-- fitxa tecnica per direccio/Ministeri;
-- possible registre mes detallat d'importacions/exportacions entre docents.
-
-## Estat del Bloc 1
-
-El Bloc 1 queda preparat amb:
-
-- mapa de dades;
-- sensibilitat inicial;
-- revisio de necessitat docent;
-- revisio de Firebase;
-- proteccions principals dins l'app.
-
-El seguent bloc natural es treballar mesures de minimitzacio i seguretat operativa: reduir text sensible, definir politica de copies, preparar documentacio per direccio i planificar Storage per fotos.
-
-## Referencies utils
-
-- Condicions de tractament de dades de Firebase: https://firebase.google.com/terms/data-processing-terms
-- Xifratge per defecte a Google Cloud: https://docs.cloud.google.com/docs/security/encryption/default-encryption
-- Llei 29/2021, qualificada de proteccio de dades personals d'Andorra: https://www.portaljuridicandorra.ad/L2021029_0
+La dada de major risc no es nomes el nom. El risc apareix en combinar identitat amb rendiment, conducta, necessitats educatives, tutoria i relacions socials. La separacio d'identitat pot reduir l'impacte d'una filtracio, pero no converteix aquestes dades en anonimes si Avaluapro o el docent poden reidentificar l'alumne.

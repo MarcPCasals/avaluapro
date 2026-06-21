@@ -1,14 +1,30 @@
-# Bloc 2: Firebase i acces
+# Firebase, accessos i estat de les regles
 
-Data original: 4 de juny de 2026
-Avís d'actualitzacio: 18 de juny de 2026
-Estat: auditoria antiga de l'espai privat; la part de comparticio requereix una nova auditoria
+Data d'actualitzacio: 21 de juny de 2026
+Estat: arquitectura contrastada amb el codi; regles reforcades provades localment i pendents de desplegament
 
-Aquest document va revisar inicialment com Avaluapro usava Firebase. La separacio de `users/{uid}` continua sent la base privada, pero les seccions que afirmaven que `teacherGradePackages` era l'unica ruta compartida han quedat desactualitzades.
+Aquest document descriu l'arquitectura real de Firebase d'Avaluapro. No acredita per si sol el compliment normatiu ni que la configuracio local coincideixi amb la publicada.
 
-Actualment tambe existeixen:
+## 1. Serveis utilitzats
+
+| Servei | Us actual |
+| --- | --- |
+| Firebase Authentication | Inici de sessio amb Google i persistencia local de la sessio. |
+| Cloud Firestore | Sincronitzacio privada, backups, paquets de notes, cotutories i sociometria. |
+| Firebase Hosting | Entorn public principal. |
+| Firebase Storage | No s'utilitza encara; hi ha unes regles preparatories. |
+
+La configuracio web de Firebase es publica al navegador per disseny. La seguretat depen de les regles, la identitat autenticada, la configuracio del projecte i els procediments operatius, no d'ocultar l'API key.
+
+## 2. Rutes principals
 
 ```text
+users/{uid}
+users/{uid}/meta/app
+users/{uid}/{collectionName}/{documentId}
+users/{uid}/cloudBackups/{backupId}
+users/{uid}/cloudBackups/{backupId}/{collectionName}/{documentId}
+teacherGradePackages/{packageId}
 tutoringSpaces/{spaceId}
 tutoringSpaces/{spaceId}/{collectionName}/{documentId}
 tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
@@ -18,172 +34,84 @@ sociometricSurveys/{surveyId}/accessTokens/{tokenId}
 sociometricSurveys/{surveyId}/responses/{responseId}
 ```
 
-La revisio prioritaria queda definida a `docs/comparticio-docents.md` i a la fase 0 de `docs/full-de-ruta-institucional-i-empresa.md`.
+## 3. Model privat
 
-## 1. Rules de Firestore
+Les dades ordinàries de cada docent viuen sota `users/{uid}`. Les regles exigeixen que el `uid` autenticat coincideixi amb el de la ruta.
 
-Les rules actuals de Firestore tenen diverses zones privades i compartides:
+Aixo proporciona aillament tecnic entre docents per a:
 
-| Ruta | Qui hi pot accedir | Valoracio |
-| --- | --- | --- |
-| `users/{uid}` | Nomes l'usuari autenticat amb aquell mateix `uid` | Correcte. |
-| `users/{uid}/{collection}` | Nomes l'usuari autenticat amb aquell mateix `uid` | Correcte. |
-| `users/{uid}/cloudBackups/{backupId}` | Nomes l'usuari autenticat amb aquell mateix `uid` | Correcte. |
-| `teacherGradePackages/{packageId}` | Emissor i correu destinatari del paquet | Correcte, amb mes risc per ser una ruta compartida. |
-| `tutoringSpaces/{spaceId}` i subcol.leccions | Membres de la cotutoria | Critic: comparteix dades tutorials d'alta sensibilitat i requereix auditoria granular. |
-| Safates d'invitacions | Emissor o destinatari segons el flux | Requereix proves de comptes, duplicats, revocacio i casos limits. |
-| `sociometricSurveys`, tokens i respostes | Docents membres; consulta publica temporal amb token individual | Token aleatori d'un sol ús i caducitat de 24 hores implementats localment. Continuen pendents la minimització dels noms visibles i la política de conservació. |
-
-El punt mes delicat es `teacherGradePackages`, perque es global i compartit. Les rules actuals ja limiten:
-
-- creacio: nomes l'emissor autenticat pot crear un paquet propi;
-- lectura: nomes emissor o destinatari;
-- actualitzacio: nomes el destinatari pot marcar-lo com a importat;
-- eliminacio: nomes l'emissor.
-
-Conclusio actualitzada: no s'ha de considerar validat tot el model compartit fins que es completi la nova auditoria i les proves automatitzades.
-
-## 2. Rutes d'usuari
-
-El codi de Firebase fa servir aquestes rutes principals:
-
-```text
-users/{uid}
-users/{uid}/meta/app
-users/{uid}/{collectionName}
-users/{uid}/cloudBackups/{backupId}
-users/{uid}/cloudBackups/{backupId}/{collectionName}/{documentId}
-teacherGradePackages/{packageId}
-tutoringSpaces/{spaceId}
-tutoringSpaces/{spaceId}/{collectionName}/{documentId}
-tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
-tutoringInvitationOutbox/{senderUid}/items/{outboxId}
-sociometricSurveys/{surveyId}
-sociometricSurveys/{surveyId}/responses/{responseId}
-```
-
-Les dades reals del docent viuen dins `users/{uid}`. Aixo inclou:
-
-- classes;
-- alumnes;
-- notes;
-- tasques;
-- seguiment;
-- tutoria;
-- sociograma;
-- grups cooperatius;
-- disposicio d'aula;
+- classes, alumnes i configuracio;
+- avaluacio, tasques i comportament;
+- tutoria, sociograma, grups i disposicions;
 - antecedents;
-- configuracio.
+- copies al nuvol.
 
-Conclusio: la separacio per usuari esta ben aplicada.
+Limit: un compte compromes, un dispositiu desbloquejat o una exportacio mal custodiada continuen permetent accedir a les dades legitimes d'aquell docent.
 
-## 3. Rutes compartides
+## 4. Fluxos compartits
 
-La descripcio anterior d'una unica ruta compartida ja no es valida. Hi ha paquets puntuals, espais persistents de cotutoria, safates d'invitacions i formularis sociometrics.
+| Flux | Control previst per les regles locals | Estat |
+| --- | --- | --- |
+| Paquets de notes | Emissor i destinatari concret; el destinatari nomes pot registrar la importacio. | Implementat; prova real amb dos comptes pendent. |
+| Cotutoria | Acces per membres; nomes el propietari gestiona membres i espai. | Implementat i provat amb emulador; desplegament i prova real pendents. |
+| Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat i provat localment. |
+| Eliminacio compartida | Es bloqueja el `delete` fisic i s'utilitzen tombstones minims. | Implementat i provat localment; prova real pendent. |
+| Revocacio o sortida | Propietari retira cotutor; cotutor nomes es pot retirar a si mateix. | Implementat i provat localment; prova real pendent. |
+| Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat i provat localment; desplegament bloquejat. |
 
-El detall actualitzat es troba a:
-
-```text
-docs/comparticio-docents.md
-```
-
-## 4. Comprovacio d'aillament entre usuaris
-
-Amb les rules actuals, un usuari no pot llegir:
-
-- `users/{uid}` d'un altre usuari;
-- backups al nuvol d'un altre usuari;
-- col.leccions d'un altre usuari;
-- paquets de notes si no n'es emissor ni destinatari.
-
-Punt important: els canvis de `firestore.rules` al repositori no es publiquen automaticament a Firebase amb el workflow actual de GitHub Pages. Cal publicar-los manualment a Firebase Console o configurar un deploy amb Firebase CLI.
-
-## 5. Backups al nuvol
-
-Les copies al nuvol es desen a:
+Les deu col.leccions permeses dins una cotutoria son:
 
 ```text
-users/{uid}/cloudBackups/{backupId}
-users/{uid}/cloudBackups/{backupId}/{collectionName}/{documentId}
+students
+studentAntecedents
+tutorialGroupSets
+tutorialMarks
+tutorialRecords
+tutorialRelations
+tutorialSeatingPlans
+tutorialSociogramLayouts
+tutorialSociometricMoments
+tutorialStudentRoles
 ```
 
-Avantatges:
+## 5. Proves automatitzades
 
-- cada copia queda dins l'espai privat del docent;
-- les col.leccions queden compartimentades;
-- es redueix el risc d'un unic document gegant;
-- es poden llistar les darreres copies;
-- es pot restaurar una copia concreta.
+La versio local reforcada disposa de:
 
-Pendent recomanat:
+- 26 proves de regles de Firestore;
+- 5 proves de fusio i tombstones de cotutoria;
+- total: 31 proves de seguretat dels fluxos compartits actuals.
 
-- definir politica de conservacio;
-- per exemple, mostrar darreres 5 copies i valorar eliminar copies molt antigues quan hi hagi moltes;
-- separar clarament copia manual al dispositiu i copia al nuvol.
+Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminacions, tokens sociometrics, caducitat, avís informatiu, resposta d'un sol us i eliminacio reservada al propietari.
 
-## 6. Rules futures per Firebase Storage
+No cobreixen encara tota la realitat operativa: cal provar comptes reals, dispositius, conflictes simultanis, restauracions i la configuracio efectivament desplegada.
 
-Avaluapro encara no fa servir Firebase Storage. De moment, les fotos poden quedar dins de dades comprimides. Per a un us amb mes docents, es recomana migrar fotos i imatges grans a Storage.
+## 6. Bloqueig de desplegament actual
 
-S'ha afegit el fitxer preparatori:
+Les regles reforcades no s'han publicat encara. L'auditoria del 20 de juny va detectar:
 
-```text
-storage.rules
-```
+- 10 qüestionaris antics sense token ni caducitat;
+- 4 marcats com a actius;
+- 47 respostes repartides en dos qüestionaris;
+- una resposta pendent de sincronitzar en cadascun d'aquests dos qüestionaris.
 
-Aquest fitxer proposa rutes futures:
+Abans del desplegament cal sincronitzar aquestes respostes, executar `npm run audit:firebase` i publicar hosting i regles conjuntament. El procediment complet es troba a `docs/checklist-desplegament-rules-2026-06.md`.
 
-```text
-users/{uid}/studentPhotos/{fileName}
-users/{uid}/seatingCharts/{fileName}
-users/{uid}/tutorialImages/{fileName}
-```
+## 7. Controls pendents
 
-La proposta nomes permet:
+- prova manual amb almenys dos comptes docents;
+- prova de conflictes d'edicio simultania;
+- verificacio completa d'autoria i data dels canvis sensibles;
+- purga automatica de dades sociometriques brutes;
+- separacio tecnica de desenvolupament, proves i produccio;
+- MFA i govern real dels comptes administratius;
+- logs i alertes adequats;
+- revisio de dominis, claus i configuracio real;
+- App Check, despres de validar Safari i iPad;
+- auditoria tecnica externa proporcional al risc.
 
-- llegir/esborrar imatges del propi usuari;
-- pujar imatges si l'usuari es propietari de la ruta;
-- limitar el fitxer a menys de 2 MB;
-- acceptar nomes `image/*`;
-- bloquejar tota la resta.
+## 8. Conclusio
 
-Important: aquestes rules no estan activades encara. Per activar-les cal:
+Firebase pot sostenir una arquitectura institucional defensable, pero no la converteix automaticament en conforme. Avaluapro te un bon aillament privat i ha reforcat els fluxos compartits. L'estat correcte a 21 de juny de 2026 es:
 
-1. activar Firebase Storage al projecte;
-2. revisar si les rutes proposades encaixen amb la implementacio final;
-3. afegir Storage al `firebase.json`;
-4. publicar les rules a Firebase.
-
-## 7. App Check
-
-App Check es una capa addicional per reduir accessos a Firebase des de clients no autoritzats. No substitueix les rules.
-
-Valoracio per Avaluapro:
-
-- no es imprescindible per al pilot inicial;
-- es interessant si l'app es fa servir amb molts docents;
-- es mes recomanable quan Avaluapro estigui desplegat en Firebase Hosting o domini estable;
-- cal provar-ho be amb Safari/iPad abans de fer-ho obligatori.
-
-Recomanacio actual:
-
-- no activar-ho encara de manera obligatoria;
-- mantenir-ho documentat com a mesura futura controlada;
-- provar-ho amb Firebase Hosting, Safari, Chrome i iPad abans d'activar-ho;
-- activar-ho quan l'entorn public sigui estable i hi hagi diversos docents.
-
-La decisio completa queda definida a `docs/app-check-entorn-public.md`.
-
-## Conclusio del Bloc 2
-
-El model privat continua sent coherent, pero el model compartit esta pendent de revalidacio:
-
-- les dades personals viuen a `users/{uid}`;
-- les copies al nuvol tambe viuen dins `users/{uid}`;
-- ja no hi ha una unica ruta compartida;
-- les cotutories comparteixen un conjunt ampli de dades tutorials;
-- els qüestionaris sociometrics introdueixen un flux public temporal;
-- cal provar permisos, revocacio, eliminacio i autoria;
-- Storage encara no esta actiu, pero ja te proposta de rules futures;
-- App Check esta documentat al Bloc 8, pero no s'activa encara per no bloquejar docents legitims.
+**implementat i provat localment, pero encara no desplegat ni validat en condicions reals.**

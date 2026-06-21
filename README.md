@@ -16,6 +16,8 @@ Aquest document indica quins fitxers llegir, per què serveix cadascun i quina r
 
 Els documents principals són:
 
+- `docs/resum-executiu-paquet-ministeri.md`: porta d'entrada curta al dossier i decisions sol·licitades.
+- `docs/matriu-estat-dossier-institucional.md`: estat únic de controls, proves, bloquejos i responsables futurs.
 - `docs/full-de-ruta-institucional-i-empresa.md`
 - `docs/informacio-participants-sociometria.md`: text informatiu mostrat als alumnes abans de respondre i punts pendents de validació institucional.
 - `docs/checklist-desplegament-rules-2026-06.md`: auditoria prèvia, migració dels qüestionaris antics i desplegament conjunt de hosting i rules.

@@ -62,10 +62,12 @@ Abans de crear aquest full de ruta, el repositori ja disposava d'un dossier tecn
 | Document | Contingut | Estat a 18/06/2026 |
 | --- | --- | --- |
 | `docs/guia-documents-direccio-ministeri.md` | Index i ordre de lectura del dossier. | Fet i actualitzat per incloure aquest full de ruta. |
-| `docs/fitxa-tecnica-direccio-ministeri.md` | Resum executiu per presentar l'arquitectura i les mesures. | Fet com a base; revisio pendent abans d'una nova presentacio. |
-| `docs/proteccio-dades-avaluapro.md` | Explicacio general del tractament i les proteccions. | Fet com a base; no substitueix revisio juridica. |
-| `docs/mapa-dades.md` | Inventari de dades, ubicacions, finalitats i sensibilitat. | Base molt avancada; cal actualitzar-la amb els canvis posteriors al 04/06/2026. |
-| `docs/firebase-acces.md` | Rutes, rules, aillament per usuari, backups i comparticio. | Desactualitzat en la part compartida; cal una nova auditoria de cotutories i sociometria. |
+| `docs/resum-executiu-paquet-ministeri.md` | Porta d'entrada, limits i decisions sol.licitades. | Fet i actualitzat a 21/06/2026. |
+| `docs/matriu-estat-dossier-institucional.md` | Estat unic de controls, proves i bloquejos. | Fet i actualitzat a 21/06/2026. |
+| `docs/fitxa-tecnica-direccio-ministeri.md` | Resum tecnic per presentar l'arquitectura i les mesures. | Actualitzat amb l'estat real a 21/06/2026. |
+| `docs/proteccio-dades-avaluapro.md` | Explicacio general del tractament i les proteccions. | Actualitzat a 21/06/2026; no substitueix revisio juridica. |
+| `docs/mapa-dades.md` | Inventari de dades, ubicacions, finalitats i sensibilitat. | Actualitzat i contrastat amb les 23 col.leccions actuals. |
+| `docs/firebase-acces.md` | Rutes, rules, aillament, proves i bloqueig de desplegament. | Actualitzat: 31 proves locals superades; desplegament pendent. |
 | `docs/minimitzacio-dades.md` | Criteris sobre diagnostics, text lliure, fotos i sociograma. | Fet. |
 | `docs/controls-minimitzacio-app.md` | Controls i avisos implementats dins l'aplicacio. | Fet segons la revisio del 04/06/2026; cal prova de regressio. |
 | `docs/seguretat-dins-app.md` | Pantalla de dades, copies, restauracio i eliminacio. | Fet com a documentacio funcional. |
@@ -92,14 +94,11 @@ No partim de zero. Ja existeixen:
 - una checklist de seguretat;
 - decisions documentades sobre Storage i App Check.
 
-El principal risc documental actual es la desactualitzacio. La majoria d'aquests documents tenen data 4 de juny de 2026 i Avaluapro ha continuat canviant. Abans d'utilitzar el dossier com a evidencia institucional, cal comparar-lo de nou amb:
+Els documents nuclears s'han tornat a contrastar amb el codi el 21 de juny de 2026. Abans d'utilitzar el dossier com a evidencia institucional encara cal comparar-lo amb:
 
-- el codi actual;
-- les col.leccions actuals d'IndexedDB;
-- les rules actuals de Firestore;
 - la configuracio real publicada a Firebase;
-- els fluxos nous de tutoria i sociometria;
-- els mecanismes actuals de backup, comparticio i eliminacio.
+- el resultat del desplegament pendent;
+- les proves reals de comptes, dispositius, backup, comparticio i eliminacio.
 
 ## 2.2. Prioritat critica detectada: dades compartides
 
@@ -198,8 +197,8 @@ Fer coincidir la documentacio i les garanties de seguretat amb el funcionament a
 - [x] Evitar respostes duplicades o suplantacions quan sigui necessari. **Fet localment:** enllaç individual amb token aleatori, identitat fixada i resposta d'un sol ús. No elimina el risc que un alumne comparteixi voluntàriament el seu enllaç.
 - [x] Mostrar informació essencial abans de respondre. **Fet localment:** finalitat, destinataris, no anonimat, conservació, ús de l'enllaç i canal de consulta.
 - [ ] Validar jurídicament la informació als participants i completar responsable, base jurídica, DPD, drets i canal institucional.
-- [ ] Ampliar les proves automatitzades amb Firebase Emulator a totes les rules compartides. **Parcial:** 26 proves de rules i 5 proves de fusio superades.
-- [ ] Actualitzar `docs/firebase-acces.md`, `docs/mapa-dades.md` i la fitxa tecnica amb el resultat final.
+- [x] Implantar proves automatitzades amb Firebase Emulator per als fluxos compartits actuals. **Fet:** 26 proves de rules i 5 proves de fusio superades; s'han d'ampliar quan canviin els fluxos.
+- [x] Actualitzar `docs/firebase-acces.md`, `docs/mapa-dades.md` i la fitxa tecnica amb l'estat real a 21/06/2026.
 
 La matriu, les troballes i les decisions provisionals es troben a `docs/auditoria-comparticio-permisos.md`.
 
@@ -307,14 +306,14 @@ Descriure amb precisio que guarda Avaluapro, per que ho guarda, qui hi accedeix,
 
 ## Accions
 
-- [ ] Actualitzar el mapa complet de dades amb els canvis posteriors al 04/06/2026. **Parcial:** ja existeix `docs/mapa-dades.md`.
+- [x] Actualitzar el mapa complet de dades amb els canvis posteriors al 04/06/2026. **Fet:** contrastat amb les 23 col.leccions actuals el 21/06/2026.
 - [x] Classificar inicialment cada dada com a necessaria, opcional, calculada o prescindible. **Fet:** `docs/mapa-dades.md`.
 - [x] Identificar dades especialment delicades: salut, diagnostics, familia, conducta, sociograma i text lliure. **Fet:** `docs/mapa-dades.md` i `docs/minimitzacio-dades.md`.
-- [x] Documentar les ubicacions conegudes: IndexedDB, Firestore, backups, exportacions i paquets compartits. **Fet com a base:** cal verificar que no hi hagi fluxos nous.
+- [x] Documentar les ubicacions conegudes: IndexedDB, Firestore, backups, exportacions i fluxos compartits. **Fet i revisat a 21/06/2026.**
 - [x] Identificar dades duplicades o que convindria no duplicar. **Fet com a criteri inicial:** `docs/mapa-dades.md`.
 - [x] Identificar dades calculables que no cal guardar. **Fet:** mitjanes, percentatges, perfils i estadistiques derivades estan documentats.
-- [ ] Validar els fluxos actuals de comparticio entre docents. **Parcial:** estan descrits a `docs/comparticio-docents.md`, pero falta l'auditoria de la fase 0.
-- [ ] Documentar de manera completa els accessos tecnics i administratius possibles. **Parcial:** els accessos docents estan descrits; falten administradors, suport i model institucional.
+- [ ] Validar els fluxos actuals de comparticio entre docents. **Parcial:** auditats i provats localment; falten desplegament i proves reals.
+- [x] Documentar els accessos tecnics i administratius candidats. **Fet preliminarment:** `docs/procediment-identitats-rols-baixes-preliminar.md` i `docs/govern-administradors-accessos-excepcionals-preliminar.md`; implantacio institucional pendent.
 - [x] Preparar un RAT preliminar per activitats. **Fet:** `docs/registre-activitats-tractament-preliminar.md`; capçalera, bases i terminis pendents de validació institucional.
 - [x] Preparar una matriu preliminar de rols i bases jurídiques. **Fet:** `docs/rols-i-bases-juridiques-preliminars.md`.
 - [x] Definir quines dades s'han d'evitar o limitar. **Fet com a politica interna:** informacio medica detallada, familiar, economica i judicis no necessaris.
@@ -640,9 +639,9 @@ Demostrar amb proves que les mesures descrites existeixen i funcionen.
 
 - [ ] Separar desenvolupament, proves i produccio.
 - [x] Establir que la demo i el desenvolupament han d'utilitzar dades ficticies. **Fet com a politica documentada; falta un entorn tecnic separat.**
-- [ ] Revisar i provar totes les regles de Firestore sobre la versio actual. **Parcial:** hi ha auditoria interna i rules publicades segons el dossier del 04/06/2026, pero `firestore.rules` ha canviat posteriorment i cal repetir la verificacio.
-- [ ] Implantar proves automatitzades d'autoritzacio.
-- [ ] Aplicar minim privilegi a usuaris i administradors.
+- [ ] Revisar i provar totes les regles de Firestore sobre la versio actual. **Parcial:** 26 proves de rules i 5 de sincronitzacio passen localment; falta desplegament i verificacio externa.
+- [x] Implantar proves automatitzades d'autoritzacio per als fluxos compartits actuals. **Fet:** s'han de mantenir i ampliar amb cada canvi.
+- [ ] Aplicar minim privilegi a usuaris i administradors. **Parcial:** usuaris compartits reforcats al codi; govern administratiu documentat pero no implantat.
 - [ ] Activar MFA per als comptes administratius.
 - [ ] Revisar dominis, claus i configuracio real de Firebase. **Parcial:** hi ha criteris i llista de dominis documentats, pero la configuracio es externa al repositori.
 - [ ] Valorar i desplegar App Check quan l'entorn sigui estable. **Ajornat conscientment:** `docs/app-check-entorn-public.md`.
@@ -871,7 +870,7 @@ En paral·lel, es pot iniciar sense comprometre l'arquitectura:
 
 1. la cerca i possible registre de la marca;
 2. l'ordenacio de proves d'autoria i llicencies;
-3. l'actualitzacio del mapa de dades;
+3. la revisio externa del mapa de dades i l'AIPD;
 4. la cerca d'un assessor andorra de proteccio de dades;
 5. una estimacio realista del cost de crear i mantenir la societat.
 
@@ -880,6 +879,8 @@ En paral·lel, es pot iniciar sense comprometre l'arquitectura:
 # Documents relacionats del repositori
 
 - `docs/guia-documents-direccio-ministeri.md`
+- `docs/resum-executiu-paquet-ministeri.md`
+- `docs/matriu-estat-dossier-institucional.md`
 - `docs/fitxa-tecnica-direccio-ministeri.md`
 - `docs/proteccio-dades-avaluapro.md`
 - `docs/mapa-dades.md`

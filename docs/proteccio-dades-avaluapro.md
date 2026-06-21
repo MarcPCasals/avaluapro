@@ -1,166 +1,119 @@
-# Com protegeix les dades Avaluapro
+# Proteccio de dades a Avaluapro
 
-Data: 4 de juny de 2026  
-Estat: document tecnic breu per a direccio, centre o Ministeri
+Data d'actualitzacio: 21 de juny de 2026
+Estat: explicacio general contrastada amb l'arquitectura actual
 
-Aquest document resumeix com Avaluapro tracta i protegeix les dades educatives. No substitueix una revisio juridica ni el contracte d'encarrec de tractament que correspongui en un us institucional, pero explica les mesures tecniques i pedagogiques previstes en l'aplicacio.
+## 1. Idea central
 
-Per a una presentacio breu a direccio o Ministeri, es pot fer servir la fitxa resum `docs/fitxa-tecnica-direccio-ministeri.md`.
+La seguretat tecnica i el compliment normatiu no son equivalents.
 
-## 1. Que es Avaluapro
+Firebase, Google Authentication, HTTPS i el xifratge son controls rellevants, pero la conformitat tambe exigeix finalitat, base juridica, minimitzacio, rols, contractes, conservacio, drets, incidents, govern d'accessos i proves.
 
-Avaluapro es una eina docent per registrar avaluacio competencial, seguiment de tasques, comportament, tutoria i estadistiques pedagogiques. Esta pensada com un quadern docent digital: ajuda el professorat a prendre decisions educatives mes informades i a preparar millor les reunions d'equip educatiu o tutoria.
+## 2. Xifratge, pseudonimitzacio i anonimitzacio
 
-L'aplicacio no substitueix la plataforma oficial del centre. El seu objectiu es ajudar el docent en la gestio pedagogica diaria.
-
-## 2. Quines dades pot guardar
-
-Avaluapro pot guardar dades com:
-
-- dades identificatives d'alumnes: nom, classe, mig grup i, si el docent ho decideix, fotografia;
-- notes competencials i dades d'avaluacio;
-- tasques, constancia, incompletes, no fetes i exempcions;
-- registres de comportament, notes a l'agenda i entrades de diari docent;
-- diagnostics o etiquetes educatives controlades, com TDAH, TEA, dislexia/discalculia, alumne de progres o altes capacitats;
-- comentaris pedagogics d'equip educatiu i tutoria;
-- DOIPs o resums de demandes/respostes d'equip educatiu;
-- antecedents academics del curs anterior;
-- sociograma, grups cooperatius i disposicio d'aula;
-- copies de seguretat locals o al nuvol;
-- paquets de notes enviats entre docents.
-
-Aquestes dades poden ser sensibles, especialment quan identifiquen menors, descriuen necessitats educatives, comportament, relacions socials o situacions tutorials.
-
-## 3. On es guarden les dades
-
-Avaluapro utilitza dos espais principals:
-
-| Espai | Funcio | Observacio |
+| Mesura | Que aporta | Que no resol |
 | --- | --- | --- |
-| Navegador del dispositiu | Guarda una copia local de treball amb IndexedDB | Permet treballar encara que la xarxa falli. |
-| Firebase / Google Cloud | Guarda dades sincronitzades quan el docent inicia sessio | Les dades queden vinculades al compte autenticat del docent. |
+| Xifratge | Redueix exposicio durant transmissio i emmagatzematge. | Els usuaris i serveis autoritzats continuen tractant dades personals. |
+| Pseudonimitzacio | Separa o substitueix identificadors i redueix l'impacte d'algunes filtracions. | Si es pot recuperar la identitat, continua sent dada personal. |
+| Anonimitzacio | Impedeix reidentificar de manera raonablement probable. | Normalment es incompatible amb un quadern docent operatiu. |
 
-Tambe es poden generar copies manuals en format JSON. Quan un docent descarrega una copia manual, el fitxer queda fora d'Avaluapro i la seva custodia passa al dispositiu o espai on el docent el guardi.
+`OriSP`, `alumne_001` o `A` no son anonims si el docent o Avaluapro saben a qui corresponen.
 
-## 4. Acces i separacio per usuari
+## 3. Arquitectura actual
 
-L'acces al nuvol es fa amb autenticacio de Google. Cada docent autenticat te un identificador propi i les dades principals es guarden separades per usuari a Firestore:
+Avaluapro combina:
 
-`users/{uid}/...`
+- una copia local a IndexedDB;
+- un espai privat de Firestore per UID;
+- backups al nuvol;
+- paquets puntuals de notes;
+- cotutories persistents;
+- qüestionaris sociometrics temporals.
 
-Les regles de Firestore fan que un usuari nomes pugui llegir i escriure les dades del seu propi espai. Aixo reforca el model actual d'Avaluapro com a quadern docent personal.
+L'espai privat esta ben compartimentat. Els riscos mes elevats es concentren en:
 
-Les dades privades continuen separades per `uid`, pero ara existeixen diversos fluxos compartits que requereixen controls especifics:
+- text lliure i diagnostics;
+- dispositius i exportacions;
+- cotutories i revocacions;
+- respostes sociometriques;
+- conservacio i copies;
+- administracio del projecte Firebase.
 
-- paquets puntuals de notes entre emissor i destinatari;
-- espais persistents de cotutoria amb dades tutorials;
-- safates d'invitacions de cotutoria;
-- qüestionaris sociometrics actius amb formulari public.
-
-La cotutoria compartida pot incloure perfils d'alumnes, registres, notes tutorials, relacions, sociograma, rols, agrupaments, disposicions i antecedents. Per aquest motiu, aquesta part no es considera institucionalment validada fins que es completi l'auditoria definida a `docs/comparticio-docents.md`.
-
-## 5. Mesures tecniques aplicades
-
-Avaluapro incorpora aquestes mesures:
+## 4. Mesures aplicades
 
 - autenticacio amb Google;
-- separacio de dades per usuari a Firestore;
-- rules de Firestore per impedir accessos entre usuaris;
-- espai separat per a copies al nuvol;
-- rules especifiques per als paquets de notes, cotutories, invitacions i qüestionaris sociometrics;
-- copies locals amb IndexedDB per evitar perdua de dades per problemes de connexio;
-- copies manuals exportables en JSON;
-- registre de l'ultima sincronitzacio i de les darreres copies al nuvol;
-- missatges d'error quan falla una copia, restauracio, importacio o enviament;
-- avisos dins l'aplicacio en camps de text potencialment sensibles;
-- distincio entre dades reals, dades de demo i dades importades.
+- aillament per UID;
+- minim privilegi en paquets i cotutories;
+- propietari com a gestor de membres;
+- subcol.leccions compartides limitades;
+- eliminacions sincronitzades sense `delete` fisic directe;
+- revocacio de membres;
+- token sociometric individual, temporal i d'un sol us;
+- document general del qüestionari no public;
+- resposta existent no modificable;
+- avis informatiu al participant;
+- avisos de minimitzacio;
+- backups i exportacio;
+- 31 proves automatitzades dels fluxos compartits reforcats.
 
-Les dades que es poden calcular, com percentatges, perfils d'intervencio o estadistiques, no s'haurien de duplicar innecessariament. Avaluapro prioritza guardar registres base i calcular les estadistiques a partir d'aquests registres.
+## 5. Limits actuals
 
-## 6. Avisos d'us responsable
+Les regles reforcades encara no s'han desplegat. Cal preservar i sincronitzar les respostes de qüestionaris antics abans de publicar hosting i regles conjuntament.
 
-L'aplicacio inclou avisos en camps oberts per recordar al docent que ha d'escriure nomes informacio pedagogica necessaria. El criteri intern es:
+Tambe resten pendents:
 
-> Escriu observacions pedagogiques, concretes i necessaries. Evita informacio medica, familiar o personal que no sigui imprescindible per a la funcio docent.
+- proves amb dos comptes i dispositius reals;
+- conflictes simultanis i autoria completa;
+- purga automatica;
+- entorns separats;
+- MFA, logs i govern administratiu implantats;
+- verificacio de backups i restauracions;
+- revisio tecnica externa;
+- aprovacio de l'AIPD i dels textos legals;
+- contracte d'encarrec i inventari contractual de proveidors.
 
-Aixo es especialment important en:
+## 6. Separar identitat i dades
 
-- comentaris d'equip educatiu;
-- comentaris de tutoria;
-- DOIPs;
-- incidencies de comportament;
-- diagnostics i anotacions personals;
-- antecedents academics;
-- observacions lliures sobre alumnes.
+Separar la correspondencia `id -> nom` de les dades educatives pot reduir el dany d'una filtracio parcial i limitar el que rep un proveidor extern.
 
-## 7. Minimitzacio de dades
+No obstant aixo:
 
-Avaluapro ha de guardar nomes dades necessaries per a la funcio docent. La filosofia de disseny es:
+- continua sent pseudonimitzacio si Avaluapro pot recompondre la identitat;
+- complica sincronitzacio, backups, comparticio i recuperacio;
+- una clau nomes local pot provocar perdua irreversible;
+- compartir entre docents exigeix compartir o custodiar la clau;
+- les observacions poden reidentificar per si soles.
 
-- prioritzar etiquetes controlades abans que text lliure;
-- evitar historials personals llargs si un resum pedagogic es suficient;
-- no guardar dades familiars, mediques o personals si no son necessaries;
-- no duplicar fotos ni imatges grans;
-- separar dades reals, copies de seguretat i paquets compartits;
-- permetre exportar i eliminar dades quan calgui;
-- explicar al docent que les copies manuals descarregades queden sota la seva responsabilitat.
+Recomanacio: no redissenyar ara tot el producte per eliminar noms del nuvol. Prioritzar una separacio logica clara, minimitzacio, permisos, govern institucional i pseudonimitzacio selectiva en exportacions o serveis externs.
 
-## 8. Copies de seguretat i recuperacio
+## 7. Integracio futura amb IA
 
-Avaluapro permet:
+Enviar `alumne A` en lloc del nom es una bona practica, pero normalment continua sent tractament de dades personals si Avaluapro conserva la correspondencia o si el text permet reidentificar.
 
-- crear copies manuals al dispositiu;
-- crear copies al nuvol dins l'espai del docent;
-- veure l'ultima copia al nuvol;
-- revisar les darreres copies disponibles;
-- restaurar una copia quan calgui;
-- esborrar dades per reiniciar el curs.
+Arquitectura recomanada:
 
-Les copies de seguretat son especialment sensibles perque poden contenir gairebe tot el quadern docent. Per aquest motiu, l'aplicacio les tracta com a dades d'alt risc i mostra informacio clara sobre el seu us.
+1. no enviar noms, correus, fotos, dades familiars ni diagnostics;
+2. filtrar observacions i limitar text lliure;
+3. enviar el minim context necessari amb un identificador temporal;
+4. no permetre entrenament amb les dades;
+5. establir contracte, ubicacio, retencio i subencarregats;
+6. registrar la finalitat i l'operacio;
+7. mantenir decisio i revisio humana;
+8. activar IA nomes despres de l'AIPD i l'autoritzacio institucional.
 
-## 9. Fotos, imatges i Storage
+## 8. Recomanacio d'arquitectura
 
-Actualment les fotos i imatges es poden guardar com a dades comprimides dins l'ecosistema d'Avaluapro. Aquesta solucio es suficient per a un us inicial, pero no es la millor opcio si l'eina creix amb molts docents i moltes imatges.
+Per a un producte educatiu real que vol creixer:
 
-Mesura prevista:
+- mantenir Firebase provisionalment, sense migracio precipitada;
+- completar el desplegament segur i les proves reals;
+- separar entorns i reforcar administradors;
+- mantenir dades privades per UID i espais compartits explicits;
+- usar pseudonimitzacio selectiva per IA, analitica i exportacions;
+- definir conservacio i purga automatica;
+- formalitzar Ministeri com a responsable i empresa com a encarregada, si aquest es el model acceptat;
+- fer revisio juridica i tecnica abans del pilot.
 
-- migrar fotos d'alumnes i imatges grans a Firebase Storage;
-- mantenir a Firestore nomes la referencia de la imatge;
-- aplicar rules de Storage per usuari;
-- reduir mida i duplicacio d'imatges.
+## 9. Conclusio
 
-Aquesta millora reduiria risc tecnic, mida de dades i possibilitat d'arribar als limits de Firestore.
-
-## 10. App Check i mesures futures
-
-Quan Avaluapro es desplegui per a un us mes ampli, es recomana valorar:
-
-- activar Firebase App Check;
-- revisar les rules amb suport tecnic extern;
-- definir politica de conservacio de copies;
-- migrar fotos a Firebase Storage;
-- seguir el protocol definit a `docs/app-check-entorn-public.md` abans de fer App Check obligatori;
-- preparar documentacio formal per a direccio o Ministeri;
-- revisar si cal avaluacio d'impacte de proteccio de dades;
-- formalitzar el contracte d'encarrec de tractament si l'us passa a ser institucional.
-
-App Check no substitueix les rules de Firestore, pero pot ajudar a reduir usos no autoritzats de Firebase des de clients aliens.
-
-## 11. Limits i responsabilitats
-
-Avaluapro pot aplicar mesures tecniques, avisos i disseny responsable, pero hi ha decisions que no depenen nomes del desenvolupament de l'aplicacio:
-
-- autoritzar l'us institucional al centre;
-- determinar el responsable i encarregat de tractament;
-- signar el contracte d'encarrec de tractament;
-- validar RGPD i normativa andorrana aplicable;
-- decidir si cal revisio juridica o avaluacio d'impacte;
-- definir protocols interns d'us i custodia de copies.
-
-Per tant, Avaluapro esta preparat per treballar amb criteris de seguretat i minimitzacio, pero l'us oficial hauria d'anar acompanyat de validacio institucional.
-
-## 12. Resum executiu
-
-Avaluapro protegeix les dades mitjancant autenticacio Google, separacio per usuari, rules de Firestore, copies de seguretat controlades, avisos d'us responsable i criteris de minimitzacio. Les dades mes sensibles son diagnostics, comentaris tutorials, DOIPs, comportament, fotos, sociograma i copies de seguretat.
-
-L'aplicacio combina un quadern docent personal amb funcionalitats compartides. L'espai privat continua separat per usuari, pero les cotutories i la sociometria necessiten una nova auditoria de permisos, revocacio, eliminacio, autoria i exposicio publica abans d'un us institucional. Tambe cal completar la validacio legal, definir el contracte d'encarrec de tractament i valorar mesures futures com Firebase Storage i App Check.
+L'arquitectura actual es defensable com a base tecnica, pero encara no esta tancada per a un us institucional. El problema no es que Firestore contingui noms: el problema seria tractar dades de menors sense govern, proporcionalitat, contractes, controls verificats i una resposta clara davant errors o incidents.
