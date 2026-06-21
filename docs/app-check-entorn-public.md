@@ -152,7 +152,7 @@ Es recomana activar App Check quan es compleixin aquestes condicions:
 - el domini definitiu esta clar;
 - Firebase Hosting o domini propi esta provat;
 - login funciona en Chrome, Safari i iPad;
-- les rules de Firestore estan publicades i verificades;
+- la versio de rules prevista per al pilot esta desplegada i verificada;
 - hi ha una manera clara d'atendre incidencies.
 
 Activacio recomanada:
@@ -166,7 +166,7 @@ Activacio recomanada:
 
 | Mesura | Estat |
 | --- | --- |
-| Rules Firestore | Implementades i publicades |
+| Rules Firestore | Versió reforçada preparada i provada localment; desplegament pendent de resoldre els qüestionaris antics |
 | Separacio per usuari | Implementada |
 | Paquets entre docents | Implementats amb rules especifiques |
 | API key restringida per domini | Configuracio externa a Google Cloud |

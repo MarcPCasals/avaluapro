@@ -2,6 +2,8 @@
 
 Aquest document defineix com Avaluapro gestiona còpies de seguretat, restauracions i conservació de dades al llarg del curs.
 
+La política institucional de referència és `docs/politica-conservacio-eliminacio-preliminar.md`. Els terminis que s'hi proposen encara han de ser aprovats pel responsable i implementats tècnicament.
+
 ## 1. Còpies manuals JSON
 
 La còpia manual és un fitxer JSON descarregat al dispositiu del docent.
@@ -70,14 +72,16 @@ Restaurar una còpia substitueix l'estat local actual. Si hi ha sessió iniciada
 
 ## 5. Política de final de curs
 
-Al final del curs es recomana:
+Al final del curs, i només d'acord amb la política institucional aprovada, es recomana:
 
-1. descarregar una còpia manual completa;
-2. crear una còpia al núvol;
+1. verificar que les dades necessàries consten al sistema oficial;
+2. crear una còpia temporal només si és necessària per verificar el tancament;
 3. exportar antecedents acadèmics només dels alumnes que interessi conservar per al curs vinent;
-4. reiniciar el curs quan ja no calgui treballar amb les dades actuals.
+4. registrar la ubicació i la data d'eliminació de qualsevol còpia;
+5. reiniciar el curs quan ja no calgui treballar amb les dades actuals;
+6. eliminar les còpies temporals en acabar la verificació.
 
-No cal conservar indefinidament totes les tasques i incidències si ja no aporten valor pedagògic.
+Un backup complet no s'ha d'utilitzar com a arxiu acadèmic permanent. No cal conservar indefinidament tasques, incidències o observacions si ja no aporten valor pedagògic.
 
 ## 6. Eliminació de dades antigues
 

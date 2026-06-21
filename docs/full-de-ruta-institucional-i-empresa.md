@@ -69,7 +69,8 @@ Abans de crear aquest full de ruta, el repositori ja disposava d'un dossier tecn
 | `docs/minimitzacio-dades.md` | Criteris sobre diagnostics, text lliure, fotos i sociograma. | Fet. |
 | `docs/controls-minimitzacio-app.md` | Controls i avisos implementats dins l'aplicacio. | Fet segons la revisio del 04/06/2026; cal prova de regressio. |
 | `docs/seguretat-dins-app.md` | Pantalla de dades, copies, restauracio i eliminacio. | Fet com a documentacio funcional. |
-| `docs/backups-conservacio.md` | Copies, restauracio, final de curs i antecedents. | Parcial: hi ha politica operativa, pero falta una politica institucional de terminis. |
+| `docs/backups-conservacio.md` | Copies, restauracio, final de curs i antecedents. | Actualitzat amb la política institucional preliminar; terminis finals i automatització pendents. |
+| `docs/politica-conservacio-eliminacio-preliminar.md` | Matriu de terminis candidats, bloqueig, tancament de curs, baixa de docents i eliminació. | Fet com a proposta; pendent d'aprovació institucional i implantació tècnica. |
 | `docs/fotos-fitxers.md` | Estat actual de les imatges i pla futur de Storage. | Fet com a decisio tecnica; migracio ajornada. |
 | `docs/comparticio-docents.md` | Paquets de notes, cotutories, invitacions i sociometria compartida. | Actualitzat descriptivament; auditoria de seguretat pendent. |
 | `docs/auditoria-comparticio-permisos.md` | Matriu actual/objectiu, riscos i ordre de correccio dels fluxos compartits. | Primera auditoria interna completada; correccions pendents. |
@@ -224,7 +225,8 @@ Evitar crear l'empresa, migrar la infraestructura o assumir costos abans de sabe
 
 ## Accions
 
-- [ ] Demanar al Ministeri un resum escrit dels proxims passos.
+- [ ] Enviar al Ministeri el qüestionari de decisions i demanar un resum escrit dels pròxims passos. **Preparat però retingut:** `docs/questionari-ministeri-decisions-institucionals.md`. Marc prefereix enviar-lo juntament amb el dossier complet, no per separat.
+- [ ] Fer una revisió final del paquet complet abans de l'enviament: qüestionari, fitxa tècnica, mapa de dades, RAT institucional, registre de l'empresa, AIPD, arquitectura, mesures de seguretat, continuïtat, reversibilitat i annexos contractuals disponibles.
 - [ ] Confirmar si la creacio d'una societat es un requisit imprescindible per contractar.
 - [ ] Preguntar quin tipus de procediment preveuen: compra, llicencia, servei, manteniment, pilot o licitacio.
 - [ ] Identificar la persona responsable de la part funcional.
@@ -236,6 +238,7 @@ Evitar crear l'empresa, migrar la infraestructura o assumir costos abans de sabe
 - [ ] Preguntar si accepten Firebase/Google Cloud amb garanties contractuals adequades.
 - [ ] Preguntar si exigeixen certificacions, auditories, asseguranca o nivells de servei.
 - [ ] Preguntar si volen iniciar un pilot limitat abans d'una contractacio completa.
+- [x] Preparar una comunicació estructurada per recollir aquestes decisions. **Fet:** qüestionari, correu d'acompanyament i registre intern de respostes.
 
 ## Resultat necessari per avancar
 
@@ -312,6 +315,8 @@ Descriure amb precisio que guarda Avaluapro, per que ho guarda, qui hi accedeix,
 - [x] Identificar dades calculables que no cal guardar. **Fet:** mitjanes, percentatges, perfils i estadistiques derivades estan documentats.
 - [ ] Validar els fluxos actuals de comparticio entre docents. **Parcial:** estan descrits a `docs/comparticio-docents.md`, pero falta l'auditoria de la fase 0.
 - [ ] Documentar de manera completa els accessos tecnics i administratius possibles. **Parcial:** els accessos docents estan descrits; falten administradors, suport i model institucional.
+- [x] Preparar un RAT preliminar per activitats. **Fet:** `docs/registre-activitats-tractament-preliminar.md`; capçalera, bases i terminis pendents de validació institucional.
+- [x] Preparar una matriu preliminar de rols i bases jurídiques. **Fet:** `docs/rols-i-bases-juridiques-preliminars.md`.
 - [x] Definir quines dades s'han d'evitar o limitar. **Fet com a politica interna:** informacio medica detallada, familiar, economica i judicis no necessaris.
 - [x] Separar conceptualment les dades del sistema oficial de les dades de suport docent. **Fet:** Avaluapro es descriu com a quadern docent i no com a substitut de Clickedu.
 
@@ -423,7 +428,8 @@ Analitzar els riscos per als alumnes abans d'un desplegament institucional, no n
 ## Accions
 
 - [ ] Contractar o consultar un especialista en proteccio de dades d'Andorra.
-- [ ] Preparar una avaluacio d'impacte preliminar d'Avaluapro.
+- [x] Preparar un cribratge preliminar d'Avaluapro. **Fet:** `docs/cribratge-aipd-preliminar.md`; l'AIPD formal continua pendent del responsable i del DPD.
+- [x] Elaborar una AIPD preliminar completa: tractaments, necessitat, proporcionalitat, riscos, probabilitat, impacte, mesures i risc residual. **Fet:** `docs/aipd-preliminar-avaluapro.md`; pendent de revisió i aprovació institucional.
 - [ ] Validar amb el responsable de proteccio de dades del Ministeri qui aprova i signa l'avaluacio final.
 - [ ] Analitzar especialment el tractament de menors.
 - [ ] Analitzar avaluacio, puntuacio, perfils, comportament i prediccions.
@@ -516,6 +522,11 @@ No migrar Firebase ni construir un backend propi fins a disposar de:
 4. definicio de qui mantindra la infraestructura;
 5. pla de migracio i recuperacio.
 
+Tasques preparatòries que sí es poden avançar:
+
+- [ ] Preparar un pla de migració del Firebase actual cap a l'entorn institucional objectiu, amb inventari, exportació, validació, tall, retorn enrere i eliminació de l'entorn anterior.
+- [ ] Resoldre la recuperació i neteja dels qüestionaris sociomètrics antics abans de desplegar les rules reforçades. **Incidència registrada:** `docs/checklist-desplegament-rules-2026-06.md`.
+
 ---
 
 # Fase 7. Constituir l'empresa quan hi hagi una via contractual clara
@@ -581,20 +592,25 @@ Permetre que el Ministeri contracti Avaluapro amb responsabilitats i garanties c
 ## Documents que cal preparar
 
 - [ ] Contracte principal de llicencia o prestacio del servei.
-- [ ] Contracte d'encarrec de tractament.
-- [ ] Relacio de subencarregats.
-- [ ] Descripcio de les mesures tecniques i organitzatives.
-- [ ] Registre d'activitats o categories de tractament de l'empresa.
-- [ ] Politica de conservacio i eliminacio.
-- [ ] Procediment d'exercici de drets.
-- [ ] Procediment de notificacio i gestio d'incidents.
-- [ ] Pla de continuitat i recuperacio.
-- [ ] Condicions de retorn o eliminacio de dades al final del contracte.
-- [ ] Compromisos de confidencialitat.
-- [ ] Condicions de suport i manteniment.
-- [ ] Acord de nivell de servei, si escau.
-- [ ] Politica de vulnerabilitats i actualitzacions.
-- [ ] Inventari i condicions dels proveidors externs.
+- [x] Preparar un esborrany de contracte d'encarrec de tractament. **Fet:** `docs/esborrany-contracte-encarrec-tractament.md`; pendent de parts, negociació i revisió jurídica.
+- [x] Preparar la relacio preliminar de subencarregats i proveidors. **Fet:** `docs/inventari-subencarregats-i-proveidors.md`; pendent de contractes i autorització institucional.
+- [x] Preparar la descripcio preliminar de mesures tecniques i organitzatives. **Fet:** `docs/mesures-tecniques-organitzatives-preliminars.md`; separa mesures implantades, locals, parcials i pendents, i requereix aprovació i verificació externa.
+- [x] Preparar el registre preliminar de categories i activitats de tractament de l'empresa. **Fet:** `docs/registre-empresa-categories-tractament-preliminar.md`; separa el rol d'encarregada dels tractaments corporatius propis i requereix dades de la societat i clients.
+- [x] Preparar una politica preliminar de conservacio, bloqueig i eliminacio. **Fet:** `docs/politica-conservacio-eliminacio-preliminar.md`; els terminis són candidats i requereixen aprovació institucional i implementació tècnica.
+- [x] Preparar el procediment d'exercici de drets. **Fet:** `docs/procediment-exercici-drets-preliminar.md`; pendent de responsable, DPD, canals, eines d'execució i simulacre.
+- [x] Preparar el procediment de notificacio i gestio d'incidents. **Fet:** `docs/protocol-incidents-violacions-seguretat-preliminar.md`; pendent de responsables, canals urgents, integració contractual i simulacres.
+- [x] Preparar el pla preliminar de continuitat, recuperacio i reversibilitat. **Fet:** `docs/pla-continuitat-recuperacio-preliminar.md`; RPO, RTO, responsables, arquitectura de backup i simulacres pendents d'aprovació i implantació.
+- [x] Preparar les condicions i el procediment preliminar de retorn, migracio i eliminacio al final del contracte. **Fet:** `docs/procediment-retorn-migracio-supressio-preliminar.md`; pendent de formats, canals, calendari contractual i prova completa.
+- [x] Preparar compromisos preliminars de confidencialitat i formacio. **Fet:** `docs/compromis-confidencialitat-formacio-preliminar.md`; pendent d'adaptació laboral, signatura i formació real.
+- [x] Preparar les condicions preliminars de suport i manteniment. **Fet:** `docs/procediment-suport-manteniment-preliminar.md`; pendent de canals, equip, cobertura i eina.
+- [x] Preparar un acord de nivell de servei preliminar. **Fet:** `docs/acord-nivell-servei-preliminar.md`; no vigent, amb horaris, disponibilitat, conseqüències i objectius pendents de negociació.
+- [x] Preparar la politica preliminar de vulnerabilitats i actualitzacions. **Fet:** `docs/politica-vulnerabilitats-actualitzacions-preliminar.md`; pendent de canal, eines, responsables i simulacre.
+- [x] Preparar l'inventari i les condicions preliminars dels proveidors externs. **Fet:** `docs/inventari-subencarregats-i-proveidors.md`; contractes, autoritzacions i transferències pendents.
+- [x] Preparar una politica de privacitat institucional preliminar. **Fet:** `docs/politica-privacitat-institucional-preliminar.md`; no publicable fins a completar responsable, DPD, bases, transferències i terminis.
+- [x] Preparar l'avis legal preliminar de l'aplicacio. **Fet:** `docs/avis-legal-preliminar.md`; no publicable fins a identificar el prestador i revisar el contracte.
+- [x] Preparar clausules informatives per a docents, alumnes, families i fluxos sensibles. **Fet:** `docs/clausules-informatives-preliminars.md`; pendent de validació institucional.
+- [ ] Procediment d'alta, canvi de rol, substitucio i baixa de docents.
+- [x] Preparar el procediment preliminar de tancament de curs, bloqueig, arxiu i eliminacio. **Inclòs a:** `docs/politica-conservacio-eliminacio-preliminar.md`; pendent d'eines, responsables i prova completa.
 
 ## Decisions contractuals importants
 

@@ -8,6 +8,14 @@ Les rutes indicades són les carpetes i fitxers dins del repositori GitHub:
 
 ## Lectura recomanada principal
 
+### 0. Qüestionari de decisions institucionals
+
+Ruta: `docs/questionari-ministeri-decisions-institucionals.md`
+
+Document operatiu per obtenir resposta escrita sobre contractació, societat, propietat, responsable del tractament, bases jurídiques, infraestructura, ciberseguretat i pilot.
+
+Inclou una part curta amb les decisions imprescindibles, annexos per a protecció de dades i sistemes, un correu d'acompanyament i una taula interna per traslladar les respostes als altres documents.
+
 ### 1. Full de ruta institucional, empresarial i de protecció de dades
 
 Ruta: `docs/full-de-ruta-institucional-i-empresa.md`
@@ -110,13 +118,79 @@ Ruta: `docs/app-check-entorn-public.md`
 
 Document tècnic sobre App Check i mesures futures per reforçar l'ús públic de l'aplicació.
 
+### Exercici de drets
+
+Ruta: `docs/procediment-exercici-drets-preliminar.md`
+
+Defineix com rebre, verificar, decidir i executar peticions d'accés, rectificació, supressió, limitació, oposició i portabilitat. Inclou el paper auxiliar d'Avaluapro, terminis, dades compartides i plantilles de treball.
+
+### Incidents i violacions de seguretat
+
+Ruta: `docs/protocol-incidents-violacions-seguretat-preliminar.md`
+
+Estableix el circuit de detecció, contenció, preservació d'evidències, avaluació de risc, notificació a l'APDA, comunicació a les persones i revisió posterior.
+
+### Conservació, bloqueig i eliminació
+
+Ruta: `docs/politica-conservacio-eliminacio-preliminar.md`
+
+Separa el quadern docent de l'expedient oficial i proposa terminis per categoria, tancament de curs, baixa de docents, backups, bloqueig legal, eliminació segura i finalització del servei.
+
+### Mesures tècniques i organitzatives
+
+Ruta: `docs/mesures-tecniques-organitzatives-preliminars.md`
+
+Descriu els controls de govern, accessos, xifratge, dispositius, desenvolupament, desplegament, backups, logs, proveïdors i continuïtat. Diferencia mesures implantades, preparades localment, parcials, documentades i pendents.
+
+### Continuïtat, recuperació i reversibilitat
+
+Ruta: `docs/pla-continuitat-recuperacio-preliminar.md`
+
+Defineix funcions prioritàries, RPO i RTO candidats, capes de còpia, recuperació per escenaris, mode degradat, dependència de comptes i persones, migració i tancament de l'empresa.
+
+### Registre de l'empresa Avaluapro
+
+Ruta: `docs/registre-empresa-categories-tractament-preliminar.md`
+
+Separa les categories que la futura empresa executaria com a encarregada de les activitats pròpies en què actuaria com a responsable, com clients, facturació, personal i proveïdors.
+
+### Retorn, migració i supressió
+
+Ruta: `docs/procediment-retorn-migracio-supressio-preliminar.md`
+
+Defineix l'inventari de sortida, el format, el canal, la validació, el tall, l'eliminació, les confirmacions dels subencarregats i el certificat final.
+
+### Confidencialitat i formació
+
+Ruta: `docs/compromis-confidencialitat-formacio-preliminar.md`
+
+Estableix obligacions del personal i col·laboradors, accés excepcional, formació, alta, canvi de rol, baixa i evidències.
+
+### Suport i manteniment
+
+Ruta: `docs/procediment-suport-manteniment-preliminar.md`
+
+Defineix canals, prioritats, diagnòstic amb dades mínimes, escalat, accés excepcional i manteniment planificat o urgent.
+
+### Acord de nivell de servei
+
+Ruta: `docs/acord-nivell-servei-preliminar.md`
+
+Proposa cobertura, temps de resposta, disponibilitat, manteniment, informes i conseqüències, sense presentar-los encara com a compromisos vigents.
+
+### Vulnerabilitats i actualitzacions
+
+Ruta: `docs/politica-vulnerabilitats-actualitzacions-preliminar.md`
+
+Regula la recepció d'avisos, severitat, contenció, correcció, dependències, secrets, desplegaments urgents i divulgació coordinada.
+
 ## Fitxers tècnics clau
 
 ### Firestore rules
 
 Ruta: `firestore.rules`
 
-Rules reals de Firebase publicades. Controlen l'accés a:
+Rules de Firebase mantingudes al repositori. La versió reforçada està provada localment, però el desplegament continua pendent de resoldre i migrar els qüestionaris antics. Controlen l'accés previst a:
 
 - dades personals de cada usuari;
 - paquets de notes entre docents;
@@ -139,13 +213,14 @@ Configuració de Firebase Hosting i deploy.
 
 1. Obrir l'aplicació: `https://avaluapro.web.app`
 2. Situar l'estat i els passos futurs: `docs/full-de-ruta-institucional-i-empresa.md`
-3. Llegir o ensenyar: `docs/fitxa-tecnica-direccio-ministeri.md`
-4. Si preocupa la protecció de dades: `docs/proteccio-dades-avaluapro.md`
-5. Si volen saber quines dades es guarden: `docs/mapa-dades.md`
-6. Si ho revisa una persona tècnica: `docs/firebase-acces.md` i `firestore.rules`
-7. Si interessa el treball entre docents: `docs/comparticio-docents.md`
-8. Per revisar riscos pendents: `docs/auditoria-comparticio-permisos.md`
-9. Per tancar: `docs/checklist-final-seguretat.md`
+3. Utilitzar `docs/questionari-ministeri-decisions-institucionals.md` per obtenir les decisions pendents.
+4. Llegir o ensenyar: `docs/fitxa-tecnica-direccio-ministeri.md`
+5. Si preocupa la protecció de dades: `docs/proteccio-dades-avaluapro.md`
+6. Si volen saber quines dades es guarden: `docs/mapa-dades.md`
+7. Si ho revisa una persona tècnica: `docs/firebase-acces.md` i `firestore.rules`
+8. Si interessa el treball entre docents: `docs/comparticio-docents.md`
+9. Per revisar riscos pendents: `docs/auditoria-comparticio-permisos.md`
+10. Per tancar: `docs/checklist-final-seguretat.md`
 
 ## Nota important
 

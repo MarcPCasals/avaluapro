@@ -2,6 +2,8 @@
 
 Data: 4 de juny de 2026
 
+Avís d'actualització: aquest document recull una revisió anterior. La situació actual de les rules compartides, els qüestionaris sociomètrics i les mesures institucionals es troba a `docs/checklist-desplegament-rules-2026-06.md` i `docs/mesures-tecniques-organitzatives-preliminars.md`.
+
 Aquest document recull la revisio final que es pot fer des del projecte i separa les comprovacions que necessiten comptes reals, dispositius reals o una accio manual del docent.
 
 ## Resultat tecnic local
@@ -29,7 +31,7 @@ Aquest document recull la revisio final que es pot fer des del projecte i separa
 
 ## Checklist final de seguretat
 
-- Firestore separa les dades privades per usuari a `/users/{uid}`.
+- Les rules preparades separen les dades privades per usuari a `/users/{uid}`; cal verificar la versió efectivament desplegada abans d'un pilot.
 - Les dades privades d'un usuari no son llegibles per altres usuaris autenticats.
 - Les copies al nuvol viuen dins del mateix espai privat de l'usuari.
 - Els paquets de notes entre docents nomes es poden llegir pel docent emissor o pel correu destinatari.
@@ -66,4 +68,3 @@ Aquest document recull la revisio final que es pot fer des del projecte i separa
 - Missatge de consola si n'hi ha.
 - Si afecta login: revisar dominis autoritzats, restriccions HTTP de la API key i Firebase Authentication.
 - Si afecta sincronitzacio o backups: revisar rules de Firestore i mida de les dades.
-
