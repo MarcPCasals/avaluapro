@@ -157,6 +157,11 @@ Estat actual: **parcial**. Existeixen mapa de dades i inventari de proveïdors, 
 
 ## 8. Identitat, autenticació i accessos
 
+Documents de referència:
+
+- `docs/procediment-identitats-rols-baixes-preliminar.md`
+- `docs/govern-administradors-accessos-excepcionals-preliminar.md`
+
 ### Controls exigits
 
 - compte individual, mai compartit;

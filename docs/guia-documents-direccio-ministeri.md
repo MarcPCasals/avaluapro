@@ -184,6 +184,18 @@ Ruta: `docs/politica-vulnerabilitats-actualitzacions-preliminar.md`
 
 Regula la recepció d'avisos, severitat, contenció, correcció, dependències, secrets, desplegaments urgents i divulgació coordinada.
 
+### Identitats, rols i baixes
+
+Ruta: `docs/procediment-identitats-rols-baixes-preliminar.md`
+
+Separa autenticació i autorització, defineix fonts oficials, rols, altes, canvis, substitucions, baixes i tractament de còpies locals.
+
+### Administradors i accessos excepcionals
+
+Ruta: `docs/govern-administradors-accessos-excepcionals-preliminar.md`
+
+Defineix comptes privilegiats, IAM, MFA, doble control, suport temporal, accés d'emergència, logs, claus i baixa d'administradors.
+
 ## Fitxers tècnics clau
 
 ### Firestore rules

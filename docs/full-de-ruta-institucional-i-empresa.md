@@ -609,7 +609,7 @@ Permetre que el Ministeri contracti Avaluapro amb responsabilitats i garanties c
 - [x] Preparar una politica de privacitat institucional preliminar. **Fet:** `docs/politica-privacitat-institucional-preliminar.md`; no publicable fins a completar responsable, DPD, bases, transferències i terminis.
 - [x] Preparar l'avis legal preliminar de l'aplicacio. **Fet:** `docs/avis-legal-preliminar.md`; no publicable fins a identificar el prestador i revisar el contracte.
 - [x] Preparar clausules informatives per a docents, alumnes, families i fluxos sensibles. **Fet:** `docs/clausules-informatives-preliminars.md`; pendent de validació institucional.
-- [ ] Procediment d'alta, canvi de rol, substitucio i baixa de docents.
+- [x] Preparar el procediment preliminar d'alta, canvi de rol, substitucio i baixa de docents. **Fet:** `docs/procediment-identitats-rols-baixes-preliminar.md`; pendent de font oficial, rols aprovats i implementació.
 - [x] Preparar el procediment preliminar de tancament de curs, bloqueig, arxiu i eliminacio. **Inclòs a:** `docs/politica-conservacio-eliminacio-preliminar.md`; pendent d'eines, responsables i prova completa.
 
 ## Decisions contractuals importants

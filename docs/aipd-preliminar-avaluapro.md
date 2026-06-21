@@ -328,7 +328,7 @@ El catàleg complet i l'estat verificable de les mesures es troba a `docs/mesure
 - [ ] Designar responsable i DPD.
 - [ ] Aprovar bases jurídiques i article 9.2.
 - [ ] Aprovar aquesta AIPD i el risc residual.
-- [ ] Definir centres, rols i permisos.
+- [x] Preparar el model procedimental de centres, rols, altes i baixes: `docs/procediment-identitats-rols-baixes-preliminar.md`. Les decisions institucionals i la implementació continuen pendents.
 - [ ] Separar desenvolupament, proves i producció.
 - [ ] Desplegar i provar les rules reforçades.
 - [ ] Resoldre els qüestionaris antics.
@@ -340,7 +340,7 @@ El catàleg complet i l'estat verificable de les mesures es troba a `docs/mesure
 
 - [ ] Registre d'accessos i canvis sensibles.
 - [ ] Purga automàtica.
-- [ ] MFA administratiu.
+- [x] Preparar el govern d'administradors, MFA i accessos excepcionals: `docs/govern-administradors-accessos-excepcionals-preliminar.md`. Implantació i evidències pendents.
 - [ ] Prova de restauració.
 - [ ] Auditoria externa proporcional.
 - [ ] Formació docent.

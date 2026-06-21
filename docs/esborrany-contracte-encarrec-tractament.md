@@ -171,6 +171,11 @@ La base preliminar de l'annex 2 és:
 
 Abans de signar, les parts hauran de convertir els estats provisionals en compromisos verificables, indicar responsables, freqüències, evidències i terminis, i retirar qualsevol mesura que no formi part de l'arquitectura contractada.
 
+El govern d'identitats i accessos privilegiats es desenvolupa a:
+
+- `docs/procediment-identitats-rols-baixes-preliminar.md`
+- `docs/govern-administradors-accessos-excepcionals-preliminar.md`
+
 ## 10. Subencarregats
 
 ### 10.1 Autorització

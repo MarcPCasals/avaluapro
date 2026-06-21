@@ -39,6 +39,8 @@ Els documents principals són:
 - `docs/procediment-suport-manteniment-preliminar.md`: canals, prioritats, diagnòstic amb dades mínimes, escalat i manteniment.
 - `docs/acord-nivell-servei-preliminar.md`: cobertura, resposta, disponibilitat, manteniment, RPO/RTO i informes candidats.
 - `docs/politica-vulnerabilitats-actualitzacions-preliminar.md`: detecció, divulgació, severitat, correcció, dependències, secrets i actualitzacions.
+- `docs/procediment-identitats-rols-baixes-preliminar.md`: font oficial, rols, altes, canvis, substitucions, baixes i còpies locals.
+- `docs/govern-administradors-accessos-excepcionals-preliminar.md`: IAM, MFA, doble control, suport privilegiat, emergències, logs i secrets.
 - `docs/questionari-ministeri-decisions-institucionals.md`: preguntes, correu i registre de decisions per desbloquejar contractació, protecció de dades i infraestructura.
 - `docs/fitxa-tecnica-direccio-ministeri.md`
 - `docs/proteccio-dades-avaluapro.md`

@@ -116,6 +116,11 @@ No s'ha de donar d'alta un client institucional sense aquesta fitxa i les instru
 | Conservació | Mentre existeixi autorització i període de responsabilitat aprovat. |
 | Mesures | Compte individual, mínim privilegi, MFA administratiu, revisió i baixa. |
 
+Procediments de referència:
+
+- `docs/procediment-identitats-rols-baixes-preliminar.md`
+- `docs/govern-administradors-accessos-excepcionals-preliminar.md`
+
 ## 7. CAT-E03. Backups, restauració i continuïtat
 
 | Camp | Contingut preliminar |

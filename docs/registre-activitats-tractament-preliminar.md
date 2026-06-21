@@ -106,7 +106,7 @@ Estat: esborrany de treball; no és el RAT formal del Ministeri
 | Destinataris | Administradors autoritzats i proveïdors tecnològics. |
 | Conservació | Mentre el compte estigui actiu i durant el període necessari per responsabilitats i seguretat. |
 | Mesures | Google Authentication, mínim privilegi, revocació, entorns separats i registre d'operacions. |
-| Pendent | Procés d'alta/baixa, font oficial de rols i suport administratiu. |
+| Pendent | Font oficial, rols aprovats i implementació. Procediment preparat a `docs/procediment-identitats-rols-baixes-preliminar.md`. |
 
 ## 9. RAT-08. Backups, exportacions i recuperació
 
