@@ -1,7 +1,7 @@
 # Firebase, accessos i estat de les regles
 
-Data d'actualitzacio: 21 de juny de 2026
-Estat: arquitectura contrastada amb el codi; regles reforcades provades localment i pendents de desplegament
+Data d'actualitzacio: 22 de juny de 2026
+Estat: regles reforcades desplegades i verificades; proves reals addicionals pendents
 
 Aquest document descriu l'arquitectura real de Firebase d'Avaluapro. No acredita per si sol el compliment normatiu ni que la configuracio local coincideixi amb la publicada.
 
@@ -53,11 +53,11 @@ Limit: un compte compromes, un dispositiu desbloquejat o una exportacio mal cust
 | Flux | Control previst per les regles locals | Estat |
 | --- | --- | --- |
 | Paquets de notes | Emissor i destinatari concret; el destinatari nomes pot registrar la importacio. | Implementat; prova real amb dos comptes pendent. |
-| Cotutoria | Acces per membres; nomes el propietari gestiona membres i espai. | Implementat i provat amb emulador; desplegament i prova real pendents. |
-| Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat i provat localment. |
+| Cotutoria | Acces per membres; nomes el propietari gestiona membres i espai. | Implementat, provat amb emulador i desplegat; prova real completa pendent. |
+| Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat, provat i desplegat. |
 | Eliminacio compartida | Es bloqueja el `delete` fisic i s'utilitzen tombstones minims. | Implementat i provat localment; prova real pendent. |
 | Revocacio o sortida | Propietari retira cotutor; cotutor nomes es pot retirar a si mateix. | Implementat i provat localment; prova real pendent. |
-| Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat i provat localment; desplegament bloquejat. |
+| Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat, provat i desplegat. |
 
 Les deu col.leccions permeses dins una cotutoria son:
 
@@ -86,16 +86,18 @@ Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminaci
 
 No cobreixen encara tota la realitat operativa: cal provar comptes reals, dispositius, conflictes simultanis, restauracions i la configuracio efectivament desplegada.
 
-## 6. Bloqueig de desplegament actual
+## 6. Desplegament reforcat
 
-Les regles reforcades no s'han publicat encara. L'auditoria del 20 de juny va detectar:
+El 22 de juny de 2026 es van publicar conjuntament hosting i regles:
 
-- 10 qüestionaris antics sense token ni caducitat;
-- 4 marcats com a actius;
-- 47 respostes repartides en dos qüestionaris;
-- una resposta pendent de sincronitzar en cadascun d'aquests dos qüestionaris.
+- ruleset `7eb98fe3-1d89-4e35-a4fd-fe41937ebc85`;
+- 26 proves de regles i 5 de sincronitzacio superades;
+- hash local i desplegat identics;
+- cap resposta pendent de sincronitzacio despres de la neteja;
+- supressio administrativa controlada del qüestionari orfe `733e3088e6`, amb 24 respostes brutes i sense tokens;
+- conservacio de les 141 relacions que ja s'havien importat abans de la supressio.
 
-Abans del desplegament cal sincronitzar aquestes respostes, executar `npm run audit:firebase` i publicar hosting i regles conjuntament. El procediment complet es troba a `docs/checklist-desplegament-rules-2026-06.md`.
+Queden tres qüestionaris antics marcats com a actius. Les regles noves els fan inaccessibles publicament; la seva neteja administrativa continua pendent.
 
 ## 7. Controls pendents
 
@@ -112,6 +114,6 @@ Abans del desplegament cal sincronitzar aquestes respostes, executar `npm run au
 
 ## 8. Conclusio
 
-Firebase pot sostenir una arquitectura institucional defensable, pero no la converteix automaticament en conforme. Avaluapro te un bon aillament privat i ha reforcat els fluxos compartits. L'estat correcte a 21 de juny de 2026 es:
+Firebase pot sostenir una arquitectura institucional defensable, pero no la converteix automaticament en conforme. Avaluapro te un bon aillament privat i ha reforcat els fluxos compartits. L'estat correcte a 22 de juny de 2026 es:
 
-**implementat i provat localment, pero encara no desplegat ni validat en condicions reals.**
+**implementat, provat i desplegat; encara pendent de proves operatives completes i validacio externa.**

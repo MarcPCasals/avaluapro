@@ -2,7 +2,7 @@
 
 Data de preparació: 20 de juny de 2026
 Projecte: `avaluapro`
-Estat: desplegament bloquejat fins a completar la sincronització de qüestionaris antics
+Estat: desplegament completat el 22 de juny de 2026; neteja i proves posteriors pendents
 
 ## 1. Situació observada
 
@@ -101,11 +101,14 @@ El ruleset anterior queda identificat en aquest document només com a referènci
 
 ## 7. Comprovacions finals
 
-- [ ] Les 47 respostes brutes existents han estat sincronitzades.
-- [ ] `npm run audit:firebase` no detecta respostes pendents.
-- [ ] `npm run test:security` passa.
-- [ ] `npm run build:firebase` passa.
-- [ ] S'ha publicat hosting i rules en una sola operació.
+- [x] El qüestionari de `2n B` ha quedat sincronitzat amb 23 respostes.
+- [x] El qüestionari orfe `733e3088e6` s'ha suprimit administrativament amb confirmació explícita: 24 respostes brutes eliminades, cap token i 141 relacions ja importades conservades.
+- [x] `npm run audit:firebase` no detecta respostes pendents.
+- [x] `npm run test:security` passa: 26 proves de rules i 5 de sincronització.
+- [x] `npm run build:firebase` passa.
+- [x] S'ha publicat hosting i rules en una sola operació.
+- [x] Ruleset publicat: `projects/avaluapro/rulesets/7eb98fe3-1d89-4e35-a4fd-fe41937ebc85`.
+- [x] El hash de les rules publicades coincideix amb el fitxer local.
 - [ ] S'ha provat amb dades fictícies.
-- [ ] S'han eliminat els qüestionaris antics.
-- [ ] S'ha registrat la data i el resultat del desplegament.
+- [ ] S'han eliminat els tres qüestionaris antics que encara consten actius però ja no són accessibles públicament.
+- [x] S'ha registrat la data i el resultat del desplegament.

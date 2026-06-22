@@ -20,10 +20,10 @@ Objectiu: distingir evidencia existent, proves locals, desplegament, validacio r
 | --- | --- | --- | --- | --- |
 | Dades privades | `users/{uid}` i `firestore.rules` | Implementat | Verificar configuracio desplegada i prova amb segon compte. | Fer prova d'aillament real. |
 | Paquets de notes | Regles i flux d'importacio | Implementat; prova real pendent | Enviament, recepcio i destinatari equivocat. | Provar amb dos comptes ficticis. |
-| Membres de cotutoria | Propietari, acceptacio i sortida | Provat localment | Desplegament i prova real de revocacio. | Completar migracio i desplegar. |
-| Subcol.leccions compartides | Llista tancada de deu col.leccions | Provat localment | Confirmar que la versio publicada es la mateixa. | Desplegar i auditar. |
+| Membres de cotutoria | Propietari, acceptacio i sortida | Desplegat i provat localment | Prova real de revocacio. | Provar amb dos comptes. |
+| Subcol.leccions compartides | Llista tancada de deu col.leccions | Desplegat i auditat | Mantenir proves davant canvis. | Revisio continua. |
 | Eliminacions compartides | Tombstones i bloqueig de `delete` | Provat localment | Conflictes simultanis i propagacio entre dispositius. | Prova amb dos comptes. |
-| Sociometria | Token individual, avís i 24 hores | Provat localment; pendent de desplegament | Deu qüestionaris antics i dues respostes pendents de sincronitzar. | Seguir el checklist de desplegament. |
+| Sociometria | Token individual, avís i 24 hores | Desplegat i provat | Neteja de tres qüestionaris antics inaccessibles i prova ficticia del flux nou. | Completar neteja i prova real controlada. |
 | Purga sociometrica | Politica provisional | Pendent | No hi ha eliminacio automatica en set dies. | Implementar backend programat abans del pilot. |
 | Backups | Local, nuvol i restauracio | Implementat; prova real pendent | Restauracio, retencio i eliminacio verificades. | Fer prova completa i registrar resultat. |
 | Minimitzacio | Avisos i documents de criteri | Implementat parcialment | Revisar camps oberts i categories especialment sensibles. | Prova de regressio i revisio pedagogica. |
@@ -47,13 +47,11 @@ Objectiu: distingir evidencia existent, proves locals, desplegament, validacio r
 
 ## Bloquejos tecnics immediats
 
-1. sincronitzar les 47 respostes dels dos qüestionaris antics;
-2. repetir `npm run audit:firebase`;
-3. executar les proves de seguretat i build;
-4. desplegar hosting i regles conjuntament;
-5. eliminar els qüestionaris antics des de la versio nova;
-6. provar amb dos comptes, dades ficticies i almenys un iPad;
-7. registrar incidencies i resultats.
+1. eliminar els tres qüestionaris antics que continuen inaccessibles;
+2. provar el flux nou amb dades ficticies;
+3. provar amb dos comptes i almenys un iPad;
+4. verificar conflictes, revocacio i restauracio;
+5. registrar incidencies i resultats.
 
 ## Bloquejos institucionals
 

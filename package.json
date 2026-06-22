@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:firebase": "VITE_BASE_PATH=/ vite build",
     "audit:firebase": "node scripts/audit-firebase-predeploy.mjs",
+    "delete:survey:admin": "node scripts/delete-sociometric-survey-admin.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:rules": "bash scripts/run-firestore-rules-tests.sh",

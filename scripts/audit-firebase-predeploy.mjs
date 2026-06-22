@@ -78,6 +78,22 @@ async function listDocuments(collectionPath, token) {
   return result.documents || []
 }
 
+async function getDocument(documentPath, token) {
+  const response = await fetch(`${FIRESTORE_ROOT}/${documentPath}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (response.status === 404) return null
+  const body = await response.json()
+  if (response.status === 401) {
+    throw new Error(
+      'La sessió de Firebase CLI ha caducat o no és vàlida. Executa `npx firebase projects:list` ' +
+        'per renovar-la o `npx firebase login --reauth`, i torna a provar l’auditoria.',
+    )
+  }
+  if (!response.ok) throw new Error(`${response.status}: ${JSON.stringify(body)}`)
+  return body
+}
+
 async function listCollectionIds(documentPath, token) {
   const result = await requestJson(`${FIRESTORE_ROOT}/${documentPath}:listCollectionIds`, token, {
     method: 'POST',
@@ -112,6 +128,15 @@ async function auditSurveys(token) {
       listDocuments(`sociometricSurveys/${encodeURIComponent(id)}/accessTokens`, token),
       listDocuments(`sociometricSurveys/${encodeURIComponent(id)}/responses`, token),
     ])
+    const privateDocument = fields.ownerUid
+      ? await getDocument(
+          `users/${encodeURIComponent(fields.ownerUid)}/sociometricSurveys/${encodeURIComponent(id)}`,
+          token,
+        )
+      : null
+    const privateFields = Object.fromEntries(
+      Object.entries(privateDocument?.fields || {}).map(([key, value]) => [key, decodeFirestoreValue(value)]),
+    )
 
     surveys.push({
       ref: shortRef(id),
@@ -127,6 +152,9 @@ async function auditSurveys(token) {
       declaredResponseCount: Number(fields.responseCount) || 0,
       importedRelationCount: Number(fields.importedRelationCount) || 0,
       lastSyncedAt: fields.lastSyncedAt || '',
+      privateCopyExists: Boolean(privateDocument),
+      privateResponseCount: Number(privateFields.responseCount) || 0,
+      privateLastSyncedAt: privateFields.lastSyncedAt || '',
     })
   }
 

@@ -48,17 +48,17 @@ No s'afirma que:
 
 - l'aplicacio tingui certificacio de seguretat;
 - el dossier hagi estat validat juridicament;
-- les regles reforcades estiguin desplegades;
+- el desplegament reforcat equivalgui a una certificacio o auditoria externa;
 - les proves locals substitueixin proves reals o una auditoria externa;
 - Firebase hagi estat acceptat pel Ministeri;
 - la futura empresa ja pugui actuar com a proveidor;
 - el servei estigui preparat per a un desplegament massiu.
 
-## Bloqueig tecnic actual
+## Estat tecnic actual
 
-Hi ha deu qüestionaris sociometrics antics. Dos contenen 47 respostes en total i cadascun te una resposta pendent de sincronitzar. Aquestes dades s'han de preservar i migrar abans de publicar conjuntament la nova aplicacio i les regles reforcades.
+Hosting i regles reforcades es van publicar conjuntament el 22 de juny de 2026, despres de superar 31 proves de seguretat. La verificacio posterior confirma que les regles locals i les desplegades son identiques i que no queda cap resposta pendent.
 
-Despres cal fer proves amb dades ficticies, dos comptes docents, conflictes, backups i iPad.
+Queden tres qüestionaris antics inaccessibles que s'han de netejar, i cal fer proves amb dades ficticies, dos comptes docents, conflictes, backups i iPad.
 
 ## Decisions sol.licitades al Ministeri
 

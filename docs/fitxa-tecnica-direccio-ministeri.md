@@ -41,23 +41,23 @@ Son dades personals de menors i algunes poden tenir sensibilitat molt elevada. L
 
 ## 5. Estat verificable
 
-| Element | Estat a 21/06/2026 |
+| Element | Estat a 22/06/2026 |
 | --- | --- |
 | Espai privat per UID | Implementat en produccio. |
-| Regles compartides reforcades | Implementades i provades localment. |
+| Regles compartides reforcades | Implementades, provades i desplegades el 22/06/2026. |
 | Proves de seguretat | 26 proves de regles i 5 de sincronitzacio superades. |
-| Desplegament de les regles reforcades | Pendent per migracio de qüestionaris antics. |
+| Desplegament de les regles reforcades | Completat; hash desplegat i local coincidents. |
 | Proves amb dos comptes reals | Pendents. |
 | Conflictes simultanis, iPad i restauracions | Pendents de prova real. |
 | Purga sociometrica automatica | Pendent. |
 | Entorns separats, MFA administratiu, logs i alertes | Pendents. |
 | Revisio legal, AIPD i contractes definitius | Pendents de validacio externa i institucional. |
 
-## 6. Incidencia bloquejant actual
+## 6. Darrer desplegament de seguretat
 
-Abans de publicar l'enduriment de seguretat cal sincronitzar i netejar deu qüestionaris antics. Dos contenen 47 respostes en total i presenten una resposta pendent de sincronitzar cadascun. Hosting i regles s'han de desplegar conjuntament.
+El 22 de juny de 2026 es van publicar conjuntament hosting i regles reforcades. Abans del desplegament es va sincronitzar el qüestionari de `2n B` i es va suprimir administrativament un qüestionari orfe de `4t E`, despres d'una comprovacio en sec i confirmacio explicita. Es van eliminar 24 respostes brutes i es van conservar 141 relacions ja importades.
 
-No s'ha d'obrir un pilot institucional amb dades reals fins que aquest desplegament i les proves reals estiguin completats.
+No queda cap resposta pendent. Continuen pendents les proves reals completes i la validacio institucional abans d'un pilot.
 
 ## 7. Model institucional proposat
 
