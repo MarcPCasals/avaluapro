@@ -11,6 +11,7 @@
     "delete:survey:admin": "node scripts/delete-sociometric-survey-admin.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "smoke:sociometric:production": "node scripts/smoke-test-sociometric-production.mjs",
     "test:rules": "bash scripts/run-firestore-rules-tests.sh",
     "test:shared-sync": "node --test tests/shared-tutoring-sync.test.js",
     "test:security": "npm run test:shared-sync && npm run test:rules"

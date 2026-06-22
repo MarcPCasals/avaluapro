@@ -2,7 +2,7 @@
 
 Data de preparació: 20 de juny de 2026
 Projecte: `avaluapro`
-Estat: desplegament completat el 22 de juny de 2026; neteja i proves posteriors pendents
+Estat: desplegament, neteja de qüestionaris antics i prova sociomètrica fictícia completats el 22 de juny de 2026
 
 ## 1. Situació observada
 
@@ -75,15 +75,23 @@ Immediatament després de publicar les rules:
 
 ## 5. Neteja posterior
 
-Des de la nova versió de l'app:
+La neteja posterior es va completar el 22 de juny de 2026:
 
-1. revisar que les relacions i moments sociomètrics sincronitzats existeixen;
-2. utilitzar `Eliminar dades brutes` per als 10 qüestionaris antics;
-3. confirmar que desapareixen qüestionari, respostes i qualsevol token;
-4. tornar a executar `npm run audit:firebase`;
-5. crear un qüestionari nou només amb alumnes ficticis;
-6. provar token correcte, reutilitzat i caducat;
-7. eliminar les dades de prova.
+1. es van revisar i conservar les relacions sociomètriques ja importades;
+2. es van eliminar administrativament els quatre qüestionaris antics que continuaven actius;
+3. es va confirmar la desaparició dels qüestionaris, les respostes brutes i els tokens associats;
+4. `npm run audit:firebase` va confirmar que no quedava cap qüestionari antic actiu ni cap resposta pendent;
+5. es va crear temporalment un qüestionari nou només amb dos alumnes ficticis;
+6. es van provar l'aïllament del document general, la no-enumeració dels tokens, la vinculació del token a l'alumne, l'ús únic i la caducitat;
+7. es van eliminar totes les dades de la prova fictícia.
+
+La prova es pot repetir de forma controlada amb:
+
+```bash
+CONFIRM_PRODUCTION_SMOKE="PROVA SOCIOMETRICA FICTICIA" npm run smoke:sociometric:production
+```
+
+Sense la frase de confirmació, el comandament només mostra el pla i no modifica producció.
 
 ## 6. Retorn enrere
 
@@ -109,6 +117,6 @@ El ruleset anterior queda identificat en aquest document només com a referènci
 - [x] S'ha publicat hosting i rules en una sola operació.
 - [x] Ruleset publicat: `projects/avaluapro/rulesets/7eb98fe3-1d89-4e35-a4fd-fe41937ebc85`.
 - [x] El hash de les rules publicades coincideix amb el fitxer local.
-- [ ] S'ha provat amb dades fictícies.
-- [ ] S'han eliminat els tres qüestionaris antics que encara consten actius però ja no són accessibles públicament.
+- [x] S'ha provat en producció amb dades exclusivament fictícies i s'han eliminat les dades de prova.
+- [x] S'han eliminat els tres qüestionaris antics restants que encara constaven actius però ja no eren accessibles públicament.
 - [x] S'ha registrat la data i el resultat del desplegament.

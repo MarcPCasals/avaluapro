@@ -1,7 +1,7 @@
 # Firebase, accessos i estat de les regles
 
 Data d'actualitzacio: 22 de juny de 2026
-Estat: regles reforcades desplegades i verificades; proves reals addicionals pendents
+Estat: regles reforcades desplegades i verificades; neteja antiga i prova sociometrica ficticia completades
 
 Aquest document descriu l'arquitectura real de Firebase d'Avaluapro. No acredita per si sol el compliment normatiu ni que la configuracio local coincideixi amb la publicada.
 
@@ -57,7 +57,7 @@ Limit: un compte compromes, un dispositiu desbloquejat o una exportacio mal cust
 | Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat, provat i desplegat. |
 | Eliminacio compartida | Es bloqueja el `delete` fisic i s'utilitzen tombstones minims. | Implementat i provat localment; prova real pendent. |
 | Revocacio o sortida | Propietari retira cotutor; cotutor nomes es pot retirar a si mateix. | Implementat i provat localment; prova real pendent. |
-| Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat, provat i desplegat. |
+| Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat, desplegat i verificat en produccio amb dades ficticies. |
 
 Les deu col.leccions permeses dins una cotutoria son:
 
@@ -97,7 +97,15 @@ El 22 de juny de 2026 es van publicar conjuntament hosting i regles:
 - supressio administrativa controlada del qüestionari orfe `733e3088e6`, amb 24 respostes brutes i sense tokens;
 - conservacio de les 141 relacions que ja s'havien importat abans de la supressio.
 
-Queden tres qüestionaris antics marcats com a actius. Les regles noves els fan inaccessibles publicament; la seva neteja administrativa continua pendent.
+El mateix dia es van eliminar els tres qüestionaris antics restants:
+
+- `60c1dd58c2`, amb 23 respostes sincronitzades i 132 relacions importades conservades;
+- `35aaaa18df`, sense respostes;
+- `a4a099d859`, sense respostes.
+
+L'auditoria final no detecta qüestionaris antics actius, respostes pendents ni subcol.leccions inesperades.
+
+També es va executar una prova de fum en produccio amb dos alumnes ficticis. Va confirmar que el document general no es public, els tokens no es poden enumerar, cada token queda vinculat al seu alumne, la resposta no es pot sobreescriure i el token caducat deixa de ser consultable. Les dades ficticies es van eliminar en acabar.
 
 ## 7. Controls pendents
 

@@ -1,6 +1,6 @@
 # Resum executiu del paquet Avaluapro
 
-Data: 21 de juny de 2026
+Data: 22 de juny de 2026
 Destinataris: Ministeri d'Educacio, Direccio, proteccio de dades i sistemes
 
 ## Que es Avaluapro
@@ -58,7 +58,9 @@ No s'afirma que:
 
 Hosting i regles reforcades es van publicar conjuntament el 22 de juny de 2026, despres de superar 31 proves de seguretat. La verificacio posterior confirma que les regles locals i les desplegades son identiques i que no queda cap resposta pendent.
 
-Queden tres qüestionaris antics inaccessibles que s'han de netejar, i cal fer proves amb dades ficticies, dos comptes docents, conflictes, backups i iPad.
+Els qüestionaris antics actius ja s'han eliminat i el flux sociometric nou s'ha verificat en produccio amb dades exclusivament ficticies. La prova va validar l'aillament del qüestionari, els tokens individuals no enumerables, l'ús únic i la caducitat, i va eliminar les dades de prova en acabar.
+
+Continuen pendents les proves amb dos comptes docents, conflictes, backups i iPad, a mes de la purga sociometrica automatica i la validacio externa.
 
 ## Decisions sol.licitades al Ministeri
 

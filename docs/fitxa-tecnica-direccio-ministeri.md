@@ -47,6 +47,7 @@ Son dades personals de menors i algunes poden tenir sensibilitat molt elevada. L
 | Regles compartides reforcades | Implementades, provades i desplegades el 22/06/2026. |
 | Proves de seguretat | 26 proves de regles i 5 de sincronitzacio superades. |
 | Desplegament de les regles reforcades | Completat; hash desplegat i local coincidents. |
+| Prova sociometrica ficticia en produccio | Superada; dades de prova eliminades en acabar. |
 | Proves amb dos comptes reals | Pendents. |
 | Conflictes simultanis, iPad i restauracions | Pendents de prova real. |
 | Purga sociometrica automatica | Pendent. |
@@ -55,9 +56,9 @@ Son dades personals de menors i algunes poden tenir sensibilitat molt elevada. L
 
 ## 6. Darrer desplegament de seguretat
 
-El 22 de juny de 2026 es van publicar conjuntament hosting i regles reforcades. Abans del desplegament es va sincronitzar el qüestionari de `2n B` i es va suprimir administrativament un qüestionari orfe de `4t E`, despres d'una comprovacio en sec i confirmacio explicita. Es van eliminar 24 respostes brutes i es van conservar 141 relacions ja importades.
+El 22 de juny de 2026 es van publicar conjuntament hosting i regles reforcades. Abans del desplegament es va sincronitzar el qüestionari de `2n B` i es va suprimir administrativament un qüestionari orfe de `4t E`, despres d'una comprovacio en sec i confirmacio explicita. Es van eliminar 24 respostes brutes i es van conservar 141 relacions ja importades. Despres es van eliminar els tres qüestionaris antics restants, preservant les relacions que ja s'havien importat.
 
-No queda cap resposta pendent. Continuen pendents les proves reals completes i la validacio institucional abans d'un pilot.
+No queda cap resposta pendent ni cap qüestionari antic actiu. Una prova en produccio amb dades ficticies va validar els controls principals del nou flux public i va netejar totes les dades de prova en acabar. Continuen pendents les proves reals completes amb dos comptes i dispositius, i la validacio institucional abans d'un pilot.
 
 ## 7. Model institucional proposat
 
@@ -74,8 +75,8 @@ Cal confirmar bases juridiques, rols, infraestructura, conservacio, exercici de 
 
 ## 8. Proposta de seguent pas
 
-1. completar la migracio i el desplegament segur;
-2. executar proves amb dades ficticies i dos comptes;
+1. executar proves amb dos comptes docents i almenys un iPad;
+2. verificar conflictes, revocacio, backups i restauracio;
 3. sotmetre el dossier a revisio tecnica i juridica;
 4. obtenir respostes escrites del Ministeri;
 5. definir un pilot limitat, reversible i sense funcions d'IA.
