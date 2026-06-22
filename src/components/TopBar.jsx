@@ -16,6 +16,7 @@ import {
   RotateCw,
   Send,
   Settings,
+  ShieldCheck,
   Trash2,
   UsersRound,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
+import { DataTreatmentModal } from '../features/data/DataTreatmentModal'
 import { RemindersModal } from '../features/data/RemindersModal'
 import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
 import { TutoringShareModal } from '../features/data/TutoringShareModal'
@@ -112,6 +114,7 @@ export function TopBar() {
   const [showNewClass, setShowNewClass] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showDataSafety, setShowDataSafety] = useState(false)
+  const [showDataTreatment, setShowDataTreatment] = useState(false)
   const [dataSafetyInitialSection, setDataSafetyInitialSection] = useState('')
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
   const [showTutoringShare, setShowTutoringShare] = useState(false)
@@ -421,6 +424,16 @@ export function TopBar() {
                 <Cloud size={18} />
                 Còpies i estat
               </button>
+              <button
+                onClick={() => {
+                  setShowDataTreatment(true)
+                  setShowDataMenu(false)
+                }}
+                type="button"
+              >
+                <ShieldCheck size={18} />
+                Tractament de dades
+              </button>
               <button disabled={!cloud.user} onClick={handleCreateCloudBackup} type="button">
                 <Cloud size={18} />
                 Crear còpia al núvol
@@ -497,6 +510,7 @@ export function TopBar() {
           onClose={() => setShowDataSafety(false)}
         />
       )}
+      {showDataTreatment && <DataTreatmentModal onClose={() => setShowDataTreatment(false)} />}
       {showHelp && (
         <HelpCenterModal
           onClose={() => setShowHelp(false)}
