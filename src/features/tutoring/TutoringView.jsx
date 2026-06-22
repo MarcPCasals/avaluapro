@@ -65,6 +65,7 @@ import {
 import {
   buildStudentCooperativeGroupText,
   buildTeacherCooperativeGroupText,
+  formatCooperativeStudentName,
 } from './cooperativeGroupOutputUtils'
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
@@ -275,6 +276,12 @@ const TUTORING_TEXT_LIMIT = 700
 const RELATION_NOTE_LIMIT = 400
 const SEATING_GRID_COLUMNS = 9
 const SEATING_GRID_ROWS = 5
+const DEFAULT_SEATING_BLOCKS = [2, 3, 1]
+const SEATING_STRUCTURE_PRESETS = [
+  { blocks: [2, 2, 2], id: '2-2-2', label: '2 · 2 · 2' },
+  { blocks: [2, 3, 1], id: '2-3-1', label: '2 · 3 · 1' },
+  { blocks: [3, 3], id: '3-3', label: '3 · 3' },
+]
 const DEFAULT_SEATING_ACTIVE_SEATS = [
   [0, 1, 3, 4, 5, 7, 8],
   [0, 1, 3, 4, 5, 7, 8],
@@ -487,7 +494,6 @@ function getSeatingShortName(name) {
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .reverse()
     .map((part) => part[0]?.toUpperCase())
     .join('')
   return `${firstName} ${surnameInitials}`.trim() || String(name || '')
@@ -2148,7 +2154,52 @@ function getDefaultSeatingActiveSeatIds() {
   )
 }
 
-function getSeatZone(seat) {
+function normalizeSeatingBlocks(blocks) {
+  if (!Array.isArray(blocks)) return []
+  return blocks
+    .map((value) => Math.min(5, Math.max(1, Number.parseInt(value, 10) || 0)))
+    .filter(Boolean)
+    .slice(0, 5)
+}
+
+function getSeatingBlockStartColumns(layout) {
+  const blocks = normalizeSeatingBlocks(layout?.blocks)
+  if (blocks.length === 0) return []
+  let cursor = 0
+  return blocks.map((size) => {
+    const start = cursor
+    cursor += size
+    return start
+  })
+}
+
+function getSeatingBlockPosition(layout, x) {
+  const blocks = normalizeSeatingBlocks(layout?.blocks)
+  if (blocks.length === 0) {
+    return {
+      block: Math.min(2, Math.max(0, Math.floor(Number(x || 0) / 3))),
+      column: Number(x || 0),
+    }
+  }
+
+  let cursor = 0
+  const blockIndex = blocks.findIndex((size) => {
+    const includesColumn = x >= cursor && x < cursor + size
+    cursor += size
+    return includesColumn
+  })
+  const start = blocks.slice(0, Math.max(0, blockIndex)).reduce((sum, size) => sum + size, 0)
+  return {
+    block: Math.max(0, blockIndex),
+    column: Math.max(0, x - start),
+  }
+}
+
+function getSeatZone(seat, layout) {
+  if (normalizeSeatingBlocks(layout?.blocks).length > 0) {
+    const { block } = getSeatingBlockPosition(layout, Number(seat?.x || 0))
+    return block
+  }
   const x = Number(seat?.x ?? seat?.block ?? 0)
   if (x <= 2) return 0
   if (x <= 5) return 1
@@ -2162,19 +2213,29 @@ function getStableStudentNumber(value, variant = 0) {
 }
 
 function normalizeSeatingLayout(layout) {
+  const blocks = normalizeSeatingBlocks(layout?.blocks)
+  const rows = Math.min(7, Math.max(3, Number.parseInt(layout?.rows, 10) || SEATING_GRID_ROWS))
+  const columns =
+    blocks.length > 0
+      ? blocks.reduce((sum, size) => sum + size, 0)
+      : Math.min(12, Math.max(1, Number.parseInt(layout?.columns, 10) || SEATING_GRID_COLUMNS))
   const validSeatIds = new Set()
-  Array.from({ length: SEATING_GRID_ROWS }).forEach((_, y) => {
-    Array.from({ length: SEATING_GRID_COLUMNS }).forEach((__, x) => validSeatIds.add(getGridSeatId(x, y)))
+  Array.from({ length: rows }).forEach((_, y) => {
+    Array.from({ length: columns }).forEach((__, x) => validSeatIds.add(getGridSeatId(x, y)))
   })
+  const structuredDefaultSeatIds = [...validSeatIds]
   const activeSeatIds =
     Array.isArray(layout?.activeSeatIds) && layout.activeSeatIds.length > 0
       ? layout.activeSeatIds
-      : getDefaultSeatingActiveSeatIds()
+      : blocks.length > 0
+        ? structuredDefaultSeatIds
+        : getDefaultSeatingActiveSeatIds()
 
   return {
     activeSeatIds: activeSeatIds.filter((seatId) => validSeatIds.has(seatId)),
-    columns: SEATING_GRID_COLUMNS,
-    rows: SEATING_GRID_ROWS,
+    ...(blocks.length > 0 ? { blocks } : {}),
+    columns,
+    rows,
   }
 }
 
@@ -2315,7 +2376,7 @@ function buildTutorialSeatingPlan({
         id: seatId,
         x,
         y,
-        zone: getSeatZone({ x }),
+        zone: getSeatZone({ x }, cleanLayout),
       })
     })
   })
@@ -2534,7 +2595,13 @@ function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
   Array.from({ length: cleanLayout.rows }).forEach((_, row) => {
     Array.from({ length: cleanLayout.columns }).forEach((__, column) => {
       const seatId = getGridSeatId(column, row)
-      seats.push({ enabled: activeSeatIds.has(seatId), id: seatId, x: column, y: row, zone: getSeatZone({ x: column }) })
+      seats.push({
+        enabled: activeSeatIds.has(seatId),
+        id: seatId,
+        x: column,
+        y: row,
+        zone: getSeatZone({ x: column }, cleanLayout),
+      })
     })
   })
   const placements = (plan?.seats || [])
@@ -2553,7 +2620,7 @@ function materializeSavedSeatingPlan({ plan, profilesByStudentId }) {
           id: getGridSeatId(x, y),
           x,
           y,
-          zone: getSeatZone({ x }),
+          zone: getSeatZone({ x }, cleanLayout),
         },
         student: profile,
         studentId: profile.student.id,
@@ -4052,7 +4119,14 @@ export function TutoringView() {
   const [cooperativeCopyMessage, setCooperativeCopyMessage] = useState('')
   const [showCooperativeProjection, setShowCooperativeProjection] = useState(false)
   const [cooperativeWorkspacePanel, setCooperativeWorkspacePanel] = useState('')
-  const [seatingLayout, setSeatingLayout] = useState({ activeSeatIds: getDefaultSeatingActiveSeatIds(), columns: 9, rows: 5 })
+  const [seatingLayout, setSeatingLayout] = useState(() =>
+    normalizeSeatingLayout({ blocks: DEFAULT_SEATING_BLOCKS, rows: SEATING_GRID_ROWS }),
+  )
+  const [seatingStructureDraft, setSeatingStructureDraft] = useState({
+    blocks: DEFAULT_SEATING_BLOCKS,
+    rows: SEATING_GRID_ROWS,
+  })
+  const [seatingWorkspacePanel, setSeatingWorkspacePanel] = useState('structure')
   const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
   const [seatingManualEmptySeatIds, setSeatingManualEmptySeatIds] = useState([])
   const [seatingLockedStudentIds, setSeatingLockedStudentIds] = useState([])
@@ -5029,6 +5103,9 @@ export function TutoringView() {
     ) {
       return null
     }
+    if (cooperativeEditDraft.type === 'move' && sourceGroup.members.length <= 2) {
+      return null
+    }
 
     const nextGroups =
       cooperativeEditDraft.type === 'swap'
@@ -5056,8 +5133,8 @@ export function TutoringView() {
     return {
       actionLabel:
         cooperativeEditDraft.type === 'swap'
-          ? `Intercanviar ${sourceMember.student.name} amb ${targetMember.student.name}`
-          : `Moure ${sourceMember.student.name} a ${targetGroup.name}`,
+          ? `Intercanviar ${formatCooperativeStudentName(sourceMember.student.name)} amb ${formatCooperativeStudentName(targetMember.student.name)}`
+          : `Moure ${formatCooperativeStudentName(sourceMember.student.name)} a ${targetGroup.name}`,
       nextAnalysis,
       nextGroups,
       nextSourceGroup,
@@ -5126,6 +5203,7 @@ export function TutoringView() {
   const visibleSeatingPlan = selectedSeatingPlan
     ? materializeSavedSeatingPlan({ plan: selectedSeatingPlan, profilesByStudentId: cooperativeProfilesByStudentId })
     : generatedSeatingPlan
+  const visibleSeatingBlockStarts = getSeatingBlockStartColumns(visibleSeatingPlan.layout).slice(1)
   const seatingPlanAnalysis = useMemo(
     () =>
       analyzeTutorialSeatingPlan({
@@ -5571,6 +5649,45 @@ export function TutoringView() {
     setSeatingIterationMessage('')
   }
 
+  const updateSeatingStructureBlock = (index, nextValue) => {
+    setSeatingStructureDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((value, blockIndex) =>
+        blockIndex === index ? Math.min(5, Math.max(1, nextValue)) : value,
+      ),
+    }))
+  }
+
+  const applySeatingStructure = () => {
+    const blocks = normalizeSeatingBlocks(seatingStructureDraft.blocks)
+    if (blocks.length === 0) return
+    captureSeatingQualityBaseline('Abans de canviar l’estructura de l’aula')
+    const nextLayout = normalizeSeatingLayout({
+      blocks,
+      rows: seatingStructureDraft.rows,
+    })
+    setSeatingLayout(nextLayout)
+    setSeatingManualSeatByStudentId({})
+    setSeatingManualEmptySeatIds([])
+    setSeatingLockedStudentIds([])
+    setSeatingRestrictions((current) => ({ ...current, blockedSeatIds: [] }))
+    setSeatingProblemSeats({})
+    setSeatingAppliedProblemSeats({})
+    setSeatingUnseatedStudentIds([])
+    setSelectedSeatingPlanId('')
+    setSelectedSeatingStudentId('')
+    setSeatingMoveStudentId('')
+    setSeatingBlockSeatMode(false)
+    setSeatingVariant((current) => current + 1)
+    setSeatingIterationMessage(
+      `Estructura aplicada: ${nextLayout.rows} files i ${blocks.length} blocs (${blocks.join(' · ')}).`,
+    )
+  }
+
+  const selectSeatingStructurePreset = (blocks) => {
+    setSeatingStructureDraft((current) => ({ ...current, blocks: [...blocks] }))
+  }
+
   const handleGenerateSeatingVariant = () => {
     captureSeatingQualityBaseline('Proposta anterior')
     setSelectedSeatingPlanId('')
@@ -6012,6 +6129,13 @@ export function TutoringView() {
     const seatAssignments = getSavedSeatingAssignments(plan, getGridSeatId)
 
     setSeatingLayout(cleanLayout)
+    setSeatingStructureDraft({
+      blocks:
+        normalizeSeatingBlocks(cleanLayout.blocks).length > 0
+          ? normalizeSeatingBlocks(cleanLayout.blocks)
+          : DEFAULT_SEATING_BLOCKS,
+      rows: cleanLayout.rows,
+    })
     setSeatingManualSeatByStudentId(seatAssignments)
     setSeatingManualEmptySeatIds([])
     setSeatingLockedStudentIds([...(plan.layout?.lockedStudentIds || [])])
@@ -6242,7 +6366,7 @@ export function TutoringView() {
         targetGroup?.members.find(
           (member) => !cooperativeLockedStudentIds.includes(member.student.id),
         )?.student.id || '',
-      type: 'move',
+      type: sourceGroup.members.length <= 2 ? 'swap' : 'move',
     })
   }
 
@@ -9036,17 +9160,6 @@ export function TutoringView() {
               </div>
               <div className="cooperative-canvas-actions">
                 <button
-                  className={cooperativeWorkspacePanel === 'config' ? 'secondary-action compact active' : 'secondary-action compact'}
-                  onClick={() => {
-                    setSelectedCooperativeGroupId('')
-                    setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
-                  }}
-                  type="button"
-                >
-                  <SlidersHorizontal size={16} />
-                  Ajustar proposta
-                </button>
-                <button
                   className="primary-action compact"
                   onClick={() => {
                     setSelectedCooperativeGroupId('')
@@ -9192,36 +9305,14 @@ export function TutoringView() {
                 }}
                 type="button"
               >
-                <UsersRound aria-hidden="true" size={22} />
-                <strong>Mida</strong>
-                <span>{cooperativeGroupSize === '2' ? 'Parelles' : `Grups de ${cooperativeGroupSize}`}</span>
-              </button>
-              <button
-                className={cooperativeWorkspacePanel === 'config' ? 'active' : ''}
-                onClick={() => {
-                  setSelectedCooperativeGroupId('')
-                  setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
-                }}
-                type="button"
-              >
                 <SlidersHorizontal aria-hidden="true" size={22} />
-                <strong>Criteri</strong>
+                <strong>Configuració</strong>
+                <span>{cooperativeGroupSize === '2' ? 'Parelles' : `Grups de ${cooperativeGroupSize}`}</span>
                 <span>
                   {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.label ||
                     'Equilibrat'}
                 </span>
-              </button>
-              <button
-                className={cooperativeWorkspacePanel === 'config' ? 'active' : ''}
-                onClick={() => {
-                  setSelectedCooperativeGroupId('')
-                  setCooperativeWorkspacePanel((current) => (current === 'config' ? '' : 'config'))
-                }}
-                type="button"
-              >
-                <Layers3 aria-hidden="true" size={22} />
-                <strong>Mig grup</strong>
-                <span>{prioritizeHalfGroups ? 'Prioritzar' : 'Barrejar'}</span>
+                <small>{prioritizeHalfGroups ? 'Mig grup prioritzat' : 'Mig grup barrejat'}</small>
               </button>
               <button
                 onClick={() => {
@@ -9524,7 +9615,7 @@ export function TutoringView() {
                           {selectedCooperativeGroup.members.map((member) => (
                             <article className={`cooperative-detail-member ${member.performanceLevel}`} key={member.student.id}>
                               <div>
-                                <strong>{member.student.name}</strong>
+                                <strong>{formatCooperativeStudentName(member.student.name)}</strong>
                                 <span>{member.halfGroup}</span>
                               </div>
                               <div className="cooperative-member-labels">
@@ -9632,7 +9723,7 @@ export function TutoringView() {
                         <header>
                           <div>
                             <span>Canvi manual pendent</span>
-                            <h4>{cooperativeEditSourceMember.student.name}</h4>
+                            <h4>{formatCooperativeStudentName(cooperativeEditSourceMember.student.name)}</h4>
                             <p>Configura el canvi i revisa’n l’impacte abans de confirmar-lo.</p>
                           </div>
                           <button
@@ -9651,6 +9742,7 @@ export function TutoringView() {
                             <div>
                               <button
                                 className={cooperativeEditDraft.type === 'move' ? 'active' : ''}
+                                disabled={cooperativeEditSourceGroup?.members.length <= 2}
                                 onClick={() =>
                                   setCooperativeEditDraft((current) => ({ ...current, type: 'move' }))
                                 }
@@ -9676,6 +9768,9 @@ export function TutoringView() {
                                 Intercanviar
                               </button>
                             </div>
+                            {cooperativeEditSourceGroup?.members.length <= 2 && (
+                              <small>Cal intercanviar: moure’l deixaria un alumne sol.</small>
+                            )}
                           </fieldset>
 
                           <label>
@@ -9729,7 +9824,7 @@ export function TutoringView() {
                                   )
                                   .map((member) => (
                                     <option key={member.student.id} value={member.student.id}>
-                                      {member.student.name}
+                                      {formatCooperativeStudentName(member.student.name)}
                                     </option>
                                   ))}
                               </select>
@@ -9836,8 +9931,19 @@ export function TutoringView() {
 
                       <div className="cooperative-group-members">
                         {group.members.map((member) => (
-                          <div className="cooperative-member compact" key={member.student.id}>
-                            <strong>{member.student.name}</strong>
+                          <div
+                            className={`cooperative-member compact ${member.performanceLevel}`}
+                            key={member.student.id}
+                          >
+                            <strong>{formatCooperativeStudentName(member.student.name)}</strong>
+                            {member.isStar && (
+                              <Star
+                                aria-label="Alumne estrella"
+                                className="cooperative-member-star"
+                                fill="currentColor"
+                                size={15}
+                              />
+                            )}
                           </div>
                         ))}
                       </div>
@@ -9916,7 +10022,7 @@ export function TutoringView() {
                         <ol>
                           {group.members.map((member) => (
                             <li key={`projection_${group.id}_${member.student.id}`}>
-                              {member.student.name}
+                              {formatCooperativeStudentName(member.student.name)}
                             </li>
                           ))}
                         </ol>
@@ -9932,60 +10038,425 @@ export function TutoringView() {
           </section>
 
           <section
-            className={`tutorial-seating-planner-panel relationship-tool-panel ${
+            className={`tutorial-seating-planner-panel relationship-tool-panel seating-panel-${seatingWorkspacePanel || 'none'} ${
               activeRelationshipTool === 'seating' ? 'active' : ''
             }`}
           >
-            <header>
-              <div>
-                <span className="section-kicker">
-                  <LayoutGrid size={17} />
-                  Disposició d’aula
-                </span>
-                <h2>Proposta de llocs</h2>
-                <p>Matriu editable amb mig grup, relacions i llocs fixats.</p>
-              </div>
-              <div className="tutorial-seating-controls">
-                <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">
-                  <ArrowLeft aria-hidden="true" size={17} />
-                  Tornar a eines
-                </button>
-                <label className="cooperative-toggle-control">
-                  Mig grup
-                  <button
-                    className={seatingPrioritizeHalfGroups ? 'active' : ''}
-                    onClick={handleToggleSeatingHalfGroups}
-                    type="button"
-                  >
-                    {seatingPrioritizeHalfGroups ? 'Prioritzar' : 'Permetre barreja'}
-                  </button>
-                </label>
+            <header className="tutorial-seating-app-header">
+              <div className="tutorial-seating-title">
                 <button
-                  className="secondary-action compact"
-                  onClick={handleGenerateSeatingVariant}
+                  aria-label="Tornar a les eines de tutoria"
+                  className="tutorial-seating-back"
+                  onClick={() => setActiveRelationshipTool('')}
                   type="button"
                 >
-                  <Shuffle size={16} />
-                  Generar proposta
+                  <ArrowLeft aria-hidden="true" size={22} />
                 </button>
-                <label className="wide">
-                  Nom versió
-                  <input
-                    onChange={(event) => setSeatingPlanName(event.target.value)}
-                    placeholder="Ex: inici de curs"
-                    value={seatingPlanName}
-                  />
-                </label>
-                <button className="secondary-action compact" onClick={resetSeatingManualChanges} type="button">
-                  <RotateCcw size={16} />
-                  Netejar canvis
+                <LayoutGrid aria-hidden="true" size={25} />
+                <div>
+                  <span>Mode tutoria</span>
+                  <h2>Disposició d’aula</h2>
+                </div>
+                <button
+                  className={`tutorial-seating-score-chip ${seatingPlanAnalysis.quality.tone}`}
+                  onClick={() => setSeatingWorkspacePanel('diagnostics')}
+                  type="button"
+                >
+                  <strong>{seatingPlanAnalysis.score}/100</strong>
+                  <span>· {seatingPlanAnalysis.conflicts.length} conflicte/s</span>
                 </button>
-                <button className="secondary-action compact" onClick={handleSaveTutorialSeatingPlan} type="button">
-                  <Save size={16} />
-                  Guardar disposició
+              </div>
+              <div className="tutorial-seating-header-actions">
+                <button className="primary" disabled={Boolean(selectedSeatingPlan)} onClick={handleImproveSeatingPlan} type="button">
+                  <TrendingUp aria-hidden="true" size={17} />
+                  Millorar
+                </button>
+                <button
+                  className={seatingWorkspacePanel === 'structure' ? 'active' : ''}
+                  onClick={() => setSeatingWorkspacePanel((current) => (current === 'structure' ? '' : 'structure'))}
+                  type="button"
+                >
+                  <SlidersHorizontal aria-hidden="true" size={17} />
+                  Configurar
+                </button>
+                <button className="save" onClick={() => setSeatingWorkspacePanel('save')} type="button">
+                  <Save aria-hidden="true" size={17} />
+                  Guardar
+                </button>
+                <button onClick={() => setSeatingWorkspacePanel('diagnostics')} type="button">
+                  <BarChart3 aria-hidden="true" size={17} />
+                  Més
                 </button>
               </div>
             </header>
+
+            <nav aria-label="Eines de disposició d’aula" className="tutorial-seating-side-toolbar">
+              <button
+                className={seatingWorkspacePanel === 'structure' ? 'active' : ''}
+                onClick={() => setSeatingWorkspacePanel('structure')}
+                type="button"
+              >
+                <LayoutGrid aria-hidden="true" size={22} />
+                <strong>Estructura</strong>
+                <span>{normalizeSeatingBlocks(seatingLayout.blocks).join(' · ') || 'Clàssica'}</span>
+              </button>
+              <button
+                className={seatingWorkspacePanel === 'objective' ? 'active' : ''}
+                onClick={() => setSeatingWorkspacePanel('objective')}
+                type="button"
+              >
+                <TrendingUp aria-hidden="true" size={22} />
+                <strong>Objectiu</strong>
+                <span>
+                  {SEATING_ITERATION_OBJECTIVES.find((item) => item.id === seatingIterationObjective)?.label}
+                </span>
+              </button>
+              <button
+                className={seatingWorkspacePanel === 'half-groups' ? 'active' : ''}
+                onClick={() => setSeatingWorkspacePanel('half-groups')}
+                type="button"
+              >
+                <UsersRound aria-hidden="true" size={22} />
+                <strong>Mig grup</strong>
+                <span>{seatingPrioritizeHalfGroups ? 'Prioritzar' : 'Barrejar'}</span>
+              </button>
+              <button
+                className={seatingWorkspacePanel === 'restrictions' ? 'active' : ''}
+                onClick={() => setSeatingWorkspacePanel('restrictions')}
+                type="button"
+              >
+                <ShieldAlert aria-hidden="true" size={22} />
+                <strong>Restriccions</strong>
+                <span>{seatingRestrictionCount} actives</span>
+              </button>
+              <button
+                className={seatingWorkspacePanel === 'versions' ? 'active' : ''}
+                onClick={() => setSeatingWorkspacePanel('versions')}
+                type="button"
+              >
+                <History aria-hidden="true" size={22} />
+                <strong>Versions</strong>
+                <span>{classTutorialSeatingPlans.length} guardades</span>
+              </button>
+            </nav>
+
+            {seatingWorkspacePanel && (
+              <aside className="tutorial-seating-config-panel">
+                <header>
+                  <div>
+                    <span>Configuració</span>
+                    <h3>
+                      {seatingWorkspacePanel === 'structure'
+                        ? 'Estructura física de l’aula'
+                        : seatingWorkspacePanel === 'objective'
+                          ? 'Objectiu de la proposta'
+                          : seatingWorkspacePanel === 'half-groups'
+                            ? 'Organització del mig grup'
+                            : seatingWorkspacePanel === 'restrictions'
+                              ? 'Restriccions de l’aula'
+                              : seatingWorkspacePanel === 'versions'
+                                ? 'Versions guardades'
+                                : seatingWorkspacePanel === 'save'
+                                  ? 'Guardar disposició'
+                                  : 'Lectura de la proposta'}
+                    </h3>
+                  </div>
+                  <button aria-label="Tancar configuració" onClick={() => setSeatingWorkspacePanel('')} type="button">
+                    <X aria-hidden="true" size={17} />
+                  </button>
+                </header>
+
+                {seatingWorkspacePanel === 'structure' && (
+                  <div className="tutorial-seating-structure-editor">
+                    <p>Defineix les files i quantes taules individuals hi ha a cada bloc.</p>
+                    <label>
+                      Files
+                      <span className="tutorial-seating-stepper">
+                        <button
+                          aria-label="Treure una fila"
+                          onClick={() =>
+                            setSeatingStructureDraft((current) => ({
+                              ...current,
+                              rows: Math.max(3, current.rows - 1),
+                            }))
+                          }
+                          type="button"
+                        >
+                          −
+                        </button>
+                        <strong>{seatingStructureDraft.rows}</strong>
+                        <button
+                          aria-label="Afegir una fila"
+                          onClick={() =>
+                            setSeatingStructureDraft((current) => ({
+                              ...current,
+                              rows: Math.min(7, current.rows + 1),
+                            }))
+                          }
+                          type="button"
+                        >
+                          +
+                        </button>
+                      </span>
+                    </label>
+                    <fieldset>
+                      <legend>Distribució per blocs</legend>
+                      <div className="tutorial-seating-block-editors">
+                        {seatingStructureDraft.blocks.map((blockSize, index) => (
+                          <label key={`seating_block_${index}`}>
+                            <span>Bloc {index + 1}</span>
+                            <div>
+                              <button
+                                aria-label={`Treure una columna al bloc ${index + 1}`}
+                                onClick={() => updateSeatingStructureBlock(index, blockSize - 1)}
+                                type="button"
+                              >
+                                −
+                              </button>
+                              <strong>{blockSize}</strong>
+                              <button
+                                aria-label={`Afegir una columna al bloc ${index + 1}`}
+                                onClick={() => updateSeatingStructureBlock(index, blockSize + 1)}
+                                type="button"
+                              >
+                                +
+                              </button>
+                              {seatingStructureDraft.blocks.length > 1 && (
+                                <button
+                                  aria-label={`Eliminar el bloc ${index + 1}`}
+                                  className="remove"
+                                  onClick={() =>
+                                    setSeatingStructureDraft((current) => ({
+                                      ...current,
+                                      blocks: current.blocks.filter((_, blockIndex) => blockIndex !== index),
+                                    }))
+                                  }
+                                  type="button"
+                                >
+                                  <X aria-hidden="true" size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      {seatingStructureDraft.blocks.length < 5 && (
+                        <button
+                          className="tutorial-seating-add-block"
+                          onClick={() =>
+                            setSeatingStructureDraft((current) => ({
+                              ...current,
+                              blocks: [...current.blocks, 1],
+                            }))
+                          }
+                          type="button"
+                        >
+                          <Plus aria-hidden="true" size={15} />
+                          Afegir bloc
+                        </button>
+                      )}
+                    </fieldset>
+                    <div className="tutorial-seating-structure-preview" aria-label="Previsualització de l’estructura">
+                      {Array.from({ length: seatingStructureDraft.rows }).map((_, rowIndex) => (
+                        <div key={`preview_row_${rowIndex}`}>
+                          {seatingStructureDraft.blocks.map((blockSize, blockIndex) => (
+                            <span key={`preview_${rowIndex}_${blockIndex}`}>
+                              {Array.from({ length: blockSize }).map((__, columnIndex) => (
+                                <i key={`preview_${rowIndex}_${blockIndex}_${columnIndex}`} />
+                              ))}
+                            </span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <strong className="tutorial-seating-distribution-label">
+                      {seatingStructureDraft.blocks.join(' · ')} · {seatingStructureDraft.rows} files ·{' '}
+                      {seatingStructureDraft.blocks.reduce((sum, size) => sum + size, 0) *
+                        seatingStructureDraft.rows}{' '}
+                      taules
+                    </strong>
+                    <div className="tutorial-seating-structure-presets">
+                      <span>Presets ràpids</span>
+                      <div>
+                        {SEATING_STRUCTURE_PRESETS.map((preset) => (
+                          <button
+                            className={
+                              preset.blocks.join(',') === seatingStructureDraft.blocks.join(',') ? 'active' : ''
+                            }
+                            key={preset.id}
+                            onClick={() => selectSeatingStructurePreset(preset.blocks)}
+                            type="button"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button className="tutorial-seating-apply-structure" onClick={applySeatingStructure} type="button">
+                      Aplicar estructura
+                    </button>
+                    <p className="tutorial-seating-config-note">
+                      Després podràs eliminar o afegir taules individuals clicant directament al plànol.
+                    </p>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'objective' && (
+                  <div className="tutorial-seating-simple-panel">
+                    <label>
+                      Prioritat
+                      <select
+                        disabled={Boolean(selectedSeatingPlan)}
+                        onChange={(event) => setSeatingIterationObjective(event.target.value)}
+                        value={seatingIterationObjective}
+                      >
+                        {SEATING_ITERATION_OBJECTIVES.map((objective) => (
+                          <option key={objective.id} value={objective.id}>
+                            {objective.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p>
+                      {SEATING_ITERATION_OBJECTIVES.find((item) => item.id === seatingIterationObjective)?.description}
+                    </p>
+                    <button onClick={handleGenerateSeatingAlternative} type="button">
+                      <Shuffle aria-hidden="true" size={16} />
+                      Generar alternativa
+                    </button>
+                    <button onClick={handleGenerateSeatingVariant} type="button">
+                      <RefreshCw aria-hidden="true" size={16} />
+                      Regenerar proposta
+                    </button>
+                    <button className="primary" onClick={handleImproveSeatingPlan} type="button">
+                      <TrendingUp aria-hidden="true" size={16} />
+                      Millorar proposta
+                    </button>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'half-groups' && (
+                  <div className="tutorial-seating-simple-panel">
+                    <p>Decideix si els mig grups han de quedar visualment agrupats o es poden barrejar.</p>
+                    <button
+                      className={seatingPrioritizeHalfGroups ? 'primary' : ''}
+                      onClick={handleToggleSeatingHalfGroups}
+                      type="button"
+                    >
+                      <UsersRound aria-hidden="true" size={16} />
+                      {seatingPrioritizeHalfGroups ? 'Prioritzar mig grup' : 'Permetre barreja'}
+                    </button>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'restrictions' && (
+                  <div className="tutorial-seating-simple-panel">
+                    <strong>{seatingRestrictionCount} restriccions actives</strong>
+                    <p>Selecciona un alumne per editar proximitats i zones, o bloqueja una taula lliure.</p>
+                    <button
+                      className={seatingBlockSeatMode ? 'primary' : ''}
+                      disabled={Boolean(selectedSeatingPlan)}
+                      onClick={() => {
+                        setSeatingBlockSeatMode((current) => !current)
+                        setSeatingMoveStudentId('')
+                      }}
+                      type="button"
+                    >
+                      <Ban aria-hidden="true" size={16} />
+                      {seatingBlockSeatMode ? 'Cancel·lar bloqueig' : 'Bloquejar seient'}
+                    </button>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'save' && (
+                  <div className="tutorial-seating-simple-panel">
+                    <label>
+                      Nom de la versió
+                      <input
+                        onChange={(event) => setSeatingPlanName(event.target.value)}
+                        placeholder="Ex: inici de curs"
+                        value={seatingPlanName}
+                      />
+                    </label>
+                    <label>
+                      Observació
+                      <textarea
+                        onChange={(event) => setSeatingPlanObservation(event.target.value)}
+                        placeholder="Què vols recordar d’aquesta disposició?"
+                        rows={4}
+                        value={seatingPlanObservation}
+                      />
+                    </label>
+                    <label className="tutorial-seating-save-active">
+                      <input
+                        checked={seatingSaveAsActive}
+                        onChange={(event) => setSeatingSaveAsActive(event.target.checked)}
+                        type="checkbox"
+                      />
+                      Marcar com a disposició activa
+                    </label>
+                    <button className="primary" onClick={handleSaveTutorialSeatingPlan} type="button">
+                      <Save aria-hidden="true" size={16} />
+                      Guardar versió
+                    </button>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'diagnostics' && (
+                  <div className="tutorial-seating-diagnostics-summary">
+                    <strong>{seatingPlanAnalysis.score}/100 · {seatingPlanAnalysis.quality.label}</strong>
+                    <p>{seatingPlanAnalysis.summary}</p>
+                    <dl>
+                      <div>
+                        <dt>Conflictes</dt>
+                        <dd>{seatingPlanAnalysis.conflicts.length}</dd>
+                      </div>
+                      <div>
+                        <dt>Capacitat</dt>
+                        <dd>{seatingCapacity}/{classStudents.length}</dd>
+                      </div>
+                      <div>
+                        <dt>Fixats</dt>
+                        <dd>{seatingLockedStudentIds.length}</dd>
+                      </div>
+                    </dl>
+                    {seatingPlanAnalysis.conflicts.slice(0, 4).map((conflict, index) => (
+                      <article className={conflict.severity} key={`${conflict.title}_${index}`}>
+                        <AlertTriangle aria-hidden="true" size={15} />
+                        <span>
+                          <strong>{conflict.title}</strong>
+                          <small>{conflict.text}</small>
+                        </span>
+                      </article>
+                    ))}
+                    <button onClick={resetSeatingManualChanges} type="button">
+                      <RotateCcw aria-hidden="true" size={16} />
+                      Netejar canvis manuals
+                    </button>
+                  </div>
+                )}
+
+                {seatingWorkspacePanel === 'versions' && (
+                  <div className="tutorial-seating-versions-compact">
+                    {classTutorialSeatingPlans.length > 0 ? (
+                      classTutorialSeatingPlans.map((plan) => (
+                        <article key={`compact_${plan.id}`}>
+                          <div>
+                            <strong>{plan.title || 'Disposició guardada'}</strong>
+                            <small>{plan.qualitySnapshot?.score ?? '—'}/100</small>
+                          </div>
+                          <button onClick={() => handleLoadTutorialSeatingPlan(plan)} type="button">
+                            Carregar
+                          </button>
+                        </article>
+                      ))
+                    ) : (
+                      <p>Encara no hi ha cap versió guardada.</p>
+                    )}
+                  </div>
+                )}
+              </aside>
+            )}
 
             <div className="tutorial-seating-matrix-help compact">
               <article className="tutorial-seating-capacity">
@@ -10500,17 +10971,28 @@ export function TutoringView() {
             )}
 
             <div className={`tutorial-seating-workspace ${selectedSeatingProfile ? 'has-panel' : ''}`}>
-              <div
-                className={`tutorial-seating-board-grid ${seatingMoveStudentId ? 'move-mode' : ''} ${
-                  seatingBlockSeatMode ? 'block-mode' : ''
-                }`}
-              >
-                {visibleSeatingPlan.seats.map((seat) => {
+              <div className="tutorial-seating-classroom">
+                <div className="tutorial-seating-classroom-front">
+                  <span>Pissarra</span>
+                  <strong>Taula docent</strong>
+                </div>
+                <div
+                  className={`tutorial-seating-board-grid ${seatingMoveStudentId ? 'move-mode' : ''} ${
+                    seatingBlockSeatMode ? 'block-mode' : ''
+                  }`}
+                  style={{
+                    '--seating-columns': visibleSeatingPlan.columns,
+                    gridTemplateColumns: `repeat(${visibleSeatingPlan.columns}, minmax(88px, 1fr))`,
+                  }}
+                >
+                  {visibleSeatingPlan.seats.map((seat) => {
                   const placement = visibleSeatingPlan.placements.find((item) => item.seat.id === seat.id)
                   const isManualEmpty = seatingManualEmptySeatIds.includes(seat.id)
                   const isLocked = Boolean(placement?.isLocked || seatingLockedStudentIds.includes(placement?.studentId))
                   const isSelected = placement?.studentId === selectedSeatingStudentId
                   const isBlocked = visibleSeatingRestrictions.blockedSeatIds?.includes(seat.id)
+                  const isBlockStart = visibleSeatingBlockStarts.includes(seat.x)
+                  const blockPosition = getSeatingBlockPosition(visibleSeatingPlan.layout, seat.x)
                   return (
                     <div
                       aria-pressed={isSelected}
@@ -10522,7 +11004,7 @@ export function TutoringView() {
                         isLocked ? 'locked' : ''
                       } ${isBlocked ? 'blocked-seat' : ''} ${isSelected ? 'selected' : ''} ${
                         draggingSeatingStudentId || seatingMoveStudentId ? 'drop-ready' : ''
-                      }`}
+                      } ${isBlockStart ? 'block-start' : ''}`}
                       draggable={Boolean(placement && !selectedSeatingPlan && !isLocked && !isBlocked)}
                       key={seat.id}
                       onClick={() => handleSeatingSeatClick(seat, placement)}
@@ -10538,6 +11020,7 @@ export function TutoringView() {
                         handleSeatingSeatClick(seat, placement)
                       }}
                       role="button"
+                      style={{ '--seat-block': blockPosition.block + 1 }}
                       tabIndex={0}
                       title={
                         seatingBlockSeatMode
@@ -10646,7 +11129,8 @@ export function TutoringView() {
                       )}
                     </div>
                   )
-                })}
+                  })}
+                </div>
               </div>
 
               {selectedSeatingProfile && (

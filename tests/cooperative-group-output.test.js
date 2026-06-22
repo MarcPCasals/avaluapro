@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   buildStudentCooperativeGroupText,
   buildTeacherCooperativeGroupText,
+  formatCooperativeStudentName,
 } from '../src/features/tutoring/cooperativeGroupOutputUtils.js'
 
 const groups = [
@@ -21,6 +22,13 @@ const groups = [
 ]
 
 describe('sortides de grups cooperatius', () => {
+  it('mostra primer el nom i després els cognoms', () => {
+    assert.equal(
+      formatCooperativeStudentName('Chamorro De La Cruz, Joao'),
+      'Joao Chamorro De La Cruz',
+    )
+  })
+
   it('la còpia per alumnat només inclou noms i grups', () => {
     const text = buildStudentCooperativeGroupText(groups, { title: 'Laboratori' })
 

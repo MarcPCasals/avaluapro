@@ -405,6 +405,49 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
     })
   }
 
+  function redistributeSingletonCooperativeGroups(groups, relations, strategy, groupSize) {
+    const nextGroups = groups.map((group) => ({ ...group, members: [...group.members] }))
+    const singletonGroups = nextGroups.filter((group) => group.members.length === 1)
+
+    singletonGroups.forEach((singletonGroup) => {
+      if (!nextGroups.includes(singletonGroup) || singletonGroup.members.length !== 1) return
+
+      const candidate = singletonGroup.members[0]
+      const targetGroup = nextGroups
+        .filter((group) => group !== singletonGroup && group.members.length > 0)
+        .map((group) => ({
+          group,
+          sameHalfGroup: group.members.some((member) => member.halfGroup === candidate.halfGroup),
+          score: getCooperativePlacementScore({
+            candidate,
+            group,
+            groupSize: groupSize + 1,
+            prioritizeHalfGroups: false,
+            relations,
+            strategy,
+          }),
+        }))
+        .sort(
+          (a, b) =>
+            Number(b.sameHalfGroup) - Number(a.sameHalfGroup) ||
+            a.score - b.score ||
+            a.group.members.length - b.group.members.length,
+        )[0]?.group
+
+      if (!targetGroup) return
+      targetGroup.members.push(candidate)
+      nextGroups.splice(nextGroups.indexOf(singletonGroup), 1)
+    })
+
+    return nextGroups.map((group, index) => ({
+      ...group,
+      id: `group_${index + 1}`,
+      name: group.halfGroupName
+        ? `Grup ${index + 1} · ${group.halfGroupName}`
+        : `Grup ${index + 1}`,
+    }))
+  }
+
   function moveCooperativeMemberToGroup(groups, studentId, targetGroupId, relations) {
     if (!studentId || !targetGroupId) return groups
     let movingMember = null
@@ -607,7 +650,15 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
         halfGroupGroups.push(...localGroups)
       })
 
-      return enrichCooperativeGroups(halfGroupGroups, relations)
+      return enrichCooperativeGroups(
+        redistributeSingletonCooperativeGroups(
+          halfGroupGroups,
+          relations,
+          strategy,
+          cleanGroupSize,
+        ),
+        relations,
+      )
     }
 
     const groupCount = Math.max(1, Math.ceil(students.length / cleanGroupSize))
@@ -636,7 +687,10 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
       bestGroup?.members.push(student)
     })
 
-    return enrichCooperativeGroups(groups, relations)
+    return enrichCooperativeGroups(
+      redistributeSingletonCooperativeGroups(groups, relations, strategy, cleanGroupSize),
+      relations,
+    )
   }
 
   function analyzeTutorialSeatingPlan({ plan, relations, restrictions = {}, getSeatDistance }) {

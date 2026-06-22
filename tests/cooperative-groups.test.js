@@ -51,6 +51,33 @@ function createMember({
 }
 
 describe('anàlisi explicable de grups cooperatius', () => {
+  it('redistribueix el grup sobrant perquè mai quedi un alumne sol', () => {
+    const profiles = Array.from({ length: 9 }, (_, index) =>
+      createProfile({
+        averageScore: 1.8 + (index % 4) * 0.5,
+        id: `student-${index + 1}`,
+        name: `Alumne ${index + 1}`,
+      }),
+    )
+    const groups = helpers.buildCooperativeGroups({
+      groupSize: 4,
+      prioritizeHalfGroups: true,
+      profiles,
+      recordRowsByStudent: new Map(),
+      relationRowsByStudent: new Map(),
+      relations: [],
+      roleRowsByStudent: new Map(),
+      sociometricRowsByStudentId: new Map(),
+      strategy: 'balanced',
+    })
+
+    assert.equal(
+      groups.reduce((total, group) => total + group.members.length, 0),
+      9,
+    )
+    assert.ok(groups.every((group) => group.members.length !== 1))
+  })
+
   it('tradueix el perfil calculat a etiquetes pedagògiques', () => {
     const result = helpers.buildStudentCooperativeProfile({
       profile: createProfile({

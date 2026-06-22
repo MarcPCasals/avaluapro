@@ -1,7 +1,16 @@
+export function formatCooperativeStudentName(name) {
+  const cleanName = String(name || '').trim()
+  if (!cleanName.includes(',')) return cleanName
+
+  const [surnames, ...givenNameParts] = cleanName.split(',')
+  const givenName = givenNameParts.join(',').trim()
+  return [givenName, surnames.trim()].filter(Boolean).join(' ')
+}
+
 function getGroupMemberNames(group) {
   return (group?.members || [])
     .map((member) => member?.student?.name || member?.name || '')
-    .map((name) => String(name || '').trim())
+    .map(formatCooperativeStudentName)
     .filter(Boolean)
 }
 
