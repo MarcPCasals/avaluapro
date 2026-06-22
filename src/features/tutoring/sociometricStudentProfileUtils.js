@@ -1,10 +1,10 @@
 const DEFAULT_READING_BY_CATEGORY = {
   Acceptat: 'No presenta senyals de rebuig destacat, però tampoc concentra molta afinitat explícita.',
   Aïllat: 'Queda poc connectat al mapa social; convé crear vincles segurs i observables.',
-  Controvertit: 'Combina acceptació i rebuig; pot influir en el grup però necessita context i seguiment.',
+  Controvertit: 'Combina força acceptació i rebuig; és un perfil polaritzat que necessita lectura fina.',
   Líder: 'Rep eleccions positives i pot actuar com a suport social si es gestiona amb discreció.',
   Promig: 'Mostra una integració general adequada i sense senyals sociomètriques extremes.',
-  Rebutjat: 'Rep rebuigs significatius; cal contrastar la situació abans de prendre decisions de grup.',
+  Rebutjat: 'Rep més rebuigs que suport positiu; cal contrastar la situació abans de prendre decisions de grup.',
 }
 
 const TEACHER_OBSERVATION_RELATION_SOURCE = 'teacher-observation'
@@ -14,9 +14,37 @@ export const SOCIOMETRIC_CATEGORY_META = {
   Líder: { id: 'leader', label: 'Líder', tone: 'green', description: 'Molta elecció positiva i poc rebuig.' },
   Promig: { id: 'average', label: 'Promig', tone: 'blue', description: 'Bona acceptació general i relació fluida amb el grup.' },
   Acceptat: { id: 'accepted', label: 'Acceptat', tone: 'cyan', description: 'Poca afinitat explícita, però sense rebuig significatiu.' },
-  Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'violet', description: 'Rep eleccions positives i rebuigs.' },
+  Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'orange', description: 'Rep eleccions positives i també rebuigs; perfil polaritzat.' },
   Aïllat: { id: 'isolated', label: 'Aïllat', tone: 'gray', description: 'Poques connexions registrades.' },
-  Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep força rebuigs i poques eleccions.' },
+  Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep rebuigs alts i el balanç social és clarament negatiu.' },
+}
+
+function getSociometricCategory({
+  avoidReceived,
+  p15,
+  p40,
+  p60Avoid,
+  p75Avoid,
+  p85,
+  positiveGiven,
+  positiveReceived,
+}) {
+  const highPositive = positiveReceived >= Math.max(1, p40)
+  const veryHighPositive = positiveReceived >= Math.max(1, p85)
+  const moderateAvoid = avoidReceived >= Math.max(1, p60Avoid)
+  const highAvoid = avoidReceived >= Math.max(1, p75Avoid)
+  const lowPositive = positiveReceived <= p15
+  const positiveBalance = positiveReceived - avoidReceived
+  const clearlyRejected = highAvoid && (positiveReceived === 0 || positiveBalance <= -1 || (lowPositive && avoidReceived >= 2))
+
+  if (veryHighPositive && avoidReceived <= p60Avoid) return 'Líder'
+  if (highAvoid && highPositive && positiveBalance >= 0) return 'Controvertit'
+  if (highAvoid && highPositive && positiveReceived >= Math.max(1, avoidReceived - 1)) return 'Controvertit'
+  if (clearlyRejected) return 'Rebutjat'
+  if (highPositive && moderateAvoid) return 'Controvertit'
+  if (lowPositive && positiveGiven <= 1 && avoidReceived <= p60Avoid) return 'Aïllat'
+  if (highPositive && avoidReceived <= p60Avoid) return 'Promig'
+  return 'Acceptat'
 }
 
 function getRelationPedagogicalWeight(relation) {
@@ -117,12 +145,16 @@ function buildSociometricRows(students, relations, categoryMetaByName = SOCIOMET
 
   return rows.map((row) => {
     const { avoidGiven, avoidReceived, positiveGiven, positiveReceived, student } = row
-    let category = 'Acceptat'
-    if (avoidReceived > 0 && avoidReceived >= Math.max(1, p75Avoid)) category = 'Rebutjat'
-    else if (positiveReceived >= Math.max(1, p85) && avoidReceived <= p60Avoid) category = 'Líder'
-    else if (positiveReceived >= Math.max(1, p40) && avoidReceived >= Math.max(1, p60Avoid)) category = 'Controvertit'
-    else if (positiveReceived <= p15 && positiveGiven <= 1 && avoidReceived <= p60Avoid) category = 'Aïllat'
-    else if (positiveReceived >= Math.max(1, p40) && avoidReceived <= p60Avoid) category = 'Promig'
+    const category = getSociometricCategory({
+      avoidReceived,
+      p15,
+      p40,
+      p60Avoid,
+      p75Avoid,
+      p85,
+      positiveGiven,
+      positiveReceived,
+    })
 
     const categoryMeta = categoryMetaByName[category] || categoryMetaByName.Promig
     const nodeSizeClass =

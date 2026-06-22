@@ -135,6 +135,32 @@ const SOCIOGRAM_FILTERS = [
   { id: 'work', label: 'Treball' },
   { id: 'avoid', label: 'Rebuig' },
 ]
+const SOCIOMETRIC_STAT_DRILLDOWN_META = {
+  avoidGiven: {
+    emptyLabel: 'No ha registrat cap rebuig.',
+    label: 'Rebuigs fets',
+    relationType: 'avoid',
+    tone: 'red',
+  },
+  avoidReceived: {
+    emptyLabel: 'No ha rebut cap rebuig registrat.',
+    label: 'Rebuigs rebuts',
+    relationType: 'avoid',
+    tone: 'red',
+  },
+  positiveGiven: {
+    emptyLabel: 'No ha fet cap elecció social.',
+    label: 'Eleccions fetes',
+    relationType: 'friendship',
+    tone: 'green',
+  },
+  positiveReceived: {
+    emptyLabel: 'No ha rebut cap elecció social.',
+    label: 'Eleccions rebudes',
+    relationType: 'friendship',
+    tone: 'green',
+  },
+}
 const SOCIOMETRIC_REPORT_TYPES = [
   {
     id: 'quick',
@@ -239,9 +265,9 @@ const SOCIOMETRIC_CATEGORY_META = {
   Líder: { id: 'leader', label: 'Líder', tone: 'green', description: 'Molta elecció positiva i poc rebuig.' },
   Promig: { id: 'average', label: 'Promig', tone: 'blue', description: 'Bona acceptació general i relació fluida amb el grup.' },
   Acceptat: { id: 'accepted', label: 'Acceptat', tone: 'cyan', description: 'Poca afinitat explícita, però sense rebuig significatiu.' },
-  Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'violet', description: 'Rep eleccions positives i rebuigs.' },
+  Controvertit: { id: 'controversial', label: 'Controvertit', tone: 'orange', description: 'Rep eleccions positives i també rebuigs; perfil polaritzat.' },
   Aïllat: { id: 'isolated', label: 'Aïllat', tone: 'gray', description: 'Poques connexions registrades.' },
-  Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep força rebuigs i poques eleccions.' },
+  Rebutjat: { id: 'rejected', label: 'Rebutjat', tone: 'red', description: 'Rep rebuigs alts i el balanç social és clarament negatiu.' },
 }
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
@@ -294,6 +320,109 @@ function isSociometricSocialRelation(relation) {
     relation?.source === SOCIOMETRIC_PUBLIC_FORM_SOURCE ||
     relation?.source === 'sociometric-questionnaire'
   )
+}
+
+function buildSociometricStatDrilldownItems({ relationKey, relations, studentId }) {
+  const meta = SOCIOMETRIC_STAT_DRILLDOWN_META[relationKey]
+  if (!meta || !studentId) return []
+
+  const isOutgoing = relationKey === 'positiveGiven' || relationKey === 'avoidGiven'
+  const relevantRelations = (relations || []).filter((relation) => {
+    if (meta.relationType === 'avoid' && !isSociometricSocialRelation(relation)) return false
+    if (relation.type !== meta.relationType) return false
+    return isOutgoing ? relation.sourceStudentId === studentId : relation.targetStudentId === studentId
+  })
+
+  const itemsByStudentId = new Map()
+
+  relevantRelations.forEach((relation) => {
+    const counterpart = isOutgoing ? relation.targetStudent : relation.sourceStudent
+    const counterpartId = isOutgoing ? relation.targetStudentId : relation.sourceStudentId
+    if (!counterpart || !counterpartId) return
+
+    const current = itemsByStudentId.get(counterpartId) || {
+      id: counterpartId,
+      name: counterpart.name,
+      relationCount: 0,
+      sources: new Set(),
+      weight: 0,
+    }
+
+    current.relationCount += 1
+    current.weight += getRelationPedagogicalWeight(relation)
+    current.sources.add(relation.source || TEACHER_OBSERVATION_RELATION_SOURCE)
+    itemsByStudentId.set(counterpartId, current)
+  })
+
+  return [...itemsByStudentId.values()]
+    .map((item) => ({
+      ...item,
+      sources: [...item.sources],
+    }))
+    .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name, 'ca'))
+}
+
+function getSociometricCategory({
+  avoidReceived,
+  p15,
+  p40,
+  p60Avoid,
+  p75Avoid,
+  p85,
+  positiveGiven,
+  positiveReceived,
+}) {
+  const highPositive = positiveReceived >= Math.max(1, p40)
+  const veryHighPositive = positiveReceived >= Math.max(1, p85)
+  const moderateAvoid = avoidReceived >= Math.max(1, p60Avoid)
+  const highAvoid = avoidReceived >= Math.max(1, p75Avoid)
+  const lowPositive = positiveReceived <= p15
+  const positiveBalance = positiveReceived - avoidReceived
+  const clearlyRejected = highAvoid && (positiveReceived === 0 || positiveBalance <= -1 || (lowPositive && avoidReceived >= 2))
+
+  if (veryHighPositive && avoidReceived <= p60Avoid) return 'Líder'
+  if (highAvoid && highPositive && positiveBalance >= 0) return 'Controvertit'
+  if (highAvoid && highPositive && positiveReceived >= Math.max(1, avoidReceived - 1)) return 'Controvertit'
+  if (clearlyRejected) return 'Rebutjat'
+  if (highPositive && moderateAvoid) return 'Controvertit'
+  if (lowPositive && positiveGiven <= 1 && avoidReceived <= p60Avoid) return 'Aïllat'
+  if (highPositive && avoidReceived <= p60Avoid) return 'Promig'
+  return 'Acceptat'
+}
+
+function getSociometricCategoryExplanation(row) {
+  if (!row) return ''
+
+  const positiveReceived = row.positiveReceived || 0
+  const avoidReceived = row.avoidReceived || 0
+  const positiveGiven = row.positiveGiven || 0
+  const balance = positiveReceived - avoidReceived
+
+  if (row.category === 'Líder') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es i només ${avoidReceived} rebuig/s. És un perfil molt acceptat dins del grup.`
+  }
+
+  if (row.category === 'Promig') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es i ${avoidReceived} rebuig/s. El balanç és positiu i la seva integració general és bona.`
+  }
+
+  if (row.category === 'Acceptat') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es i ${avoidReceived} rebuig/s. No destaca molt per afinitat explícita, però tampoc per tensió social.`
+  }
+
+  if (row.category === 'Controvertit') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es i ${avoidReceived} rebuig/s. Hi ha suport social, però també tensió; per això és un perfil polaritzat i no un rebuig clar.`
+  }
+
+  if (row.category === 'Aïllat') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es, ${avoidReceived} rebuig/s i només ${positiveGiven} elecció/ns feta/es. Hi ha poques connexions visibles al mapa social.`
+  }
+
+  if (row.category === 'Rebutjat') {
+    return `Té ${positiveReceived} elecció/ns rebuda/es i ${avoidReceived} rebuig/s. El balanç social és ${balance} i el pes del rebuig supera el suport positiu.`
+  }
+
+  return row.categoryMeta?.description || ''
 }
 
 function getSociogramRelationContext(relation) {
@@ -1262,12 +1391,16 @@ function summarizeSociometricMetrics({ relations, students }) {
 
   const classifiedRows = rows.map((row) => {
     const { avoidGiven, avoidReceived, positiveGiven, positiveReceived, student } = row
-    let category = 'Acceptat'
-    if (avoidReceived > 0 && avoidReceived >= Math.max(1, p75Avoid)) category = 'Rebutjat'
-    else if (positiveReceived >= Math.max(1, p85) && avoidReceived <= p60Avoid) category = 'Líder'
-    else if (positiveReceived >= Math.max(1, p40) && avoidReceived >= Math.max(1, p60Avoid)) category = 'Controvertit'
-    else if (positiveReceived <= p15 && positiveGiven <= 1 && avoidReceived <= p60Avoid) category = 'Aïllat'
-    else if (positiveReceived >= Math.max(1, p40) && avoidReceived <= p60Avoid) category = 'Promig'
+    const category = getSociometricCategory({
+      avoidReceived,
+      p15,
+      p40,
+      p60Avoid,
+      p75Avoid,
+      p85,
+      positiveGiven,
+      positiveReceived,
+    })
 
     const categoryMeta = SOCIOMETRIC_CATEGORY_META[category] || SOCIOMETRIC_CATEGORY_META.Promig
     const nodeSizeClass = positiveReceived >= Math.max(1, p85) ? 'node-large' : positiveReceived >= Math.max(1, p40) ? 'node-medium' : 'node-small'
@@ -1665,18 +1798,19 @@ function getSociogramRingDefinitions(sociometricRows) {
     sociometricRows.some((row) => (row.categoryMeta?.id || 'average') === categoryId),
   )
   const radiusByCategory = {
-    accepted: 31,
-    average: 18,
-    controversial: 38,
-    isolated: 44,
-    leader: 7,
-    rejected: 49,
+    accepted: { x: 31, y: 22 },
+    average: { x: 20, y: 14 },
+    controversial: { x: 39, y: 29 },
+    isolated: { x: 46, y: 34 },
+    leader: { x: 10, y: 7 },
+    rejected: { x: 49, y: 38 },
   }
 
   return occupied.map((categoryId) => ({
     categoryId,
     label: labels[categoryId] || categoryId,
-    radius: occupied.length <= 1 ? 0 : radiusByCategory[categoryId] || 36,
+    xRadius: occupied.length <= 1 ? 0 : radiusByCategory[categoryId]?.x || 36,
+    yRadius: occupied.length <= 1 ? 0 : radiusByCategory[categoryId]?.y || 26,
   }))
 }
 
@@ -1764,13 +1898,20 @@ function buildRadialSociogramNodes({ positionsByStudentId, relations, roleRowsBy
         (sociometricRow?.avoidReceived || 0) === 0 &&
         (sociometricRow?.avoidGiven || 0) === 0
       const reservedOffset = isFullyIsolated ? 0.68 : 0
+      const ringPhase = getStableUnitInterval(`${ring.categoryId}_${total}`) * 0.38
+      const laneSpread =
+        total >= 10 ? 3.2 : total >= 7 ? 2.4 : total >= 5 ? 1.6 : total >= 3 ? 0.9 : 0
+      const laneDirection = total > 1 ? (index % 2 === 0 ? -1 : 1) : 0
+      const laneOffsetX = laneDirection * laneSpread
+      const laneOffsetY = laneDirection * Math.max(0.6, laneSpread * 0.72)
       const angle =
         -Math.PI / 2 +
         reservedOffset * Math.PI +
+        ringPhase +
         ((index + getStableUnitInterval(student.id) * 0.2) / Math.max(1, total)) * Math.PI * 2
       const fallback = {
-        x: 50 + Math.cos(angle) * ring.radius,
-        y: 50 + Math.sin(angle) * ring.radius * 0.86,
+        x: 50 + Math.cos(angle) * (ring.xRadius + laneOffsetX),
+        y: 50 + Math.sin(angle) * (ring.yRadius + laneOffsetY),
       }
 
       nodes.push({
@@ -1814,6 +1955,22 @@ function buildTutorialSociogramMap({
     if (filter === 'avoid') return getRelationCategory(relation.type) === 'avoid'
     return true
   })
+  const selectedRelationMetaByStudentId = new Map()
+  filteredRelations.forEach((relation) => {
+    if (relation.sourceStudentId !== selectedId && relation.targetStudentId !== selectedId) return
+    const counterpartId = relation.sourceStudentId === selectedId ? relation.targetStudentId : relation.sourceStudentId
+    const current = selectedRelationMetaByStudentId.get(counterpartId) || {
+      avoid: false,
+      incoming: 0,
+      outgoing: 0,
+      support: false,
+    }
+    if (relation.sourceStudentId === selectedId) current.outgoing += 1
+    if (relation.targetStudentId === selectedId) current.incoming += 1
+    if (relation.type === 'avoid') current.avoid = true
+    if (relation.type === 'friendship' || relation.type === 'positive') current.support = true
+    selectedRelationMetaByStudentId.set(counterpartId, current)
+  })
   const selectedRelationStudentIds = new Set(
     filteredRelations
       .filter((relation) => relation.sourceStudentId === selectedId || relation.targetStudentId === selectedId)
@@ -1831,6 +1988,8 @@ function buildTutorialSociogramMap({
   const normalizedNodes = nodes.map((node) => ({
     ...node,
     isDimmed: Boolean(selectedId) && node.id !== selectedId && !selectedRelationStudentIds.has(node.id),
+    isDirectAvoid: Boolean(selectedRelationMetaByStudentId.get(node.id)?.avoid),
+    isDirectSupport: Boolean(selectedRelationMetaByStudentId.get(node.id)?.support),
     isRelated: selectedRelationStudentIds.has(node.id),
     isSelected: node.id === selectedId,
   }))
@@ -1847,6 +2006,12 @@ function buildTutorialSociogramMap({
         ...relation,
         category: getRelationCategory(relation.type),
         context: getSociogramRelationContext(relation),
+        direction:
+          relation.sourceStudentId === selectedId
+            ? 'outgoing'
+            : relation.targetStudentId === selectedId
+              ? 'incoming'
+              : 'neutral',
         isSelectedLink: relation.sourceStudentId === selectedId || relation.targetStudentId === selectedId,
         reciprocal: isSociogramReciprocalRelation(relation, validRelations),
         source,
@@ -3856,6 +4021,7 @@ export function TutoringView() {
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
+  const [selectedSociometricStatKey, setSelectedSociometricStatKey] = useState('')
   const [sociometricPasteText, setSociometricPasteText] = useState('')
   const [sociometricImportMessage, setSociometricImportMessage] = useState('')
   const [sociometricSurveyMessage, setSociometricSurveyMessage] = useState('')
@@ -4066,6 +4232,8 @@ export function TutoringView() {
       ]),
     [savedSociogramPositionsByStudentId, sociogramDraftPositions],
   )
+  const sociogramManualPositionCount = sociogramPositionsByStudentId.size
+  const hasManualSociogramLayout = sociogramManualPositionCount > 0
   const subjectOptions = useMemo(() => getSubjectOptionsForArea(areaFilter), [areaFilter])
   const allSubjectOptions = useMemo(() => getAllTutorialSubjectOptions(), [])
   const diagnosisSubjectOptions = useMemo(() => getSubjectOptionsForArea(diagnosisAreaFilter), [diagnosisAreaFilter])
@@ -4695,6 +4863,21 @@ export function TutoringView() {
   const selectedSociometricRow = selectedRelationRow
     ? sociometricRowsByStudentId.get(selectedRelationRow.student.id)
     : null
+  const selectedSociogramPositionIsManual = Boolean(
+    selectedSociometricRow && sociogramPositionsByStudentId.has(selectedSociometricRow.student.id),
+  )
+  const selectedSociometricDrilldownMeta = selectedSociometricStatKey
+    ? SOCIOMETRIC_STAT_DRILLDOWN_META[selectedSociometricStatKey] || null
+    : null
+  const selectedSociometricDrilldownItems = useMemo(
+    () =>
+      buildSociometricStatDrilldownItems({
+        relationKey: selectedSociometricStatKey,
+        relations: tutorialRelationSummary.enrichedRelations,
+        studentId: selectedSociometricRow?.student.id,
+      }),
+    [selectedSociometricRow?.student.id, selectedSociometricStatKey, tutorialRelationSummary.enrichedRelations],
+  )
   const tutorialSociogramMap = useMemo(
     () =>
       buildTutorialSociogramMap({
@@ -8498,6 +8681,19 @@ export function TutoringView() {
               </article>
             </div>
 
+            {hasManualSociogramLayout && (
+              <div className="tutorial-sociogram-warning">
+                <AlertTriangle size={18} />
+                <div>
+                  <strong>Mapa ajustat manualment</strong>
+                  <p>
+                    Hi ha {sociogramManualPositionCount} alumne/s amb posició guardada manualment. La ubicació visual
+                    pot no coincidir exactament amb la disposició radial automàtica per categories.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {classStudents.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes a la tutoria per veure el sociograma.</div>
             ) : (
@@ -8545,8 +8741,8 @@ export function TutoringView() {
                       cx="50"
                       cy="50"
                       key={ring.categoryId}
-                      rx={ring.radius}
-                      ry={ring.radius * 0.86}
+                      rx={ring.xRadius}
+                      ry={ring.yRadius}
                     >
                       <title>{ring.label}</title>
                     </ellipse>
@@ -8557,18 +8753,20 @@ export function TutoringView() {
                       key={`${ring.categoryId}_label`}
                       textAnchor="middle"
                       x="50"
-                      y={Math.max(6, 50 - ring.radius * 0.86 - 1.8)}
+                      y={Math.max(6, 50 - ring.yRadius - 1.8)}
                     >
                       {ring.label}
                     </text>
                   ))}
                   {tutorialSociogramMap.links.map((link) => (
                     <line
-                      className={`tutorial-sociogram-link ${link.typeMeta.tone} ${link.context} ${
-                        link.reciprocal ? 'reciprocal' : ''
-                      } ${
-                        link.isSelectedLink ? 'selected' : 'muted'
-                      }`}
+                        className={`tutorial-sociogram-link ${link.typeMeta.tone} ${link.context} ${
+                          link.reciprocal ? 'reciprocal' : ''
+                        } ${
+                          link.isSelectedLink ? 'selected' : 'muted'
+                        } ${link.direction} ${
+                          link.category === 'avoid' ? 'relation-avoid' : 'relation-support'
+                        }`}
                       key={link.id}
                       markerEnd={`url(#sociogram-arrow-${
                         link.context === 'social' ? 'green' : link.context === 'work' ? 'blue' : 'red'
@@ -8598,7 +8796,9 @@ export function TutoringView() {
                           node.isSelected ? 'selected' : ''
                         } ${node.isRelated ? 'related' : ''} ${node.isDimmed ? 'dimmed' : ''} ${
                           node.avoidCount > 0 ? 'has-avoid' : ''
-                        } ${node.isStar ? 'is-star' : ''} ${node.isConflict ? 'is-conflict' : ''}`}
+                        } ${node.isStar ? 'is-star' : ''} ${node.isConflict ? 'is-conflict' : ''} ${
+                          node.isDirectAvoid ? 'direct-avoid' : ''
+                        } ${node.isDirectSupport ? 'direct-support' : ''}`}
                         key={node.id}
                         onClick={() => setSelectedRelationStudentId(node.id)}
                         onPointerCancel={(event) => handleSociogramPointerUp(event, node)}
@@ -8625,25 +8825,132 @@ export function TutoringView() {
                   </span>
                   <h3>{selectedSociometricRow.student.name}</h3>
                   <p>{selectedSociometricRow.categoryMeta.description}</p>
+                  <p className="tutorial-sociogram-category-reading">
+                    {getSociometricCategoryExplanation(selectedSociometricRow)}
+                  </p>
+                  {selectedSociogramPositionIsManual && (
+                    <p className="tutorial-sociogram-position-note">
+                      La posició d’aquest alumne està ajustada manualment i pot no coincidir amb la seva anella automàtica.
+                    </p>
+                  )}
                 </div>
                 <dl>
                   <div>
                     <dt>Eleccions rebudes</dt>
-                    <dd>{selectedSociometricRow.positiveReceived}</dd>
+                    <dd>
+                      <button
+                        aria-expanded={selectedSociometricStatKey === 'positiveReceived'}
+                        className={`sociogram-stat-button ${
+                          selectedSociometricStatKey === 'positiveReceived' ? 'active tone-green' : ''
+                        }`}
+                        onClick={() =>
+                          setSelectedSociometricStatKey((current) =>
+                            current === 'positiveReceived' ? '' : 'positiveReceived',
+                          )
+                        }
+                        type="button"
+                      >
+                        {selectedSociometricRow.positiveReceived}
+                      </button>
+                    </dd>
                   </div>
                   <div>
                     <dt>Eleccions fetes</dt>
-                    <dd>{selectedSociometricRow.positiveGiven}</dd>
+                    <dd>
+                      <button
+                        aria-expanded={selectedSociometricStatKey === 'positiveGiven'}
+                        className={`sociogram-stat-button ${
+                          selectedSociometricStatKey === 'positiveGiven' ? 'active tone-green' : ''
+                        }`}
+                        onClick={() =>
+                          setSelectedSociometricStatKey((current) =>
+                            current === 'positiveGiven' ? '' : 'positiveGiven',
+                          )
+                        }
+                        type="button"
+                      >
+                        {selectedSociometricRow.positiveGiven}
+                      </button>
+                    </dd>
                   </div>
                   <div>
                     <dt>Rebuigs rebuts</dt>
-                    <dd>{selectedSociometricRow.avoidReceived}</dd>
+                    <dd>
+                      <button
+                        aria-expanded={selectedSociometricStatKey === 'avoidReceived'}
+                        className={`sociogram-stat-button ${
+                          selectedSociometricStatKey === 'avoidReceived' ? 'active tone-red' : ''
+                        }`}
+                        onClick={() =>
+                          setSelectedSociometricStatKey((current) =>
+                            current === 'avoidReceived' ? '' : 'avoidReceived',
+                          )
+                        }
+                        type="button"
+                      >
+                        {selectedSociometricRow.avoidReceived}
+                      </button>
+                    </dd>
                   </div>
                   <div>
                     <dt>Rebuigs fets</dt>
-                    <dd>{selectedSociometricRow.avoidGiven}</dd>
+                    <dd>
+                      <button
+                        aria-expanded={selectedSociometricStatKey === 'avoidGiven'}
+                        className={`sociogram-stat-button ${
+                          selectedSociometricStatKey === 'avoidGiven' ? 'active tone-red' : ''
+                        }`}
+                        onClick={() =>
+                          setSelectedSociometricStatKey((current) => (current === 'avoidGiven' ? '' : 'avoidGiven'))
+                        }
+                        type="button"
+                      >
+                        {selectedSociometricRow.avoidGiven}
+                      </button>
+                    </dd>
                   </div>
                 </dl>
+                {selectedSociometricDrilldownMeta && (
+                  <section className={`tutorial-sociogram-drilldown ${selectedSociometricDrilldownMeta.tone}`}>
+                    <header>
+                      <div>
+                        <strong>{selectedSociometricDrilldownMeta.label}</strong>
+                        <span>
+                          {selectedSociometricDrilldownItems.length} alumne/s implicat/s · pes total{' '}
+                          {selectedSociometricRow[selectedSociometricStatKey] || 0}
+                        </span>
+                      </div>
+                      <button
+                        aria-label="Tancar detall"
+                        className="icon-button subtle"
+                        onClick={() => setSelectedSociometricStatKey('')}
+                        type="button"
+                      >
+                        <X aria-hidden="true" size={16} />
+                      </button>
+                    </header>
+                    {selectedSociometricDrilldownItems.length > 0 ? (
+                      <div className="tutorial-sociogram-drilldown-list">
+                        {selectedSociometricDrilldownItems.map((item) => (
+                          <button
+                            className="tutorial-sociogram-drilldown-item"
+                            key={item.id}
+                            onClick={() => setSelectedRelationStudentId(item.id)}
+                            type="button"
+                          >
+                            <span className="name">{item.name}</span>
+                            <span className="meta">
+                              pes {item.weight}
+                              {item.relationCount > 1 ? ` · ${item.relationCount} registres` : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>{selectedSociometricDrilldownMeta.emptyLabel}</p>
+                    )}
+                  </section>
+                )}
               </aside>
             )}
 
@@ -8653,7 +8960,7 @@ export function TutoringView() {
                 <span className="legend-dot green">Líder</span>
                 <span className="legend-dot blue">Promig</span>
                 <span className="legend-dot cyan">Acceptat</span>
-                <span className="legend-dot violet">Controvertit</span>
+                <span className="legend-dot orange">Controvertit</span>
                 <span className="legend-dot gray">Aïllat</span>
                 <span className="legend-dot red">Rebutjat</span>
                 <span className="legend-outline yellow">Estrella</span>
@@ -8674,6 +8981,28 @@ export function TutoringView() {
               <section className="legend-summary">
                 <strong>{tutorialSociogramMap.selectedNode?.student.name || 'Sense alumne seleccionat'}</strong>
                 <span>{tutorialSociogramMap.relatedCount} relació/ns visibles</span>
+                {selectedSociometricRow && (
+                  <>
+                    <div className="legend-summary-pills">
+                      <span className="summary-pill green">
+                        Rep {selectedSociometricRow.positiveReceived} elecció/ns
+                      </span>
+                      <span className="summary-pill green">
+                        Fa {selectedSociometricRow.positiveGiven} elecció/ns
+                      </span>
+                      <span className="summary-pill red">
+                        Rep {selectedSociometricRow.avoidReceived} rebuig/s
+                      </span>
+                      <span className="summary-pill red">
+                        Fa {selectedSociometricRow.avoidGiven} rebuig/s
+                      </span>
+                    </div>
+                    <small className="legend-summary-note">
+                      Les línies més intenses mostren les relacions directes de l’alumne seleccionat; la resta queda
+                      en segon pla per facilitar la lectura.
+                    </small>
+                  </>
+                )}
               </section>
             </footer>
           </section>
@@ -10996,7 +11325,9 @@ export function TutoringView() {
                   const priority = getTutorialProfilePriority(profile, recordRow)
                   const reportStatus = profile.student.tutorialReportUpdatedAt
                     ? 'En preparació'
-                    : 'No iniciat'
+                    : priority > 0
+                      ? 'Cal revisar'
+                      : 'No iniciat'
                   return (
                     <button
                       className={`tutorial-student-profile-row ${
@@ -11012,7 +11343,7 @@ export function TutoringView() {
                           {profile.notDevelopedCount} no assolides · {trackingCount} registres · {reportStatus}
                         </small>
                       </div>
-                      <span className="tutorial-report-row-status">{priority > 0 ? 'Cal revisar' : reportStatus}</span>
+                      <span className="tutorial-report-row-status">{reportStatus}</span>
                       <em>Preparar</em>
                     </button>
                   )
