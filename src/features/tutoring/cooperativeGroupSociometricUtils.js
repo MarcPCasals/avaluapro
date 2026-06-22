@@ -28,7 +28,11 @@ function getCooperativeQuality(score) {
   return { label: 'Crític', tone: 'danger' }
 }
 
-export function createCooperativeSociometricHelpers({ getRelationInfluence, getRelationTypeMeta }) {
+export function createCooperativeSociometricHelpers({
+  formatSeatingStudentName = (name) => name,
+  getRelationInfluence,
+  getRelationTypeMeta,
+}) {
   function buildStudentCooperativeProfile({ profile, recordRow, relationRow, roleRow, sociometricRow }) {
     const recordSeverity =
       (recordRow?.agenda || 0) +
@@ -790,14 +794,16 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
     const recommendations = []
     if (adjacentAvoidPairs.length > 0) {
       const [left, right] = adjacentAvoidPairs[0].pair
-      recommendations.push(`Separa ${left.student.student.name} i ${right.student.student.name}: ara queden massa a prop.`)
+      recommendations.push(
+        `Separa ${formatSeatingStudentName(left.student.student.name)} i ${formatSeatingStudentName(right.student.student.name)}: ara queden massa a prop.`,
+      )
     }
     if (vulnerableWithoutSupport.length > 0) {
       const target = vulnerableWithoutSupport[0]
       const candidateSupport = placements
         .filter((placement) => placement.studentId !== target.studentId && isSupportiveSeatingProfile(placement.student))
         .map((placement) => ({
-          name: placement.student.student.name,
+          name: formatSeatingStudentName(placement.student.student.name),
           relation: summarizeCooperativePair(relations, target.studentId, placement.studentId),
         }))
         .sort(
@@ -809,12 +815,14 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
 
       recommendations.push(
         candidateSupport
-          ? `Acosta ${target.student.student.name} a ${candidateSupport.name} per donar-li un suport més clar.`
-          : `Busca un lloc amb més suport proper per a ${target.student.student.name}.`,
+          ? `Acosta ${formatSeatingStudentName(target.student.student.name)} a ${candidateSupport.name} per donar-li un suport més clar.`
+          : `Busca un lloc amb més suport proper per a ${formatSeatingStudentName(target.student.student.name)}.`,
       )
     }
     if (priorityInBack.length > 0) {
-      recommendations.push(`Porta ${priorityInBack[0].student.student.name} a una zona més propera al docent.`)
+      recommendations.push(
+        `Porta ${formatSeatingStudentName(priorityInBack[0].student.student.name)} a una zona més propera al docent.`,
+      )
     }
     if (adjacentLeaderPairs.length >= 2) {
       recommendations.push('Reparteix una mica més els lideratges perquè no monopolitzin la mateixa zona.')
@@ -865,37 +873,37 @@ export function createCooperativeSociometricHelpers({ getRelationInfluence, getR
     const conflicts = [
       ...adjacentAvoidPairs.map(({ pair, severity }) => ({
         severity,
-        text: `${pair[0].student.student.name} i ${pair[1].student.student.name} tenen tensió o rebuig i són massa a prop.`,
+        text: `${formatSeatingStudentName(pair[0].student.student.name)} i ${formatSeatingStudentName(pair[1].student.student.name)} tenen tensió o rebuig i són massa a prop.`,
         title: 'Relació incompatible',
       })),
       ...neverNearConflicts.map(({ pair }) => ({
         severity: 'danger',
-        text: `${pair[0].student.student.name} i ${pair[1].student.student.name} incompleixen la restricció “mai a prop”.`,
+        text: `${formatSeatingStudentName(pair[0].student.student.name)} i ${formatSeatingStudentName(pair[1].student.student.name)} incompleixen la restricció “mai a prop”.`,
         title: 'Restricció incomplerta',
       })),
       ...avoidedZoneConflicts.map(({ placement }) => ({
         severity: 'warning',
-        text: `${placement.student.student.name} ha quedat en una zona marcada per evitar.`,
+        text: `${formatSeatingStudentName(placement.student.student.name)} ha quedat en una zona marcada per evitar.`,
         title: 'Zona a evitar',
       })),
       ...preferredZoneMisses.map(({ placement }) => ({
         severity: 'warning',
-        text: `${placement.student.student.name} no ha quedat a la zona preferent.`,
+        text: `${formatSeatingStudentName(placement.student.student.name)} no ha quedat a la zona preferent.`,
         title: 'Zona preferent pendent',
       })),
       ...preferNearMisses.map(({ pair }) => ({
         severity: 'warning',
-        text: `${pair[0].student.student.name} i ${pair[1].student.student.name} haurien d’estar més a prop.`,
+        text: `${formatSeatingStudentName(pair[0].student.student.name)} i ${formatSeatingStudentName(pair[1].student.student.name)} haurien d’estar més a prop.`,
         title: 'Suport massa lluny',
       })),
       ...vulnerableWithoutSupport.map((placement) => ({
         severity: 'warning',
-        text: `${placement.student.student.name} no té cap suport relacional o de treball clar a prop.`,
+        text: `${formatSeatingStudentName(placement.student.student.name)} no té cap suport relacional o de treball clar a prop.`,
         title: 'Perfil vulnerable sense suport',
       })),
       ...priorityInBack.map((placement) => ({
         severity: 'warning',
-        text: `${placement.student.student.name} és prioritari i queda lluny de la supervisió docent.`,
+        text: `${formatSeatingStudentName(placement.student.student.name)} és prioritari i queda lluny de la supervisió docent.`,
         title: 'Seguiment difícil',
       })),
     ]

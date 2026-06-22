@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  Armchair,
   ArrowLeft,
   ArrowRightLeft,
   Ban,
@@ -18,6 +19,7 @@ import {
   GraduationCap,
   HeartHandshake,
   History,
+  Image,
   Layers3,
   LayoutGrid,
   Loader2,
@@ -276,10 +278,10 @@ const TUTORING_TEXT_LIMIT = 700
 const RELATION_NOTE_LIMIT = 400
 const SEATING_GRID_COLUMNS = 9
 const SEATING_GRID_ROWS = 5
-const DEFAULT_SEATING_BLOCKS = [2, 3, 1]
+const DEFAULT_SEATING_BLOCKS = [2, 3, 2]
 const SEATING_STRUCTURE_PRESETS = [
   { blocks: [2, 2, 2], id: '2-2-2', label: '2 · 2 · 2' },
-  { blocks: [2, 3, 1], id: '2-3-1', label: '2 · 3 · 1' },
+  { blocks: [2, 3, 2], id: '2-3-2', label: '2 · 3 · 2' },
   { blocks: [3, 3], id: '3-3', label: '3 · 3' },
 ]
 const DEFAULT_SEATING_ACTIVE_SEATS = [
@@ -497,6 +499,64 @@ function getSeatingShortName(name) {
     .map((part) => part[0]?.toUpperCase())
     .join('')
   return `${firstName} ${surnameInitials}`.trim() || String(name || '')
+}
+
+function getSeatingPriorityMeta(profileOrScore) {
+  const profile = typeof profileOrScore === 'object' ? profileOrScore : null
+  const cleanScore = Math.max(0, Number(profile?.priorityScore ?? profileOrScore) || 0)
+  const details = []
+  if (profile?.tutorialProfile?.notDevelopedCount > 0) {
+    details.push(
+      `${profile.tutorialProfile.notDevelopedCount} competència/es no assolida/es`,
+    )
+  }
+  if (profile?.tutorialProfile?.notDevelopedPercent >= 30) {
+    details.push('percentatge d’assoliment baix')
+  }
+  if (profile?.tutorialProfile?.averageScore > 0 && profile.tutorialProfile.averageScore <= 2) {
+    details.push('rendiment mitjà baix')
+  }
+  if (profile?.recordSeverity > 0) {
+    details.push('registres de seguiment tutorial')
+  }
+  const evidence = details.length > 0 ? `Es basa en: ${details.join(', ')}.` : ''
+  if (cleanScore >= 8) {
+    return {
+      description: `Acumula diversos indicadors que demanen seguiment proper. ${evidence}`.trim(),
+      label: 'Alta',
+      tone: 'high',
+    }
+  }
+  if (cleanScore >= 4) {
+    return {
+      description: `Té alguns indicadors que recomanen una posició fàcil de supervisar. ${evidence}`.trim(),
+      label: 'Mitjana',
+      tone: 'medium',
+    }
+  }
+  if (cleanScore > 0) {
+    return {
+      description: `Hi ha algun indicador lleu, sense necessitat d’una intervenció intensa. ${evidence}`.trim(),
+      label: 'Baixa',
+      tone: 'low',
+    }
+  }
+  return { description: 'No hi ha indicadors que exigeixin una ubicació prioritària.', label: 'Ordinària', tone: 'none' }
+}
+
+function getSeatingHalfGroupKey(halfGroup) {
+  const cleanValue = String(halfGroup || '').toLocaleLowerCase('ca')
+  if (cleanValue.includes('a')) return 'A'
+  if (cleanValue.includes('b')) return 'B'
+  return ''
+}
+
+function normalizeSeatingHalfGroupSeatIds(value, validSeatIds = null) {
+  const normalizeList = (seatIds) =>
+    [...new Set(Array.isArray(seatIds) ? seatIds : [])].filter((seatId) => !validSeatIds || validSeatIds.has(seatId))
+  const groupA = normalizeList(value?.A)
+  const groupB = normalizeList(value?.B).filter((seatId) => !groupA.includes(seatId))
+  return { A: groupA, B: groupB }
 }
 
 function getTodayDateInput() {
@@ -830,6 +890,7 @@ const {
   summarizeCooperativePair,
   swapCooperativeMembers,
 } = createCooperativeSociometricHelpers({
+  formatSeatingStudentName: getSeatingShortName,
   getRelationInfluence,
   getRelationTypeMeta,
 })
@@ -2235,6 +2296,7 @@ function normalizeSeatingLayout(layout) {
     activeSeatIds: activeSeatIds.filter((seatId) => validSeatIds.has(seatId)),
     ...(blocks.length > 0 ? { blocks } : {}),
     columns,
+    halfGroupSeatIds: normalizeSeatingHalfGroupSeatIds(layout?.halfGroupSeatIds, validSeatIds),
     rows,
   }
 }
@@ -2288,7 +2350,7 @@ function getEmptySeatingRestrictions() {
   }
 }
 
-function getSeatingPlacementContext({ placement, plan, prioritizeHalfGroups, relations }) {
+function getSeatingPlacementContext({ placement, plan, relations }) {
   if (!placement) {
     return {
       alerts: [],
@@ -2312,7 +2374,10 @@ function getSeatingPlacementContext({ placement, plan, prioritizeHalfGroups, rel
   const reasons = []
   const alerts = []
   const zoneLabel = getSeatingZoneLabel(placement.seat, plan?.rows)
-  if (prioritizeHalfGroups) reasons.push(`Manté el bloc de ${placement.halfGroup || 'mig grup'}.`)
+  const halfGroupKey = getSeatingHalfGroupKey(placement.halfGroup)
+  if (halfGroupKey && plan?.layout?.halfGroupSeatIds?.[halfGroupKey]?.includes(placement.seat.id)) {
+    reasons.push(`Ocupa una posició assignada al Grup ${halfGroupKey}.`)
+  }
   if (profile.priorityScore >= 4 && placement.seat.y <= 1) {
     reasons.push('Està davant perquè és un perfil prioritari i facilita el seguiment docent.')
   } else if (profile.academicRisk && placement.seat.y <= 2) {
@@ -2328,10 +2393,12 @@ function getSeatingPlacementContext({ placement, plan, prioritizeHalfGroups, rel
 
   nearby.forEach((item) => {
     if (item.distance <= 1 && item.pair.hasAvoid) {
-      alerts.push(`Massa a prop de ${item.placement.student.student.name}, amb una relació a evitar.`)
+      alerts.push(`Massa a prop de ${getSeatingShortName(item.placement.student.student.name)}, amb una relació a evitar.`)
     }
     if (item.distance <= 2 && placement.isConflict && item.placement.isConflict) {
-      alerts.push(`Proximitat amb ${item.placement.student.student.name}, també marcat per control de conducta.`)
+      alerts.push(
+        `Proximitat amb ${getSeatingShortName(item.placement.student.student.name)}, també marcat per control de conducta.`,
+      )
     }
   })
 
@@ -2353,7 +2420,6 @@ function buildTutorialSeatingPlan({
   manualSeatByStudentId = {},
   objective = 'balanced',
   problemSeatsByStudentId = {},
-  prioritizeHalfGroups,
   profilesByStudentId,
   relations,
   restrictions = {},
@@ -2399,8 +2465,7 @@ function buildTutorialSeatingPlan({
       return a.student.name.localeCompare(b.student.name, 'ca')
     })
 
-  const halfGroups = [...new Set(studentsToPlace.map((student) => student.halfGroup || 'Sense mig grup'))]
-  const halfGroupZone = new Map(halfGroups.map((halfGroup, index) => [halfGroup, index % 3]))
+  const halfGroupSeatIds = normalizeSeatingHalfGroupSeatIds(cleanLayout.halfGroupSeatIds, activeSeatIds)
   const placed = []
   const activeSeatMap = new Map(seats.filter((seat) => seat.enabled).map((seat) => [seat.id, seat]))
   const placedStudentIds = new Set()
@@ -2443,8 +2508,16 @@ function buildTutorialSeatingPlan({
         const seatZoneId = getSeatingZoneId(seat, cleanLayout.rows)
         if (preferredZone) score += preferredZone === seatZoneId ? -90 : 65
         if (avoidedZone === seatZoneId) score += 240
-        if (prioritizeHalfGroups) {
-          score += seat.zone === halfGroupZone.get(student.halfGroup || 'Sense mig grup') ? -35 : 80
+        const halfGroupKey = getSeatingHalfGroupKey(student.halfGroup)
+        const assignedSeatIds = halfGroupKey ? halfGroupSeatIds[halfGroupKey] : []
+        const assignedToOtherGroup = Object.entries(halfGroupSeatIds).some(
+          ([groupKey, seatIds]) => groupKey !== halfGroupKey && seatIds.includes(seat.id),
+        )
+        if (assignedSeatIds.length > 0) {
+          score += assignedSeatIds.includes(seat.id) ? -180 : 140
+        }
+        if (assignedToOtherGroup) {
+          score += 280
         }
         if (student.academicRisk && !student.isStar) score += seat.y * 1.1
         if (student.priorityScore >= 4 || ['Aïllat', 'Rebutjat'].includes(student.sociometricCategory)) {
@@ -2526,21 +2599,22 @@ function buildTutorialSeatingPlan({
   if (placed.length < studentsToPlace.length) {
     warnings.push(`Falten ${studentsToPlace.length - placed.length} alumne/s per falta de llocs actius.`)
   }
-  if (
-    prioritizeHalfGroups &&
-    placed.some((placement) => placement.seat.zone !== halfGroupZone.get(placement.halfGroup || 'Sense mig grup'))
-  ) {
-    warnings.push('No s’ha pogut mantenir algun alumne dins del bloc del seu mig grup.')
+  if (placed.some((placement) => {
+    const halfGroupKey = getSeatingHalfGroupKey(placement.halfGroup)
+    const assignedSeatIds = halfGroupKey ? halfGroupSeatIds[halfGroupKey] : []
+    return assignedSeatIds.length > 0 && !assignedSeatIds.includes(placement.seat.id)
+  })) {
+    warnings.push('No s’ha pogut mantenir algun alumne dins de les posicions assignades al seu mig grup.')
   }
   placed.forEach((placement, index) => {
     const preferredZone = restrictions.preferredZoneByStudentId?.[placement.studentId]
     const avoidedZone = restrictions.avoidedZoneByStudentId?.[placement.studentId]
     const actualZone = getSeatingZoneId(placement.seat, cleanLayout.rows)
     if (preferredZone && preferredZone !== actualZone) {
-      warnings.push(`${placement.student.student.name} no ha quedat a la seva zona preferent.`)
+      warnings.push(`${getSeatingShortName(placement.student.student.name)} no ha quedat a la seva zona preferent.`)
     }
     if (avoidedZone && avoidedZone === actualZone) {
-      warnings.push(`${placement.student.student.name} ha quedat en una zona que cal evitar.`)
+      warnings.push(`${getSeatingShortName(placement.student.student.name)} ha quedat en una zona que cal evitar.`)
     }
     placed.slice(index + 1).forEach((otherPlacement) => {
       const distance = getSeatDistance(placement.seat, otherPlacement.seat)
@@ -2549,7 +2623,7 @@ function buildTutorialSeatingPlan({
         distance <= 2
       ) {
         warnings.push(
-          `${placement.student.student.name} i ${otherPlacement.student.student.name} tenen una restricció de “mai a prop”.`,
+          `${getSeatingShortName(placement.student.student.name)} i ${getSeatingShortName(otherPlacement.student.student.name)} tenen una restricció de “mai a prop”.`,
         )
       }
       if (
@@ -2557,19 +2631,19 @@ function buildTutorialSeatingPlan({
         distance > 2
       ) {
         warnings.push(
-          `${placement.student.student.name} i ${otherPlacement.student.student.name} haurien d’estar més a prop.`,
+          `${getSeatingShortName(placement.student.student.name)} i ${getSeatingShortName(otherPlacement.student.student.name)} haurien d’estar més a prop.`,
         )
       }
       if (distance > 1) return
       const relation = relationBetween(relations, placement.student.student.id, otherPlacement.student.student.id)
       if (relation?.type === 'avoid') {
         warnings.push(
-          `${placement.student.student.name} i ${otherPlacement.student.student.name} tenen una relació a evitar i queden massa a prop.`,
+          `${getSeatingShortName(placement.student.student.name)} i ${getSeatingShortName(otherPlacement.student.student.name)} tenen una relació a evitar i queden massa a prop.`,
         )
       }
       if (placement.isConflict && otherPlacement.isConflict) {
         warnings.push(
-          `${placement.student.student.name} i ${otherPlacement.student.student.name} estan marcats com a conflictius i queden massa a prop.`,
+          `${getSeatingShortName(placement.student.student.name)} i ${getSeatingShortName(otherPlacement.student.student.name)} estan marcats com a conflictius i queden massa a prop.`,
         )
       }
     })
@@ -4134,7 +4208,8 @@ export function TutoringView() {
   const [seatingIterationObjective, setSeatingIterationObjective] = useState('balanced')
   const [seatingIterationZone, setSeatingIterationZone] = useState('front')
   const [seatingIterationMessage, setSeatingIterationMessage] = useState('')
-  const [seatingPrioritizeHalfGroups, setSeatingPrioritizeHalfGroups] = useState(true)
+  const [seatingHalfGroupAssignmentMode, setSeatingHalfGroupAssignmentMode] = useState('')
+  const [seatingShowStudentPhotos, setSeatingShowStudentPhotos] = useState(false)
   const [seatingProblemSeats, setSeatingProblemSeats] = useState({})
   const [seatingAppliedProblemSeats, setSeatingAppliedProblemSeats] = useState({})
   const [seatingUnseatedStudentIds, setSeatingUnseatedStudentIds] = useState([])
@@ -5168,7 +5243,6 @@ export function TutoringView() {
         manualSeatByStudentId: seatingManualSeatByStudentId,
         objective: seatingIterationObjective,
         problemSeatsByStudentId: seatingAppliedProblemSeats,
-        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
         restrictions: seatingRestrictions,
@@ -5186,7 +5260,6 @@ export function TutoringView() {
       seatingManualEmptySeatIds,
       seatingManualSeatByStudentId,
       seatingIterationObjective,
-      seatingPrioritizeHalfGroups,
       seatingRestrictions,
       seatingUnseatedStudentIds,
       seatingVariant,
@@ -5257,6 +5330,7 @@ export function TutoringView() {
   const selectedSeatingProfile = selectedSeatingStudentId
     ? cooperativeProfilesByStudentId.get(selectedSeatingStudentId) || null
     : null
+  const selectedSeatingPriorityMeta = getSeatingPriorityMeta(selectedSeatingProfile)
   const selectedSeatingPlacement =
     visibleSeatingPlan.placements.find((placement) => placement.studentId === selectedSeatingStudentId) || null
   const selectedSeatingIsLocked = Boolean(
@@ -5289,10 +5363,9 @@ export function TutoringView() {
       getSeatingPlacementContext({
         placement: selectedSeatingPlacement,
         plan: visibleSeatingPlan,
-        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
         relations: effectiveTutorialRelations,
       }),
-    [effectiveTutorialRelations, seatingPrioritizeHalfGroups, selectedSeatingPlacement, visibleSeatingPlan],
+    [effectiveTutorialRelations, selectedSeatingPlacement, visibleSeatingPlan],
   )
   const filteredTutorialProfiles = useMemo(
     () =>
@@ -5619,7 +5692,6 @@ export function TutoringView() {
       manualSeatByStudentId: manualAssignments,
       objective: seatingIterationObjective,
       problemSeatsByStudentId: seatingAppliedProblemSeats,
-      prioritizeHalfGroups: seatingPrioritizeHalfGroups,
       profilesByStudentId: cooperativeProfilesByStudentId,
       relations: effectiveTutorialRelations,
       restrictions: seatingRestrictions,
@@ -5782,11 +5854,6 @@ export function TutoringView() {
     )
   }
 
-  const handleToggleSeatingHalfGroups = () => {
-    captureSeatingQualityBaseline('Abans de canviar el criteri de mig grup')
-    setSeatingPrioritizeHalfGroups((current) => !current)
-  }
-
   const toggleSeatingGridSeat = (seat, placement) => {
     if (selectedSeatingPlan) return
     captureSeatingQualityBaseline('Abans de modificar la matriu')
@@ -5814,6 +5881,28 @@ export function TutoringView() {
   }
 
   const handleSeatingSeatClick = (seat, placement) => {
+    if (seatingHalfGroupAssignmentMode) {
+      if (!seat?.enabled || selectedSeatingPlan) return
+      captureSeatingQualityBaseline(`Abans d’assignar posicions al Grup ${seatingHalfGroupAssignmentMode}`)
+      setSeatingLayout((current) => {
+        const cleanLayout = normalizeSeatingLayout(current)
+        const otherGroup = seatingHalfGroupAssignmentMode === 'A' ? 'B' : 'A'
+        const currentGroupSeatIds = cleanLayout.halfGroupSeatIds[seatingHalfGroupAssignmentMode]
+        const nextGroupSeatIds = currentGroupSeatIds.includes(seat.id)
+          ? currentGroupSeatIds.filter((seatId) => seatId !== seat.id)
+          : [...currentGroupSeatIds, seat.id]
+        return normalizeSeatingLayout({
+          ...cleanLayout,
+          halfGroupSeatIds: {
+            ...cleanLayout.halfGroupSeatIds,
+            [otherGroup]: cleanLayout.halfGroupSeatIds[otherGroup].filter((seatId) => seatId !== seat.id),
+            [seatingHalfGroupAssignmentMode]: nextGroupSeatIds,
+          },
+        })
+      })
+      return
+    }
+
     if (seatingBlockSeatMode) {
       if (!seat?.enabled || placement || selectedSeatingPlan) return
       captureSeatingQualityBaseline('Abans de bloquejar el seient')
@@ -5879,6 +5968,32 @@ export function TutoringView() {
       return [...next]
     })
     setSeatingMoveStudentId('')
+  }
+
+  const handleAutoAssignHalfGroupPositions = () => {
+    captureSeatingQualityBaseline('Abans de repartir les posicions dels mig grups')
+    setSeatingLayout((current) => {
+      const cleanLayout = normalizeSeatingLayout(current)
+      const activeSeats = cleanLayout.activeSeatIds
+        .map((seatId) => {
+          const [, x, y] = seatId.split('_').map(Number)
+          return { id: seatId, x, y }
+        })
+        .sort((a, b) => a.x - b.x || a.y - b.y)
+      const middleColumn = Math.floor(cleanLayout.columns / 2)
+      const hasNeutralMiddleColumn = cleanLayout.columns % 2 === 1
+      return normalizeSeatingLayout({
+        ...cleanLayout,
+        halfGroupSeatIds: {
+          A: activeSeats
+            .filter((seat) => seat.x > middleColumn || (!hasNeutralMiddleColumn && seat.x === middleColumn))
+            .map((seat) => seat.id),
+          B: activeSeats.filter((seat) => seat.x < middleColumn).map((seat) => seat.id),
+        },
+      })
+    })
+    setSeatingVariant((current) => current + 1)
+    setSeatingIterationMessage('Posicions repartides: Grup B a l’esquerra i Grup A a la dreta. Pots ajustar cada taula.')
   }
 
   const toggleSeatingLockedStudent = (placement) => {
@@ -6096,7 +6211,6 @@ export function TutoringView() {
         iterationObjective: seatingIterationObjective,
         seatingRestrictions,
         lockedStudentIds: seatingLockedStudentIds,
-        prioritizeHalfGroups: seatingPrioritizeHalfGroups,
       },
       observation: seatingPlanObservation,
       qualitySnapshot: {
@@ -6140,7 +6254,6 @@ export function TutoringView() {
     setSeatingManualEmptySeatIds([])
     setSeatingLockedStudentIds([...(plan.layout?.lockedStudentIds || [])])
     setSeatingIterationObjective(plan.layout?.iterationObjective || 'balanced')
-    setSeatingPrioritizeHalfGroups(plan.layout?.prioritizeHalfGroups !== false)
     setSeatingRestrictions(savedRestrictions)
     setSeatingUnseatedStudentIds(
       getUnseatedStudentIds(
@@ -10083,6 +10196,14 @@ export function TutoringView() {
                   <Save aria-hidden="true" size={17} />
                   Guardar
                 </button>
+                <button
+                  className={seatingShowStudentPhotos ? 'active' : ''}
+                  onClick={() => setSeatingShowStudentPhotos((current) => !current)}
+                  type="button"
+                >
+                  <Image aria-hidden="true" size={17} />
+                  {seatingShowStudentPhotos ? 'Amagar fotos' : 'Mostrar fotos'}
+                </button>
                 <button onClick={() => setSeatingWorkspacePanel('diagnostics')} type="button">
                   <BarChart3 aria-hidden="true" size={17} />
                   Més
@@ -10118,7 +10239,9 @@ export function TutoringView() {
               >
                 <UsersRound aria-hidden="true" size={22} />
                 <strong>Mig grup</strong>
-                <span>{seatingPrioritizeHalfGroups ? 'Prioritzar' : 'Barrejar'}</span>
+                <span>
+                  {seatingLayout.halfGroupSeatIds.A.length + seatingLayout.halfGroupSeatIds.B.length} posicions
+                </span>
               </button>
               <button
                 className={seatingWorkspacePanel === 'restrictions' ? 'active' : ''}
@@ -10336,15 +10459,58 @@ export function TutoringView() {
                 )}
 
                 {seatingWorkspacePanel === 'half-groups' && (
-                  <div className="tutorial-seating-simple-panel">
-                    <p>Decideix si els mig grups han de quedar visualment agrupats o es poden barrejar.</p>
+                  <div className="tutorial-seating-simple-panel tutorial-seating-half-group-editor">
+                    <p>
+                      Tria un grup i clica les taules que li corresponen. El programa farà servir aquestes posicions
+                      quan generi la disposició del grup sencer.
+                    </p>
+                    <div className="tutorial-seating-half-group-buttons">
+                      <button
+                        className={seatingHalfGroupAssignmentMode === 'A' ? 'group-a active' : 'group-a'}
+                        onClick={() =>
+                          setSeatingHalfGroupAssignmentMode((current) => (current === 'A' ? '' : 'A'))
+                        }
+                        type="button"
+                      >
+                        <span />
+                        Grup A
+                        <small>{seatingLayout.halfGroupSeatIds.A.length} taules</small>
+                      </button>
+                      <button
+                        className={seatingHalfGroupAssignmentMode === 'B' ? 'group-b active' : 'group-b'}
+                        onClick={() =>
+                          setSeatingHalfGroupAssignmentMode((current) => (current === 'B' ? '' : 'B'))
+                        }
+                        type="button"
+                      >
+                        <span />
+                        Grup B
+                        <small>{seatingLayout.halfGroupSeatIds.B.length} taules</small>
+                      </button>
+                    </div>
+                    {seatingHalfGroupAssignmentMode && (
+                      <p className={`tutorial-seating-assignment-notice group-${seatingHalfGroupAssignmentMode.toLowerCase()}`}>
+                        Assignació activa: clica les taules del Grup {seatingHalfGroupAssignmentMode}.
+                      </p>
+                    )}
                     <button
-                      className={seatingPrioritizeHalfGroups ? 'primary' : ''}
-                      onClick={handleToggleSeatingHalfGroups}
+                      onClick={handleAutoAssignHalfGroupPositions}
                       type="button"
                     >
                       <UsersRound aria-hidden="true" size={16} />
-                      {seatingPrioritizeHalfGroups ? 'Prioritzar mig grup' : 'Permetre barreja'}
+                      Repartir automàticament
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSeatingLayout((current) =>
+                          normalizeSeatingLayout({ ...current, halfGroupSeatIds: { A: [], B: [] } }),
+                        )
+                        setSeatingHalfGroupAssignmentMode('')
+                      }}
+                      type="button"
+                    >
+                      <RotateCcw aria-hidden="true" size={16} />
+                      Netejar posicions
                     </button>
                   </div>
                 )}
@@ -10773,7 +10939,7 @@ export function TutoringView() {
                 </p>
                 <div>
                   {seatingReviewRows.map((placement) => (
-                    <span key={placement.studentId}>{placement.student.student.name}</span>
+                    <span key={placement.studentId}>{getSeatingShortName(placement.student.student.name)}</span>
                   ))}
                 </div>
               </div>
@@ -10963,26 +11129,35 @@ export function TutoringView() {
                       onDragStart={(event) => handleSeatingPendingDragStart(event, profile.student.id)}
                       type="button"
                     >
-                      {profile.student.name}
+                      {getSeatingShortName(profile.student.name)}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className={`tutorial-seating-workspace ${selectedSeatingProfile ? 'has-panel' : ''}`}>
+            <div
+              className={`tutorial-seating-workspace ${selectedSeatingProfile ? 'has-panel' : ''} ${
+                seatingShowStudentPhotos ? 'show-photos' : 'hide-photos'
+              }`}
+            >
               <div className="tutorial-seating-classroom">
                 <div className="tutorial-seating-classroom-front">
                   <span>Pissarra</span>
                   <strong>Taula docent</strong>
+                  <img
+                    alt=""
+                    className="tutorial-seating-classroom-plant"
+                    src={`${import.meta.env.BASE_URL}assets/classroom-plant-top-view.png`}
+                  />
                 </div>
                 <div
                   className={`tutorial-seating-board-grid ${seatingMoveStudentId ? 'move-mode' : ''} ${
                     seatingBlockSeatMode ? 'block-mode' : ''
-                  }`}
+                  } ${seatingHalfGroupAssignmentMode ? 'half-group-assignment-mode' : ''}`}
                   style={{
                     '--seating-columns': visibleSeatingPlan.columns,
-                    gridTemplateColumns: `repeat(${visibleSeatingPlan.columns}, minmax(88px, 1fr))`,
+                    gridTemplateColumns: `repeat(${visibleSeatingPlan.columns}, minmax(118px, 1fr))`,
                   }}
                 >
                   {visibleSeatingPlan.seats.map((seat) => {
@@ -10993,6 +11168,11 @@ export function TutoringView() {
                   const isBlocked = visibleSeatingRestrictions.blockedSeatIds?.includes(seat.id)
                   const isBlockStart = visibleSeatingBlockStarts.includes(seat.x)
                   const blockPosition = getSeatingBlockPosition(visibleSeatingPlan.layout, seat.x)
+                  const assignedHalfGroup = visibleSeatingPlan.layout.halfGroupSeatIds.A.includes(seat.id)
+                    ? 'A'
+                    : visibleSeatingPlan.layout.halfGroupSeatIds.B.includes(seat.id)
+                      ? 'B'
+                      : ''
                   return (
                     <div
                       aria-pressed={isSelected}
@@ -11004,7 +11184,9 @@ export function TutoringView() {
                         isLocked ? 'locked' : ''
                       } ${isBlocked ? 'blocked-seat' : ''} ${isSelected ? 'selected' : ''} ${
                         draggingSeatingStudentId || seatingMoveStudentId ? 'drop-ready' : ''
-                      } ${isBlockStart ? 'block-start' : ''}`}
+                      } ${isBlockStart ? 'block-start' : ''} ${
+                        assignedHalfGroup ? `assigned-group-${assignedHalfGroup.toLowerCase()}` : ''
+                      }`}
                       draggable={Boolean(placement && !selectedSeatingPlan && !isLocked && !isBlocked)}
                       key={seat.id}
                       onClick={() => handleSeatingSeatClick(seat, placement)}
@@ -11038,6 +11220,8 @@ export function TutoringView() {
                               : 'Clica per crear una taula.'
                       }
                     >
+                      {seat.x === 0 && <span className="tutorial-seat-row-label">{seat.y + 1}</span>}
+                      {seat.enabled && <Armchair aria-hidden="true" className="tutorial-seat-chair" size={28} />}
                       {!seat.enabled ? (
                         <span className="empty">Espai</span>
                       ) : isBlocked ? (
@@ -11047,15 +11231,17 @@ export function TutoringView() {
                         </span>
                       ) : placement ? (
                         <>
-                          <div className="tutorial-seat-student-media">
-                            {placement.student.student.photoUrl ? (
-                              <img alt="" draggable="false" src={placement.student.student.photoUrl} />
-                            ) : (
-                              <span>{getSociogramInitials(placement.student.student.name)}</span>
-                            )}
-                          </div>
+                          {seatingShowStudentPhotos && (
+                            <div className="tutorial-seat-student-media">
+                              {placement.student.student.photoUrl ? (
+                                <img alt="" draggable="false" src={placement.student.student.photoUrl} />
+                              ) : (
+                                <span>{getSociogramInitials(placement.student.student.name)}</span>
+                              )}
+                            </div>
+                          )}
                           <div className="tutorial-seat-student-copy">
-                            <strong title={placement.student.student.name}>
+                            <strong title={getSeatingShortName(placement.student.student.name)}>
                               {getSeatingShortName(placement.student.student.name)}
                             </strong>
                             <small>
@@ -11066,19 +11252,19 @@ export function TutoringView() {
                           <div className="tutorial-seat-statuses">
                             {placement.isStar ? (
                               <span className="star" title="Alumne estrella">
-                                <Star aria-hidden="true" size={13} />
+                                <Star aria-hidden="true" size={17} />
                                 <span className="sr-only">Alumne estrella</span>
                               </span>
                             ) : null}
                             {placement.isConflict ? (
                               <span className="conflict" title="Requereix control de proximitats">
-                                <ShieldAlert aria-hidden="true" size={13} />
+                                <ShieldAlert aria-hidden="true" size={17} />
                                 <span className="sr-only">Requereix control de proximitats</span>
                               </span>
                             ) : null}
                             {placement.student.supportLabel ? (
                               <span className="support" title={placement.student.supportLabel}>
-                                <HeartHandshake aria-hidden="true" size={13} />
+                                <HeartHandshake aria-hidden="true" size={17} />
                                 <span className="sr-only">{placement.student.supportLabel}</span>
                               </span>
                             ) : null}
@@ -11101,8 +11287,8 @@ export function TutoringView() {
                               <button
                                 aria-label={
                                   seatingProblemSeats[placement.studentId]
-                                    ? `Deixar de revisar el lloc de ${placement.student.student.name}`
-                                    : `Revisar el lloc de ${placement.student.student.name}`
+                                    ? `Deixar de revisar el lloc de ${getSeatingShortName(placement.student.student.name)}`
+                                    : `Revisar el lloc de ${getSeatingShortName(placement.student.student.name)}`
                                 }
                                 className={`tutorial-seat-problem-button ${
                                   seatingProblemSeats[placement.studentId] ? 'active' : ''
@@ -11146,7 +11332,7 @@ export function TutoringView() {
                       </div>
                       <div>
                         <span>{selectedSeatingProfile.halfGroup}</span>
-                        <h3>{selectedSeatingProfile.student.name}</h3>
+                        <h3>{getSeatingShortName(selectedSeatingProfile.student.name)}</h3>
                       </div>
                     </div>
                     <button
@@ -11181,7 +11367,9 @@ export function TutoringView() {
                     </div>
                     <div>
                       <span>Prioritat</span>
-                      <strong>{selectedSeatingProfile.priorityScore > 0 ? `P${selectedSeatingProfile.priorityScore}` : 'OK'}</strong>
+                      <strong className={`priority-${selectedSeatingPriorityMeta.tone}`}>
+                        {selectedSeatingPriorityMeta.label}
+                      </strong>
                     </div>
                     <div>
                       <span>Sociometria</span>
@@ -11192,6 +11380,11 @@ export function TutoringView() {
                       <strong>{selectedSeatingProfile.recordSeverity || 0}</strong>
                     </div>
                   </div>
+
+                  <p className="tutorial-seating-priority-explanation">
+                    <strong>Què vol dir la prioritat {selectedSeatingPriorityMeta.label.toLocaleLowerCase('ca')}?</strong>
+                    <span>{selectedSeatingPriorityMeta.description}</span>
+                  </p>
 
                   <section>
                     <strong>Per què és aquí</strong>
@@ -11229,7 +11422,7 @@ export function TutoringView() {
                                   : 'Proximitat'
                           return (
                             <div key={item.placement.studentId}>
-                              <span>{item.placement.student.student.name}</span>
+                              <span>{getSeatingShortName(item.placement.student.student.name)}</span>
                               <strong className={item.pair.hasAvoid ? 'risk' : ''}>
                                 {relationLabel} · {item.distance <= 1 ? 'al costat' : 'a prop'}
                               </strong>
@@ -11265,7 +11458,7 @@ export function TutoringView() {
                             .filter((student) => student.id !== selectedSeatingStudentId)
                             .map((student) => (
                               <option key={student.id} value={student.id}>
-                                {student.name}
+                                {getSeatingShortName(student.name)}
                               </option>
                             ))}
                         </select>

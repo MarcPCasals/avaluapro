@@ -25233,6 +25233,33 @@ button.profile-followup-card:focus-visible {
   margin-left: 22px;
 }
 
+.tutorial-seat-card.block-start::before {
+  position: absolute;
+  top: -13px;
+  bottom: -22px;
+  left: -17px;
+  border-left: 1px dashed #cbd5e1;
+  content: '';
+  pointer-events: none;
+}
+
+.tutorial-seat-row-label {
+  position: absolute;
+  top: 50%;
+  left: -25px;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  color: #64748b;
+  background: #ffffff;
+  font-size: 9px;
+  font-weight: 950;
+  transform: translateY(-50%);
+}
+
 .tutorial-seat-card.disabled {
   border-style: dashed;
   border-color: #cbd5e1;
@@ -25383,5 +25410,282 @@ button.profile-followup-card:focus-visible {
     min-height: 0;
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
+  }
+}
+
+/* Disposició d'aula: fidelitat visual i lectura pedagògica */
+.tutorial-seating-classroom-front {
+  position: relative;
+}
+
+.tutorial-seating-classroom-plant {
+  position: absolute;
+  top: -2px;
+  right: 18px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+}
+
+.tutorial-seat-card {
+  --seat-accent: #94a3b8;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(42px, auto) 30px;
+  min-height: 88px;
+  border-left: 7px solid var(--seat-accent);
+  padding: 11px 10px 15px 13px;
+  background: #f4dfbf;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 6px 0 #cbd5e1,
+    0 9px 14px rgba(15, 23, 42, 0.1);
+}
+
+.tutorial-seat-card.half-a {
+  --seat-accent: #7c3aed;
+}
+
+.tutorial-seat-card.half-b {
+  --seat-accent: #16a34a;
+}
+
+.tutorial-seat-card.assigned-group-a:not(.half-a):not(.half-b) {
+  --seat-accent: #7c3aed;
+}
+
+.tutorial-seat-card.assigned-group-b:not(.half-a):not(.half-b) {
+  --seat-accent: #16a34a;
+}
+
+.tutorial-seat-card.disabled {
+  border-left-width: 1px;
+}
+
+.tutorial-seat-chair {
+  position: absolute;
+  z-index: 2;
+  right: 50%;
+  bottom: -16px;
+  transform: translateX(50%);
+  color: #475569;
+  fill: #64748b;
+  filter: drop-shadow(0 3px 2px rgba(15, 23, 42, 0.2));
+  pointer-events: none;
+}
+
+.tutorial-seat-student-copy strong {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+
+.tutorial-seat-student-copy small {
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-card {
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 4px 8px;
+  padding-top: 8px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-media,
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-media img {
+  display: grid;
+  width: 40px;
+  height: 40px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-copy strong {
+  font-size: 12px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-statuses {
+  grid-column: 1;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-actions {
+  grid-column: 2;
+}
+
+.tutorial-seating-workspace.hide-photos .tutorial-seat-statuses {
+  grid-column: 1;
+}
+
+.tutorial-seating-workspace.hide-photos .tutorial-seat-actions {
+  grid-column: 1;
+}
+
+.tutorial-seat-statuses {
+  position: static;
+  display: flex;
+  gap: 5px;
+  align-self: end;
+}
+
+.tutorial-seat-statuses > span {
+  width: 25px;
+  height: 25px;
+  flex-basis: 25px;
+  border-width: 2px;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.1);
+}
+
+.tutorial-seat-statuses svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tutorial-seat-actions {
+  position: static;
+  align-self: end;
+}
+
+.tutorial-seat-lock-button,
+.tutorial-seat-problem-button {
+  width: 27px;
+  height: 27px;
+}
+
+.tutorial-seating-board-grid.half-group-assignment-mode .tutorial-seat-card.active-table {
+  cursor: crosshair;
+  outline: 2px dashed #94a3b8;
+  outline-offset: 2px;
+}
+
+.tutorial-seating-board-grid.half-group-assignment-mode .tutorial-seat-card.assigned-group-a {
+  outline-color: #7c3aed;
+  background: #f3e8ff;
+}
+
+.tutorial-seating-board-grid.half-group-assignment-mode .tutorial-seat-card.assigned-group-b {
+  outline-color: #16a34a;
+  background: #dcfce7;
+}
+
+.tutorial-seating-half-group-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tutorial-seating-half-group-buttons button {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 7px;
+  min-height: 64px;
+  border: 1px solid #dbe3ef;
+  border-radius: 9px;
+  padding: 9px;
+  text-align: left;
+  color: #334155;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.tutorial-seating-half-group-buttons button > span {
+  grid-row: 1 / 3;
+  width: 7px;
+  height: 38px;
+  border-radius: 999px;
+}
+
+.tutorial-seating-half-group-buttons button small {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.tutorial-seating-half-group-buttons .group-a > span {
+  background: #7c3aed;
+}
+
+.tutorial-seating-half-group-buttons .group-b > span {
+  background: #16a34a;
+}
+
+.tutorial-seating-half-group-buttons button.active {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.tutorial-seating-half-group-buttons .group-a.active {
+  color: #6d28d9;
+  background: #faf5ff;
+}
+
+.tutorial-seating-half-group-buttons .group-b.active {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.tutorial-seating-assignment-notice {
+  border-left: 4px solid;
+  border-radius: 7px;
+  padding: 8px 9px;
+  font-weight: 900 !important;
+}
+
+.tutorial-seating-assignment-notice.group-a {
+  border-color: #7c3aed;
+  color: #6d28d9 !important;
+  background: #faf5ff;
+}
+
+.tutorial-seating-assignment-notice.group-b {
+  border-color: #16a34a;
+  color: #15803d !important;
+  background: #f0fdf4;
+}
+
+.tutorial-seating-profile-metrics strong.priority-high {
+  color: #b91c1c;
+}
+
+.tutorial-seating-profile-metrics strong.priority-medium {
+  color: #b45309;
+}
+
+.tutorial-seating-profile-metrics strong.priority-low {
+  color: #0369a1;
+}
+
+.tutorial-seating-priority-explanation {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 11px 14px;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.tutorial-seating-priority-explanation strong {
+  font-size: 10px;
+}
+
+.tutorial-seating-priority-explanation span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+@media (max-width: 1180px) {
+  .tutorial-seat-student-copy strong {
+    font-size: 13px;
+  }
+
+  .tutorial-seating-classroom-plant {
+    right: 8px;
+    width: 58px;
+    height: 58px;
   }
 }

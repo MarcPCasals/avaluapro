@@ -4,50 +4,57 @@
 
 **Implementation evidence**
 
-- Desktop: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-layout-final-names-1600x900.png`
-- iPad: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-layout-ipad-1024x768.png`
-- Full-view comparison: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-layout-comparison-full.png`
-- Focused comparison: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-layout-comparison-focused.png`
+- Desktop with photos and half-group positions: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-final-desktop-evidence.png`
+- iPad with photos and half-group positions: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-final-ipad-evidence.png`
+- Full comparison: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-final-comparison-full.png`
+- Focused comparison: `/Users/marc/Documents/projectes/avaluapro/tmp/seating-final-comparison-focused.png`
 
 **Viewport and state**
 
-- Desktop: 1600 × 900, mode tutoria, Relacions i grups → Disposició d’aula.
-- iPad: 1024 × 768, same route and configuration state.
-- Structure panel open with 5 rows and `2 · 3 · 1`.
-- Student-detail state also verified by selecting an occupied desk.
+- Desktop: 1600 × 900.
+- iPad: 1024 × 768.
+- Mode tutoria → Relacions i grups → Disposició d’aula.
+- Structure `2 · 3 · 2`, photos enabled and half-group positions assigned.
+- Student inspector, photos off/on, automatic A/B assignment and manual seat reassignment verified.
+- Final iPad measurement after the last spacing patch: desk width 142.85 px; horizontal classroom width preserved instead of compressing names.
 
 **Findings**
 
 - No actionable P0, P1 or P2 findings remain.
-- Fonts and typography: the implementation keeps Avaluapro’s existing type system while matching the reference hierarchy, compact labels and strong action weights.
-- Spacing and layout rhythm: header, left toolbar, contextual configuration panel, central classroom and optional student inspector follow the reference hierarchy. The production app uses slightly larger desks to preserve touch targets and real student controls.
-- Colors and visual tokens: navy primary actions, violet configuration state, orange save action, green/amber quality chip and neutral classroom surfaces match the approved direction while reusing product tokens.
-- Image and asset fidelity: the reference contains no required photographic assets. Existing Lucide product icons are used consistently; desks remain interactive application components rather than decorative imagery.
-- Copy and content: configuration terminology is adapted to the requested real model: rows, blocks and individual desks. Desk labels use `Nom C1C2`; full names remain available in the detail panel.
-- Responsiveness: at 1024 × 768 controls remain readable and the classroom preserves desk proportions with horizontal overflow instead of compressing names or touch areas.
-- Intentional product deviation: the rendered desks include lock/review controls and real pedagogical states that were absent or simplified in the visual concept. They are retained because they are working core functions.
+- Fonts and typography: desk names are now a strong 14 px without photos and 12 px beside a 40 px avatar. The fixed `Nom C1C2` format remains legible; explanatory and configuration names use the same formatter.
+- Spacing and layout rhythm: the classroom remains the dominant surface. Individual desks, visible chairs, row markers, block aisles, board, teacher desk and contextual panels reproduce the approved hierarchy.
+- Colors and visual tokens: purple and green left rails provide immediate Grup A/B scanning. Assignment mode reinforces the same colors without relying on color alone because the group name stays visible.
+- Image and asset fidelity: the classroom plant is a dedicated optimized raster asset. Student photos use saved profile images and initials are used when no photo exists.
+- Copy and content: opaque `P6/P10` codes are removed. Priority is shown as Ordinària/Baixa/Mitjana/Alta with a plain-language evidence summary. The second structure preset is `2 · 3 · 2`.
+- Icons and affordances: star, conflict and support indicators are 25 px containers with 16–17 px icons, separated from lock/review actions.
+- Responsiveness: iPad keeps readable desk widths and uses horizontal overflow when the complete classroom needs more space.
+- Intentional deviation: desks are slightly larger than the concept image to preserve touch targets, photos, names and pedagogical actions on an iPad.
 
-**Patches made since the previous QA pass**
+**Patches made**
 
-- Replaced the overloaded vertical page with a classroom-first workspace.
-- Added configurable rows and desk blocks, presets `2·2·2`, `2·3·1`, `3·3`, add/remove block and per-block column steppers.
-- Added block-aware aisle spacing while preserving individual desk toggling.
-- Moved objective, half-group, restrictions, diagnostics, save and versions into contextual panels.
-- Added compact quality and conflict summary in the header.
-- Preserved move, lock, review, restrictions, saved versions and student-detail interactions.
-- Corrected desk labels to `Nom C1C2` in surname order.
+- Added a functional Mostrar/Amagar fotos control.
+- Added photo and initials variants without shrinking essential information.
+- Applied `Nom C1C2` throughout seating explanations, conflicts, restrictions, nearby students and selectors.
+- Replaced numeric priority codes with labels and evidence.
+- Enlarged pedagogical status icons.
+- Added Grup A/B side rails.
+- Replaced half-group prioritization with explicit A/B position assignment, automatic distribution, manual correction and reset.
+- Persisted half-group positions inside saved seating layouts while keeping old layouts compatible.
+- Changed the default and second preset to `2 · 3 · 2`.
+- Added visible chairs, block aisles, row markers and a top-view classroom plant.
 
 **Implementation checklist**
 
-- Desktop visual comparison completed.
-- Focused header/configuration comparison completed.
-- iPad viewport completed.
-- Structure change `2·3·1 → 3·3 → 2·3·1` completed.
-- Student inspector opening completed.
-- Lint and production build completed.
+- Photos off/on: passed.
+- Automatic A/B position assignment: passed.
+- Manual A/B seat reassignment: passed.
+- Student inspector and readable priority: passed.
+- Legacy saved-layout normalization: passed.
+- Desktop and iPad checks: passed.
+- Lint, build and functional tests: passed.
 
 **Follow-up polish**
 
-- P3: a future iteration could add optional decorative door/plant details, but these are not needed for task clarity or fidelity.
+- P3: a future pass could offer two decorative classroom themes without changing the functional floor plan.
 
 final result: passed

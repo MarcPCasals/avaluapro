@@ -235,4 +235,43 @@ describe('anàlisi explicable de grups cooperatius', () => {
       [2, 2],
     )
   })
+
+  it('aplica el format de nom compacte als conflictes de disposició', () => {
+    const seatingHelpers = createCooperativeSociometricHelpers({
+      formatSeatingStudentName: (name) => `Curt:${name.split(' ')[0]}`,
+      getRelationInfluence: (relation) => Number(relation.strength) || 1,
+      getRelationTypeMeta: () => ({ shortLabel: 'Incompatibilitat' }),
+    })
+    const createPlacement = (id, name, x) => ({
+      seat: { x, y: 0 },
+      student: {
+        isSociometricVulnerable: false,
+        priorityScore: 0,
+        sociometricCategory: 'Promig',
+        student: { id, name },
+      },
+      studentId: id,
+    })
+    const analysis = seatingHelpers.analyzeTutorialSeatingPlan({
+      getSeatDistance: (left, right) => Math.abs(left.x - right.x) + Math.abs(left.y - right.y),
+      plan: {
+        placements: [
+          createPlacement('student-1', 'Nom Primer', 0),
+          createPlacement('student-2', 'Nom Segon', 1),
+        ],
+        rows: 5,
+      },
+      relations: [
+        {
+          sourceStudentId: 'student-1',
+          strength: 2,
+          targetStudentId: 'student-2',
+          type: 'avoid',
+        },
+      ],
+    })
+
+    assert.match(analysis.conflicts[0].text, /Curt:Nom/)
+    assert.doesNotMatch(analysis.conflicts[0].text, /Primer|Segon/)
+  })
 })
