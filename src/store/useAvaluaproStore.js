@@ -40,6 +40,7 @@ import {
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
+import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
 import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
@@ -283,7 +284,9 @@ function normalizeDataset(dataset) {
       ...student,
       name: formatStudentNameForDisplay(student.name),
     })),
-    sociometricSurveys: normalizedDataset.sociometricSurveys.map(normalizeSociometricSurvey),
+    sociometricSurveys: removeExpiredSociometricSurveys(
+      normalizedDataset.sociometricSurveys.map(normalizeSociometricSurvey),
+    ),
     uts: normalizedDataset.uts.filter((ut) => ut.name !== 'Transversals' || usedUtIds.has(ut.id)),
   }
 

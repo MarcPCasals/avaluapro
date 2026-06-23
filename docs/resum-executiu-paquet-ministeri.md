@@ -60,7 +60,9 @@ Hosting i regles reforcades es van publicar conjuntament el 22 de juny de 2026, 
 
 Els qüestionaris antics actius ja s'han eliminat i el flux sociometric nou s'ha verificat en produccio amb dades exclusivament ficticies. La prova va validar l'aillament del qüestionari, els tokens individuals no enumerables, l'ús únic i la caducitat, i va eliminar les dades de prova en acabar.
 
-Continuen pendents les proves amb dos comptes docents, conflictes, backups i iPad, a mes de la purga sociometrica automatica i la validacio externa.
+La purga sociometrica automatica ja esta implementada i provada amb emulador, amb termini configurable i activacio segura en mode sec. Encara no esta desplegada ni activada.
+
+Continuen pendents les proves amb dos comptes docents, conflictes, backups i iPad, el desplegament controlat de la purga i la validacio externa.
 
 ## Decisions sol.licitades al Ministeri
 

@@ -56,9 +56,9 @@ La decisió formal correspon al responsable del tractament, assessorat pel DPD. 
 - [ ] Definir responsable, DPD i bases jurídiques.
 - [ ] Determinar la base de l'article 9.2 per a dades de salut.
 - [ ] Separar centres, rols i grups en una arquitectura institucional.
-- [ ] Desplegar i provar les rules noves.
-- [ ] Resoldre la migració dels qüestionaris antics.
-- [ ] Implementar purga automàtica.
+- [x] Desplegar i provar les rules noves. **Completat:** desplegament i verificació del 22/06/2026.
+- [x] Resoldre la migració dels qüestionaris antics. **Completat:** respostes sincronitzades o eliminades de manera controlada i auditoria final neta.
+- [ ] Activar la purga automàtica. **Parcial:** backend implementat i provat el 23/06/2026; Cloud Functions API desactivada i desplegament en mode sec pendent.
 - [x] Definir una proposta de conservació, bloqueig i final de curs. **Preparada:** `docs/politica-conservacio-eliminacio-preliminar.md`; pendent d'aprovació, automatització i prova.
 - [ ] Registrar accessos i operacions sensibles.
 - [x] Crear procediments d'exercici de drets i rectificació d'observacions. **Preparat:** `docs/procediment-exercici-drets-preliminar.md`; pendent d'aprovació i simulacre.

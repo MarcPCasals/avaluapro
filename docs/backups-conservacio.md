@@ -144,6 +144,17 @@ S'aplica provisionalment aquesta política específica:
 6. eliminar una classe també elimina els qüestionaris al núvol creats pel mateix docent.
 7. els qüestionaris temporals i els tokens queden exclosos tant de les còpies manuals com de les còpies al núvol.
 
-Com a límit operatiu provisional, les respostes brutes no haurien de superar els set dies després de la caducitat. Abans d'un pilot institucional cal implementar una purga automàtica en un backend de confiança, perquè una aplicació web no pot garantir l'eliminació si cap docent torna a obrir-la.
+Com a límit operatiu provisional, les respostes brutes no haurien de superar els set dies després de la caducitat.
+
+El 23 de juny de 2026 es va preparar una Cloud Function programada que:
+
+- s'executa diàriament a `europe-southwest1`;
+- utilitza set dies com a termini provisional configurable;
+- elimina qüestionari, tokens, respostes, còpia privada i còpies antigues que encara el continguin;
+- registra només recomptes agregats de l'operació;
+- disposa de mode sec i límit de documents per execució;
+- es complementa amb una neteja local per evitar que un navegador antic torni a sincronitzar metadades caducades.
+
+La funció està implementada i provada amb l'emulador, però no està desplegada ni activada. Abans d'activar-la cal confirmar el pla de facturació, executar-la en mode sec sobre producció, revisar el resultat i fixar `SOCIOMETRIC_PURGE_ENABLED=true`.
 
 El termini del resultat pedagògic derivat s'haurà de fixar amb el Ministeri o el responsable del tractament segons la finalitat, el curs acadèmic i la política documental aplicable.

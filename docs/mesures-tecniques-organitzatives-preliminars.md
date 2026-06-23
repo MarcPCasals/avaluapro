@@ -104,11 +104,11 @@ En una empresa unipersonal aquesta separació pot no ser completa. S'ha de compe
 ### Mancances principals
 
 - un sol projecte Firebase per a usos reals i proves;
-- rules reforçades encara pendents de desplegament;
+- rules reforçades desplegades, però encara pendents de proves operatives completes;
 - manca d'identitat institucional centralitzada, rols per centre i procés complet d'alta/baixa;
 - MFA administratiu no acreditat;
 - logs d'auditoria insuficients;
-- retenció i purga automàtiques pendents;
+- retenció general pendent; purga sociomètrica implementada però encara no desplegada ni activada;
 - App Check no activat;
 - backups manuals sense xifratge controlat per l'app;
 - dispositius i còpies locals fora d'una gestió institucional;
@@ -458,7 +458,7 @@ Estat:
 - terminis candidats documentats;
 - eliminació manual disponible en diversos fluxos;
 - tombstones preparats localment;
-- purga automàtica de qüestionaris pendent;
+- purga automàtica de qüestionaris implementada i provada amb emulador; desplegament i activació pendents;
 - retenció de backups pendent;
 - expiració de paquets i invitacions pendent;
 - magatzem de bloqueig legal pendent;

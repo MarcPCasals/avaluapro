@@ -1,6 +1,6 @@
 # Matriu d'estat del dossier institucional d'Avaluapro
 
-Data: 22 de juny de 2026
+Data: 23 de juny de 2026
 Objectiu: distingir evidencia existent, proves locals, desplegament, validacio real i decisions externes
 
 ## Llegenda
@@ -24,7 +24,7 @@ Objectiu: distingir evidencia existent, proves locals, desplegament, validacio r
 | Subcol.leccions compartides | Llista tancada de deu col.leccions | Desplegat i auditat | Mantenir proves davant canvis. | Revisio continua. |
 | Eliminacions compartides | Tombstones i bloqueig de `delete` | Provat localment | Conflictes simultanis i propagacio entre dispositius. | Prova amb dos comptes. |
 | Sociometria | Token individual, avís i 24 hores | Desplegat i verificat en produccio amb dades ficticies | Mantenir la prova davant canvis de regles o del flux public. | Repetir la prova de fum en cada canvi sensible. |
-| Purga sociometrica | Politica provisional | Pendent | No hi ha eliminacio automatica en set dies. | Implementar backend programat abans del pilot. |
+| Purga sociometrica | Cloud Function diaria, termini configurable i neteja local | Implementada i provada amb emulador; no desplegada | Confirmar facturacio, executar mode sec i activar-la. | Desplegar desactivada, revisar logs i activar. |
 | Backups | Local, nuvol i restauracio | Implementat; prova real pendent | Restauracio, retencio i eliminacio verificades. | Fer prova completa i registrar resultat. |
 | Minimitzacio | Avisos i documents de criteri | Implementat parcialment | Revisar camps oberts i categories especialment sensibles. | Prova de regressio i revisio pedagogica. |
 | Conservacio | Politica preliminar | Documentat | Terminis sense aprovacio ni automatitzacio. | Decisio del Ministeri i implantacio. |
@@ -50,7 +50,7 @@ Objectiu: distingir evidencia existent, proves locals, desplegament, validacio r
 1. provar amb dos comptes i almenys un iPad;
 2. verificar conflictes, revocacio i restauracio;
 3. registrar incidencies i resultats;
-4. implantar la purga sociometrica automatica abans del pilot.
+4. desplegar la purga sociometrica en mode sec i activar-la abans del pilot.
 
 ## Bloquejos institucionals
 

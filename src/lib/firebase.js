@@ -27,6 +27,7 @@ import {
 } from 'firebase/firestore'
 import { COLLECTIONS } from '../data/seedData'
 import { getSharedRowVersion } from './sharedTutoringRows'
+import { removeExpiredSociometricSurveys } from './sociometricRetention'
 
 export const SHARED_TUTORING_COLLECTIONS = [
   'students',
@@ -694,7 +695,11 @@ export async function saveCloudCollections(uid, dataset, collectionsToSave = COL
   )
 
   for (const collectionName of collectionsToSave) {
-    await replaceCloudCollection(uid, collectionName, dataset[collectionName] || [])
+    const rows =
+      collectionName === SOCIOMETRIC_SURVEYS_COLLECTION
+        ? removeExpiredSociometricSurveys(dataset[collectionName])
+        : dataset[collectionName] || []
+    await replaceCloudCollection(uid, collectionName, rows)
   }
 
   await setDoc(

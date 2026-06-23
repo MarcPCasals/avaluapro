@@ -238,7 +238,7 @@ export function DataTreatmentModal({ onClose }) {
               <InfoCard icon={AlertTriangle} title="Límits actuals" tone="warning">
                 <BulletList>
                   <li>App Check encara no és obligatori.</li>
-                  <li>La purga sociomètrica automàtica està pendent.</li>
+                  <li>La purga sociomètrica automàtica està preparada, però encara no està activada.</li>
                   <li>Les fotos encara no fan servir Firebase Storage.</li>
                   <li>Falten validació institucional i auditoria externa.</li>
                 </BulletList>

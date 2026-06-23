@@ -119,6 +119,22 @@ Text informatiu candidat:
 - [ ] Provar el procés complet amb dades fictícies abans d'activar-lo.
 - [ ] Verificar que una restauració posterior no recupera dades que ja havien estat suprimides.
 
+Progrés específic de la purga sociomètrica, 23 de juny de 2026:
+
+- [x] Backend programat diari implementat amb Cloud Functions.
+- [x] Termini provisional de set dies centralitzat com a paràmetre configurable.
+- [x] Mode sec i activació explícita incorporats.
+- [x] Eliminació de qüestionari, tokens, respostes i còpies privades implementada.
+- [x] Neteja local de metadades caducades per evitar resincronitzacions.
+- [x] Registre agregat sense noms ni contingut sociomètric.
+- [x] Tres proves de backend i tres de retenció local superades.
+- [ ] Confirmar que el projecte disposa del pla de facturació necessari.
+- [x] Comprovar l'estat de l'API: Cloud Functions API encara està desactivada a `avaluapro`.
+- [ ] Habilitar Cloud Functions i Cloud Scheduler només després de confirmar el model de facturació.
+- [ ] Desplegar la funció amb `SOCIOMETRIC_PURGE_ENABLED=false`.
+- [ ] Revisar almenys una execució en mode sec.
+- [ ] Activar la purga amb `SOCIOMETRIC_PURGE_ENABLED=true`.
+
 ### Decisions institucionals pendents
 
 - [ ] Aprovar quines categories s'han de conservar, transferir, bloquejar o eliminar.

@@ -105,7 +105,7 @@ El document general no es public. Cada participant rep un token aleatori que:
 - nomes permet crear una resposta;
 - exigeix acreditar la lectura de l'avís.
 
-Les dades brutes s'han d'eliminar despres de sincronitzar-les. La purga automatica continua pendent.
+Les dades brutes s'han d'eliminar despres de sincronitzar-les. La purga automatica esta implementada i provada amb emulador, pero encara no esta desplegada ni activada.
 
 ## 6. Dades que s'han d'evitar
 

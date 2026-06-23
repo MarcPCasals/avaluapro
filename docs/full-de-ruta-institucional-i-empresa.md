@@ -193,11 +193,11 @@ Fer coincidir la documentacio i les garanties de seguretat amb el funcionament a
 - [ ] Verificar que cada canvi sensible deixa autoria i data suficients.
 - [ ] Revisar el formulari sociometric public i la visibilitat dels noms. **Parcial:** el document general ja no es public ni revela la llista; cada token valid continua mostrant els noms necessaris per respondre.
 - [x] Definir caducitat, tancament i eliminació manual dels qüestionaris. **Fet localment:** caducitat de 24 hores i eliminació completa de qüestionari, tokens i respostes només pel propietari.
-- [ ] Implementar purga automàtica de respostes sociomètriques. **Política provisional:** eliminar després de sincronitzar i, com a màxim, set dies després de caducar. Requereix backend programat abans del pilot institucional.
+- [ ] Activar la purga automàtica de respostes sociomètriques. **Implementació preparada el 23/06/2026:** Cloud Function diària, termini provisional configurable de set dies, mode sec, logs agregats, eliminació de fills i còpies privades, i prevenció de resincronització local. Falta confirmar facturació, desplegar-la desactivada, revisar el mode sec i activar-la abans del pilot.
 - [x] Evitar respostes duplicades o suplantacions quan sigui necessari. **Fet localment:** enllaç individual amb token aleatori, identitat fixada i resposta d'un sol ús. No elimina el risc que un alumne comparteixi voluntàriament el seu enllaç.
 - [x] Mostrar informació essencial abans de respondre. **Fet localment:** finalitat, destinataris, no anonimat, conservació, ús de l'enllaç i canal de consulta.
 - [ ] Validar jurídicament la informació als participants i completar responsable, base jurídica, DPD, drets i canal institucional.
-- [x] Implantar proves automatitzades amb Firebase Emulator per als fluxos compartits actuals. **Fet:** 26 proves de rules i 5 proves de fusio superades; s'han d'ampliar quan canviin els fluxos.
+- [x] Implantar proves automatitzades amb Firebase Emulator per als fluxos compartits actuals. **Fet:** 26 proves de rules, 5 proves de fusio, 3 de retencio local i 3 de purga programada superades; s'han d'ampliar quan canviin els fluxos.
 - [x] Actualitzar `docs/firebase-acces.md`, `docs/mapa-dades.md` i la fitxa tecnica amb l'estat real a 21/06/2026.
 
 La matriu, les troballes i les decisions provisionals es troben a `docs/auditoria-comparticio-permisos.md`.

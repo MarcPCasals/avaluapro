@@ -1,7 +1,7 @@
 # Firebase, accessos i estat de les regles
 
-Data d'actualitzacio: 22 de juny de 2026
-Estat: regles reforcades desplegades i verificades; neteja antiga i prova sociometrica ficticia completades
+Data d'actualitzacio: 23 de juny de 2026
+Estat: regles reforcades desplegades; purga sociometrica implementada i provada, pendent de desplegament i activacio
 
 Aquest document descriu l'arquitectura real de Firebase d'Avaluapro. No acredita per si sol el compliment normatiu ni que la configuracio local coincideixi amb la publicada.
 
@@ -112,7 +112,7 @@ També es va executar una prova de fum en produccio amb dos alumnes ficticis. Va
 - prova manual amb almenys dos comptes docents;
 - prova de conflictes d'edicio simultania;
 - verificacio completa d'autoria i data dels canvis sensibles;
-- purga automatica de dades sociometriques brutes;
+- desplegament de la purga sociometrica en mode sec i activacio posterior;
 - separacio tecnica de desenvolupament, proves i produccio;
 - MFA i govern real dels comptes administratius;
 - logs i alertes adequats;
@@ -124,4 +124,4 @@ També es va executar una prova de fum en produccio amb dos alumnes ficticis. Va
 
 Firebase pot sostenir una arquitectura institucional defensable, pero no la converteix automaticament en conforme. Avaluapro te un bon aillament privat i ha reforcat els fluxos compartits. L'estat correcte a 22 de juny de 2026 es:
 
-**implementat, provat i desplegat; encara pendent de proves operatives completes i validacio externa.**
+**regles implementades, provades i desplegades; purga programada implementada i provada localment; encara pendent de desplegament de la funcio, proves operatives completes i validacio externa.**

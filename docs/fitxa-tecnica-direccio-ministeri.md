@@ -50,7 +50,7 @@ Son dades personals de menors i algunes poden tenir sensibilitat molt elevada. L
 | Prova sociometrica ficticia en produccio | Superada; dades de prova eliminades en acabar. |
 | Proves amb dos comptes reals | Pendents. |
 | Conflictes simultanis, iPad i restauracions | Pendents de prova real. |
-| Purga sociometrica automatica | Pendent. |
+| Purga sociometrica automatica | Implementada i provada amb emulador; pendent de desplegament en mode sec i activacio. |
 | Entorns separats, MFA administratiu, logs i alertes | Pendents. |
 | Revisio legal, AIPD i contractes definitius | Pendents de validacio externa i institucional. |
 
