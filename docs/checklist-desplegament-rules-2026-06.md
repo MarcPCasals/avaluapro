@@ -88,10 +88,12 @@ La neteja posterior es va completar el 22 de juny de 2026:
 La prova es pot repetir de forma controlada amb:
 
 ```bash
-CONFIRM_PRODUCTION_SMOKE="PROVA SOCIOMETRICA FICTICIA" npm run smoke:sociometric:production
+FIREBASE_WEB_API_KEY="..." \
+CONFIRM_PRODUCTION_SMOKE="PROVA SOCIOMETRICA FICTICIA" \
+npm run smoke:sociometric:production
 ```
 
-Sense la frase de confirmació, el comandament només mostra el pla i no modifica producció.
+La clau web de Firebase es passa temporalment a la prova per evitar duplicar-la al repositori. Sense la frase de confirmació, el comandament només mostra el pla i no modifica producció.
 
 ## 6. Retorn enrere
 

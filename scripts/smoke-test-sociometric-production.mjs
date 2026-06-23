@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 const PROJECT_ID = 'avaluapro'
-const API_KEY = 'AIzaSyDCwA7vxVpHQ3CST49xnNblj4JqNPs8sd4'
+const API_KEY = String(process.env.FIREBASE_WEB_API_KEY || '').trim()
 const FIRESTORE_ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`
 const CONFIRMATION = String(process.env.CONFIRM_PRODUCTION_SMOKE || '')
 const REQUIRED_CONFIRMATION = 'PROVA SOCIOMETRICA FICTICIA'
@@ -49,7 +49,7 @@ async function getAccessToken() {
 
 function apiUrl(documentPath, query = '') {
   const separator = query ? '&' : '?'
-  return `${FIRESTORE_ROOT}/${documentPath}${query}${separator}key=${API_KEY}`
+  return `${FIRESTORE_ROOT}/${documentPath}${query}${API_KEY ? `${separator}key=${API_KEY}` : ''}`
 }
 
 async function request(url, { body, method = 'GET', token } = {}) {
@@ -140,8 +140,14 @@ console.log(
 )
 
 if (CONFIRMATION !== REQUIRED_CONFIRMATION) {
-  console.log(`\nMode sec. Per executar: CONFIRM_PRODUCTION_SMOKE="${REQUIRED_CONFIRMATION}"`)
+  console.log(
+    `\nMode sec. Per executar: FIREBASE_WEB_API_KEY="..." CONFIRM_PRODUCTION_SMOKE="${REQUIRED_CONFIRMATION}"`,
+  )
   process.exit(0)
+}
+
+if (!API_KEY) {
+  throw new Error('Cal indicar `FIREBASE_WEB_API_KEY` per executar la prova pública en producció.')
 }
 
 const adminToken = await getAccessToken()
