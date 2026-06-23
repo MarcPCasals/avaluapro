@@ -426,6 +426,92 @@
   }
 }
 
+/* Disposició d'aula: plànol compacte i llegenda */
+.tutorial-seating-teacher-side {
+  display: grid;
+  gap: 7px;
+}
+
+.tutorial-seating-teacher-side > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tutorial-seating-teacher-side button {
+  min-height: 34px;
+  border: 1px solid #dbe3ef;
+  border-radius: 7px;
+  color: #475569;
+  background: #ffffff;
+  font-size: 10px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.tutorial-seating-teacher-side button.active {
+  border-color: #8b5cf6;
+  color: #6d28d9;
+  background: #f5f3ff;
+}
+
+.tutorial-seating-teacher-side small {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.tutorial-seating-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  min-width: 860px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 6px;
+  padding: 10px 8px 0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.tutorial-seating-legend > strong {
+  color: #172033;
+  font-size: 11px;
+}
+
+.tutorial-seating-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.tutorial-seating-legend svg {
+  color: #475569;
+}
+
+.tutorial-seating-legend i {
+  display: inline-block;
+  width: 7px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.tutorial-seating-legend i.group-a {
+  background: #7c3aed;
+}
+
+.tutorial-seating-legend i.group-b {
+  background: #16a34a;
+}
+
+@media (max-width: 1180px) {
+  .tutorial-seating-legend {
+    min-width: 860px;
+  }
+}
+
 @media (max-width: 760px) {
   .public-sociometric-privacy-grid {
     grid-template-columns: 1fr;
@@ -6753,7 +6839,7 @@ button.tutorial-record-pill {
   grid-column: 1 / -1;
   display: grid;
   place-items: center;
-  min-height: 62px;
+  min-height: 30px;
   color: #94a3b8;
   font-size: 11px;
   font-weight: 950;
@@ -25687,5 +25773,141 @@ button.profile-followup-card:focus-visible {
     right: 8px;
     width: 58px;
     height: 58px;
+  }
+}
+
+/* Overrides finals del plànol compacte */
+.tutorial-seating-classroom {
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+
+.tutorial-seating-classroom-front {
+  grid-template-columns: 110px minmax(260px, 1fr) 110px;
+  grid-template-rows: 30px 46px;
+  gap: 4px 12px;
+  min-width: 860px;
+  margin-bottom: 8px;
+}
+
+.tutorial-seating-classroom-front > span {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: min(58%, 540px);
+  min-height: 28px;
+}
+
+.tutorial-seating-classroom-front .tutorial-seating-teacher-desk {
+  position: static;
+  grid-row: 2;
+  align-self: center;
+  width: 116px;
+  min-height: 38px;
+}
+
+.tutorial-seating-classroom-front.teacher-left .tutorial-seating-teacher-desk {
+  grid-column: 1;
+}
+
+.tutorial-seating-classroom-front.teacher-right .tutorial-seating-teacher-desk {
+  grid-column: 3;
+}
+
+.tutorial-seating-classroom-plant {
+  position: static;
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  width: 52px;
+  height: 52px;
+}
+
+.tutorial-seating-classroom-front.teacher-left .tutorial-seating-classroom-plant {
+  grid-column: 3;
+}
+
+.tutorial-seating-classroom-front.teacher-right .tutorial-seating-classroom-plant {
+  grid-column: 1;
+}
+
+.tutorial-seating-board-grid {
+  min-height: 0;
+  align-content: start;
+  gap: 12px 10px;
+  padding: 6px 8px 18px;
+}
+
+.tutorial-seat-card {
+  grid-template-rows: minmax(30px, auto) 25px;
+  min-height: 61px;
+  padding: 7px 8px 9px 11px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 4px 0 #cbd5e1,
+    0 6px 9px rgba(15, 23, 42, 0.09);
+}
+
+.tutorial-seat-card.block-start::before {
+  top: -8px;
+  bottom: -17px;
+}
+
+.tutorial-seat-chair {
+  bottom: -13px;
+  width: 24px;
+  height: 24px;
+}
+
+.tutorial-seat-student-copy strong {
+  font-size: 13px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-card {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 7px;
+  padding-top: 5px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-media,
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-media img {
+  width: 32px;
+  height: 32px;
+}
+
+.tutorial-seating-workspace.show-photos .tutorial-seat-student-copy strong {
+  font-size: 11px;
+}
+
+.tutorial-seat-statuses {
+  gap: 4px;
+}
+
+.tutorial-seat-statuses > span {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
+}
+
+.tutorial-seat-statuses svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tutorial-seat-lock-button,
+.tutorial-seat-problem-button {
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 1180px) {
+  .tutorial-seating-classroom-front,
+  .tutorial-seating-legend {
+    min-width: 860px;
+  }
+
+  .tutorial-seating-classroom-plant {
+    position: static;
+    width: 46px;
+    height: 46px;
   }
 }

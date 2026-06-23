@@ -2298,6 +2298,7 @@ function normalizeSeatingLayout(layout) {
     columns,
     halfGroupSeatIds: normalizeSeatingHalfGroupSeatIds(layout?.halfGroupSeatIds, validSeatIds),
     rows,
+    teacherDeskSide: layout?.teacherDeskSide === 'right' ? 'right' : 'left',
   }
 }
 
@@ -4199,6 +4200,7 @@ export function TutoringView() {
   const [seatingStructureDraft, setSeatingStructureDraft] = useState({
     blocks: DEFAULT_SEATING_BLOCKS,
     rows: SEATING_GRID_ROWS,
+    teacherDeskSide: 'left',
   })
   const [seatingWorkspacePanel, setSeatingWorkspacePanel] = useState('structure')
   const [seatingManualSeatByStudentId, setSeatingManualSeatByStudentId] = useState({})
@@ -5737,6 +5739,7 @@ export function TutoringView() {
     const nextLayout = normalizeSeatingLayout({
       blocks,
       rows: seatingStructureDraft.rows,
+      teacherDeskSide: seatingStructureDraft.teacherDeskSide,
     })
     setSeatingLayout(nextLayout)
     setSeatingManualSeatByStudentId({})
@@ -6249,6 +6252,7 @@ export function TutoringView() {
           ? normalizeSeatingBlocks(cleanLayout.blocks)
           : DEFAULT_SEATING_BLOCKS,
       rows: cleanLayout.rows,
+      teacherDeskSide: cleanLayout.teacherDeskSide,
     })
     setSeatingManualSeatByStudentId(seatAssignments)
     setSeatingManualEmptySeatIds([])
@@ -10322,6 +10326,30 @@ export function TutoringView() {
                         </button>
                       </span>
                     </label>
+                    <fieldset className="tutorial-seating-teacher-side">
+                      <legend>Taula docent</legend>
+                      <div>
+                        <button
+                          className={seatingStructureDraft.teacherDeskSide === 'left' ? 'active' : ''}
+                          onClick={() =>
+                            setSeatingStructureDraft((current) => ({ ...current, teacherDeskSide: 'left' }))
+                          }
+                          type="button"
+                        >
+                          Esquerra
+                        </button>
+                        <button
+                          className={seatingStructureDraft.teacherDeskSide === 'right' ? 'active' : ''}
+                          onClick={() =>
+                            setSeatingStructureDraft((current) => ({ ...current, teacherDeskSide: 'right' }))
+                          }
+                          type="button"
+                        >
+                          Dreta
+                        </button>
+                      </div>
+                      <small>La planta quedarà sempre al costat contrari.</small>
+                    </fieldset>
                     <fieldset>
                       <legend>Distribució per blocs</legend>
                       <div className="tutorial-seating-block-editors">
@@ -11142,9 +11170,9 @@ export function TutoringView() {
               }`}
             >
               <div className="tutorial-seating-classroom">
-                <div className="tutorial-seating-classroom-front">
+                <div className={`tutorial-seating-classroom-front teacher-${visibleSeatingPlan.layout.teacherDeskSide}`}>
                   <span>Pissarra</span>
-                  <strong>Taula docent</strong>
+                  <strong className="tutorial-seating-teacher-desk">Taula docent</strong>
                   <img
                     alt=""
                     className="tutorial-seating-classroom-plant"
@@ -11244,10 +11272,6 @@ export function TutoringView() {
                             <strong title={getSeatingShortName(placement.student.student.name)}>
                               {getSeatingShortName(placement.student.student.name)}
                             </strong>
-                            <small>
-                              <span aria-hidden="true" />
-                              {placement.halfGroup}
-                            </small>
                           </div>
                           <div className="tutorial-seat-statuses">
                             {placement.isStar ? (
@@ -11317,6 +11341,16 @@ export function TutoringView() {
                   )
                   })}
                 </div>
+                <footer className="tutorial-seating-legend">
+                  <strong>Llegenda</strong>
+                  <span><i className="group-a" /> Grup A</span>
+                  <span><i className="group-b" /> Grup B</span>
+                  <span><Star aria-hidden="true" size={16} /> Alumne estrella</span>
+                  <span><ShieldAlert aria-hidden="true" size={16} /> Control de proximitat</span>
+                  <span><HeartHandshake aria-hidden="true" size={16} /> Necessita suport</span>
+                  <span><Lock aria-hidden="true" size={16} /> Lloc fixat</span>
+                  <span><Eye aria-hidden="true" size={16} /> Lloc per revisar</span>
+                </footer>
               </div>
 
               {selectedSeatingProfile && (
