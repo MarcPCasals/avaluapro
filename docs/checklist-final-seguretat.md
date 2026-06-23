@@ -1,6 +1,7 @@
 # Bloc 9: revisio final de seguretat
 
-Data: 4 de juny de 2026
+Data inicial: 4 de juny de 2026
+Última actualització: 23 de juny de 2026
 
 Avís d'actualització: aquest document recull una revisió anterior. La situació actual de les rules compartides, els qüestionaris sociomètrics i les mesures institucionals es troba a `docs/checklist-desplegament-rules-2026-06.md` i `docs/mesures-tecniques-organitzatives-preliminars.md`.
 
@@ -68,3 +69,65 @@ Aquest document recull la revisio final que es pot fer des del projecte i separa
 - Missatge de consola si n'hi ha.
 - Si afecta login: revisar dominis autoritzats, restriccions HTTP de la API key i Firebase Authentication.
 - Si afecta sincronitzacio o backups: revisar rules de Firestore i mida de les dades.
+
+## Tancament anual i eliminació del curs anterior
+
+Proposta de seguretat incorporada el 23 de juny de 2026:
+
+Avaluapro ha de funcionar principalment com a espai de treball del curs actual, no com a arxiu acadèmic permanent. Es proposa una purga anual automàtica de les dades educatives del curs anterior, després d'un període d'avís i verificació.
+
+La data exacta i les possibles excepcions han de ser aprovades pel Ministeri o pel responsable del tractament. No s'ha de fixar unilateralment una eliminació rígida el 3 de setembre si encara poden existir revisions, reclamacions o obligacions de conservació.
+
+Calendari candidat:
+
+1. final de juny: primer avís i revisió de dades;
+2. 15 d'agost: recordatori i opció d'exportació autoritzada;
+3. 1 de setembre: avís final i bloqueig de modificació del curs anterior;
+4. 15 de setembre: purga automàtica, excepte dades justificadament bloquejades o conservades.
+
+### Abast mínim de la purga
+
+- [ ] Eliminar alumnes, classes, notes de treball, rúbriques, tasques i observacions del curs tancat.
+- [ ] Eliminar dades tutorials, sociogrames, grups i disposicions que ja no siguin necessaris.
+- [ ] Tancar cotutories i eliminar dades compartides del curs anterior.
+- [ ] Eliminar paquets de notes, invitacions i dades temporals caducades.
+- [ ] Eliminar còpies al núvol i aplicar el termini aprovat als backups gestionats de Firestore.
+- [ ] Evitar que un dispositiu antic resincronitzi dades ja eliminades.
+- [ ] Conservar només el resum pedagògic mínim expressament autoritzat.
+- [ ] Conservar només les metadades tècniques necessàries per acreditar la purga, sense copiar el contingut eliminat.
+
+### Exportació manual abans de la purga
+
+- [ ] Oferir exportació només quan sigui necessària i estigui autoritzada.
+- [ ] Prioritzar un format xifrat o protegit, no un JSON o Excel obert amb dades personals.
+- [ ] Informar que la còpia queda fora dels controls d'accés, traçabilitat i supressió d'Avaluapro.
+- [ ] Indicar que s'ha de custodiar en un dispositiu o espai institucional autoritzat.
+- [ ] Mostrar una data recomanada d'eliminació de la còpia.
+- [ ] No afirmar que el docent es converteix automàticament en l'únic responsable legal de la còpia.
+
+Text informatiu candidat:
+
+> La còpia exportada deixa d'estar protegida pels controls d'accés, supressió i traçabilitat d'Avaluapro. Cal conservar-la només si està autoritzat, en un dispositiu institucional protegit, i eliminar-la quan deixi de ser necessària.
+
+### Requisits tècnics
+
+- [ ] Executar la purga des d'un backend programat, sense dependre que el docent obri l'aplicació.
+- [ ] Fer la supressió per lots i verificar-ne el resultat.
+- [ ] Incloure Firestore privat, espais compartits, qüestionaris, backups i dades locals sincronitzables.
+- [ ] Registrar curs, compte, categories, data, resultat i excepcions, sense noms d'alumnes.
+- [ ] Generar alertes si una purga falla o queda incompleta.
+- [ ] Provar el procés complet amb dades fictícies abans d'activar-lo.
+- [ ] Verificar que una restauració posterior no recupera dades que ja havien estat suprimides.
+
+### Decisions institucionals pendents
+
+- [ ] Aprovar quines categories s'han de conservar, transferir, bloquejar o eliminar.
+- [ ] Aprovar el calendari definitiu i el període de reclamacions.
+- [ ] Determinar què constitueix expedient oficial i què és només informació temporal del docent.
+- [ ] Aprovar les excepcions i qui les pot autoritzar.
+- [ ] Definir la responsabilitat i la custòdia de les exportacions manuals.
+- [ ] Incorporar els terminis al RAT, l'AIPD, els contractes i la informació de privacitat.
+
+Document de desenvolupament d'aquesta proposta:
+
+`docs/politica-conservacio-eliminacio-preliminar.md`
