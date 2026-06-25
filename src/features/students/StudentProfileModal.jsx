@@ -219,6 +219,7 @@ function isCompetencyModified(marks, studentId, competencyId) {
 export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, onOpenAnnotations }) {
   const state = useAvaluaproStore()
   const { activeClassId } = state.ui
+  const showSociometricProfile = mode === 'tutoring'
   const student = state.students.find((item) => item.id === studentId)
   const antecedent = state.studentAntecedents.find((item) => item.studentId === studentId)
   const studentClass = state.classes.find((classItem) => classItem.id === student?.classId) ||
@@ -307,12 +308,14 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const [ptiLinkDraft, setPtiLinkDraft] = useState(student?.ptiUrl || '')
   const [historyModalType, setHistoryModalType] = useState('')
   const sociometricReport = useMemo(
-    () =>
-      buildSociometricStudentReportsFromRelations({
+    () => {
+      if (!showSociometricProfile) return null
+      return buildSociometricStudentReportsFromRelations({
         relations: classTutorialRelations,
         students: classStudents,
-      }).find((report) => report.student.id === studentId) || null,
-    [classStudents, classTutorialRelations, studentId],
+      }).find((report) => report.student.id === studentId) || null
+    },
+    [classStudents, classTutorialRelations, showSociometricProfile, studentId],
   )
   const activeDiagnosisLabels = diagnoses
     .map((diagnosisId) => DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)?.label)
@@ -471,7 +474,13 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
         <section className="annotation-tools-row">
           <div>
             <span>{student.halfGroup || 'Sense mig grup assignat'}</span>
-            <small>{mode === 'tracking' ? 'Perfil personal des del seguiment' : 'Perfil personal des de l’avaluació'}</small>
+            <small>
+              {mode === 'tutoring'
+                ? 'Perfil personal des de tutoria'
+                : mode === 'tracking'
+                  ? 'Perfil personal des del seguiment'
+                  : 'Perfil personal des de l’avaluació'}
+            </small>
           </div>
           <div className="student-profile-print-actions">
             {onOpenAnnotations && (
@@ -498,7 +507,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             </div>
             <div className="student-profile-print-badges">
               <span className={`student-profile-print-pill ${currentProfileSnapshot.tone}`}>{currentProfileSnapshot.label}</span>
-              {sociometricReport ? (
+              {showSociometricProfile && sociometricReport ? (
                 <span className={`student-profile-print-pill ${sociometricReport.categoryMeta.tone}`}>
                   {sociometricReport.category}
                 </span>
@@ -553,14 +562,16 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             </article>
           </div>
 
-          <section className="tutorial-profile-sociometric-section student-profile-print-sociometric">
-            <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
-            <SociometricStudentInsightCard
-              emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per generar el resum relacional."
-              report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
-              showSupportLabel
-            />
-          </section>
+          {showSociometricProfile && (
+            <section className="tutorial-profile-sociometric-section student-profile-print-sociometric">
+              <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+              <SociometricStudentInsightCard
+                emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per generar el resum relacional."
+                report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
+                showSupportLabel
+              />
+            </section>
+          )}
 
           <footer className="student-profile-print-footer">
             Resum orientatiu per a seguiment docent. Cal interpretar-lo amb el context real d’aula i contrastar-lo amb
@@ -568,14 +579,16 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
           </footer>
         </section>
 
-        <section className="tutorial-profile-sociometric-section">
-          <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
-          <SociometricStudentInsightCard
-            emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per mostrar aquesta lectura."
-            report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
-            showSupportLabel
-          />
-        </section>
+        {showSociometricProfile && (
+          <section className="tutorial-profile-sociometric-section">
+            <h3 className="tutorial-profile-section-title">Lectura sociomètrica</h3>
+            <SociometricStudentInsightCard
+              emptyMessage="Encara no hi ha prou dades sociomètriques d’aquesta classe per mostrar aquesta lectura."
+              report={sociometricReport && classTutorialRelations.length > 0 ? sociometricReport : null}
+              showSupportLabel
+            />
+          </section>
+        )}
 
         <section className="annotation-section" data-tour="annotation-diagnosis">
           <h3>

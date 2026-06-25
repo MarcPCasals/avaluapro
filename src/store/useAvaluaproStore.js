@@ -40,6 +40,7 @@ import {
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
+import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
 import {
   normalizeCooperativeGenerationMeta,
@@ -587,12 +588,7 @@ function normalizeEmail(value = '') {
 }
 
 function normalizeName(value = '') {
-  return String(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
+  return normalizeClassName(value)
 }
 
 function getTutorialMarkKey(mark) {
@@ -2428,21 +2424,65 @@ export const useAvaluaproStore = create((set, get) => ({
     }))
 
     try {
+      const targetSpaceId = invitation.spaceId || invitation.id
+      const invitationClassName = invitation.className || ''
+      const initialTarget = findSharedTutoringClassTarget({
+        className: invitationClassName,
+        classes: get().classes,
+        spaceId: targetSpaceId,
+      })
+      let confirmedClassId = ''
+
+      if (initialTarget.needsConfirmation && initialTarget.classItem) {
+        const shouldUseExistingClass = window.confirm(
+          [
+            `Ja tens una classe anomenada “${initialTarget.classItem.name}”.`,
+            '',
+            'Vols assignar aquesta tutoria compartida a aquesta classe existent?',
+            '',
+            'Si acceptes, es conservaran els alumnes, notes i dades que ja hi tens.',
+            'Si cancel·les, AvaluaPro crearà una classe nova per a aquesta cotutoria.',
+          ].join('\n'),
+        )
+        if (shouldUseExistingClass) confirmedClassId = initialTarget.classItem.id
+      }
+
       const space = await respondTutoringInvitation({
         recipientEmail: user.email,
-        spaceId: invitation.spaceId || invitation.id,
+        spaceId: targetSpaceId,
         status: 'accepted',
         user,
       })
-      const targetSpaceId = space.id || invitation.spaceId || invitation.id
-      const normalizedClassName = normalizeName(space.className || invitation.className || '')
-      let targetClass = get().classes.find((classItem) => classItem.sharedTutoringSpaceId === targetSpaceId)
-      if (!targetClass) {
-        targetClass = get().classes.find(
-          (classItem) =>
-            normalizeName(classItem.name || '') === normalizedClassName &&
-            (classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
-        )
+      const confirmedSpaceId = space.id || targetSpaceId
+      const spaceClassName = space.className || invitation.className || ''
+      let targetClass = confirmedClassId
+        ? get().classes.find((classItem) => classItem.id === confirmedClassId)
+        : get().classes.find((classItem) => classItem.sharedTutoringSpaceId === confirmedSpaceId)
+
+      if (
+        !targetClass &&
+        !initialTarget.needsConfirmation &&
+        spaceClassName &&
+        normalizeName(spaceClassName) !== normalizeName(invitationClassName)
+      ) {
+        const lateTarget = findSharedTutoringClassTarget({
+          className: spaceClassName,
+          classes: get().classes,
+          spaceId: confirmedSpaceId,
+        })
+        if (lateTarget.needsConfirmation && lateTarget.classItem) {
+          const shouldUseExistingClass = window.confirm(
+            [
+              `Ja tens una classe anomenada “${lateTarget.classItem.name}”.`,
+              '',
+              'Vols assignar aquesta tutoria compartida a aquesta classe existent?',
+              '',
+              'Si acceptes, es conservaran els alumnes, notes i dades que ja hi tens.',
+              'Si cancel·les, AvaluaPro crearà una classe nova per a aquesta cotutoria.',
+            ].join('\n'),
+          )
+          if (shouldUseExistingClass) targetClass = lateTarget.classItem
+        }
       }
 
       let nextClassId = targetClass?.id
@@ -2454,10 +2494,10 @@ export const useAvaluaproStore = create((set, get) => ({
           halfGroups: DEFAULT_HALF_GROUPS,
           id: nextClassId,
           isTutoringGroup: true,
-          name: space.className || invitation.className || 'Tutoria compartida',
+          name: spaceClassName || 'Tutoria compartida',
           order: getNextClassOrder(get().classes),
           sharedTutoringMemberEmails: space.memberEmails || [user.email],
-          sharedTutoringSpaceId: targetSpaceId,
+          sharedTutoringSpaceId: confirmedSpaceId,
           subject: 'Tutoria',
           tutorialLinkedClassId: nextClassId,
           utModelReady: true,
@@ -2470,7 +2510,7 @@ export const useAvaluaproStore = create((set, get) => ({
         await persistCollections(set, get, ['classes', 'semesters', 'uts'])
       }
 
-      await get().linkClassToSharedTutoringSpace({ classId: nextClassId, spaceId: targetSpaceId })
+      await get().linkClassToSharedTutoringSpace({ classId: nextClassId, spaceId: confirmedSpaceId })
       await get().setActiveClass(nextClassId)
       get().setActiveMode('tutoring')
       await get().loadSharedTutoringInvitations()
@@ -4043,6 +4083,15 @@ export const useAvaluaproStore = create((set, get) => ({
         seats: (plan.seats || []).filter((seat) => seat.studentId !== studentId),
         updatedAt: now,
       })),
+      seatingCharts: current.seatingCharts.map((chart) => ({
+        ...chart,
+        manualLayout: chart.manualLayout
+          ? {
+              ...chart.manualLayout,
+              placements: (chart.manualLayout.placements || []).filter((placement) => placement.studentId !== studentId),
+            }
+          : chart.manualLayout,
+      })),
       sociometricSurveys: (current.sociometricSurveys || []).map((survey) => ({
         ...survey,
         status: activeSurveysWithStudent.some((item) => item.id === survey.id)
@@ -4068,12 +4117,13 @@ export const useAvaluaproStore = create((set, get) => ({
       'tutorialSociogramLayouts',
       'tutorialStudentRoles',
       'tutorialSeatingPlans',
+      'seatingCharts',
       'sociometricSurveys',
     ])
   },
 
-  upsertSeatingChart: async ({ classId, halfGroup = 'all', imageData, title }) => {
-    if (!classId || !imageData) return
+  upsertSeatingChart: async ({ classId, halfGroup = 'all', imageData = '', manualLayout = null, mode = 'image', title }) => {
+    if (!classId || (!imageData && !manualLayout)) return
 
     set((state) => {
       const existing = state.seatingCharts.find(
@@ -4083,8 +4133,10 @@ export const useAvaluaproStore = create((set, get) => ({
         id: existing?.id || createId('seat'),
         classId,
         halfGroup,
-        title,
         imageData,
+        manualLayout,
+        mode,
+        title,
         updatedAt: new Date().toISOString(),
       }
 

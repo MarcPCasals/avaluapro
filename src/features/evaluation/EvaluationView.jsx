@@ -294,6 +294,7 @@ export function EvaluationView() {
           charts={classSeatingCharts}
           classId={activeClassId}
           halfGroups={halfGroups}
+          students={students}
           onClose={() => setShowSeatingModal(false)}
           onDelete={deleteSeatingChart}
           onSave={upsertSeatingChart}

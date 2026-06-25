@@ -7520,6 +7520,11 @@ export function TutoringView() {
               <strong>Sociograma</strong>
               <span>Mapa visual de relacions reals del grup.</span>
             </button>
+            <button data-tour="tutoring-tool-survey" onClick={() => setActiveRelationshipTool('survey')} type="button">
+              <ClipboardList size={25} />
+              <strong>Qüestionari sociomètric</strong>
+              <span>Enllaços per a l’alumnat i observacions docents.</span>
+            </button>
             <button data-tour="tutoring-tool-groups" onClick={() => setActiveRelationshipTool('groups')} type="button">
               <UsersRound size={25} />
               <strong>Grups cooperatius</strong>
@@ -7551,7 +7556,8 @@ export function TutoringView() {
                 <h2>Crear qüestionari per al grup</h2>
                 <p>
                   Flux recomanat: crea un enllaç propi d’Avaluapro, envia’l als alumnes i recull les respostes sense
-                  Google Forms ni fulls de càlcul.
+                  Google Forms ni fulls de càlcul. En aquesta mateixa pantalla també pots registrar observacions
+                  docents puntuals.
                 </p>
               </div>
               <div className="sociometric-import-actions">
@@ -7710,6 +7716,126 @@ export function TutoringView() {
                 </span>
               </div>
             </div>
+
+            <article className="tutoring-card tutorial-relation-form-card" data-tour="tutoring-relation-form">
+              <div>
+                <Plus size={24} />
+                <h2>Registrar relació docent</h2>
+              </div>
+              <form className="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
+                <label>
+                  Alumne origen
+                  <div className="tutorial-relation-picker">
+                    <Search size={16} />
+                    <input
+                      list="tutorial-source-students"
+                      onChange={(event) => handleRelationSearchChange('source', event.target.value)}
+                      placeholder="Escriu el nom..."
+                      value={relationSearch.source}
+                    />
+                    <select
+                      onChange={(event) => {
+                        const student = classStudents.find((item) => item.id === event.target.value)
+                        setRelationForm((current) => ({ ...current, sourceStudentId: event.target.value }))
+                        setRelationSearch((current) => ({ ...current, source: student?.name || '' }))
+                      }}
+                      value={relationForm.sourceStudentId}
+                    >
+                      <option value="">Primer alumne de la llista</option>
+                      {classStudents.map((student) => (
+                        <option key={student.id} value={student.id}>
+                          {student.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                <label>
+                  Alumne relacionat
+                  <div className="tutorial-relation-picker">
+                    <Search size={16} />
+                    <input
+                      list="tutorial-target-students"
+                      onChange={(event) => handleRelationSearchChange('target', event.target.value)}
+                      placeholder="Escriu el nom..."
+                      value={relationSearch.target}
+                    />
+                    <select
+                      onChange={(event) => {
+                        const student = classStudents.find((item) => item.id === event.target.value)
+                        setRelationForm((current) => ({ ...current, targetStudentId: event.target.value }))
+                        setRelationSearch((current) => ({ ...current, target: student?.name || '' }))
+                      }}
+                      value={relationForm.targetStudentId}
+                    >
+                      <option value="">Tria un alumne</option>
+                      {classStudents
+                        .filter((student) => student.id !== relationForm.sourceStudentId)
+                        .map((student) => (
+                          <option key={student.id} value={student.id}>
+                            {student.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </label>
+                <datalist id="tutorial-source-students">
+                  {classStudents.map((student) => (
+                    <option key={student.id} value={student.name} />
+                  ))}
+                </datalist>
+                <datalist id="tutorial-target-students">
+                  {classStudents
+                    .filter((student) => student.id !== relationForm.sourceStudentId)
+                    .map((student) => (
+                      <option key={student.id} value={student.name} />
+                    ))}
+                </datalist>
+
+                <fieldset className="tutorial-relation-type-grid">
+                  <legend>Tipus</legend>
+                  {TUTORING_RELATION_TYPES.map((type) => (
+                    <button
+                      className={`tutorial-relation-type-button ${type.tone} ${
+                        relationForm.type === type.id ? 'active' : ''
+                      }`}
+                      key={type.id}
+                      onClick={() => setRelationForm((current) => ({ ...current, type: type.id }))}
+                      type="button"
+                    >
+                      {type.shortLabel}
+                    </button>
+                  ))}
+                </fieldset>
+
+                <label>
+                  Intensitat
+                  <select
+                    onChange={(event) => setRelationForm((current) => ({ ...current, strength: event.target.value }))}
+                    value={relationForm.strength}
+                  >
+                    <option value="1">Baixa</option>
+                    <option value="2">Mitjana</option>
+                    <option value="3">Alta</option>
+                  </select>
+                </label>
+
+                <label className="full">
+                  Nota breu
+                  <textarea
+                    maxLength={RELATION_NOTE_LIMIT}
+                    onChange={(event) => setRelationForm((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Ex: treballen bé en tasques obertes, cal evitar-los en exàmens cooperatius..."
+                    value={relationForm.note}
+                  />
+                </label>
+
+                <button className="primary-action" disabled={classStudents.length < 2} type="submit">
+                  Guardar relació
+                </button>
+              </form>
+            </article>
 
             <div className="sociometric-import-layout">
               <article className="sociometric-import-help">
@@ -11661,126 +11787,6 @@ export function TutoringView() {
           </section>
 
           <div className="tutorial-relationships-grid">
-            <article className="tutoring-card tutorial-relation-form-card" data-tour="tutoring-relation-form">
-              <div>
-                <Plus size={24} />
-                <h2>Registrar relació</h2>
-              </div>
-              <form className="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
-                <label>
-                  Alumne origen
-                  <div className="tutorial-relation-picker">
-                    <Search size={16} />
-                    <input
-                      list="tutorial-source-students"
-                      onChange={(event) => handleRelationSearchChange('source', event.target.value)}
-                      placeholder="Escriu el nom..."
-                      value={relationSearch.source}
-                    />
-                    <select
-                      onChange={(event) => {
-                        const student = classStudents.find((item) => item.id === event.target.value)
-                        setRelationForm((current) => ({ ...current, sourceStudentId: event.target.value }))
-                        setRelationSearch((current) => ({ ...current, source: student?.name || '' }))
-                      }}
-                      value={relationForm.sourceStudentId}
-                    >
-                      <option value="">Primer alumne de la llista</option>
-                      {classStudents.map((student) => (
-                        <option key={student.id} value={student.id}>
-                          {student.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </label>
-
-                <label>
-                  Alumne relacionat
-                  <div className="tutorial-relation-picker">
-                    <Search size={16} />
-                    <input
-                      list="tutorial-target-students"
-                      onChange={(event) => handleRelationSearchChange('target', event.target.value)}
-                      placeholder="Escriu el nom..."
-                      value={relationSearch.target}
-                    />
-                    <select
-                      onChange={(event) => {
-                        const student = classStudents.find((item) => item.id === event.target.value)
-                        setRelationForm((current) => ({ ...current, targetStudentId: event.target.value }))
-                        setRelationSearch((current) => ({ ...current, target: student?.name || '' }))
-                      }}
-                      value={relationForm.targetStudentId}
-                    >
-                      <option value="">Tria un alumne</option>
-                      {classStudents
-                        .filter((student) => student.id !== relationForm.sourceStudentId)
-                        .map((student) => (
-                          <option key={student.id} value={student.id}>
-                            {student.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </label>
-                <datalist id="tutorial-source-students">
-                  {classStudents.map((student) => (
-                    <option key={student.id} value={student.name} />
-                  ))}
-                </datalist>
-                <datalist id="tutorial-target-students">
-                  {classStudents
-                    .filter((student) => student.id !== relationForm.sourceStudentId)
-                    .map((student) => (
-                      <option key={student.id} value={student.name} />
-                    ))}
-                </datalist>
-
-                <fieldset className="tutorial-relation-type-grid">
-                  <legend>Tipus</legend>
-                  {TUTORING_RELATION_TYPES.map((type) => (
-                    <button
-                      className={`tutorial-relation-type-button ${type.tone} ${
-                        relationForm.type === type.id ? 'active' : ''
-                      }`}
-                      key={type.id}
-                      onClick={() => setRelationForm((current) => ({ ...current, type: type.id }))}
-                      type="button"
-                    >
-                      {type.shortLabel}
-                    </button>
-                  ))}
-                </fieldset>
-
-                <label>
-                  Intensitat
-                  <select
-                    onChange={(event) => setRelationForm((current) => ({ ...current, strength: event.target.value }))}
-                    value={relationForm.strength}
-                  >
-                    <option value="1">Baixa</option>
-                    <option value="2">Mitjana</option>
-                    <option value="3">Alta</option>
-                  </select>
-                </label>
-
-                <label className="full">
-                  Nota breu
-                  <textarea
-                    maxLength={RELATION_NOTE_LIMIT}
-                    onChange={(event) => setRelationForm((current) => ({ ...current, note: event.target.value }))}
-                    placeholder="Ex: treballen bé en tasques obertes, cal evitar-los en exàmens cooperatius..."
-                    value={relationForm.note}
-                  />
-                </label>
-
-                <button className="primary-action" disabled={classStudents.length < 2} type="submit">
-                  Guardar relació
-                </button>
-              </form>
-            </article>
-
             <article className="tutoring-card tutorial-sociogram-card">
               <div>
                 <Network size={24} />

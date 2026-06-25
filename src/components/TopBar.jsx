@@ -11,6 +11,7 @@ import {
   LogIn,
   LogOut,
   Loader2,
+  MessageSquareText,
   Plus,
   RotateCcw,
   RotateCw,
@@ -30,6 +31,7 @@ import { DataTreatmentModal } from '../features/data/DataTreatmentModal'
 import { RemindersModal } from '../features/data/RemindersModal'
 import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
 import { TutoringShareModal } from '../features/data/TutoringShareModal'
+import { FeedbackModal } from '../features/help/FeedbackModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
@@ -122,6 +124,7 @@ export function TopBar() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
   const dataMenuRef = useRef(null)
@@ -172,17 +175,15 @@ export function TopBar() {
     pendingTutoringShares > 0 ? 'tutoria' : '',
     pendingReminderCount > 0 ? 'recordatoris' : '',
   ].filter(Boolean)
-  const dataMenuBadgeColor = reminderSummary.hasTodayUpcoming
-    ? 'purple'
-    : activeBadgeTypes.length > 1
+  const dataMenuBadgeColor = activeBadgeTypes.length > 1
       ? 'red'
       : activeBadgeTypes[0] === 'notes'
         ? 'orange'
         : activeBadgeTypes[0] === 'tutoria'
-          ? 'green'
+          ? 'blue'
           : activeBadgeTypes[0] === 'recordatoris'
             ? 'yellow'
-            : ''
+            : 'gray'
   const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares + pendingReminderCount
 
   useEffect(() => {
@@ -326,6 +327,14 @@ export function TopBar() {
         >
           <HelpCircle size={22} />
         </button>
+        <button
+          className="icon-button"
+          onClick={() => setShowFeedback(true)}
+          title="Enviar suggeriment o dubte"
+          type="button"
+        >
+          <MessageSquareText size={22} />
+        </button>
         <span className="top-divider" />
         {cloud.user && (
           <div className={`top-sync-status ${syncIndicator.className}`} data-tour="sync-status">
@@ -346,9 +355,7 @@ export function TopBar() {
           >
             <Cloud size={20} />
             <span>Dades i Compte</span>
-            {dataMenuBadgeTotal > 0 && (
-              <em className={`top-menu-trigger-badge ${dataMenuBadgeColor}`}>{dataMenuBadgeTotal}</em>
-            )}
+            <em className={`top-menu-trigger-badge ${dataMenuBadgeColor}`}>{dataMenuBadgeTotal}</em>
             <ChevronDown size={17} />
           </button>
           {showDataMenu && (
@@ -403,11 +410,7 @@ export function TopBar() {
               >
                 <Bell size={18} />
                 <span className="top-menu-button-label">Recordatoris</span>
-                <em
-                  className={`top-menu-badge ${pendingReminderCount > 0 ? 'active' : ''} ${
-                    reminderSummary.hasTodayUpcoming ? 'purple' : 'yellow'
-                  }`}
-                >
+                <em className={`top-menu-badge ${pendingReminderCount > 0 ? 'active yellow' : ''}`}>
                   {pendingReminderCount}
                 </em>
               </button>
@@ -474,7 +477,7 @@ export function TopBar() {
               >
                 <UsersRound size={18} />
                 <span className="top-menu-button-label">Compartir tutoria</span>
-                <em className={`top-menu-badge ${pendingTutoringShares > 0 ? 'active green' : ''}`}>
+                <em className={`top-menu-badge ${pendingTutoringShares > 0 ? 'active blue' : ''}`}>
                   {pendingTutoringShares}
                 </em>
               </button>
@@ -520,6 +523,7 @@ export function TopBar() {
           }}
         />
       )}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
       {showTutoringShare && <TutoringShareModal onClose={() => setShowTutoringShare(false)} />}
