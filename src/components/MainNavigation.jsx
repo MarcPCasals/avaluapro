@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
+import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles } from '../lib/analytics'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
@@ -11,6 +11,7 @@ const modes = [
 
 const insights = [
   { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3 },
+  { id: 'aiBriefing', label: 'Briefing IA', icon: Brain },
 ]
 
 function getUrgentProfiles(state) {

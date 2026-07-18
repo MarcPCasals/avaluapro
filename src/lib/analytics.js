@@ -1,4 +1,4 @@
-import { calculateGrade, getNumericFromGrade } from './grades'
+import { calculateGrade, getNumericFromGrade } from './grades.js'
 
 export function getStudentEvaluationScore(studentId, state) {
   const studentMarks = state.marks.filter((mark) => mark.studentId === studentId)

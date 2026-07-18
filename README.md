@@ -6,6 +6,22 @@ Aplicació en producció:
 
 - https://avaluapro.web.app
 
+## OpenAI Build Week 2026
+
+AvaluaPro participa a OpenAI Build Week com a projecte educatiu existent que s'ha ampliat durant el període del repte.
+
+Extensió Build Week:
+
+- `Briefing IA`: prepara un paquet pseudonimitzat per a ús d'IA amb revisió docent.
+- No envia dades automàticament a cap proveïdor d'IA.
+- Exclou noms, cognoms, correus, fotos, diagnòstics, informació familiar, observacions textuals i el mapa local
+  d'identitat.
+- Inclou tests específics per verificar que el paquet copiat no conté identificadors directes.
+
+Document per a jutges:
+
+- `BUILD_WEEK_2026.md`
+
 ## Documentació per a Direcció i Ministeri
 
 El repositori inclou una guia de documents per presentar Avaluapro a Direcció, responsables de centre o Ministeri:
