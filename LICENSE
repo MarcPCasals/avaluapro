@@ -1,0 +1,24 @@
+AvaluaPro Evaluation License
+Version 1.0, July 18, 2026
+
+Copyright (c) 2026 Marc Pérez Casals. All rights reserved.
+
+Permission is granted to the OpenAI Build Week sponsor, administrator, judges,
+and authorized testing personnel to access, reproduce internally, execute, and
+evaluate this repository solely for the purpose of judging and testing the
+OpenAI Build Week submission.
+
+No permission is granted to any other person or entity to copy, modify,
+distribute, sublicense, sell, commercialize, publicly deploy, or create
+derivative works from AvaluaPro without prior written permission from the
+copyright holder.
+
+This license does not limit any rights separately granted under the OpenAI
+Build Week or Devpost terms accepted by the entrant. Third-party libraries,
+frameworks, assets, and dependencies remain subject to their own licenses.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.

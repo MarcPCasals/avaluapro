@@ -1,87 +1,156 @@
-# Avaluapro
+# AvaluaPro
 
-Avaluapro és una aplicació educativa per avaluar competències, fer seguiment d'hàbits de treball i comportament, i generar estadístiques docents a partir de dades d'avaluació, constància i tutoria.
+> Privacy-conscious classroom intelligence for competency assessment, daily follow-up, tutoring and earlier teacher intervention.
 
-Aplicació en producció:
+[Live demo](https://avaluapro.web.app/) | [5-minute judge guide](JUDGES_GUIDE.md) | [Build Week evidence](BUILD_WEEK_2026.md) | [Privacy architecture](PRIVACY_FOR_JUDGES.md)
 
-- https://avaluapro.web.app
+![AvaluaPro privacy-conscious AI Teacher Briefing](docs/devpost-media/04-ai-briefing-privacy-gate.png)
+
+AvaluaPro is a working web application created by a teacher for the daily reality of teaching. It combines competency
+assessment, task completion, work habits, behavior, tutoring, sociometry, cooperative groups, seating plans and
+cross-signal analytics in one workspace.
+
+The product was designed in Andorra around the competency-based needs of its education system. It has been presented to
+the Andorran Ministry of Education while a possible pilot and institutional model are explored. This does not imply an
+official endorsement.
 
 ## OpenAI Build Week 2026
 
-AvaluaPro participa a OpenAI Build Week com a projecte educatiu existent que s'ha ampliat durant el període del repte.
+AvaluaPro existed before OpenAI Build Week. During the submission period, it was meaningfully extended with Codex through
+a new feature: the **privacy-conscious AI Teacher Briefing**.
 
-Extensió Build Week:
+Submission track: **Education**.
 
-- `Briefing IA`: prepara un paquet pseudonimitzat per a ús d'IA amb revisió docent.
-- No envia dades automàticament a cap proveïdor d'IA.
-- Exclou noms, cognoms, correus, fotos, diagnòstics, informació familiar, observacions textuals i el mapa local
-  d'identitat.
-- Inclou tests específics per verificar que el paquet copiat no conté identificadors directes.
+The extension:
 
-Document per a jutges:
+- combines learning, consistency, behavior and sociometric signals;
+- replaces student identities with aliases such as `Student A`;
+- excludes names, surnames, email addresses, photos, diagnosis labels, family information and raw free-text observations;
+- keeps the alias-to-identity map inside AvaluaPro and outside the copied package;
+- lets the teacher inspect the exact prompt and JSON before anything leaves the app;
+- requires human review and does not automatically send data to an AI provider.
 
-- `BUILD_WEEK_2026.md`
+The Build Week implementation is documented in [BUILD_WEEK_2026.md](BUILD_WEEK_2026.md). The main feature commit is
+[`537ee16`](https://github.com/marcpcasals/avaluapro/commit/537ee16).
 
-## Documentació per a Direcció i Ministeri
+## Try It In 90 Seconds
 
-El repositori inclou una guia de documents per presentar Avaluapro a Direcció, responsables de centre o Ministeri:
+No account or real student data is required.
 
-- `docs/guia-documents-direccio-ministeri.md`
+1. Open the [live demo](https://avaluapro.web.app/).
+2. Keep the fictitious demo classroom loaded on first launch.
+3. Click `Briefing IA` (`AI Briefing`) in the main navigation.
+4. Confirm that the summary reports `0 identificadors directes` (`0 direct identifiers`).
+5. Inspect the pseudonymized prompt and JSON package.
+6. Confirm that focus learners appear only as `Student A`, `Student B`, and similar aliases.
+7. Review the fields explicitly excluded from the package.
 
-Aquest document indica quins fitxers llegir, per què serveix cadascun i quina ruta cal seguir dins del repositori.
+The app interface is currently in Catalan. [JUDGES_GUIDE.md](JUDGES_GUIDE.md) provides complete English testing
+instructions and a translation key for the relevant controls.
 
-Els documents principals són:
+## What AvaluaPro Does
 
-- `docs/resum-executiu-paquet-ministeri.md`: porta d'entrada curta al dossier i decisions sol·licitades.
-- `docs/matriu-estat-dossier-institucional.md`: estat únic de controls, proves, bloquejos i responsables futurs.
-- `docs/full-de-ruta-institucional-i-empresa.md`
-- `docs/informacio-participants-sociometria.md`: text informatiu mostrat als alumnes abans de respondre i punts pendents de validació institucional.
-- `docs/checklist-desplegament-rules-2026-06.md`: auditoria prèvia, migració dels qüestionaris antics i desplegament conjunt de hosting i rules.
-- `docs/rols-i-bases-juridiques-preliminars.md`: separació entre responsable, encarregat, docents i proveïdors, amb bases jurídiques candidates.
-- `docs/registre-activitats-tractament-preliminar.md`: esborrany de RAT per activitats educatives, compartició, sociometria i backups.
-- `docs/cribratge-aipd-preliminar.md`: justificació i abast recomanat de l'avaluació d'impacte institucional.
-- `docs/aipd-preliminar-avaluapro.md`: AIPD preliminar completa amb operacions, proporcionalitat, registre de riscos, mesures i risc residual.
-- `docs/esborrany-contracte-encarrec-tractament.md`: esborrany adaptat de l'acord entre el responsable institucional i la futura empresa Avaluapro.
-- `docs/inventari-subencarregats-i-proveidors.md`: classificació de Firebase, GitHub i proveïdors futurs, amb verificacions i decisions pendents.
-- `docs/politica-privacitat-institucional-preliminar.md`: política completa provisional, marcada com a no publicable fins a completar les decisions institucionals.
-- `docs/avis-legal-preliminar.md`: identificació del prestador, ús admès, propietat intel·lectual i responsabilitat contractual pendents.
-- `docs/clausules-informatives-preliminars.md`: textos per a docents, alumnes, famílies, sociometria, fotografies, diagnòstics i compartició.
-- `docs/procediment-exercici-drets-preliminar.md`: circuit d'accés, rectificació, supressió, limitació, oposició i portabilitat, amb terminis, rols i plantilles.
-- `docs/protocol-incidents-violacions-seguretat-preliminar.md`: detecció, contenció, avaluació, notificació en 72 hores, comunicació i registre de violacions.
-- `docs/politica-conservacio-eliminacio-preliminar.md`: cicle de vida, terminis candidats, tancament de curs, bloqueig, backups, baixa de docents i destrucció segura.
-- `docs/mesures-tecniques-organitzatives-preliminars.md`: annex de seguretat amb controls, estat real, evidències, freqüències i prioritats abans d'un pilot.
-- `docs/pla-continuitat-recuperacio-preliminar.md`: funcions prioritàries, RPO/RTO candidats, backups, recuperació, mode degradat, reversibilitat i tancament de l'empresa.
-- `docs/registre-empresa-categories-tractament-preliminar.md`: registre de la futura empresa com a encarregada i com a responsable dels seus tractaments corporatius.
-- `docs/procediment-retorn-migracio-supressio-preliminar.md`: inventari, paquet de sortida, validació, tall, supressió, subencarregats i certificat final.
-- `docs/compromis-confidencialitat-formacio-preliminar.md`: obligacions del personal, accés excepcional, formació, alta, baixa i evidències.
-- `docs/procediment-suport-manteniment-preliminar.md`: canals, prioritats, diagnòstic amb dades mínimes, escalat i manteniment.
-- `docs/acord-nivell-servei-preliminar.md`: cobertura, resposta, disponibilitat, manteniment, RPO/RTO i informes candidats.
-- `docs/politica-vulnerabilitats-actualitzacions-preliminar.md`: detecció, divulgació, severitat, correcció, dependències, secrets i actualitzacions.
-- `docs/procediment-identitats-rols-baixes-preliminar.md`: font oficial, rols, altes, canvis, substitucions, baixes i còpies locals.
-- `docs/govern-administradors-accessos-excepcionals-preliminar.md`: IAM, MFA, doble control, suport privilegiat, emergències, logs i secrets.
-- `docs/questionari-ministeri-decisions-institucionals.md`: preguntes, correu i registre de decisions per desbloquejar contractació, protecció de dades i infraestructura.
-- `docs/fitxa-tecnica-direccio-ministeri.md`
-- `docs/proteccio-dades-avaluapro.md`
-- `docs/mapa-dades.md`
-- `docs/firebase-acces.md`
-- `docs/comparticio-docents.md`
-- `docs/auditoria-comparticio-permisos.md`
-- `docs/checklist-final-seguretat.md`
+- **Competency assessment:** fast A/B/C/D assessment across competencies, criteria, units and semesters.
+- **Daily follow-up:** task completion, late or missing work, consistency and intervention signals.
+- **Classroom analytics:** achievement, habits and behavior are combined into actionable priorities.
+- **Tutor mode:** a whole-class view across academic and tutorial information.
+- **Sociometry:** relationships, group dynamics and sociometric questionnaires.
+- **Cooperative groups:** configurable group proposals with teacher review.
+- **Classroom seating:** flexible seating plans informed by classroom context.
+- **Teacher collaboration:** controlled grade packages and shared tutoring spaces.
+- **Backup and synchronization:** local resilience with optional authenticated cloud synchronization.
 
-## Eines auxiliars
+## The Build Week Privacy Gate
 
-- `docs/google-forms-sociograma.md`: guia per crear un Google Forms sociomètric i importar-ne les respostes a Avaluapro.
-- `scripts/generar-formulari-sociometric-avaluapro.gs`: Apps Script per generar automàticament el formulari sociomètric i una plantilla compatible amb Avaluapro.
+```mermaid
+flowchart LR
+    A["Classroom signals"] --> B["Data minimization"]
+    B --> C["Pseudonymized briefing"]
+    C --> D["Teacher inspection"]
+    D --> E["Copy to an approved AI environment"]
+    F["Local identity map"] -. "not exported" .-> C
+```
 
-## Desenvolupament
+The exported package is **pseudonymized, not anonymous**. AvaluaPro can still map an alias back to a learner locally, so
+the package must continue to be handled as personal educational data. The feature reduces exposure; it does not claim to
+remove every legal or re-identification risk.
 
-Projecte creat amb Vite + React.
+## Built With
 
-Comandes habituals:
+- React 19 and React DOM
+- Vite 8
+- JavaScript
+- Zustand
+- IndexedDB
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Hosting
+- Firebase Security Rules and Rules Unit Testing
+- Tailwind CSS
+- Node.js built-in test runner
+- OpenAI Codex as the engineering partner for the Build Week extension
+
+## Run Locally
+
+The project currently uses Node.js 22 and npm.
 
 ```bash
 npm install
 npm run dev
+```
+
+Vite will print the local URL in the terminal. The fictitious demo classroom loads automatically on first launch.
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+## Tests
+
+Run the Build Week privacy test:
+
+```bash
+npm run test:ai-briefing
+```
+
+Run the broader security suite:
+
+```bash
+npm run test:security
+```
+
+Run static and production checks:
+
+```bash
 npm run lint
 npm run build
 ```
+
+## Judge Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [JUDGES_GUIDE.md](JUDGES_GUIDE.md) | English testing path, Catalan UI translation and expected results. |
+| [BUILD_WEEK_2026.md](BUILD_WEEK_2026.md) | Clear separation of pre-existing work and the Build Week extension. |
+| [PRIVACY_FOR_JUDGES.md](PRIVACY_FOR_JUDGES.md) | Concise architecture, privacy controls, residual risks and current limits. |
+| [Devpost Project Story](docs/devpost-openai-build-week-submission.md) | Copy-ready submission narrative and demo notes. |
+| [Image gallery](docs/devpost-media/README.md) | Recommended screenshots, order and English captions. |
+
+The repository also contains a larger Catalan institutional dossier covering data protection, security, retention,
+incident response, processor agreements and a preliminary impact assessment. Those documents predate Build Week and are
+working materials for a possible educational pilot; they are not presented as completed legal approval.
+
+## Responsible Testing
+
+- Use only the fictitious classroom included with the app.
+- Do not enter real student information during judging or public demonstrations.
+- The Build Week feature does not call an external AI provider.
+- Direct AI integration remains future work and would require an approved backend, contractual safeguards, retention
+  controls and institutional data-protection review.
+
+## Ownership And License
+
+Copyright 2026 Marc Pérez Casals. AvaluaPro is currently proprietary software made available for OpenAI Build Week
+evaluation. See [LICENSE](LICENSE) for the evaluation permission and restrictions.

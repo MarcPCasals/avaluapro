@@ -30,12 +30,12 @@ The existing production app is available at:
 
 During Build Week, AvaluaPro was meaningfully extended with a new feature:
 
-### Privacy-safe AI Teacher Briefing
+### Privacy-conscious AI Teacher Briefing
 
 Path in the app:
 
 ```text
-Estadístiques Globals -> Briefing IA
+Main navigation -> AI Briefing (`Briefing IA`)
 ```
 
 This feature prepares a teacher briefing package for future or external AI use without automatically sending student
@@ -61,7 +61,11 @@ The teacher can inspect the exact package that would leave the app before decidi
 environment. This is especially important because AvaluaPro works with minors and may contain sensitive educational,
 behavioral, tutoring and sociometric signals.
 
-## Files added or changed for Build Week
+## Evidence And Files Added During Build Week
+
+Main implementation commit:
+
+- [`537ee16`](https://github.com/marcpcasals/avaluapro/commit/537ee16), committed and deployed on July 18, 2026.
 
 Main feature:
 
@@ -80,6 +84,10 @@ Documentation:
 
 - `BUILD_WEEK_2026.md`
 - `README.md`
+- `JUDGES_GUIDE.md`
+- `PRIVACY_FOR_JUDGES.md`
+- `docs/devpost-openai-build-week-submission.md`
+- `docs/devpost-media/README.md`
 
 ## How Codex was used
 
@@ -87,7 +95,7 @@ Codex was used as the main engineering partner during Build Week to:
 
 - inspect the existing AvaluaPro architecture and privacy dossier;
 - identify a feature that could be honestly evaluated as new Build Week work;
-- design the privacy-safe AI briefing flow;
+- design the privacy-conscious AI briefing flow;
 - implement the pseudonymization and prompt-generation helper;
 - integrate the new React view into the existing analytics navigation;
 - add tests that verify the copied AI package does not include direct student identifiers or sensitive free-text fields;
@@ -132,10 +140,11 @@ Recommended demo path:
 
 1. Open the app.
 2. Keep the demo classroom.
-3. Open `Estadístiques Globals`.
-4. Click `Briefing IA`.
-5. Inspect the pseudonymized JSON package.
-6. Copy the prompt and confirm it contains aliases, metrics and guardrails, but no student names or raw observations.
+3. Click `Briefing IA` (`AI Briefing`) in the main navigation.
+4. Inspect the pseudonymized JSON package.
+5. Copy the prompt and confirm it contains aliases, metrics and guardrails, but no student names or raw observations.
+
+English-speaking judges can follow the complete five-minute route in [JUDGES_GUIDE.md](JUDGES_GUIDE.md).
 
 ## Current limits
 
@@ -143,3 +152,6 @@ Recommended demo path:
 - This is intentional: putting an API key in a client-side educational app would be unsafe.
 - A future institutional version should use a backend connector, approved provider terms, retention controls and a
   completed data protection review before direct AI calls are enabled.
+
+For a concise explanation of the current architecture, implemented controls and residual risks, see
+[PRIVACY_FOR_JUDGES.md](PRIVACY_FOR_JUDGES.md).
