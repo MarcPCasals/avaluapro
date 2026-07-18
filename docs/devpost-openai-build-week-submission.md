@@ -145,6 +145,8 @@ Long term, AvaluaPro aims to become a privacy-conscious classroom intelligence p
 
 ## Demo Video Notes
 
+Full timed English script: [devpost-video-script-en.md](devpost-video-script-en.md)
+
 Recommended 3-minute structure:
 
 1. Show the existing AvaluaPro workspace with demo data.
