@@ -1,29 +1,30 @@
-# AvaluaPro Devpost Demo Video
+# Vídeo de demostració d’AvaluaPro per a Devpost
 
-Target duration: 2 minutes 40 seconds to 2 minutes 50 seconds.
+Durada objectiu: entre 2 minuts i 45 segons i 2 minuts i 55 segons.
 
-The official limit is under three minutes. Record the screen first, then record the English voice separately and combine
-both tracks. A personal voice is recommended; a natural accent is completely appropriate for this story.
+El límit oficial és inferior a tres minuts. Grava primer la pantalla, després grava la veu en anglès per separat i combina
+les dues pistes. És recomanable fer servir la teva veu; un accent natural és completament adequat per explicar aquesta història.
 
-## Recording Plan
+## Pla de gravació
 
-Use the live fictitious demo at <https://avaluapro.web.app/>. Do not sign in and do not enter real student data.
+Utilitza la demostració amb dades fictícies de <https://avaluapro.web.app/>. No iniciïs sessió ni introdueixis dades reals
+d’alumnes.
 
-| Time | What to show | English narration |
+| Temps | Què has de mostrar | Narració en anglès |
 | --- | --- | --- |
-| 0:00-0:15 | Start on AvaluaPro's assessment workspace. Keep the logo, demo banner and competency table visible. | **I'm Marc Pérez Casals, a teacher from Andorra. AvaluaPro began because I needed more than a place to store grades: I needed to understand each learner and the whole class.** |
-| 0:15-0:35 | Show competency assessment, then cut to `Seguiment` with tasks, completion states and consistency percentages. | **Teachers can assess competencies, record daily work, follow consistency and behavior, and spot changes throughout the course. Information that was previously scattered becomes one practical classroom workflow.** |
-| 0:35-0:57 | Cut between `Estadístiques Globals`, the main `Mode tutoria` diagnostic, and `Relacions i grups`. Finish with cooperative groups or the seating plan. | **Global analytics connect achievement, habits and behavior. Tutor mode adds sociometry, individual and group diagnostics, cooperative groups and classroom seating, helping teachers turn daily records into personalized action.** |
-| 0:57-1:10 | Return briefly to the global view, then click `Briefing IA`. Pause on its title. | **This working classroom-intelligence foundation existed before Build Week. During the challenge, I used OpenAI Codex to add a new privacy-conscious bridge between all this educational context and AI.** |
-| 1:10-1:32 | Show the title, `0 identificadors directes`, the `Suports pedagògics` metric and the excluded-fields list. | **The privacy gate removes direct identifiers, raw text and diagnosis labels. It keeps only concrete classroom support needs, such as shorter instructions or additional processing time, without naming their clinical origin.** |
-| 1:32-1:55 | Show the four-step workflow, `Copiar prompt` and `Descarregar paquet JSON`. Do not upload the demo file anywhere during the recording. | **The teacher copies the instructions and downloads a separate JSON file containing selected competency, consistency, behavior, group and pedagogical support signals. Both actions are explicit, and nothing is sent automatically.** |
-| 1:55-2:15 | Open the technical details and show one `pedagogicalSupportNeeds` block beside an alias. Then cut to the visible local correspondence. | **Inside the JSON, the AI sees aliases and concrete accommodations, never their clinical source. The real correspondence stays inside AvaluaPro, allowing the teacher to interpret the response and retain professional control.** |
-| 2:15-2:35 | Show the GitHub Build Week commit, the generator and React filenames, then a terminal with `npm run test:ai-briefing` passing. | **Codex helped inspect the architecture, build the generator and interface, integrate the workflow, and add privacy tests confirming that names, raw observations and the identity map stay out of the copied package.** |
-| 2:35-2:48 | Return to the top of `Briefing IA`, ending on the title and zero-identifiers panel. | **AvaluaPro does not replace professional judgment. It helps teachers see the right patterns earlier, with privacy and the teacher kept firmly in the loop.** |
+| 0:00-0:15 | Comença a l’espai d’avaluació d’AvaluaPro. Mantén visibles el logotip, l’avís de dades demo i la taula de competències. | **I'm Marc Pérez Casals, a teacher from Andorra. AvaluaPro began because I needed more than a place to store grades: I needed to understand each learner and the whole class.** |
+| 0:15-0:35 | Mostra l’avaluació competencial i talla a `Seguiment`, amb les tasques, els estats de lliurament i els percentatges de constància. | **Teachers can assess competencies, record daily work, follow consistency and behavior, and spot changes throughout the course. Information that was previously scattered becomes one practical classroom workflow.** |
+| 0:35-0:57 | Alterna entre `Estadístiques Globals`, el diagnòstic principal de `Mode tutoria` i `Relacions i grups`. Acaba amb els grups cooperatius o la disposició de l’aula. | **Global analytics connect achievement, habits and behavior. Tutor mode adds sociometry, individual and group diagnostics, cooperative groups and classroom seating, helping teachers turn daily records into personalized action.** |
+| 0:57-1:10 | Torna breument a la vista global, entra a `Briefing IA` i atura’t un moment al títol. | **This working classroom-intelligence foundation existed before Build Week. During the challenge, I used OpenAI Codex to add a new privacy-conscious bridge between all this educational context and AI.** |
+| 1:10-1:32 | Mostra el títol, `0 identificadors directes`, la mètrica `Suports pedagògics` i la llista de camps exclosos. | **The privacy gate removes direct identifiers, raw text and diagnosis labels. It keeps only concrete classroom support needs, such as shorter instructions or additional processing time, without naming their clinical origin.** |
+| 1:32-1:55 | Mostra el flux de quatre passos, `Copiar prompt` i `Descarregar paquet JSON`. No pugis el fitxer demo enlloc durant la gravació. | **The teacher copies the instructions and downloads a separate JSON file containing selected competency, consistency, behavior, group and pedagogical support signals. Both actions are explicit, and nothing is sent automatically.** |
+| 1:55-2:15 | Obre els detalls tècnics i mostra un bloc `pedagogicalSupportNeeds` al costat d’un àlies. Després talla a la correspondència local visible. | **Inside the JSON, the AI sees aliases and concrete accommodations, never their clinical source. The real correspondence stays inside AvaluaPro, allowing the teacher to interpret the response and retain professional control.** |
+| 2:15-2:34 | Mostra el commit de Build Week a GitHub, els fitxers del generador i del component React, i després un terminal amb `npm run test:ai-briefing` superat. | **Codex helped inspect the architecture, build the generator and interface, integrate the workflow, and add privacy tests confirming that names, raw observations and the identity map stay out of the copied package.** |
+| 2:34-2:55 | Torna a la part superior de `Briefing IA` i acaba amb el títol i el panell de zero identificadors. | **The goal is not to replace the teacher, but to help teachers spot the right patterns earlier while keeping professional judgment, privacy and the teacher firmly in the loop. Built by a teacher for teachers, AvaluaPro is a step toward responsible classroom intelligence.** |
 
-## Catalan Labels Used In The Recording
+## Traducció dels textos de la interfície
 
-| Interface label | English narration |
+| Text de la interfície | Equivalent en anglès |
 | --- | --- |
 | `Avaluació` | Assessment |
 | `Seguiment` | Daily follow-up |
@@ -37,37 +38,37 @@ Use the live fictitious demo at <https://avaluapro.web.app/>. Do not sign in and
 | `Correspondència per interpretar la resposta` | Correspondence for interpreting the response |
 | `Veure contingut tècnic del briefing` | View technical briefing content |
 
-The Catalan labels match the interface exactly; the narration provides their English meaning.
+Els textos en català coincideixen exactament amb la interfície; la narració n’explica el significat en anglès.
 
-## Mac Recording Checklist
+## Llista de comprovació per gravar amb el Mac
 
-1. Use Chrome or Safari in a clean full-screen window at 1920 x 1080 if possible.
-2. Open the app in a fresh private window so the fictitious demo loads from the beginning.
-3. Close the interactive guide before recording.
-4. Before recording, mark the demo class as a tutor group in `Configuració del grup` so `Mode tutoria` is available.
-5. Hide bookmarks, personal tabs, notifications, email and account information.
-6. Record four short silent clips: core classroom workflow, tutor tools, AI briefing, and code/tests.
-7. Before recording the technical-details shot, open it and position the JSON at the first visible
-   `pedagogicalSupportNeeds` block. Start recording only after the text is already framed.
-8. Start each clip a few seconds before the intended action and leave a short pause at the end.
-9. Move the cursor slowly and avoid live typing wherever possible.
-10. Record the narration separately with Voice Memos in a quiet room.
-11. Combine the four clips and voice track in iMovie, keeping the final duration below 2:50.
-12. Add small English section titles only if they help: `The problem`, `Existing classroom intelligence`,
+1. Utilitza Chrome o Safari en una finestra neta i a pantalla completa, si pot ser a 1920 × 1080.
+2. Obre l’aplicació en una finestra privada nova perquè la demostració fictícia es carregui des del principi.
+3. Tanca la guia interactiva abans de gravar.
+4. Abans de gravar, marca la classe demo com a grup de tutoria a `Configuració del grup` perquè aparegui `Mode tutoria`.
+5. Amaga els marcadors, les pestanyes personals, les notificacions, el correu i qualsevol informació del compte.
+6. Grava quatre clips curts i sense veu: flux principal de l’aula, eines de tutoria, briefing IA i codi/proves.
+7. Abans de gravar el pla dels detalls tècnics, obre’ls i situa el JSON al primer bloc visible de
+   `pedagogicalSupportNeeds`. Comença a gravar quan el text ja estigui ben enquadrat.
+8. Comença cada clip uns segons abans de l’acció prevista i deixa una pausa curta al final.
+9. Mou el cursor lentament i evita escriure en directe sempre que sigui possible.
+10. Grava la narració per separat amb Notes de Veu en una habitació silenciosa.
+11. Combina els quatre clips i la pista de veu amb iMovie, mantenint la durada final per sota de 2:55.
+12. Afegeix títols breus de secció en anglès només si ajuden: `The problem`, `Existing classroom intelligence`,
     `Built during Build Week`, `Privacy gate`,
     `Built with Codex`, `Teacher stays in control`.
-13. Do not add copyrighted music. Silence under the narration is perfectly acceptable.
-14. Export as MP4, 1080p, and upload it to YouTube with visibility that satisfies the Devpost requirement.
+13. No afegeixis música amb drets d’autor. El silenci sota la narració és perfectament acceptable.
+14. Exporta el vídeo en MP4 i 1080p, i puja’l a YouTube amb una visibilitat que compleixi el requisit de Devpost.
 
-## Suggested YouTube Details
+## Text recomanat per a YouTube
 
-Title:
+Títol:
 
 ```text
 AvaluaPro - Privacy-Conscious AI Teacher Briefing | OpenAI Build Week 2026
 ```
 
-Description:
+Descripció:
 
 ```text
 AvaluaPro turns classroom assessment, work habits, behavior and group dynamics into actionable teacher intelligence.
@@ -79,13 +80,13 @@ Source code: https://github.com/MarcPCasals/avaluapro
 Build Week evidence: https://github.com/MarcPCasals/avaluapro/blob/main/BUILD_WEEK_2026.md
 ```
 
-## Final Review Before Upload
+## Revisió final abans de publicar
 
-- The video is shorter than three minutes.
-- Audio is clear and in English.
-- The phrase `AvaluaPro existed before Build Week` is included.
-- The Build Week extension is unmistakably identified.
-- Codex's contribution is explained with concrete examples.
-- Only fictitious student data appears.
-- No browser tabs, email addresses, notifications or private Codex conversations are visible.
-- The YouTube video can be opened without requesting access.
+- El vídeo dura menys de tres minuts.
+- L’àudio és clar i està en anglès.
+- S’hi explica explícitament que AvaluaPro ja existia abans de Build Week.
+- La funcionalitat creada durant Build Week queda identificada sense ambigüitats.
+- La contribució de Codex s’explica amb exemples concrets.
+- Només hi apareixen dades fictícies d’alumnes.
+- No es veuen pestanyes personals, correus electrònics, notificacions ni converses privades amb Codex.
+- El vídeo de YouTube es pot obrir sense demanar accés.
