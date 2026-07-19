@@ -26,6 +26,8 @@ The extension:
 - combines learning, consistency, behavior and sociometric signals;
 - replaces student identities with aliases such as `Student A`;
 - excludes names, surnames, email addresses, photos, diagnosis labels, family information and raw free-text observations;
+- keeps concrete classroom support needs, such as shorter instructions or additional processing time, without exporting
+  the diagnosis label that may have motivated them;
 - keeps the alias-to-identity map inside AvaluaPro and outside the copied package;
 - lets the teacher inspect the exact prompt and JSON before anything leaves the app;
 - requires human review and does not automatically send data to an AI provider.

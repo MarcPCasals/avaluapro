@@ -93,13 +93,19 @@ Enviar `alumne A` en lloc del nom es una bona practica, pero normalment continua
 Arquitectura recomanada:
 
 1. no enviar noms, correus, fotos, dades familiars ni diagnostics;
-2. filtrar observacions i limitar text lliure;
-3. enviar el minim context necessari amb un identificador temporal;
-4. no permetre entrenament amb les dades;
-5. establir contracte, ubicacio, retencio i subencarregats;
-6. registrar la finalitat i l'operacio;
-7. mantenir decisio i revisio humana;
-8. activar IA nomes despres de l'AIPD i l'autoritzacio institucional.
+2. si cal context de suport, transformar localment les etiquetes en mesures pedagogiques controlades, sense exportar
+   l'etiqueta clinica ni el seu origen;
+3. filtrar observacions i limitar text lliure;
+4. enviar el minim context necessari amb un identificador temporal;
+5. no permetre entrenament amb les dades;
+6. establir contracte, ubicacio, retencio i subencarregats;
+7. registrar la finalitat i l'operacio;
+8. mantenir decisio i revisio humana;
+9. activar IA nomes despres de l'AIPD i l'autoritzacio institucional.
+
+Les mesures pedagogiques derivades continuen sent dades personals pseudonimitzades i poden suggerir indirectament una
+necessitat educativa. Per tant, s'han de limitar als perfils rellevants, no s'han de descriure com a dades anonimes i han
+de seguir les mateixes garanties de proveidor, finalitat i revisio humana que la resta del paquet.
 
 ## 8. Recomanacio d'arquitectura
 

@@ -109,6 +109,9 @@ export function AiTeacherBriefingView() {
   const { activeClass, activeUt, localIdentityMap, promptPackage, promptText } = briefing
   const promptJson = JSON.stringify(promptPackage, null, 2)
   const excludedFields = promptPackage.privacyGuardrails.excludedFields || []
+  const supportProfileCount = (promptPackage.focusStudents || []).filter(
+    (student) => student.pedagogicalSupportNeeds?.length > 0,
+  ).length
   const activeClassLabel = activeClass?.name || 'Classe activa'
 
   return (
@@ -122,7 +125,8 @@ export function AiTeacherBriefingView() {
           <h2>Briefing IA segur per al docent</h2>
           <p>
             Converteix les dades de la classe en un paquet pseudonimitzat que pots revisar abans de copiar-lo a una IA.
-            Avaluapro no envia res automàticament i no inclou noms, diagnòstics ni observacions textuals.
+            Avaluapro no envia res automàticament: exclou noms, diagnòstics i observacions textuals, però conserva
+            mesures pedagògiques concretes sense etiqueta clínica.
           </p>
         </div>
         <aside>
@@ -162,10 +166,10 @@ export function AiTeacherBriefingView() {
           value="0"
         />
         <BriefingMetric
-          helper="Observacions i notes textuals queden fora del prompt."
-          label="Text lliure"
+          helper="Perfils de focus amb mesures concretes i sense etiqueta clínica."
+          label="Suports pedagògics"
           tone="positive"
-          value="Exclòs"
+          value={supportProfileCount}
         />
         <BriefingMetric
           helper="La IA rep mètriques, no identitat ni diagnòstics."
@@ -196,7 +200,7 @@ export function AiTeacherBriefingView() {
             <strong>2</strong>
             <div>
               <span>Descarrega les dades pseudonimitzades</span>
-              <small>El fitxer JSON conté els senyals educatius sense noms ni diagnòstics.</small>
+              <small>El JSON conté senyals i mesures pedagògiques, però no noms, diagnòstics ni text lliure.</small>
               <DownloadButton content={promptJson} />
             </div>
           </li>
@@ -226,7 +230,7 @@ export function AiTeacherBriefingView() {
             <h3>Què queda fora del paquet IA</h3>
             <p>
               Aquest filtre és intencionat: redueix risc abans d’usar qualsevol proveïdor d’IA i obliga a mantenir
-              revisió humana.
+              revisió humana. Les mesures pedagògiques s’inclouen sense indicar el diagnòstic que les pot haver motivat.
             </p>
           </div>
         </div>

@@ -43,7 +43,8 @@ Scroll to `Com utilitzar el briefing` (`How to use the briefing`). The interface
 
 Open `Veure contingut tècnic del briefing` (`View technical briefing content`) to inspect both pieces. Check that the JSON
 contains classroom metrics, competency signals and aliases such as `Student F`, but no student names, diagnosis labels or
-raw observations.
+raw observations. Some focus profiles include concrete `pedagogicalSupportNeeds`, such as short instructions or additional
+processing time, without identifying the diagnosis that may have motivated the accommodation.
 
 ### 4. Verify The Human Review Boundary
 

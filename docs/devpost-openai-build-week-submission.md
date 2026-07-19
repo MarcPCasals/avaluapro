@@ -45,6 +45,7 @@ The briefing includes:
 
 - class-level learning, habit and behavior signals;
 - focus students detected from the current classroom data;
+- pedagogical support needs expressed as concrete classroom accommodations without diagnosis labels;
 - sociometric counts and cooperative group context when available;
 - a copyable prompt asking an AI assistant for practical teaching recommendations;
 - a separate downloadable pseudonymized JSON package;

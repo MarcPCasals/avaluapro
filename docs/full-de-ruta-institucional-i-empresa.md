@@ -763,6 +763,8 @@ La correspondencia entre `A7` i l'alumne ha de quedar dins d'Avaluapro. L'identi
 
 - [ ] Cap nom, cognom, correu o informacio familiar.
 - [ ] Cap diagnostic clinic, tret que existeixi una justificacio excepcional i expressa.
+- [x] Les necessitats de suport que surtin d'Avaluapro s'expressen com a mesures pedagogiques controlades i sense
+  l'etiqueta clinica que les pot haver motivat.
 - [ ] Filtratge de text lliure abans de l'enviament.
 - [ ] Minimitzacio de les dades enviades.
 - [ ] Proveidor que no utilitzi les dades per entrenar models generals.

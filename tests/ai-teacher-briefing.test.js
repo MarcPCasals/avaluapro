@@ -60,9 +60,15 @@ describe('privacy-safe AI teacher briefing', () => {
     assert.doesNotMatch(copiedPayload, /tdah/i)
     assert.doesNotMatch(copiedPayload, /Private note/)
     assert.doesNotMatch(copiedPayload, /Raw text mentioning/)
+    assert.match(copiedPayload, /use short, single-step instructions/)
     assert.equal(briefing.promptPackage.privacyGuardrails.directIdentifiersIncluded, false)
     assert.equal(briefing.promptPackage.privacyGuardrails.localIdentityMapIncluded, false)
     assert.equal(briefing.promptPackage.privacyGuardrails.freeTextIncluded, false)
+    assert.equal(briefing.promptPackage.privacyGuardrails.pedagogicalSupportNeedsIncluded, true)
+    assert.equal(briefing.promptPackage.privacyGuardrails.supportNeedsIncludeDiagnosisLabels, false)
+    assert.ok(
+      briefing.promptPackage.focusStudents[0].pedagogicalSupportNeeds.includes('use short, single-step instructions'),
+    )
     assert.equal(briefing.localIdentityMap[0].name, 'Oriol Segarra Puig')
   })
 
@@ -97,5 +103,23 @@ describe('privacy-safe AI teacher briefing', () => {
     assert.ok(firstFocus.signals.includes('low achievement'))
     assert.ok(firstFocus.signals.includes('low work consistency'))
     assert.equal(briefing.promptPackage.competencyFocus[0].competency, 'C1: Reasoning')
+  })
+
+  it('exports concrete support needs without exposing the diagnosis that motivated them', () => {
+    const state = baseState({
+      competencies: [{ id: 'comp_1', name: 'C1: Reasoning', order: 1, utId: 'ut_1' }],
+      criteria: [{ competencyId: 'comp_1', id: 'crit_1' }],
+      marks: [{ criterionId: 'crit_1', id: 'mark_1', studentId: 'student_1', value: 'D' }],
+      students: [{ classId: 'class_1', diagnoses: ['qi-tdl'], id: 'student_1', name: 'Student One' }],
+    })
+
+    const briefing = buildPrivacySafeTeacherBriefing(state)
+    const packageText = JSON.stringify(briefing.promptPackage)
+    const [firstFocus] = briefing.promptPackage.focusStudents
+
+    assert.doesNotMatch(packageText, /qi-tdl/i)
+    assert.doesNotMatch(packageText, /\btdl\b/i)
+    assert.match(packageText, /allow additional processing and response time/)
+    assert.ok(firstFocus.pedagogicalSupportNeeds.length <= 4)
   })
 })

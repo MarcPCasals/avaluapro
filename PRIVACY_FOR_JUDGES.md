@@ -80,6 +80,7 @@ The Build Week feature creates a deliberately reduced package from existing clas
 - limited sociometric counts;
 - cooperative-group availability;
 - selected focus-student signals under temporary aliases.
+- a limited set of concrete classroom support needs, without the diagnosis labels that may have motivated them.
 
 ### Excluded
 
@@ -92,7 +93,9 @@ The Build Week feature creates a deliberately reduced package from existing clas
 - the local alias-to-identity map.
 
 The package also records its own guardrails, including that human review is required and direct identifiers, diagnosis
-labels and free text are not included.
+labels and free text are not included. The prompt explicitly prohibits inferring a diagnosis from the support needs.
+These accommodations remain pseudonymized personal data and may still suggest an educational need indirectly; AvaluaPro
+does not present them as anonymous or risk-free.
 
 ## Encryption, Pseudonymization And Anonymization
 

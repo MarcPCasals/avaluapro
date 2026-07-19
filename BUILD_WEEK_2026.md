@@ -47,7 +47,9 @@ It does four things:
 2. Replaces student identities with aliases such as `Student A`, `Student B`, etc.
 3. Excludes names, surnames, emails, photos, diagnosis labels, family information, raw free-text observations and the
    local identity map.
-4. Generates a copyable prompt that asks an AI assistant for class-level and student-level teaching options, while
+4. Converts configured needs into a small controlled set of concrete classroom accommodations without exporting their
+   diagnosis labels.
+5. Generates a copyable prompt that asks an AI assistant for class-level and student-level teaching options, while
    requiring human review.
 
 The local identity map remains visible only inside AvaluaPro and is not included in the copied prompt or JSON package.

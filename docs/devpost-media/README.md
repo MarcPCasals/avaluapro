@@ -6,7 +6,7 @@ Upload the images in this order. All screenshots use AvaluaPro's fictitious demo
 
 File: `04-ai-briefing-privacy-gate.png`
 
-Caption: Privacy-conscious AI Teacher Briefing: zero direct identifiers, no raw text, and teacher review before any data leaves AvaluaPro.
+Caption: The privacy gate removes direct identifiers and diagnosis labels while retaining concrete classroom support needs for better recommendations.
 
 ## 2. Teacher-Controlled AI Workflow
 

@@ -3,6 +3,50 @@ import { getNumericFromGrade } from './grades.js'
 
 const ALIAS_PREFIX = 'Student'
 const MAX_FOCUS_STUDENTS = 8
+const MAX_SUPPORT_NEEDS_PER_STUDENT = 4
+
+const PEDAGOGICAL_SUPPORT_NEEDS = {
+  dyslexia: [
+    'use short, clearly structured instructions',
+    'offer visual or audio access to written content',
+    'allow additional reading and writing time',
+    'offer alternative ways to demonstrate learning',
+  ],
+  dyscalculia: [
+    'break multistep calculations into visible steps',
+    'use visual or concrete representations for mathematical ideas',
+    'allow additional processing time for mathematical tasks',
+    'prioritize reasoning over speed when speed is not the objective',
+  ],
+  tdah: [
+    'use short, single-step instructions',
+    'break long tasks into visible short stages',
+    'use frequent, discreet check-ins',
+    'reduce distractions and allow brief regulation pauses',
+  ],
+  tea: [
+    'use clear, literal and predictable instructions',
+    'anticipate changes in routine or activity',
+    'provide visual schedules and explicit sequences',
+    'make roles and expectations explicit in group work',
+  ],
+  'qi-tdl': [
+    'use short, sequenced instructions with visual support',
+    'check comprehension and reformulate when needed',
+    'allow additional processing and response time',
+    'reduce linguistic load when language is not the learning objective',
+  ],
+  progress: [
+    'set short, observable and achievable learning goals',
+    'make progress visible through frequent formative feedback',
+    'prioritize the next essential learning step',
+  ],
+  'high-capacity': [
+    'offer extension, depth and transfer tasks',
+    'reduce repetitive practice when content is already secure',
+    'allow varied products or self-directed challenges',
+  ],
+}
 
 const EXCLUDED_FROM_AI_PACKAGE = [
   'student names',
@@ -142,6 +186,22 @@ function getSuggestedFocus(signals) {
   return 'Monitor with a short, observable follow-up.'
 }
 
+function getPedagogicalSupportNeeds(diagnoses) {
+  const supportSets = safeArray(diagnoses)
+    .map((diagnosis) => PEDAGOGICAL_SUPPORT_NEEDS[diagnosis] || [])
+    .filter((needs) => needs.length > 0)
+  const interleavedNeeds = []
+  const longestSet = Math.max(0, ...supportSets.map((needs) => needs.length))
+
+  for (let needIndex = 0; needIndex < longestSet; needIndex += 1) {
+    supportSets.forEach((needs) => {
+      if (needs[needIndex]) interleavedNeeds.push(needs[needIndex])
+    })
+  }
+
+  return [...new Set(interleavedNeeds)].slice(0, MAX_SUPPORT_NEEDS_PER_STUDENT)
+}
+
 function buildFocusStudents({ aliasMap, profiles, relations }) {
   return profiles
     .map((profile) => {
@@ -167,6 +227,7 @@ function buildFocusStudents({ aliasMap, profiles, relations }) {
         },
         sociometric: relationStats,
         signals,
+        pedagogicalSupportNeeds: getPedagogicalSupportNeeds(profile.student.diagnoses),
         suggestedFocus: getSuggestedFocus(signals),
         priorityScore,
       }
@@ -253,6 +314,8 @@ function buildPromptPackage({ activeClass, activeUt, aliasMap, classId, profiles
       localIdentityMapIncluded: false,
       freeTextIncluded: false,
       diagnosisLabelsIncluded: false,
+      pedagogicalSupportNeedsIncluded: true,
+      supportNeedsIncludeDiagnosisLabels: false,
       excludedFields: EXCLUDED_FROM_AI_PACKAGE,
       humanReviewRequired: true,
     },
@@ -289,6 +352,7 @@ export function buildAiTeacherBriefingPrompt() {
     'You are an educational planning assistant helping a teacher prepare the next intervention.',
     '',
     'Use only the pseudonymized classroom signals in the attached JSON file. Do not infer identity, diagnosis, family situation, or protected attributes. Do not make final decisions. Produce practical options for human review.',
+    'Pedagogical support needs describe classroom accommodations without diagnosis labels. Use them to contextualize patterns, but never infer or name a diagnosis from them.',
     '',
     'Return:',
     '1. A 5-bullet class briefing.',
