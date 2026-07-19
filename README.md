@@ -41,9 +41,9 @@ No account or real student data is required.
 2. Keep the fictitious demo classroom loaded on first launch.
 3. Click `Briefing IA` (`AI Briefing`) in the main navigation.
 4. Confirm that the summary reports `0 identificadors directes` (`0 direct identifiers`).
-5. Inspect the pseudonymized prompt and JSON package.
-6. Confirm that focus learners appear only as `Student A`, `Student B`, and similar aliases.
-7. Review the fields explicitly excluded from the package.
+5. Review the four-step workflow, then copy the prompt and download the pseudonymized JSON package.
+6. Use the visible local correspondence to confirm how aliases such as `Student A` map back to demo learners.
+7. Open the technical details and review the fields explicitly excluded from the package.
 
 The app interface is currently in Catalan. [JUDGES_GUIDE.md](JUDGES_GUIDE.md) provides complete English testing
 instructions and a translation key for the relevant controls.

@@ -284,22 +284,17 @@ function buildPromptPackage({ activeClass, activeUt, aliasMap, classId, profiles
   }
 }
 
-export function buildAiTeacherBriefingPrompt(promptPackage) {
+export function buildAiTeacherBriefingPrompt() {
   return [
     'You are an educational planning assistant helping a teacher prepare the next intervention.',
     '',
-    'Use only the pseudonymized classroom signals below. Do not infer identity, diagnosis, family situation, or protected attributes. Do not make final decisions. Produce practical options for human review.',
+    'Use only the pseudonymized classroom signals in the attached JSON file. Do not infer identity, diagnosis, family situation, or protected attributes. Do not make final decisions. Produce practical options for human review.',
     '',
     'Return:',
     '1. A 5-bullet class briefing.',
     '2. Three next-session actions for the whole class.',
     '3. A short plan for each focus student, using only their pseudonym.',
     '4. Two questions the teacher should answer before acting.',
-    '',
-    'PSEUDONYMIZED DATA:',
-    '```json',
-    JSON.stringify(promptPackage, null, 2),
-    '```',
   ].join('\n')
 }
 
@@ -330,6 +325,6 @@ export function buildPrivacySafeTeacherBriefing(state) {
       name: student.name,
     })),
     promptPackage,
-    promptText: buildAiTeacherBriefingPrompt(promptPackage),
+    promptText: buildAiTeacherBriefingPrompt(),
   }
 }

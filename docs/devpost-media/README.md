@@ -8,11 +8,11 @@ File: `04-ai-briefing-privacy-gate.png`
 
 Caption: Privacy-conscious AI Teacher Briefing: zero direct identifiers, no raw text, and teacher review before any data leaves AvaluaPro.
 
-## 2. Pseudonymized AI Package
+## 2. Teacher-Controlled AI Workflow
 
 File: `05-pseudonymized-ai-package.png`
 
-Caption: The teacher can inspect and copy the exact pseudonymized prompt and JSON package before using an approved AI environment.
+Caption: A four-step workflow separates the prompt and pseudonymized JSON package while keeping the local alias correspondence inside AvaluaPro.
 
 ## 3. Global Classroom Intelligence
 

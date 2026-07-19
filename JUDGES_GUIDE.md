@@ -32,30 +32,34 @@ At the top of the view, verify:
 - `Mapa local: No copiat`: the local identity map is not copied;
 - `Porta de sortida manual`: the package leaves only after a teacher chooses to copy it.
 
-### 3. Inspect The Package
+### 3. Inspect The Workflow
 
-Scroll to the two side-by-side panels:
+Scroll to `Com utilitzar el briefing` (`How to use the briefing`). The interface presents four explicit steps:
 
-- `Prompt pseudonimitzat`: pseudonymized prompt;
-- `Paquet JSON que sortiria de l'app`: the exact JSON package that would leave the app.
+- copy the AI instructions;
+- download the separate pseudonymized JSON package;
+- paste the prompt and attach the file in an institutionally approved AI environment;
+- use AvaluaPro's local correspondence to interpret the aliases in the response.
 
-Check that the package contains classroom metrics, competency signals and aliases such as `Student F`, but no student
-names, diagnosis labels or raw observations.
+Open `Veure contingut tècnic del briefing` (`View technical briefing content`) to inspect both pieces. Check that the JSON
+contains classroom metrics, competency signals and aliases such as `Student F`, but no student names, diagnosis labels or
+raw observations.
 
 ### 4. Verify The Human Review Boundary
 
-The buttons `Copiar prompt` and `Copiar JSON` mean `Copy prompt` and `Copy JSON`.
+The buttons `Copiar prompt` and `Descarregar paquet JSON` mean `Copy prompt` and `Download JSON package`.
 
 AvaluaPro does not call an AI service automatically. The teacher sees the exact outgoing package first and decides whether
-to copy it into an institutionally approved environment. The package is pseudonymized, not claimed to be anonymous.
+to use the prompt and file in an institutionally approved environment. The package is pseudonymized, not claimed to be
+anonymous.
 
 ### 5. Inspect The Local Identity Boundary
 
-Near the bottom, open:
+Near the bottom, review:
 
-`Veure correspondència local que no es copia a la IA`
+`Correspondència per interpretar la resposta`
 
-Translation: `View the local identity mapping that is not copied to AI`.
+Translation: `Correspondence for interpreting the response`.
 
 The mapping lets the teacher understand the briefing inside AvaluaPro. It is deliberately absent from both copyable
 outputs.

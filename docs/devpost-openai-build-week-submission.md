@@ -47,6 +47,7 @@ The briefing includes:
 - focus students detected from the current classroom data;
 - sociometric counts and cooperative group context when available;
 - a copyable prompt asking an AI assistant for practical teaching recommendations;
+- a separate downloadable pseudonymized JSON package;
 - a local identity map that stays inside AvaluaPro and is not included in the copied AI package.
 
 The goal is not to automate educational decisions or replace professional judgment. It is to give the teacher a safer, faster way to prepare for the next class, tutoring conversation or teaching-team meeting.
@@ -154,7 +155,7 @@ Recommended 3-minute structure:
 3. Open `Briefing IA` (`AI Briefing`) from the main navigation.
 4. Show aliases such as `Student A` instead of real names.
 5. Show that the identity map stays local inside AvaluaPro.
-6. Copy the prompt or JSON package.
+6. Copy the prompt and download the JSON package.
 7. Explain that Build Week added the privacy-conscious AI preparation layer.
 8. Close with the main idea: useful AI for teachers starts with data minimization and human review.
 

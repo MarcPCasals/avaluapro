@@ -16,8 +16,8 @@ Use the live fictitious demo at <https://avaluapro.web.app/>. Do not sign in and
 | 0:35-0:57 | Cut between `Estadístiques Globals`, the main `Mode tutoria` diagnostic, and `Relacions i grups`. Finish with cooperative groups or the seating plan. | **Global analytics connect achievement, habits and behavior. Tutor mode adds sociometry, individual and group diagnostics, cooperative groups and classroom seating, helping teachers turn daily records into personalized action.** |
 | 0:57-1:10 | Return briefly to the global view, then click `Briefing IA`. Pause on its title. | **This working classroom-intelligence foundation existed before Build Week. During the challenge, I used OpenAI Codex to add a new privacy-conscious bridge between all this educational context and AI.** |
 | 1:10-1:32 | Show the title, `0 identificadors directes`, the four summary cards and the excluded-fields list. | **The new AI Teacher Briefing analyzes the fictitious classroom and first applies a privacy gate: zero direct identifiers, no raw free text, no diagnosis labels, and no copied identity map.** |
-| 1:32-1:55 | Scroll to the pseudonymized prompt and JSON. Point at the guardrails, class signals and aliases such as `Student F`. | **The teacher can inspect exactly what would leave the app. Learners become Student A, Student B and similar aliases, while selected competency, consistency, behavior and group signals remain useful for educational planning.** |
-| 1:55-2:15 | Show `Copiar prompt`, `Copiar JSON`, and the local correspondence section. Do not paste the data anywhere. | **Nothing is sent automatically. The teacher reviews the prompt and JSON, then decides whether to use an approved AI environment. The package is pseudonymized, not anonymous, and the real correspondence stays inside AvaluaPro.** |
+| 1:32-1:55 | Show the four-step workflow, `Copiar prompt` and `Descarregar paquet JSON`. Do not upload the demo file anywhere during the recording. | **The teacher copies the instructions and downloads a separate JSON file containing selected competency, consistency, behavior and group signals. Both actions are explicit, and nothing is sent automatically.** |
+| 1:55-2:15 | Show the visible local correspondence, then briefly open the technical details and point at aliases such as `Student F`. | **The package is pseudonymized, not anonymous. The real correspondence stays inside AvaluaPro so the teacher can interpret the AI response, inspect the technical content and retain professional control.** |
 | 2:15-2:35 | Show the GitHub Build Week commit, the generator and React filenames, then a terminal with `npm run test:ai-briefing` passing. | **Codex helped inspect the architecture, build the generator and interface, integrate the workflow, and add privacy tests confirming that names, raw observations and the identity map stay out of the copied package.** |
 | 2:35-2:48 | Return to the top of `Briefing IA`, ending on the title and zero-identifiers panel. | **AvaluaPro does not replace professional judgment. It helps teachers see the right patterns earlier, with privacy and the teacher kept firmly in the loop.** |
 
@@ -33,7 +33,8 @@ Use the live fictitious demo at <https://avaluapro.web.app/>. Do not sign in and
 | `Text lliure: Exclòs` | Raw free text excluded |
 | `Mapa local: No copiat` | Local identity map not copied |
 | `Copiar prompt` | Copy prompt |
-| `Copiar JSON` | Copy JSON |
+| `Descarregar paquet JSON` | Download JSON package |
+| `Correspondència per interpretar la resposta` | Correspondence for interpreting the response |
 
 The Catalan labels match the interface exactly; the narration provides their English meaning.
 

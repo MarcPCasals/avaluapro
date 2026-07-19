@@ -52,6 +52,8 @@ describe('privacy-safe AI teacher briefing', () => {
     const copiedPayload = `${briefing.promptText}\n${JSON.stringify(briefing.promptPackage)}`
 
     assert.match(copiedPayload, /Student A/)
+    assert.doesNotMatch(briefing.promptText, /Student A/)
+    assert.match(JSON.stringify(briefing.promptPackage), /Student A/)
     assert.doesNotMatch(copiedPayload, /Oriol/)
     assert.doesNotMatch(copiedPayload, /Segarra/)
     assert.doesNotMatch(copiedPayload, /Puig/)
