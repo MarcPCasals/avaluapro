@@ -1,6 +1,6 @@
 # AvaluaPro Devpost Demo Video
 
-Target duration: 2 minutes 35 seconds to 2 minutes 45 seconds.
+Target duration: 2 minutes 40 seconds to 2 minutes 50 seconds.
 
 The official limit is under three minutes. Record the screen first, then record the English voice separately and combine
 both tracks. A personal voice is recommended; a natural accent is completely appropriate for this story.
@@ -11,14 +11,15 @@ Use the live fictitious demo at <https://avaluapro.web.app/>. Do not sign in and
 
 | Time | What to show | English narration |
 | --- | --- | --- |
-| 0:00-0:18 | Start on AvaluaPro's assessment workspace. Keep the logo, demo banner and competency table visible. | **I'm Marc Pérez Casals, a teacher from Andorra. During my first year in the classroom, I needed more than a place to store grades. I needed to understand how achievement, consistency, behavior and classroom relationships change together.** |
-| 0:18-0:38 | Click `Seguiment`, then briefly show `Estadístiques Globals`. Move slowly enough to show tasks, consistency and the global diagnostic. | **AvaluaPro turns that daily information into teacher intelligence. I can assess competencies, track work habits, identify students who may need early intervention, and bring the whole picture into one practical workspace.** |
-| 0:38-0:53 | Click `Briefing IA`. Pause on the title and the `0 identificadors directes` panel. | **AvaluaPro existed before Build Week. During this week, I used OpenAI Codex to design, implement, test and deploy a new privacy-conscious AI Teacher Briefing.** |
-| 0:53-1:18 | Show the four summary cards and the list of excluded fields. Keep the zero-identifiers card visible for several seconds. | **This is the new workflow. AvaluaPro analyzes the fictitious classroom and creates a focused briefing. Before any AI use, it applies a privacy gate: zero direct identifiers, no raw free text, no diagnosis labels, and no copied identity map.** |
-| 1:18-1:48 | Scroll to the pseudonymized prompt and JSON panels. Point at the guardrails and aliases such as `Student F`. | **The teacher can inspect exactly what would leave the app. Learners become Student A, Student B and similar aliases. The package keeps selected competency, consistency, behavior and group signals. It is pseudonymized, not claimed to be anonymous.** |
-| 1:48-2:08 | Show `Copiar prompt`, `Copiar JSON`, then scroll toward the local correspondence section. Do not paste the data anywhere. | **Nothing is sent automatically. The teacher reviews the prompt and JSON, then decides whether to copy them into an approved AI environment. The correspondence with real learners stays inside AvaluaPro.** |
-| 2:08-2:28 | Switch to the GitHub Build Week commit or to a terminal showing `npm run test:ai-briefing` passing. Briefly show the generator and test filenames. | **Codex helped me inspect the existing architecture, build the generator and React interface, add privacy assertions, and integrate the feature into the production app. The tests confirm that names, raw observations and the identity map stay out of the copied package.** |
-| 2:28-2:45 | Return to the top of `Briefing IA`, ending on the title and zero-identifiers panel. | **The goal is not to replace the teacher. It is to see the right patterns earlier while keeping professional judgment and privacy in the loop. AvaluaPro is built by a teacher, for teachers, as a step toward responsible classroom intelligence.** |
+| 0:00-0:15 | Start on AvaluaPro's assessment workspace. Keep the logo, demo banner and competency table visible. | **I'm Marc Pérez Casals, a teacher from Andorra. AvaluaPro began because I needed more than a place to store grades: I needed to understand each learner and the whole class.** |
+| 0:15-0:35 | Show competency assessment, then cut to `Seguiment` with tasks, completion states and consistency percentages. | **Teachers can assess competencies, record daily work, follow consistency and behavior, and spot changes throughout the course. Information that was previously scattered becomes one practical classroom workflow.** |
+| 0:35-0:57 | Cut between `Estadístiques Globals`, the main `Mode tutoria` diagnostic, and `Relacions i grups`. Finish with cooperative groups or the seating plan. | **Global analytics connect achievement, habits and behavior. Tutor mode adds sociometry, individual and group diagnostics, cooperative groups and classroom seating, helping teachers turn daily records into personalized action.** |
+| 0:57-1:10 | Return briefly to the global view, then click `Briefing IA`. Pause on its title. | **This working classroom-intelligence foundation existed before Build Week. During the challenge, I used OpenAI Codex to add a new privacy-conscious bridge between all this educational context and AI.** |
+| 1:10-1:32 | Show the title, `0 identificadors directes`, the four summary cards and the excluded-fields list. | **The new AI Teacher Briefing analyzes the fictitious classroom and first applies a privacy gate: zero direct identifiers, no raw free text, no diagnosis labels, and no copied identity map.** |
+| 1:32-1:55 | Scroll to the pseudonymized prompt and JSON. Point at the guardrails, class signals and aliases such as `Student F`. | **The teacher can inspect exactly what would leave the app. Learners become Student A, Student B and similar aliases, while selected competency, consistency, behavior and group signals remain useful for educational planning.** |
+| 1:55-2:15 | Show `Copiar prompt`, `Copiar JSON`, and the local correspondence section. Do not paste the data anywhere. | **Nothing is sent automatically. The teacher reviews the prompt and JSON, then decides whether to use an approved AI environment. The package is pseudonymized, not anonymous, and the real correspondence stays inside AvaluaPro.** |
+| 2:15-2:35 | Show the GitHub Build Week commit, the generator and React filenames, then a terminal with `npm run test:ai-briefing` passing. | **Codex helped inspect the architecture, build the generator and interface, integrate the workflow, and add privacy tests confirming that names, raw observations and the identity map stay out of the copied package.** |
+| 2:35-2:48 | Return to the top of `Briefing IA`, ending on the title and zero-identifiers panel. | **AvaluaPro does not replace professional judgment. It helps teachers see the right patterns earlier, with privacy and the teacher kept firmly in the loop.** |
 
 ## Catalan Labels Used In The Recording
 
@@ -41,16 +42,18 @@ The Catalan labels match the interface exactly; the narration provides their Eng
 1. Use Chrome or Safari in a clean full-screen window at 1920 x 1080 if possible.
 2. Open the app in a fresh private window so the fictitious demo loads from the beginning.
 3. Close the interactive guide before recording.
-4. Hide bookmarks, personal tabs, notifications, email and account information.
-5. Start screen recording with `Shift + Command + 5` or QuickTime Player.
-6. Move the cursor slowly and pause after every navigation change.
-7. Record the complete silent screen sequence in one take.
-8. Record the narration separately with Voice Memos in a quiet room.
-9. Combine video and voice in iMovie, keeping the final duration below 2:50.
-10. Add small English section titles only if they help: `The problem`, `Built during Build Week`, `Privacy gate`,
+4. Before recording, mark the demo class as a tutor group in `Configuració del grup` so `Mode tutoria` is available.
+5. Hide bookmarks, personal tabs, notifications, email and account information.
+6. Record four short silent clips: core classroom workflow, tutor tools, AI briefing, and code/tests.
+7. Start each clip a few seconds before the intended action and leave a short pause at the end.
+8. Move the cursor slowly and avoid live typing wherever possible.
+9. Record the narration separately with Voice Memos in a quiet room.
+10. Combine the four clips and voice track in iMovie, keeping the final duration below 2:50.
+11. Add small English section titles only if they help: `The problem`, `Existing classroom intelligence`,
+    `Built during Build Week`, `Privacy gate`,
     `Built with Codex`, `Teacher stays in control`.
-11. Do not add copyrighted music. Silence under the narration is perfectly acceptable.
-12. Export as MP4, 1080p, and upload it to YouTube with visibility that satisfies the Devpost requirement.
+12. Do not add copyrighted music. Silence under the narration is perfectly acceptable.
+13. Export as MP4, 1080p, and upload it to YouTube with visibility that satisfies the Devpost requirement.
 
 ## Suggested YouTube Details
 
