@@ -91,9 +91,11 @@ Documentation:
 - `docs/devpost-openai-build-week-submission.md`
 - `docs/devpost-media/README.md`
 
-## How Codex was used
+## How Codex and GPT-5.6 were used
 
-Codex was used as the main engineering partner during Build Week to:
+GPT-5.6, accessed through OpenAI Codex, was used as the main engineering partner during Build Week. Marc Perez Casals
+defined the classroom problem, pedagogical requirements, privacy boundaries and final product decisions. Codex and
+GPT-5.6 were used to:
 
 - inspect the existing AvaluaPro architecture and privacy dossier;
 - identify a feature that could be honestly evaluated as new Build Week work;

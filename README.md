@@ -35,6 +35,25 @@ The extension:
 The Build Week implementation is documented in [BUILD_WEEK_2026.md](BUILD_WEEK_2026.md). The main feature commit is
 [`537ee16`](https://github.com/marcpcasals/avaluapro/commit/537ee16).
 
+## How Codex And GPT-5.6 Were Used
+
+**GPT-5.6, working through OpenAI Codex, was the engineering partner for the Build Week extension.** Marc Perez Casals,
+an active teacher and the product creator, defined the classroom problem, pedagogical requirements, privacy boundaries
+and final product decisions. Codex and GPT-5.6 helped turn those decisions into a tested production feature by:
+
+- exploring the existing React, Firebase and privacy architecture;
+- designing the data-minimization and pseudonymization flow;
+- implementing the briefing generator and React user experience;
+- translating diagnosis-based configuration into pedagogical support needs while excluding diagnosis labels;
+- writing privacy-focused automated tests and running the security, lint and production-build checks;
+- reviewing the interaction through the live interface and preparing transparent judge documentation.
+
+The collaboration was iterative: Marc tested each workflow as a teacher, challenged unclear or unsafe choices and made
+the final decisions; Codex inspected, implemented, tested and refined the code. GPT-5.6 is **not** used to make autonomous
+decisions about students inside the deployed app. The current feature prepares an inspectable pseudonymized package, and
+the teacher decides whether to provide it to an institutionally approved AI service and remains responsible for reviewing
+any resulting suggestions.
+
 ## Try It In 90 Seconds
 
 No account or real student data is required.
