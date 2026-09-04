@@ -1,3 +1,4 @@
+import { antecedentCompetencyKey, normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import {
   Camera,
   FileDown,
@@ -121,7 +122,7 @@ const antecedentProfileLabels = {
 }
 
 function getAntecedentGrade(antecedent) {
-  const competencyGrades = Object.values(antecedent?.competencyGrades || {}).filter(Boolean)
+  const competencyGrades = Object.values(normalizeAntecedentCompetencies(antecedent?.competencyGrades)).filter(Boolean)
   const grades = competencyGrades.length > 0 ? competencyGrades : [antecedent?.lastLookGrade].filter(Boolean)
   return calculateGrade(grades)
 }
@@ -195,7 +196,7 @@ function createAntecedentDraft(antecedent) {
   return {
     courseLabel: antecedent?.courseLabel || '',
     lastLookGrade: antecedent?.lastLookGrade || '',
-    competencyGrades: antecedent?.competencyGrades || {},
+    competencyGrades: normalizeAntecedentCompetencies(antecedent?.competencyGrades),
     profile: antecedent?.profile || '',
     qualitativeNotes: antecedent?.qualitativeNotes || '',
     diagnosisSnapshot: antecedent?.diagnosisSnapshot || [],
@@ -360,7 +361,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     updateAntecedentDraft({
       competencyGrades: {
         ...(antecedentDraft.competencyGrades || {}),
-        [competencyName]: grade,
+        [antecedentCompetencyKey(competencyName)]: grade,
       },
     })
   }
@@ -850,7 +851,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                     <span>{competency.name}</span>
                     <select
                       onChange={(event) => updateAntecedentCompetencyGrade(competency.name, event.target.value)}
-                      value={antecedentDraft.competencyGrades?.[competency.name] || ''}
+                      value={antecedentDraft.competencyGrades?.[antecedentCompetencyKey(competency.name)] || ''}
                     >
                       {gradeOptions.map((grade) => (
                         <option key={`${competency.name}-${grade || 'empty'}`} value={grade}>

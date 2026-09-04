@@ -1,3 +1,4 @@
+import { normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import { getClassUts, getUtCompetencies, getStudentUtGrade, getStudentCompetencyGrade, getLatestStudentLook, getGradeFromAverage } from '../../lib/studentEvaluation'
 import { useEffect, useState } from 'react'
 import {
@@ -607,7 +608,7 @@ const antecedentProfileLabels = {
 }
 
 function getAntecedentGrade(antecedent) {
-  const competencyGrades = Object.values(antecedent?.competencyGrades || {}).filter(Boolean)
+  const competencyGrades = Object.values(normalizeAntecedentCompetencies(antecedent?.competencyGrades)).filter(Boolean)
   const grades = competencyGrades.length > 0 ? competencyGrades : [antecedent?.lastLookGrade].filter(Boolean)
   return calculateGrade(grades)
 }

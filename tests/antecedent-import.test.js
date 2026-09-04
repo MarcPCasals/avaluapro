@@ -59,3 +59,16 @@ test('omet també coincidències i permet finalitzar sense importar cap alumne',
   assert.equal(validateAntecedentAssignments(rows, students), '')
   assert.deepEqual(getAntecedentsToImport(rows), [])
 })
+
+test('sense cap coincidència conserva tot el paquet per forçar assignacions manuals', () => {
+ const rows = matchAntecedentStudents([
+  { studentName: 'Nom antic 1', antecedent: { competencyGrades: { C1: 'A' } } },
+  { studentName: 'Nom antic 2', antecedent: { competencyGrades: { C2: 'B' } } },
+ ], students)
+ assert.equal(rows.length, 2)
+ assert.ok(rows.every((row) => row.studentId === ''))
+ rows[0].studentId = 'tom'
+ rows[1].studentId = 'claudia'
+ assert.equal(validateAntecedentAssignments(rows, students), '')
+ assert.deepEqual(rows[0].antecedent.competencyGrades, { C1: 'A' })
+})
