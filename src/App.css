@@ -26963,3 +26963,54 @@ button.profile-followup-card:focus-visible {
   background: white;
   color: #1f2937;
 }
+
+.antecedent-transfer-card,
+.antecedent-selection-actions > span,
+.antecedent-student-list label {
+  color: #334155;
+}
+
+.antecedent-transfer-controls input {
+  min-height: 38px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: white;
+}
+
+.antecedent-transfer-controls label {
+  min-width: min(210px, 100%);
+  max-width: 100%;
+}
+
+.antecedent-transfer-controls select {
+  max-width: 100%;
+}
+
+.antecedent-export-preview {
+  min-width: 0;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+}
+
+.antecedent-export-preview summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.antecedent-export-preview > div {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.antecedent-export-preview article {
+  padding: 12px 0;
+  border-bottom: 1px solid #fed7aa;
+}
+
+.antecedent-summary-text {
+  white-space: pre-line;
+}

@@ -1,3 +1,4 @@
+import { prepareClassAntecedents, buildAntecedentsExport, ANTECEDENTS_EXPORT_APP_ID } from './antecedentExport'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -22,8 +23,6 @@ import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const CONTACT_EMAIL = 'mperezc@educand.ad'
-const ANTECEDENTS_EXPORT_APP_ID = 'avaluapro-student-antecedents'
-const ANTECEDENTS_EXPORT_VERSION = 1
 
 function formatBytes(bytes = 0) {
   if (!bytes) return '0 MB'
@@ -97,35 +96,6 @@ function buildAntecedentsFilename(classItem) {
   return `avaluapro-antecedents-${slugify(classItem?.name || 'classe')}-${getTodaySlug()}.json`
 }
 
-function buildAntecedentsExport({ classItem, students, antecedents }) {
-  const antecedentsByStudentId = new Map(antecedents.map((antecedent) => [antecedent.studentId, antecedent]))
-  const rows = students
-    .map((student) => {
-      const antecedent = antecedentsByStudentId.get(student.id)
-      if (!antecedent) return null
-      return {
-        studentName: student.name,
-        antecedent: {
-          courseLabel: antecedent.courseLabel || '',
-          lastLookGrade: antecedent.lastLookGrade || '',
-          competencyGrades: antecedent.competencyGrades || {},
-          profile: antecedent.profile || '',
-          qualitativeNotes: antecedent.qualitativeNotes || '',
-          diagnosisSnapshot: antecedent.diagnosisSnapshot || [],
-        },
-      }
-    })
-    .filter(Boolean)
-
-  return {
-    app: ANTECEDENTS_EXPORT_APP_ID,
-    version: ANTECEDENTS_EXPORT_VERSION,
-    exportedAt: new Date().toISOString(),
-    className: classItem?.name || '',
-    students: rows,
-  }
-}
-
 function parseAntecedentsExport(payload) {
   if (payload?.app !== ANTECEDENTS_EXPORT_APP_ID || !Array.isArray(payload.students)) {
     throw new Error('Aquest fitxer no sembla un export d’antecedents acadèmics d’Avaluapro.')
@@ -163,6 +133,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     () => state.ui.activeClassId || state.classes[0]?.id || '',
   )
   const [antecedentStatus, setAntecedentStatus] = useState('')
+  const [antecedentExportSource, setAntecedentExportSource] = useState('current')
+  const [antecedentCourseLabel, setAntecedentCourseLabel] = useState('')
   const [antecedentImport, setAntecedentImport] = useState(null)
   const [isImportingAntecedents, setIsImportingAntecedents] = useState(false)
   const [excludedAntecedentStudentIds, setExcludedAntecedentStudentIds] = useState(() => new Set())
@@ -180,7 +152,13 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     const classStudentIds = new Set(antecedentStudents.map((student) => student.id))
     return state.studentAntecedents.filter((antecedent) => classStudentIds.has(antecedent.studentId))
   }, [antecedentStudents, state.studentAntecedents])
-  const antecedentStudentIds = new Set(antecedentsForClass.map((antecedent) => antecedent.studentId))
+  const preparedAntecedents = useMemo(
+    () => prepareClassAntecedents(state, antecedentClass, antecedentCourseLabel),
+    [state, antecedentClass, antecedentCourseLabel],
+  )
+  const exportableAntecedents = antecedentExportSource === 'current'
+    ? preparedAntecedents.filter((entry) => entry.hasData) : antecedentsForClass
+  const antecedentStudentIds = new Set(exportableAntecedents.map((antecedent) => antecedent.studentId))
   const selectedAntecedentStudents = antecedentStudents.filter(
     (student) => antecedentStudentIds.has(student.id) && !excludedAntecedentStudentIds.has(student.id),
   )
@@ -365,8 +343,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
       setAntecedentStatus('No hi ha cap classe seleccionada.')
       return
     }
-    if (antecedentsForClass.length === 0) {
-      setAntecedentStatus('Aquesta classe encara no té antecedents acadèmics per exportar.')
+    if (exportableAntecedents.length === 0) {
+      setAntecedentStatus('Aquesta classe no té dades disponibles per a aquesta exportació.')
       return
     }
     if (selectedAntecedentStudents.length === 0) {
@@ -377,7 +355,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     const payload = buildAntecedentsExport({
       classItem: antecedentClass,
       students: selectedAntecedentStudents,
-      antecedents: antecedentsForClass,
+      antecedents: exportableAntecedents,
     })
     downloadJson(payload, buildAntecedentsFilename(antecedentClass))
     setAntecedentStatus(`Exportats ${payload.students.length} antecedents de ${antecedentClass.name}.`)
@@ -799,17 +777,36 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             <div>
               <h3>Antecedents per al curs vinent</h3>
               <p>
-                Exporta només el perfil inicial dels alumnes: última mirada, perfil de constància, valoració qualitativa i
-                diagnòstics capturats. Quan el curs vinent tinguis una nova classe, carrega aquest JSON i Avaluapro
-                l’associarà als alumnes pel nom entre totes les classes actuals. Podràs revisar les coincidències i assignar manualment els noms no trobats o repetits.
+                Prepara els antecedents del curs vinent a partir de les notes i estadístiques que tens d’aquesta classe.
+                Tria els alumnes per a cada company i revisa el resum abans de descarregar-lo.
+                En importar-lo, es relacionaran pel nom entre totes les classes actuals, amb assignació manual si cal.
               </p>
             </div>
+          </div>
+          <div className="antecedent-transfer-controls">
+            <label>
+              Què vols descarregar?
+              <select value={antecedentExportSource} onChange={(event) => {
+                setAntecedentExportSource(event.target.value)
+                setExcludedAntecedentStudentIds(new Set())
+                setAntecedentStatus('')
+              }}>
+                <option value="current">Preparar antecedents amb les dades d’aquesta classe</option>
+                <option value="saved">Reenviar antecedents ja guardats</option>
+              </select>
+            </label>
+            {antecedentExportSource === 'current' && <label>
+              Curs o origen del resum
+              <input value={antecedentCourseLabel} onChange={(event) => setAntecedentCourseLabel(event.target.value)}
+                placeholder="Ex.: 2n · curs 2025-2026" />
+            </label>}
           </div>
           <div className="antecedent-transfer-controls">
             <label>
               Classe per exportar
               <select onChange={(event) => {
                 setAntecedentClassId(event.target.value)
+                setAntecedentCourseLabel('')
                 setExcludedAntecedentStudentIds(new Set())
                 setAntecedentStatus('')
               }} value={antecedentClass?.id || ''}>
@@ -824,11 +821,11 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               </select>
             </label>
             <span>
-              {antecedentsForClass.length} antecedents guardats · {antecedentStudents.length} alumnes a la classe
+              {exportableAntecedents.length} alumnes amb {antecedentExportSource === 'current' ? 'dades per preparar antecedents' : 'antecedents guardats'} · {antecedentStudents.length} alumnes a la classe
             </span>
             <button className="secondary-action compact" disabled={selectedAntecedentStudents.length === 0} onClick={handleDownloadAntecedents} type="button">
               <Download size={16} />
-              Exportar antecedents ({selectedAntecedentStudents.length})
+              {antecedentExportSource === 'current' ? 'Descarregar antecedents preparats' : 'Exportar antecedents'} ({selectedAntecedentStudents.length})
             </button>
             <button className="secondary-action compact" disabled={isImportingAntecedents} onClick={() => antecedentFileInputRef.current?.click()} type="button">
               <Upload size={16} />
@@ -845,7 +842,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
           <fieldset className="antecedent-student-selection">
             <legend>Alumnes que vols exportar</legend>
             <div className="antecedent-selection-actions">
-              <span aria-live="polite">{selectedAntecedentStudents.length} de {antecedentStudentIds.size} alumnes amb antecedents seleccionats</span>
+              <span aria-live="polite">{selectedAntecedentStudents.length} de {antecedentStudentIds.size} alumnes disponibles seleccionats</span>
               <button className="secondary-action compact" disabled={selectedAntecedentStudents.length === antecedentStudentIds.size} onClick={() => {
                 setExcludedAntecedentStudentIds(new Set())
                 setAntecedentStatus('')
@@ -855,7 +852,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 setAntecedentStatus('')
               }} type="button">Desmarcar tots</button>
             </div>
-            {antecedentStudentIds.size === 0 && <p>Aquesta classe encara no té antecedents acadèmics per exportar.</p>}
+            {antecedentStudentIds.size === 0 && <p>{antecedentExportSource === 'current' ? 'Aquesta classe no té notes ni seguiment registrats per preparar un resum.' : 'Aquesta classe no té antecedents guardats. Tria «Preparar antecedents amb les dades d’aquesta classe» per generar-los.'}</p>}
             <div className="antecedent-student-list">
               {antecedentStudents.map((student) => {
                 const hasAntecedent = antecedentStudentIds.has(student.id)
@@ -873,12 +870,28 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                         })
                         setAntecedentStatus('')
                       }} />
-                    <span>{student.name}{!hasAntecedent && <small>Sense antecedents guardats</small>}</span>
+                    <span>{student.name}{!hasAntecedent && <small>{antecedentExportSource === 'current' ? 'Sense dades registrades' : 'Sense antecedents guardats'}</small>}</span>
                   </label>
                 )
               })}
             </div>
           </fieldset>
+          {antecedentExportSource === 'current' && selectedAntecedentStudents.length > 0 && (
+            <details className="antecedent-export-preview">
+              <summary>Revisar els resums que s’enviaran ({selectedAntecedentStudents.length})</summary>
+              <p>Inclou l’última nota disponible de cada competència, l’evolució per UT i el resum de tasques i incidències. Les dades provenen de tota la classe seleccionada, sense filtrar per la UT activa.</p>
+              <div>
+                {selectedAntecedentStudents.map((student) => {
+                  const entry = preparedAntecedents.find((item) => item.studentId === student.id)
+                  return <article key={student.id}>
+                    <strong>{student.name}</strong>
+                    <p>{Object.entries(entry.competencyGrades).map(([name, grade]) => `${name}: ${grade}`).join(' · ') || 'Sense notes per competència'}</p>
+                    <p className="antecedent-summary-text">{entry.qualitativeNotes}</p>
+                  </article>
+                })}
+              </div>
+            </details>
+          )}
           {antecedentImport && (
             <section className="antecedent-import-review" aria-label="Revisió de la importació">
               <h3>Revisa l’assignació dels antecedents</h3>
