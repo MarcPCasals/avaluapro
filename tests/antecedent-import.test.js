@@ -35,3 +35,27 @@ test('impedeix sobreescriptures per duplicats i destinataris eliminats', () => {
   assert.ok(validateAntecedentAssignments([{ studentId: 'removed' }], students))
   assert.ok(validateAntecedentAssignments([], students))
 })
+
+test('importa un paquet de classes diferents i omet explícitament un alumne absent', async () => {
+  const { getAntecedentsToImport } = await import('../src/features/data/antecedentImport.js')
+  const rows = matchAntecedentStudents([
+    { studentName: 'Tom Valls' }, { studentName: 'Claudia Taurinya' }, { studentName: 'Alumne absent' },
+  ], students)
+  assert.ok(validateAntecedentAssignments(rows, students))
+  rows[2].skipped = true
+  assert.equal(validateAntecedentAssignments(rows, students), '')
+  assert.deepEqual(getAntecedentsToImport(rows).map((row) => row.studentId), ['tom', 'claudia'])
+  rows[2].skipped = false
+  assert.ok(validateAntecedentAssignments(rows, students))
+})
+
+test('omet també coincidències i permet finalitzar sense importar cap alumne', async () => {
+  const { getAntecedentsToImport } = await import('../src/features/data/antecedentImport.js')
+  const rows = matchAntecedentStudents([{ studentName: 'Tom Valls' }, { studentName: 'Tom Valls' }], students)
+  rows[1].skipped = true
+  assert.equal(validateAntecedentAssignments(rows, students), '')
+  assert.equal(getAntecedentsToImport(rows).length, 1)
+  rows[0].skipped = true
+  assert.equal(validateAntecedentAssignments(rows, students), '')
+  assert.deepEqual(getAntecedentsToImport(rows), [])
+})

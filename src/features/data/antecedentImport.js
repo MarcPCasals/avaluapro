@@ -9,6 +9,7 @@ export function matchAntecedentStudents(rows, students) {
     const matches = name ? students.filter((student) => normalizeName(student.name) === name) : []
     return {
       ...row,
+      skipped: false,
       studentId: matches.length === 1 ? matches[0].id : '',
       matchReason: matches.length > 1 ? 'Hi ha més d’un alumne amb aquest nom.'
         : matches.length === 0 ? 'No s’ha trobat cap coincidència pel nom.' : '',
@@ -16,11 +17,15 @@ export function matchAntecedentStudents(rows, students) {
   })
 }
 
+export function getAntecedentsToImport(rows) {
+  return rows.filter((row) => !row.skipped)
+}
+
 export function validateAntecedentAssignments(rows, students) {
   const studentIds = new Set(students.map((student) => student.id))
   const used = new Set()
-  for (const row of rows) {
-    if (!studentIds.has(row.studentId)) return 'Assigna un alumne actual a cada antecedent abans d’importar.'
+  for (const row of getAntecedentsToImport(rows)) {
+    if (!studentIds.has(row.studentId)) return 'Assigna un alumne actual o tria «No importar aquest alumne» per a cada antecedent pendent.'
     if (used.has(row.studentId)) return 'Hi ha diversos antecedents assignats al mateix alumne. Revisa les assignacions.'
     used.add(row.studentId)
   }

@@ -15,7 +15,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { matchAntecedentStudents, validateAntecedentAssignments } from './antecedentImport'
+import { getAntecedentsToImport, matchAntecedentStudents, validateAntecedentAssignments } from './antecedentImport'
 import { Modal } from '../../components/Modal'
 import { COLLECTIONS } from '../../data/seedData'
 import { buildBackupStatusMessage, summarizeBackup } from '../../lib/backupDiagnostics'
@@ -379,8 +379,10 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
 
   const importAssignmentError = antecedentImport
     ? validateAntecedentAssignments(antecedentImport.rows, state.students) : ''
+  const includedAntecedents = antecedentImport ? getAntecedentsToImport(antecedentImport.rows) : []
+  const skippedAntecedentsCount = antecedentImport ? antecedentImport.rows.length - includedAntecedents.length : 0
   const replacedAntecedentsCount = antecedentImport
-    ? state.studentAntecedents.filter((entry) => antecedentImport.rows.some((row) => row.studentId === entry.studentId)).length : 0
+    ? state.studentAntecedents.filter((entry) => includedAntecedents.some((row) => row.studentId === entry.studentId)).length : 0
 
   const handleConfirmAntecedentImport = async () => {
     if (!antecedentImport || isImportingAntecedents) return
@@ -391,7 +393,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     }
     setIsImportingAntecedents(true)
     try {
-      const entries = antecedentImport.rows.map((row) => ({
+      const entries = getAntecedentsToImport(antecedentImport.rows).map((row) => ({
         studentId: row.studentId,
         courseLabel: row.antecedent.courseLabel || '',
         lastLookGrade: row.antecedent.lastLookGrade || '',
@@ -401,8 +403,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
         qualitativeNotes: row.antecedent.qualitativeNotes || '',
         diagnosisSnapshot: Array.isArray(row.antecedent.diagnosisSnapshot) ? row.antecedent.diagnosisSnapshot : [],
       }))
-      await bulkUpsertStudentAntecedents(entries)
-      setAntecedentStatus(`Antecedents importats: ${entries.length}. Assignats als alumnes de les seves classes actuals.`)
+      if (entries.length > 0) await bulkUpsertStudentAntecedents(entries)
+      setAntecedentStatus(`Antecedents importats: ${entries.length}. Omesos per decisió teva: ${antecedentImport.rows.length - entries.length}.`)
       setAntecedentImport(null)
     } catch (error) {
       setAntecedentStatus(error.message || 'No s’han pogut importar els antecedents acadèmics.')
@@ -896,6 +898,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             <section className="antecedent-import-review" aria-label="Revisió de la importació">
               <h3>Revisa l’assignació dels antecedents</h3>
               <p>{antecedentImport.filename} · {antecedentImport.rows.length} antecedents. La classe d’origen no es fa servir per relacionar els alumnes.</p>
+              <p>Si no tens un alumne aquest curs, tria «No importar aquest alumne». Podràs importar la resta.</p>
               <div className="antecedent-import-list">
                 {antecedentImport.rows.map((row, index) => (
                   <label key={index}>
@@ -903,14 +906,15 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                       {row.matchReason && <small>{row.matchReason}</small>}
                     </span>
                     <select aria-label={`Alumne actual per a ${row.studentName || `antecedent ${index + 1}`}`}
-                      disabled={isImportingAntecedents} value={row.studentId}
+                      disabled={isImportingAntecedents} value={row.skipped ? '__skip__' : row.studentId}
                       onChange={(event) => {
                         const studentId = event.target.value
                         setAntecedentImport((current) => ({ ...current, rows: current.rows.map((entry, rowIndex) =>
-                          rowIndex === index ? { ...entry, studentId } : entry) }))
+                          rowIndex === index ? { ...entry, studentId: studentId === '__skip__' ? '' : studentId, skipped: studentId === '__skip__' } : entry) }))
                         setAntecedentStatus('')
                       }}>
                       <option value="">Selecciona l’alumne actual…</option>
+                      <option value="__skip__">No importar aquest alumne</option>
                       {state.students.slice().sort((a, b) => a.name.localeCompare(b.name, 'ca')).map((student) => (
                         <option key={student.id} value={student.id}>
                           {student.name} · {state.classes.find((item) => item.id === student.classId)?.name || 'Sense classe'}
@@ -920,12 +924,13 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                   </label>
                 ))}
               </div>
+              <p>{includedAntecedents.filter((row) => state.students.some((student) => student.id === row.studentId)).length} assignats · {skippedAntecedentsCount} omesos · {includedAntecedents.filter((row) => !state.students.some((student) => student.id === row.studentId)).length} pendents</p>
               {replacedAntecedentsCount > 0 && <p>Es reemplaçaran els antecedents ja guardats de {replacedAntecedentsCount} alumnes.</p>}
               {importAssignmentError && <p role="status">{importAssignmentError}</p>}
               <div className="antecedent-selection-actions">
                 <button className="primary-action" disabled={Boolean(importAssignmentError) || isImportingAntecedents}
                   onClick={handleConfirmAntecedentImport} type="button">
-                  {isImportingAntecedents ? 'Important…' : 'Confirmar importació'}
+                  {isImportingAntecedents ? 'Important…' : includedAntecedents.length === 0 ? 'Finalitzar sense importar' : 'Confirmar importació'}
                 </button>
                 <button className="secondary-action" disabled={isImportingAntecedents}
                   onClick={() => { setAntecedentImport(null); setAntecedentStatus('') }} type="button">Cancel·lar</button>
