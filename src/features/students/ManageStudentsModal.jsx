@@ -384,11 +384,16 @@ export function ManageStudentsModal({ classId, onClose }) {
                     </button>
                   )}
                 </div>
-                <input
-                  aria-label={`Nom de ${student.name}`}
-                  onBlur={(event) => updateStudent(student.id, { name: formatStudentNameForDisplay(event.target.value) })}
-                  defaultValue={student.name}
-                />
+                <div className="student-editor-name-field">
+                  <input
+                    aria-label={`Nom de ${student.name}`}
+                    onBlur={(event) => updateStudent(student.id, { name: formatStudentNameForDisplay(event.target.value) })}
+                    defaultValue={student.name}
+                  />
+                  {student.isSkiStudyStudent && (
+                    <span className="student-ee-badge" title="Esquí Estudi">EE</span>
+                  )}
+                </div>
                 <select
                   aria-label={`Mig grup de ${student.name}`}
                   onChange={(event) => updateStudent(student.id, { halfGroup: event.target.value })}

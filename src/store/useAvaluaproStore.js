@@ -284,6 +284,7 @@ function normalizeDataset(dataset) {
     students: normalizedDataset.students.map((student) => ({
       ...student,
       name: formatStudentNameForDisplay(student.name),
+      isSkiStudyStudent: Boolean(student.isSkiStudyStudent),
     })),
     sociometricSurveys: removeExpiredSociometricSurveys(
       normalizedDataset.sociometricSurveys.map(normalizeSociometricSurvey),
@@ -3876,6 +3877,7 @@ export const useAvaluaproStore = create((set, get) => ({
           halfGroup: student.halfGroup || '',
           photoUrl: student.photoUrl || '',
           personalNotes: student.personalNotes || '',
+          isSkiStudyStudent: Boolean(student.isSkiStudyStudent),
         })),
       ],
     }))

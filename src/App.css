@@ -12021,6 +12021,34 @@ button.tutorial-record-pill {
   font-size: 12px;
 }
 
+.student-list-meta {
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.student-list-meta small {
+  display: inline;
+}
+
+.student-ee-badge {
+  min-width: 27px;
+  min-height: 19px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #e60073;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: white;
+  background: #ff3f9b;
+  box-shadow: 0 2px 5px rgba(190, 24, 93, 0.22);
+  font-size: 11px;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
 .mark-cell,
 .aggregate-cell,
 .task-cell,
@@ -18410,6 +18438,18 @@ button.profile-followup-card:focus-visible {
   justify-content: center;
 }
 
+.student-editor-name-field {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.student-editor-name-field input {
+  width: 100%;
+  min-width: 0;
+}
+
 .student-photo-editor {
   min-width: 0;
   display: grid;
@@ -18756,6 +18796,43 @@ button.profile-followup-card:focus-visible {
 .annotation-tools-row small {
   color: #16a34a;
   font-weight: 900;
+}
+
+.ski-study-toggle {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #f9a8d4;
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: #9d174d;
+  background: #fff1f7;
+  font: inherit;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ski-study-toggle:hover,
+.ski-study-toggle:focus-visible {
+  border-color: #ff3f9b;
+  box-shadow: 0 0 0 3px #fce7f3;
+  outline: none;
+}
+
+.ski-study-toggle.active {
+  border-color: #e60073;
+  color: #831843;
+  background: #fbcfe8;
+}
+
+.ski-study-toggle > span:last-child {
+  color: inherit;
+  font-weight: 950;
+}
+
+.ski-study-toggle .student-ee-badge {
+  color: white;
 }
 
 .student-profile-print-actions {
@@ -21565,6 +21642,7 @@ button.profile-followup-card:focus-visible {
   }
 
   .student-photo-editor,
+  .student-editor-name-field,
   .student-editor-row input:not(:first-of-type),
   .student-editor-row select {
     grid-column: 1 / -1;

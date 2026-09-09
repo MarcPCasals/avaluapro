@@ -414,6 +414,7 @@ function buildTutoringSpaceSummary(dataset = {}) {
     (student) =>
       student.photoUrl ||
       student.personalNotes ||
+      student.isSkiStudyStudent ||
       student.diagnoses?.length > 0 ||
       student.tutorialIntelligences?.length > 0 ||
       student.tutorialModifiedCompetencies?.length > 0 ||

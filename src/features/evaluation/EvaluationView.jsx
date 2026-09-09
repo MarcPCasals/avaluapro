@@ -416,7 +416,12 @@ export function EvaluationView() {
                     type="button"
                   >
                     {student.name}
-                    <small>{student.halfGroup}</small>
+                    <span className="student-list-meta">
+                      {student.halfGroup && <small>{student.halfGroup}</small>}
+                      {student.isSkiStudyStudent && (
+                        <span className="student-ee-badge" title="Esquí Estudi">EE</span>
+                      )}
+                    </span>
                   </button>
                 </td>
                 {competencies.flatMap((competency) => [

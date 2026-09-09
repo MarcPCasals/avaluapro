@@ -483,6 +483,16 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                   : 'Perfil personal des de l’avaluació'}
             </small>
           </div>
+          <button
+            aria-pressed={Boolean(student.isSkiStudyStudent)}
+            className={`ski-study-toggle ${student.isSkiStudyStudent ? 'active' : ''}`}
+            onClick={() => updateStudent(studentId, { isSkiStudyStudent: !student.isSkiStudyStudent })}
+            title={student.isSkiStudyStudent ? 'Treure la marca Esquí Estudi' : 'Marcar com a alumne d’Esquí Estudi'}
+            type="button"
+          >
+            <span className="student-ee-badge">EE</span>
+            <span>{student.isSkiStudyStudent ? 'Esquí Estudi activat' : 'Marcar Esquí Estudi'}</span>
+          </button>
           <div className="student-profile-print-actions">
             {onOpenAnnotations && (
               <button className="secondary-action" onClick={() => onOpenAnnotations(studentId)} type="button">

@@ -1404,7 +1404,12 @@ export function TrackingView() {
                           type="button"
                         >
                           <strong>{student.name}</strong>
-                          <small>{student.halfGroup}</small>
+                          <span className="student-list-meta">
+                            {student.halfGroup && <small>{student.halfGroup}</small>}
+                            {student.isSkiStudyStudent && (
+                              <span className="student-ee-badge" title="Esquí Estudi">EE</span>
+                            )}
+                          </span>
                         </button>
                       </div>
                       <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
