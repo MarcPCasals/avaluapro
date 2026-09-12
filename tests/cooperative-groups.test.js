@@ -99,6 +99,69 @@ describe('anàlisi explicable de grups cooperatius', () => {
     assert.ok(result.pedagogicalLabels.some((label) => label.label === 'Vulnerabilitat relacional'))
   })
 
+  it('aplica el perfil d’antecedents quan encara no hi ha dades actuals', () => {
+    const result = helpers.buildStudentCooperativeProfile({
+      profile: {
+        ...createProfile({
+          averageScore: 0,
+          id: 'student-antecedent',
+          name: 'Alumna Inici Curs',
+        }),
+        academicSource: 'antecedent-global',
+        academicSourceLabel: 'Antecedents globals',
+        antecedentProfile: 'invisible',
+        antecedentProfileMeta: { priorityBoost: 2, supportLabel: 'visibilitat i suport' },
+        evaluatedCount: 1,
+        hasCurrentAcademicData: false,
+        usedAntecedents: true,
+      },
+      recordRow: {},
+      relationRow: { socialPositiveCount: 0, supportiveCount: 0, total: 0, workPositiveCount: 0 },
+      roleRow: {},
+      sociometricRow: { category: 'Promig' },
+    })
+
+    assert.equal(result.academicRisk, true)
+    assert.equal(result.priorityScore, 2)
+    assert.equal(result.usedAntecedents, true)
+    assert.ok(result.pedagogicalLabels.some((label) => label.label === 'Segons antecedents'))
+    assert.ok(result.pedagogicalLabels.some((label) => label.label === 'Visibilitat inicial'))
+  })
+
+  it('explica quan un grup es basa en antecedents acadèmics', () => {
+    const groups = helpers.enrichCooperativeGroups(
+      [
+        {
+          id: 'group-antecedents',
+          members: [
+            createMember({
+              id: 'student-1',
+              name: 'Alumne Actual',
+              performanceLevel: 'alt',
+            }),
+            {
+              ...createMember({
+                averageScore: 1,
+                id: 'student-2',
+                name: 'Alumna Antecedents',
+                performanceLevel: 'baix',
+                priorityScore: 3,
+              }),
+              usedAntecedents: true,
+            },
+          ],
+          name: 'Grup amb antecedents',
+          targetGroupSize: 2,
+        },
+      ],
+      [],
+    )
+
+    assert.equal(groups[0].analysis.composition.antecedentSourceCount, 1)
+    assert.match(groups[0].analysis.summary, /1 amb dades d’antecedents/)
+    assert.ok(groups[0].analysis.strengths.some((strength) => strength.includes('antecedents acadèmics')))
+  })
+
   it('resumeix la composició i identifica un grup sòlid amb suport', () => {
     const groups = helpers.enrichCooperativeGroups(
       [

@@ -82,6 +82,7 @@ import {
   selectBestSeatingCandidate,
 } from './seatingIterationUtils'
 import { buildSociometricStudentReports } from './sociometricStudentProfileUtils'
+import { resolveEffectiveTutorialAcademicProfile } from './tutorialAcademicLookUtils'
 
 const TUTORING_RECORD_TYPES = [
   { id: 'agenda', label: 'Notes a l’agenda', tone: 'amber' },
@@ -524,7 +525,13 @@ function getSeatingPriorityMeta(profileOrScore) {
     details.push('percentatge d’assoliment baix')
   }
   if (profile?.tutorialProfile?.averageScore > 0 && profile.tutorialProfile.averageScore <= 2) {
-    details.push('rendiment mitjà baix')
+    details.push(profile.usedAntecedents ? 'rendiment baix segons antecedents' : 'rendiment mitjà baix')
+  }
+  if (profile?.usedAntecedents && profile?.academicSourceLabel) {
+    details.push(profile.academicSourceLabel.toLocaleLowerCase('ca'))
+  }
+  if (profile?.antecedentProfileMeta?.label) {
+    details.push(`perfil inicial: ${profile.antecedentProfileMeta.label.toLocaleLowerCase('ca')}`)
   }
   if (profile?.recordSeverity > 0) {
     details.push('registres de seguiment tutorial')
@@ -921,6 +928,8 @@ function summarizeTutorialData({
   areaFilter = 'all',
   classId,
   evaluationContext,
+  preferredSubject = '',
+  studentAntecedents = [],
   students,
   subjectFilter = 'all',
   tutorialMarks,
@@ -933,8 +942,44 @@ function summarizeTutorialData({
   const areaBuckets = new Map()
   const subjectBuckets = new Map()
   const trajectoryBuckets = new Map()
+  const antecedentsByStudentId = new Map((studentAntecedents || []).map((antecedent) => [antecedent.studentId, antecedent]))
+  const addAcademicRowToBuckets = (row) => {
+    const trajectoryKey = row.sourceLabel
+    const trajectoryBucket = trajectoryBuckets.get(trajectoryKey) || {
+      label: row.sourceLabel,
+      order: row.sourceOrder,
+      scores: [],
+    }
+    trajectoryBucket.scores.push(row.score)
+    trajectoryBuckets.set(trajectoryKey, trajectoryBucket)
+
+    const areaBucket = areaBuckets.get(row.areaId) || {
+      id: row.areaId,
+      name: row.areaName,
+      scores: [],
+      notDeveloped: 0,
+      evaluated: 0,
+    }
+    areaBucket.scores.push(row.score)
+    areaBucket.notDeveloped += row.notDeveloped ? 1 : 0
+    areaBucket.evaluated += 1
+    areaBuckets.set(row.areaId, areaBucket)
+
+    const subjectBucket = subjectBuckets.get(row.subject) || {
+      subject: row.subject,
+      areaName: row.areaName,
+      scores: [],
+      notDeveloped: 0,
+      evaluated: 0,
+    }
+    subjectBucket.scores.push(row.score)
+    subjectBucket.notDeveloped += row.notDeveloped ? 1 : 0
+    subjectBucket.evaluated += 1
+    subjectBuckets.set(row.subject, subjectBucket)
+  }
+
   const studentProfiles = students.map((student) => {
-    const evaluatedCompetencies = []
+    const currentEvaluatedCompetencies = []
 
     subjectOptions.forEach((subjectOption) => {
       buildTutorialCompetencies(subjectOption.subject).forEach((competency) => {
@@ -963,42 +1008,23 @@ function summarizeTutorialData({
           trackingSummary: gradeSource.trackingSummary || null,
           notDeveloped: isNotDeveloped(grade),
         }
-        evaluatedCompetencies.push(row)
-
-        const trajectoryKey = row.sourceLabel
-        const trajectoryBucket = trajectoryBuckets.get(trajectoryKey) || {
-          label: row.sourceLabel,
-          order: row.sourceOrder,
-          scores: [],
-        }
-        trajectoryBucket.scores.push(score)
-        trajectoryBuckets.set(trajectoryKey, trajectoryBucket)
-
-        const areaBucket = areaBuckets.get(subjectOption.areaId) || {
-          id: subjectOption.areaId,
-          name: subjectOption.areaName,
-          scores: [],
-          notDeveloped: 0,
-          evaluated: 0,
-        }
-        areaBucket.scores.push(score)
-        areaBucket.notDeveloped += row.notDeveloped ? 1 : 0
-        areaBucket.evaluated += 1
-        areaBuckets.set(subjectOption.areaId, areaBucket)
-
-        const subjectBucket = subjectBuckets.get(subjectOption.subject) || {
-          subject: subjectOption.subject,
-          areaName: subjectOption.areaName,
-          scores: [],
-          notDeveloped: 0,
-          evaluated: 0,
-        }
-        subjectBucket.scores.push(score)
-        subjectBucket.notDeveloped += row.notDeveloped ? 1 : 0
-        subjectBucket.evaluated += 1
-        subjectBuckets.set(subjectOption.subject, subjectBucket)
+        currentEvaluatedCompetencies.push(row)
       })
     })
+
+    const academicLook = resolveEffectiveTutorialAcademicProfile({
+      allowGlobalAntecedent: areaFilter === 'all' && subjectFilter === 'all',
+      antecedent: antecedentsByStudentId.get(student.id),
+      buildCompetencies: buildTutorialCompetencies,
+      currentRows: currentEvaluatedCompetencies,
+      getNumericFromGrade,
+      isNotDeveloped,
+      isSameCompetencyName,
+      preferredSubject,
+      subjectOptions,
+    })
+    const evaluatedCompetencies = academicLook.evaluatedCompetencies
+    evaluatedCompetencies.forEach(addAcademicRowToBuckets)
 
     const notDevelopedCount = evaluatedCompetencies.filter((item) => item.notDeveloped).length
     const averageScore = average(evaluatedCompetencies.map((item) => item.score))
@@ -1023,6 +1049,12 @@ function summarizeTutorialData({
       notDevelopedCount,
       notDevelopedPercent,
       averageScore,
+      academicSource: academicLook.academicSource,
+      academicSourceLabel: academicLook.academicSourceLabel,
+      antecedentProfile: academicLook.antecedentProfile,
+      antecedentProfileMeta: academicLook.antecedentProfileMeta,
+      hasCurrentAcademicData: academicLook.hasCurrentAcademicData,
+      usedAntecedents: academicLook.usedAntecedents,
       weakestArea: weakestAreas[0] || null,
     }
   })
@@ -2390,9 +2422,23 @@ function getSeatingPlacementContext({ placement, plan, relations }) {
     reasons.push(`Ocupa una posició assignada al Grup ${halfGroupKey}.`)
   }
   if (profile.priorityScore >= 4 && placement.seat.y <= 1) {
-    reasons.push('Està davant perquè és un perfil prioritari i facilita el seguiment docent.')
+    reasons.push(
+      profile.usedAntecedents
+        ? 'Està davant perquè els antecedents indiquen un perfil prioritari i facilita el seguiment docent.'
+        : 'Està davant perquè és un perfil prioritari i facilita el seguiment docent.',
+    )
   } else if (profile.academicRisk && placement.seat.y <= 2) {
-    reasons.push('La posició facilita supervisió i suport acadèmic.')
+    reasons.push(
+      profile.usedAntecedents
+        ? 'La posició facilita supervisió i suport acadèmic a partir de la mirada d’antecedents.'
+        : 'La posició facilita supervisió i suport acadèmic.',
+    )
+  }
+  if (profile.antecedentProfile === 'invisible') {
+    reasons.push('Venia amb perfil inicial d’alumne invisible: convé evitar que quedi fora de la mirada docent.')
+  }
+  if (profile.antecedentProfile === 'priority') {
+    reasons.push('Venia amb perfil inicial d’intervenció prioritària.')
   }
   if (placement.isStar) reasons.push('La zona central aprofita el seu potencial de suport i influència positiva.')
   if (profile.supportLabel) reasons.push(`Perfil que demana ${profile.supportLabel.toLocaleLowerCase('ca')}.`)
@@ -2744,6 +2790,7 @@ function getTutorialProfilePriority(profile, recordRow) {
     profile.notDevelopedCount * 3 +
     (profile.notDevelopedPercent >= 30 ? 2 : 0) +
     (profile.averageScore > 0 && profile.averageScore <= 2 ? 2 : 0) +
+    (profile.antecedentProfileMeta?.priorityBoost || 0) +
     (recordRow?.agenda || 0) +
     (recordRow?.incident || 0) * 2 +
     (recordRow?.classroomExpulsion || 0) * 3 +
@@ -2758,6 +2805,10 @@ function getProfileExecutiveSummary(profile, records) {
     profile.notDevelopedCount > 0
       ? `${profile.notDevelopedCount} competència/es no assolides (${formatPercent(profile.notDevelopedPercent)}).`
       : 'No hi ha competències no assolides registrades.'
+  const academicSourceText = `Mirada acadèmica basada en ${profile.academicSourceLabel.toLocaleLowerCase('ca')}.`
+  const antecedentProfileText = profile.antecedentProfileMeta?.label
+    ? `Perfil inicial: ${profile.antecedentProfileMeta.label}.`
+    : ''
   const recordCounts = TUTORING_RECORD_TYPES.map((type) => ({
     ...type,
     count: countByType(records, type.id),
@@ -2792,10 +2843,22 @@ function getProfileExecutiveSummary(profile, records) {
     tone = 'risk'
     action = 'Preparar una intervenció conjunta: tutor, docent de referència i família si escau.'
   }
+  if (profile.antecedentProfile === 'invisible' && profile.evaluatedCount > 0) {
+    title = title === 'Seguiment ordinari' ? 'Perfil invisible inicial' : title
+    tone = tone === 'ok' ? 'warning' : tone
+    action =
+      title === 'Perfil invisible inicial'
+        ? 'Assegurar una primera mirada docent visible i revisar si el rendiment inicial confirma els antecedents.'
+        : action
+  }
+  if (profile.antecedentProfile === 'priority' && profile.evaluatedCount > 0) {
+    title = title === 'Seguiment ordinari' ? 'Intervenció inicial prioritària' : title
+    tone = tone === 'ok' ? 'warning' : tone
+  }
 
   return {
     action,
-    bullets: [notDevelopedText, weakestEvidence, trackingEvidence],
+    bullets: [notDevelopedText, academicSourceText, antecedentProfileText, weakestEvidence, trackingEvidence].filter(Boolean),
     title,
     tone,
   }
@@ -3560,6 +3623,10 @@ function TutorialReportDocument({
               <span>Àrea més delicada</span>
               <strong>{profile.weakestArea?.name || '-'}</strong>
             </article>
+            <article>
+              <span>Font acadèmica</span>
+              <strong>{profile.academicSourceLabel}</strong>
+            </article>
           </div>
           {profileAreaSummaries.length > 0 && (
             <div className="tutorial-profile-insight-grid report-compact">
@@ -4252,6 +4319,7 @@ export function TutoringView() {
   const uts = useAvaluaproStore((state) => state.uts)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const tutorialMarks = useAvaluaproStore((state) => state.tutorialMarks)
+  const studentAntecedents = useAvaluaproStore((state) => state.studentAntecedents)
   const tutorialRelations = useAvaluaproStore((state) => state.tutorialRelations)
   const sociometricSurveys = useAvaluaproStore((state) => state.sociometricSurveys)
   const tutorialGroupSets = useAvaluaproStore((state) => state.tutorialGroupSets)
@@ -4516,10 +4584,12 @@ export function TutoringView() {
       summarizeTutorialData({
         classId: activeClassId,
         evaluationContext,
+        preferredSubject: linkedClass?.subject || '',
+        studentAntecedents,
         students: classStudents,
         tutorialMarks,
       }),
-    [activeClassId, classStudents, evaluationContext, tutorialMarks],
+    [activeClassId, classStudents, evaluationContext, linkedClass?.subject, studentAntecedents, tutorialMarks],
   )
   const diagnosisSummary = useMemo(
     () =>
@@ -4527,11 +4597,22 @@ export function TutoringView() {
         areaFilter: diagnosisAreaFilter,
         classId: activeClassId,
         evaluationContext,
+        preferredSubject: linkedClass?.subject || '',
+        studentAntecedents,
         students: classStudents,
         subjectFilter: diagnosisSubjectFilter,
         tutorialMarks,
       }),
-    [activeClassId, classStudents, diagnosisAreaFilter, diagnosisSubjectFilter, evaluationContext, tutorialMarks],
+    [
+      activeClassId,
+      classStudents,
+      diagnosisAreaFilter,
+      diagnosisSubjectFilter,
+      evaluationContext,
+      linkedClass?.subject,
+      studentAntecedents,
+      tutorialMarks,
+    ],
   )
   const subjectCompletion = useMemo(() => {
     const entries = subjectOptions.map((item) => {
@@ -9881,6 +9962,7 @@ export function TutoringView() {
                               <div>
                                 <strong>{formatCooperativeStudentName(member.student.name)}</strong>
                                 <span>{member.halfGroup}</span>
+                                <small>{member.academicSourceLabel}</small>
                               </div>
                               <div className="cooperative-member-labels">
                                 {(member.pedagogicalLabels || []).map((label) => (
@@ -11545,6 +11627,7 @@ export function TutoringView() {
                     <div>
                       <span>Rendiment</span>
                       <strong>{formatAverageGrade(selectedSeatingProfile.tutorialProfile.averageScore)}</strong>
+                      <small>{selectedSeatingProfile.academicSourceLabel}</small>
                     </div>
                     <div>
                       <span>Prioritat</span>
@@ -12078,7 +12161,8 @@ export function TutoringView() {
                       <div>
                         <strong>{profile.student.name}</strong>
                         <small>
-                          {profile.notDevelopedCount} no assolides · {trackingCount} registres · {reportStatus}
+                          {profile.notDevelopedCount} no assolides · {trackingCount} registres ·{' '}
+                          {profile.academicSourceLabel}
                         </small>
                       </div>
                       <span className="tutorial-report-row-status">{reportStatus}</span>

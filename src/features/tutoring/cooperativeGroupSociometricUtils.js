@@ -39,12 +39,15 @@ export function createCooperativeSociometricHelpers({
       (recordRow?.incident || 0) * 2 +
       (recordRow?.classroomExpulsion || 0) * 3 +
       (recordRow?.centerExpulsion || 0) * 4
+    const antecedentPriorityBoost = profile.antecedentProfileMeta?.priorityBoost || 0
     const academicRisk =
-      profile.evaluatedCount > 0 && (profile.averageScore <= 2 || profile.notDevelopedPercent >= 30)
+      (profile.evaluatedCount > 0 && (profile.averageScore <= 2 || profile.notDevelopedPercent >= 30)) ||
+      ['invisible', 'priority'].includes(profile.antecedentProfile)
     const priorityScore =
       profile.notDevelopedCount * 2 +
       (profile.notDevelopedPercent >= 30 ? 2 : 0) +
       (profile.averageScore > 0 && profile.averageScore <= 2 ? 2 : 0) +
+      antecedentPriorityBoost +
       recordSeverity
     const performanceLevel =
       profile.averageScore >= 3.25
@@ -79,6 +82,12 @@ export function createCooperativeSociometricHelpers({
     if (runtimeMeta.isSociometricVulnerable) {
       pedagogicalLabels.push({ id: 'vulnerable', label: 'Vulnerabilitat relacional', tone: 'warning' })
     }
+    if (profile.usedAntecedents) {
+      pedagogicalLabels.push({ id: 'antecedents', label: 'Segons antecedents', tone: 'blue' })
+    }
+    if (profile.antecedentProfile === 'invisible') {
+      pedagogicalLabels.push({ id: 'antecedent-invisible', label: 'Visibilitat inicial', tone: 'warning' })
+    }
     if (runtimeMeta.isSupportiveReference) {
       pedagogicalLabels.push({ id: 'support', label: 'Referent de suport', tone: 'positive' })
     }
@@ -88,8 +97,13 @@ export function createCooperativeSociometricHelpers({
 
     return {
       academicRisk,
+      academicSource: profile.academicSource || 'empty',
+      academicSourceLabel: profile.academicSourceLabel || 'Sense dades acadèmiques',
+      antecedentProfile: profile.antecedentProfile || '',
+      antecedentProfileMeta: profile.antecedentProfileMeta || null,
       avoidCount: relationRow?.avoidCount || 0,
       halfGroup: profile.student.halfGroup || 'Sense mig grup',
+      hasCurrentAcademicData: Boolean(profile.hasCurrentAcademicData),
       isConflict: Boolean(roleRow?.conflict),
       isStar: Boolean(roleRow?.star),
       ...runtimeMeta,
@@ -103,6 +117,7 @@ export function createCooperativeSociometricHelpers({
       student: profile.student,
       supportiveCount: relationRow?.supportiveCount || 0,
       tutorialProfile: profile,
+      usedAntecedents: Boolean(profile.usedAntecedents),
       workPositiveCount: relationRow?.workPositiveCount || 0,
     }
   }
@@ -283,6 +298,7 @@ export function createCooperativeSociometricHelpers({
       const supportiveMembers = group.members.filter((member) => member.isSupportiveReference)
       const vulnerableMembers = group.members.filter((member) => member.isSociometricVulnerable)
       const influentialMembers = group.members.filter((member) => member.isInfluential)
+      const antecedentSourceCount = group.members.filter((member) => member.usedAntecedents).length
       const alerts = []
 
       if (avoidRelations.length > 0) {
@@ -358,6 +374,11 @@ export function createCooperativeSociometricHelpers({
       if (highPerformanceCount > 0 && lowPerformanceCount > 0) {
         strengths.push('La composició acadèmica combina rendiment alt i necessitat de reforç.')
       }
+      if (antecedentSourceCount > 0) {
+        strengths.push(
+          `${antecedentSourceCount} perfil${antecedentSourceCount === 1 ? '' : 's'} parteixen d’antecedents acadèmics.`,
+        )
+      }
       if (sizeDifference <= 1) strengths.push('La mida és coherent amb l’objectiu seleccionat.')
 
       const compositionParts = []
@@ -366,6 +387,9 @@ export function createCooperativeSociometricHelpers({
       if (lowPerformanceCount > 0) compositionParts.push(`${lowPerformanceCount} que necessita reforç`)
       if (priorityMembers.length > 0) {
         compositionParts.push(`${priorityMembers.length} de seguiment prioritari`)
+      }
+      if (antecedentSourceCount > 0) {
+        compositionParts.push(`${antecedentSourceCount} amb dades d’antecedents`)
       }
       const compositionText =
         compositionParts.length > 0 ? compositionParts.join(', ') : `${group.members.length} alumnes sense dades acadèmiques suficients`
@@ -384,6 +408,7 @@ export function createCooperativeSociometricHelpers({
             mediumPerformanceCount,
             priorityCount: priorityMembers.length,
             supportiveCount: supportiveMembers.length,
+            antecedentSourceCount,
             vulnerableCount: vulnerableMembers.length,
           },
           quality,
