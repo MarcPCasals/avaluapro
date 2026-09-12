@@ -11,6 +11,10 @@ import {
   signOut,
 } from 'firebase/auth'
 import {
+  addDoc,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc,
   arrayUnion,
   collection,
   deleteDoc,
@@ -1329,4 +1333,37 @@ export async function loadTutoringSpace(spaceId) {
 export async function deleteCloudCollection(uid, collectionName) {
   const snapshot = await getDocs(getCollectionRef(uid, collectionName))
   await Promise.all(snapshot.docs.map((snapshotDoc) => deleteDoc(snapshotDoc.ref)))
+}
+
+export function isFeedbackAdmin(user) {
+  return user?.email === 'mperezc@educand.ad'
+}
+
+export async function sendFeedback({ category, message, name }) {
+  const user = auth.currentUser
+  if (!user?.email || !user.emailVerified) {
+    throw new Error('Inicia sessió amb Google per enviar el missatge.')
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('No tens connexió. El text es conserva; torna-ho a provar quan recuperis internet.')
+  }
+  await addDoc(collection(db, 'feedbackMessages'), {
+    category,
+    message: message.trim(),
+    name: name.trim(),
+    senderUid: user.uid,
+    senderEmail: user.email,
+    createdAt: serverTimestamp(),
+    status: 'new',
+  })
+}
+
+export function subscribeFeedback(onMessages, onError) {
+  return onSnapshot(query(collection(db, 'feedbackMessages'), orderBy('createdAt', 'desc')), (snapshot) => {
+    onMessages(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })))
+  }, onError)
+}
+
+export async function markFeedbackRead(id) {
+  await updateDoc(doc(db, 'feedbackMessages', id), { status: 'read' })
 }

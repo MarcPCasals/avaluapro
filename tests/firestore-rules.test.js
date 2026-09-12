@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 
 const PROJECT_ID = 'avaluapro-rules-test'
 const OWNER = { uid: 'owner-uid', email: 'owner@educand.ad' }
@@ -537,4 +537,55 @@ describe('questionari sociometric public', () => {
 
 test('les assercions de proves estan actives', () => {
   assert.ok(testEnv)
+})
+
+describe('Internal feedback inbox', () => {
+  function feedbackDb(uid = 'teacher', email = 'teacher@educand.ad', verified = true) {
+    return testEnv.authenticatedContext(uid, { email, email_verified: verified }).firestore()
+  }
+  function payload(overrides = {}) {
+    return {
+      category: 'suggeriment', message: 'Una proposta per millorar', name: '',
+      senderUid: 'teacher', senderEmail: 'teacher@educand.ad',
+      createdAt: serverTimestamp(), status: 'new', ...overrides,
+    }
+  }
+  test('verified teacher can submit but cannot read or modify the inbox', async () => {
+    const db = feedbackDb()
+    const ref = doc(db, 'feedbackMessages', 'message-1')
+    await assertSucceeds(setDoc(ref, payload()))
+    await assertFails(getDoc(ref))
+    await assertFails(getDocs(collection(db, 'feedbackMessages')))
+    await assertFails(updateDoc(ref, { status: 'read' }))
+    await assertFails(deleteDoc(ref))
+    await assertFails(getDoc(doc(feedbackDb('other', 'other@educand.ad'), 'feedbackMessages', 'message-1')))
+  })
+  test('anonymous and unverified accounts cannot submit or read', async () => {
+    for (const db of [testEnv.unauthenticatedContext().firestore(), feedbackDb('teacher', 'teacher@educand.ad', false)]) {
+      await assertFails(setDoc(doc(db, 'feedbackMessages', 'blocked'), payload()))
+      await assertFails(getDocs(collection(db, 'feedbackMessages')))
+    }
+    await assertFails(getDocs(collection(feedbackDb('marc', 'mperezc@educand.ad', false), 'feedbackMessages')))
+  })
+  test('rejects forged sender, extra fields, invalid lengths, category, time and status', async () => {
+    const db = feedbackDb()
+    for (const patch of [
+      { senderUid: 'someone-else' }, { senderEmail: 'mperezc@educand.ad' },
+      { extra: 'unexpected' }, { message: 'tiny' }, { message: 'a'.repeat(1601) },
+      { name: 'a'.repeat(81) }, { category: 'other' }, { status: 'read' },
+      { createdAt: '2026-09-04' },
+    ]) {
+      await assertFails(setDoc(doc(db, 'feedbackMessages', 'invalid'), payload(patch)))
+    }
+  })
+  test('only verified Marc can read and mark read, without changing the message', async () => {
+    await assertSucceeds(setDoc(doc(feedbackDb(), 'feedbackMessages', 'message-1'), payload()))
+    const db = feedbackDb('marc', 'mperezc@educand.ad')
+    const ref = doc(db, 'feedbackMessages', 'message-1')
+    await assertSucceeds(getDoc(ref))
+    await assertSucceeds(getDocs(collection(db, 'feedbackMessages')))
+    await assertSucceeds(updateDoc(ref, { status: 'read' }))
+    await assertFails(updateDoc(ref, { message: 'Changed by admin' }))
+    await assertFails(deleteDoc(ref))
+  })
 })

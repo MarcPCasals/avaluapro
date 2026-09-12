@@ -619,6 +619,40 @@ service cloud.firestore {
         && request.resource.data.submittedAt is string;
     }
 
+    // Suggestions are separate from teacher datasets and their backup/restore flows.
+    match /feedbackMessages/{messageId} {
+      function feedbackAdmin() {
+        return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email == 'mperezc@educand.ad';
+      }
+
+      allow create: if signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.resource.data.keys().hasAll([
+          'category', 'message', 'name', 'senderUid', 'senderEmail', 'createdAt', 'status'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'category', 'message', 'name', 'senderUid', 'senderEmail', 'createdAt', 'status'
+        ])
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email
+        && request.resource.data.category in ['suggeriment', 'dubte']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 5
+        && request.resource.data.message.size() <= 1600
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.status == 'new';
+      allow read: if feedbackAdmin();
+      allow update: if feedbackAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'read';
+      allow delete: if false;
+    }
+
     match /teacherGradePackages/{transferId} {
       allow create: if validTeacherGradePackageCreate(transferId);
 

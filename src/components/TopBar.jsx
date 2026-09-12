@@ -523,7 +523,7 @@ export function TopBar() {
           }}
         />
       )}
-      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+      {showFeedback && <FeedbackModal user={cloud.user} onClose={() => setShowFeedback(false)} />}
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
       {showTutoringShare && <TutoringShareModal onClose={() => setShowTutoringShare(false)} />}

@@ -27120,3 +27120,35 @@ button.profile-followup-card:focus-visible {
 .antecedent-summary-text {
   white-space: pre-line;
 }
+
+.feedback-navigation {
+  margin-bottom: 16px;
+}
+
+.feedback-inbox,
+.feedback-inbox-message {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-inbox-message {
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.feedback-inbox-message header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feedback-inbox-message p {
+  margin: 0;
+}
+
+.feedback-message-text {
+  white-space: pre-wrap;
+}
