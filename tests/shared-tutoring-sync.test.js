@@ -71,6 +71,26 @@ describe('fusio de files de cotutoria', () => {
     assert.equal(mergeSharedRows(localRows, incomingRows)[0].note, 'Remota')
   })
 
+  test('una edicio local amb updatedAt preval sobre una copia compartida antiga', () => {
+    const localRows = [
+      {
+        id: 'student-1',
+        personalNotes: 'Diagnòstic actualitzat',
+        sharedUpdatedAt: '2026-06-20T08:00:00.000Z',
+        updatedAt: '2026-06-20T10:00:00.000Z',
+      },
+    ]
+    const incomingRows = [
+      {
+        id: 'student-1',
+        personalNotes: 'Diagnòstic antic',
+        sharedUpdatedAt: '2026-06-20T09:00:00.000Z',
+      },
+    ]
+
+    assert.equal(mergeSharedRows(localRows, incomingRows)[0].personalNotes, 'Diagnòstic actualitzat')
+  })
+
   test('la data de baixa participa en la versio de la fila', () => {
     assert.equal(
       getSharedRowVersion({

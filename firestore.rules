@@ -135,6 +135,7 @@ service cloud.firestore {
     function isAllowedTutoringCollection(collectionName) {
       return collectionName in [
         'students',
+        'agendaNotes',
         'studentAntecedents',
         'tutorialGroupSets',
         'tutorialMarks',

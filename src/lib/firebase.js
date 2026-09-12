@@ -31,6 +31,7 @@ import { removeExpiredSociometricSurveys } from './sociometricRetention'
 
 export const SHARED_TUTORING_COLLECTIONS = [
   'students',
+  'agendaNotes',
   'tutorialRecords',
   'tutorialMarks',
   'tutorialRelations',

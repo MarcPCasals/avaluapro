@@ -322,6 +322,15 @@ describe('cotutoria compartida', () => {
         note: 'Observacio pedagogica ficticia',
       }),
     )
+    await assertSucceeds(
+      setDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'agendaNotes', 'note-1'), {
+        classId: 'class-1',
+        id: 'note-1',
+        studentId: 'student-1',
+        text: 'Comentari tutorial fictici',
+        type: 'tutoring',
+      }),
+    )
   })
 
   test('un membre pot substituir una fila per un tombstone minim', async () => {

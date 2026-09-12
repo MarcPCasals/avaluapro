@@ -94,6 +94,16 @@ const TUTORING_AGENDA_NOTE_TYPES = [
   { id: 'work', label: 'Treball' },
   { id: 'behavior', label: 'Comportament' },
 ]
+
+function getSharedTutoringCotutorLabel(memberEmails = [], currentUserEmail = '') {
+  const normalizedCurrentUserEmail = normalizeEducandEmail(currentUserEmail)
+  const cotutorEmails = memberEmails
+    .map((email) => normalizeEducandEmail(email))
+    .filter((email) => email && email !== normalizedCurrentUserEmail)
+
+  return cotutorEmails.length > 0 ? cotutorEmails.join(' · ') : 'pendent de vinculació'
+}
+
 const MULTIPLE_INTELLIGENCE_OPTIONS = [
   { id: 'linguistic', label: 'Lingüística' },
   { id: 'logical', label: 'Logicomatemàtica' },
@@ -6650,6 +6660,17 @@ export function TutoringView() {
             <strong>{classStudents.length}</strong>
             <span>alumnes vinculats</span>
             <small>Dades compartides amb {linkedClass?.name || 'la classe activa'}</small>
+            {activeClass?.sharedTutoringSpaceId && (
+              <div className="tutoring-hero-shared-members">
+                <span>Cotutoria compartida amb</span>
+                <b>
+                  {getSharedTutoringCotutorLabel(
+                    activeClass.sharedTutoringMemberEmails,
+                    cloud.user?.email,
+                  )}
+                </b>
+              </div>
+            )}
           </div>
           <div className="tutoring-hero-share-controls">
             <EducandEmailInput
@@ -6670,7 +6691,7 @@ export function TutoringView() {
             </button>
             {activeClass?.sharedTutoringSpaceId && (
               <button
-                className="secondary-action compact"
+                className="secondary-action compact tutoring-sync-button"
                 disabled={shareTutoringBusy === 'sync'}
                 onClick={handleSyncTutoringFromHeader}
                 type="button"

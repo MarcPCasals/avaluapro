@@ -1358,7 +1358,7 @@
 
 .tutoring-hero-share-controls {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: end;
 }
@@ -1366,6 +1366,34 @@
 .tutoring-hero-share-controls .secondary-action {
   min-height: 38px;
   white-space: nowrap;
+}
+
+.tutoring-hero-share-controls .tutoring-sync-button {
+  grid-column: 1 / -1;
+  justify-content: center;
+  width: 100%;
+}
+
+.tutoring-hero-shared-members {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #ecfdf5;
+  text-align: left;
+}
+
+.tutoring-hero-shared-members span {
+  color: #64748b !important;
+  font-size: 11px;
+  font-weight: 800 !important;
+}
+
+.tutoring-hero-shared-members b {
+  overflow-wrap: anywhere;
+  color: #047857;
+  font-size: 12px;
 }
 
 .tutoring-hero-share-message {

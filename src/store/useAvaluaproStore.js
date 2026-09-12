@@ -732,9 +732,22 @@ function getSharedTutoringDatasetForClass(state, classId) {
     (mark) => mark.classId === classId || studentIds.has(mark.studentId),
   )
   const linkedEvaluationTutorialMarks = buildLinkedEvaluationTutorialMarksForClass(state, classId)
+  const agendaNotes = (state.agendaNotes || [])
+    .filter(
+      (note) =>
+        studentIds.has(note.studentId) &&
+        (note.classId === classId || note.classId === rosterClassId) &&
+        (note.type === 'team' || note.type === 'tutoring'),
+    )
+    .map((note) => {
+      const sharedNote = { ...note }
+      delete sharedNote.reminder
+      return sharedNote
+    })
 
   return {
     students,
+    agendaNotes,
     tutorialRecords: state.tutorialRecords.filter(
       (record) => record.classId === classId || studentIds.has(record.studentId),
     ),
@@ -785,6 +798,7 @@ async function tombstoneSharedRowIfNeeded(state, collectionName, row) {
 function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, rosterClassId = classId) {
   return {
     students: (sharedCollections.students || []).map((student) => ({ ...student, classId: rosterClassId })),
+    agendaNotes: (sharedCollections.agendaNotes || []).map((note) => ({ ...note, classId })),
     tutorialRecords: (sharedCollections.tutorialRecords || []).map((record) => ({ ...record, classId })),
     tutorialMarks: (sharedCollections.tutorialMarks || []).map((mark) => ({ ...mark, classId })),
     tutorialRelations: (sharedCollections.tutorialRelations || []).map((relation) => ({ ...relation, classId })),
@@ -2676,6 +2690,7 @@ export const useAvaluaproStore = create((set, get) => ({
       const mappedDataset = mapSharedTutoringDatasetToClass(space.collections, classId, rosterClassId)
 
       set((current) => ({
+        agendaNotes: mergeSharedRows(current.agendaNotes, mappedDataset.agendaNotes),
         classes: current.classes.map((item) =>
           item.id === classId
             ? {
@@ -3844,6 +3859,7 @@ export const useAvaluaproStore = create((set, get) => ({
           text: cleanText,
           date: createdAt.slice(0, 10),
           createdAt,
+          updatedAt: createdAt,
         },
       ],
     }))
@@ -3851,13 +3867,19 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateAgendaNote: async (noteId, patch) => {
+    const updatedAt = new Date().toISOString()
     set((state) => ({
-      agendaNotes: state.agendaNotes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+      agendaNotes: state.agendaNotes.map((note) => (note.id === noteId ? { ...note, ...patch, updatedAt } : note)),
     }))
     await persistCollections(set, get, ['agendaNotes'])
   },
 
   deleteAgendaNote: async (noteId) => {
+    const state = get()
+    const note = state.agendaNotes.find((item) => item.id === noteId)
+    if (note?.type === 'team' || note?.type === 'tutoring') {
+      await tombstoneSharedRowIfNeeded(state, 'agendaNotes', note)
+    }
     set((state) => ({
       agendaNotes: state.agendaNotes.filter((note) => note.id !== noteId),
     }))
@@ -3866,6 +3888,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   addStudents: async (classId, studentsToAdd) => {
     if (studentsToAdd.length === 0) return
+    const createdAt = new Date().toISOString()
 
     set((state) => ({
       students: [
@@ -3878,6 +3901,8 @@ export const useAvaluaproStore = create((set, get) => ({
           photoUrl: student.photoUrl || '',
           personalNotes: student.personalNotes || '',
           isSkiStudyStudent: Boolean(student.isSkiStudyStudent),
+          createdAt,
+          updatedAt: createdAt,
         })),
       ],
     }))
@@ -3896,10 +3921,16 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateStudent: async (studentId, patch) => {
+    const updatedAt = new Date().toISOString()
     set((state) => ({
       students: state.students.map((student) =>
         student.id === studentId
-          ? { ...student, ...patch, name: patch.name ? formatStudentNameForDisplay(patch.name) : student.name }
+          ? {
+              ...student,
+              ...patch,
+              name: patch.name ? formatStudentNameForDisplay(patch.name) : student.name,
+              updatedAt,
+            }
           : student,
       ),
     }))
