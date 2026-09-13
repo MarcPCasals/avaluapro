@@ -318,9 +318,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     },
     [classStudents, classTutorialRelations, showSociometricProfile, studentId],
   )
-  const activeDiagnosisLabels = diagnoses
-    .map((diagnosisId) => DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)?.label)
-    .filter(Boolean)
   const printDate = useMemo(() => formatLongDate(new Date()), [])
   const studentPrintSummary = {
     evaluation: currentEvaluation.grade || '-',
@@ -555,20 +552,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                   Antecedents:{' '}
                   {antecedentReading || 'encara no hi ha comparativa prèvia disponible per aquest alumne'}
                 </li>
-              </ul>
-            </article>
-
-            <article className="student-profile-print-card">
-              <strong>Seguiment docent</strong>
-              <p>
-                {teamNote || tutoringNote
-                  ? 'Ja hi ha observacions registrades que poden contextualitzar la lectura acadèmica i relacional.'
-                  : 'Encara no hi ha observacions qualitatives guardades en aquest perfil.'}
-              </p>
-              <ul>
-                <li>Equip educatiu: {teamNote ? 'sí' : 'no'}</li>
-                <li>Tutoria: {tutoringNote ? 'sí' : 'no'}</li>
-                <li>Diagnòstics actius: {activeDiagnosisLabels.length > 0 ? activeDiagnosisLabels.join(', ') : 'cap'}</li>
               </ul>
             </article>
           </div>
