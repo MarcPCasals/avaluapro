@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
+import { getSharedTutoringCotutorLabel } from '../src/features/tutoring/sharedTutoringDisplayUtils.js'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../src/lib/sharedTutoringClasses.js'
 
 describe('deteccio de classe per cotutoria compartida', () => {
@@ -39,5 +40,14 @@ describe('deteccio de classe per cotutoria compartida', () => {
     assert.equal(result.classItem.id, 'class-cfn')
     assert.equal(result.matchType, 'name')
     assert.equal(result.needsConfirmation, true)
+  })
+
+  test('mostra el cotutor del mateix espai compartit encara que la classe local nomes tingui el propietari', () => {
+    const label = getSharedTutoringCotutorLabel(['mperezc@educand.ad'], 'mperezc@educand.ad', {
+      id: 'space-1',
+      memberEmails: ['mperezc@educand.ad', 'nfernandezolmos@educand.ad'],
+    })
+
+    assert.equal(label, 'nfernandezolmos@educand.ad')
   })
 })

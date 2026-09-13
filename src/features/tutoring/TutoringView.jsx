@@ -56,6 +56,7 @@ import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gra
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
 import { getCooperativeGroupSetOrigin } from './cooperativeGroupHistoryUtils'
+import { getSharedTutoringCotutorLabel } from './sharedTutoringDisplayUtils'
 import {
   canModifyCooperativeMember,
   createEmptyCooperativeGroup,
@@ -96,15 +97,6 @@ const TUTORING_AGENDA_NOTE_TYPES = [
   { id: 'work', label: 'Treball' },
   { id: 'behavior', label: 'Comportament' },
 ]
-
-function getSharedTutoringCotutorLabel(memberEmails = [], currentUserEmail = '') {
-  const normalizedCurrentUserEmail = normalizeEducandEmail(currentUserEmail)
-  const cotutorEmails = memberEmails
-    .map((email) => normalizeEducandEmail(email))
-    .filter((email) => email && email !== normalizedCurrentUserEmail)
-
-  return cotutorEmails.length > 0 ? cotutorEmails.join(' · ') : 'pendent de vinculació'
-}
 
 const MULTIPLE_INTELLIGENCE_OPTIONS = [
   { id: 'linguistic', label: 'Lingüística' },
@@ -4354,6 +4346,9 @@ export function TutoringView() {
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
+  const activeSharedTutoringSpace = (cloud.sharedTutoringSpaces || []).find(
+    (space) => space.id === activeClass?.sharedTutoringSpaceId,
+  )
   const classStudents = useMemo(
     () => students.filter((student) => student.classId === linkedClassId).sort((a, b) => a.name.localeCompare(b.name, 'ca')),
     [linkedClassId, students],
@@ -6750,6 +6745,7 @@ export function TutoringView() {
                   {getSharedTutoringCotutorLabel(
                     activeClass.sharedTutoringMemberEmails,
                     cloud.user?.email,
+                    activeSharedTutoringSpace,
                   )}
                 </b>
               </div>
