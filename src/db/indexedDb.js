@@ -1,8 +1,12 @@
 import { COLLECTIONS, EMPTY_DATASET } from '../data/seedData.js'
+import {
+  CLOUD_SYNC_QUEUE_STORE,
+  buildCloudSyncQueueChanges,
+  getSafeCloudSyncError,
+} from '../lib/cloudSyncQueue.js'
 
 const DB_NAME = 'avaluapro-v2'
 const DB_VERSION = 13
-const CLOUD_SYNC_QUEUE_STORE = 'cloudSyncQueue'
 
 const INDEXES = {
   students: ['classId'],
@@ -132,6 +136,127 @@ export async function saveCollections(dataset, collections) {
     if (db) {
       db.close()
     }
+  }
+}
+
+export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
+  if (!uid) return saveCollections(dataset, collections)
+  let db
+  try {
+    db = await openDatabase()
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([...new Set([...collections, CLOUD_SYNC_QUEUE_STORE])], 'readwrite')
+      const queueStore = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+
+      collections.forEach((collection) => {
+        const store = transaction.objectStore(collection)
+        const readRequest = store.getAll()
+        readRequest.onsuccess = () => {
+          const nextRows = dataset[collection] || []
+          const changes = buildCloudSyncQueueChanges({
+            uid,
+            collectionName: collection,
+            previousRows: readRequest.result || [],
+            nextRows,
+          })
+          store.clear()
+          nextRows.forEach((row) => store.put(row))
+          changes.forEach((change) => queueStore.put(change))
+        }
+        readRequest.onerror = () => transaction.abort()
+      })
+
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } catch (error) {
+    throw new Error(getStorageErrorMessage(error), { cause: error })
+  } finally {
+    if (db) db.close()
+  }
+}
+
+export async function loadCloudSyncQueue(uid) {
+  if (!uid) return []
+  const db = await openDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readonly')
+      const request = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE).index('uid').getAll(uid)
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function acknowledgeCloudSyncQueue(entries = []) {
+  if (entries.length === 0) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readwrite')
+      const store = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      entries.forEach((entry) => {
+        const request = store.get(entry.id)
+        request.onsuccess = () => {
+          if (request.result?.revision === entry.revision) store.delete(entry.id)
+        }
+      })
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function recordCloudSyncQueueFailure(entries = [], error) {
+  if (entries.length === 0) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readwrite')
+      const store = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      entries.forEach((entry) => {
+        const request = store.get(entry.id)
+        request.onsuccess = () => {
+          const current = request.result
+          if (current?.revision !== entry.revision) return
+          store.put({
+            ...current,
+            attempts: Math.max(0, Number(current.attempts) || 0) + 1,
+            lastError: getSafeCloudSyncError(error),
+          })
+        }
+      })
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function clearCloudSyncQueue(uid) {
+  const entries = await loadCloudSyncQueue(uid)
+  if (entries.length === 0) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readwrite')
+      const store = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      entries.forEach((entry) => store.delete(entry.id))
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
   }
 }
 

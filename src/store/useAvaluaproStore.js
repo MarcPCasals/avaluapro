@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { createId } from '../lib/ids'
-import { loadDataset, resetDatabase, saveCollections, saveDataset } from '../db/indexedDb'
+import {
+  acknowledgeCloudSyncQueue,
+  clearCloudSyncQueue,
+  loadCloudSyncQueue,
+  loadDataset,
+  recordCloudSyncQueueFailure,
+  resetDatabase,
+  saveCollections,
+  saveCollectionsWithCloudQueue,
+  saveDataset,
+} from '../db/indexedDb'
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { getSubjectOption, getSubjectStructure } from '../data/subjects'
 import {
@@ -32,6 +42,7 @@ import {
   updateSociometricSurveySyncMeta,
   saveCloudBackup,
   saveCloudCollections,
+  saveCloudOperations,
   saveTutoringSpace,
   sendTutoringInvitation,
   sendTeacherGradePackage,
@@ -42,6 +53,8 @@ import {
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
+import { isFirestoreNetworkError, isFirestoreQuotaError } from '../lib/cloudSyncDiff'
+import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
 import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
@@ -51,7 +64,9 @@ const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
 const BACKUP_VERSION = 2
 const CLOUD_SYNC_DELAY_MS = 2500
-const DAILY_CLOUD_BACKUP_KEY = 'lastCloudBackupDate'
+const CLOUD_QUOTA_RETRY_DELAY_MS = 60 * 60 * 1000
+const CLOUD_NETWORK_RETRY_MIN_DELAY_MS = 5000
+const CLOUD_NETWORK_RETRY_MAX_DELAY_MS = 5 * 60 * 1000
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
@@ -68,6 +83,9 @@ const TEACHER_OBSERVATION_RELATION_SOURCE = 'teacher-observation'
 
 let cloudSyncTimer = null
 let cloudSyncInFlight = false
+let cloudSyncBlockedUntil = 0
+let cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
+let cloudBackupInFlight = false
 const queuedCloudCollections = new Set()
 
 function getQueuedCloudCollections() {
@@ -184,10 +202,6 @@ function getInitialBackupMeta() {
   const preferences = readPreferences()
 
   return preferences.backupMeta || null
-}
-
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 function toTitleCase(value = '') {
@@ -393,11 +407,16 @@ async function persistCollections(set, get, collections) {
   )
 
   try {
-    await saveCollections(dataset, collections)
     if (state.cloud.user) {
-      scheduleCloudSync(set, get, collections)
+      await saveCollectionsWithCloudQueue(dataset, collections, state.cloud.user.uid)
+      const queuedOperations = await loadCloudSyncQueue(state.cloud.user.uid)
+      const pendingCollections = getPendingCollectionNames(queuedOperations)
+      if (queuedOperations.length > 0) {
+        scheduleCloudSync(set, get, pendingCollections, queuedOperations.length)
+      }
       await syncSharedTutoringClassesForCollections(set, get, collections)
     } else {
+      await saveCollections(dataset, collections)
       set({ error: '' })
     }
   } catch (error) {
@@ -470,64 +489,115 @@ async function syncSharedTutoringClassesForCollections(set, get, collections) {
   }
 }
 
-function scheduleCloudSync(set, get, collections) {
+function scheduleCloudSync(set, get, collections, pendingOperationCount = 0) {
   collections.forEach((collection) => queuedCloudCollections.add(collection))
   if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+
+  const quotaBlocked = Date.now() < cloudSyncBlockedUntil
 
   set((current) => ({
     error: '',
     cloud: {
       ...current.cloud,
-      status: cloudSyncInFlight ? 'syncing' : 'pending',
-      error: '',
+      status: quotaBlocked ? 'error' : cloudSyncInFlight ? 'syncing' : 'pending',
+      error: quotaBlocked
+        ? 'Les dades són desades al dispositiu, però la quota de Firebase continua temporalment esgotada. AvaluaPro tornarà a provar-ho automàticament quan acabi l’espera.'
+        : '',
+      errorKind: quotaBlocked ? 'quota' : '',
       pendingCollections: getQueuedCloudCollections(),
+      pendingOperationCount,
+      retryAvailableAt: quotaBlocked ? new Date(cloudSyncBlockedUntil).toISOString() : '',
     },
   }))
 
+  if (quotaBlocked) {
+    cloudSyncTimer = setTimeout(() => {
+      cloudSyncTimer = null
+      flushQueuedCloudSync(set, get)
+    }, Math.max(1000, cloudSyncBlockedUntil - Date.now()))
+    return
+  }
+
   cloudSyncTimer = setTimeout(() => {
+    cloudSyncTimer = null
     flushQueuedCloudSync(set, get)
   }, CLOUD_SYNC_DELAY_MS)
 }
 
 async function flushQueuedCloudSync(set, get) {
-  if (cloudSyncInFlight || queuedCloudCollections.size === 0) return
+  if (cloudSyncInFlight) return
 
   const state = get()
   if (!state.cloud.user) return
+  const userUid = state.cloud.user.uid
+  let queuedOperations
+  try {
+    queuedOperations = await loadCloudSyncQueue(userUid)
+  } catch (error) {
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        status: 'error',
+        error: error.message || 'No s’ha pogut llegir la cua local de sincronització.',
+      },
+    }))
+    return
+  }
+  if (queuedOperations.length === 0) {
+    queuedCloudCollections.clear()
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        status: current.cloud.user ? 'synced' : 'signed-out',
+        error: '',
+        errorKind: '',
+        pendingCollections: [],
+        pendingOperationCount: 0,
+        retryAvailableAt: '',
+      },
+    }))
+    return
+  }
 
-  const collectionsToSync = getQueuedCloudCollections()
+  const collectionsToSync = getPendingCollectionNames(queuedOperations)
   queuedCloudCollections.clear()
+  collectionsToSync.forEach((collection) => queuedCloudCollections.add(collection))
   cloudSyncInFlight = true
-
-  const dataset = collectionsToSync.reduce(
-    (nextDataset, collection) => ({ ...nextDataset, [collection]: get()[collection] }),
-    {},
-  )
 
   set((current) => ({
     cloud: {
       ...current.cloud,
       status: 'syncing',
       error: '',
+      errorKind: '',
       pendingCollections: collectionsToSync,
+      pendingOperationCount: queuedOperations.length,
     },
   }))
 
   try {
-    await saveCloudCollections(state.cloud.user.uid, dataset, collectionsToSync, {
+    const syncStats = await saveCloudOperations(userUid, queuedOperations, {
       profile: get().profile,
       preferences: readPreferences(),
       user: state.cloud.user,
     })
+    await acknowledgeCloudSyncQueue(queuedOperations)
+    const remainingOperations = await loadCloudSyncQueue(userUid)
     cloudSyncInFlight = false
+    cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
+    if (get().cloud.user?.uid !== userUid) return
+    queuedCloudCollections.clear()
+    getPendingCollectionNames(remainingOperations).forEach((collection) => queuedCloudCollections.add(collection))
 
-    if (queuedCloudCollections.size > 0) {
+    if (remainingOperations.length > 0) {
       set((current) => ({
         cloud: {
           ...current.cloud,
           status: 'pending',
           error: '',
+          errorKind: '',
           pendingCollections: getQueuedCloudCollections(),
+          pendingOperationCount: remainingOperations.length,
         },
       }))
       cloudSyncTimer = setTimeout(() => {
@@ -542,20 +612,75 @@ async function flushQueuedCloudSync(set, get) {
         ...current.cloud,
         status: 'synced',
         error: '',
+        errorKind: '',
         lastSyncedAt: new Date().toISOString(),
+        lastSyncStats: syncStats,
         pendingCollections: [],
+        pendingOperationCount: 0,
+        retryAvailableAt: '',
       },
     }))
   } catch (error) {
-    collectionsToSync.forEach((collection) => queuedCloudCollections.add(collection))
+    const successfulIds = new Set(error.successfulOperationIds || [])
+    const failedIds = new Set(error.failedOperationIds || [])
+    const successfulEntries = queuedOperations.filter((entry) => successfulIds.has(entry.id))
+    const failedEntries = failedIds.size > 0
+      ? queuedOperations.filter((entry) => failedIds.has(entry.id))
+      : queuedOperations.filter((entry) => !successfulIds.has(entry.id))
+    await acknowledgeCloudSyncQueue(successfulEntries).catch(() => {})
+    await recordCloudSyncQueueFailure(failedEntries, error).catch(() => {})
+    const remainingOperations = await loadCloudSyncQueue(userUid).catch(() => failedEntries)
     cloudSyncInFlight = false
+    if (get().cloud.user?.uid !== userUid) return
+    const quotaExceeded = isFirestoreQuotaError(error)
+    const networkUnavailable = isFirestoreNetworkError(error)
+    if (quotaExceeded) cloudSyncBlockedUntil = Date.now() + CLOUD_QUOTA_RETRY_DELAY_MS
+    const message = quotaExceeded
+      ? 'Les dades s’han desat al dispositiu, però no al núvol perquè s’ha esgotat temporalment la quota de Firebase. AvaluaPro tornarà a provar-ho automàticament d’aquí a una hora.'
+      : networkUnavailable
+        ? 'Les dades s’han desat al dispositiu. Es tornaran a sincronitzar automàticament quan es recuperi la connexió.'
+        : error.message || 'No s’han pogut sincronitzar les dades amb Firebase.'
     set((current) => ({
-      error: error.message || 'No s’han pogut guardar o sincronitzar les dades.',
+      error: '',
       cloud: {
         ...current.cloud,
         status: 'error',
-        error: error.message || 'No s’han pogut sincronitzar les dades amb Firebase.',
-        pendingCollections: getQueuedCloudCollections(),
+        error: message,
+        errorKind: quotaExceeded ? 'quota' : networkUnavailable ? 'network' : 'sync',
+        pendingCollections: getPendingCollectionNames(remainingOperations),
+        pendingOperationCount: remainingOperations.length,
+        retryAvailableAt: quotaExceeded ? new Date(cloudSyncBlockedUntil).toISOString() : '',
+      },
+    }))
+    if (quotaExceeded && get().cloud.user?.uid === userUid) {
+      cloudSyncTimer = setTimeout(() => {
+        cloudSyncTimer = null
+        flushQueuedCloudSync(set, get)
+      }, CLOUD_QUOTA_RETRY_DELAY_MS)
+    } else if (get().cloud.user?.uid === userUid) {
+      const retryDelay = cloudSyncRetryDelayMs
+      cloudSyncRetryDelayMs = Math.min(cloudSyncRetryDelayMs * 2, CLOUD_NETWORK_RETRY_MAX_DELAY_MS)
+      cloudSyncTimer = setTimeout(() => {
+        flushQueuedCloudSync(set, get)
+      }, retryDelay)
+    }
+  }
+}
+
+async function resumePersistentCloudSync(set, get, uid) {
+  if (!uid || get().cloud.user?.uid !== uid) return
+  try {
+    const entries = await loadCloudSyncQueue(uid)
+    if (get().cloud.user?.uid !== uid || entries.length === 0) return
+    queuedCloudCollections.clear()
+    getPendingCollectionNames(entries).forEach((collection) => queuedCloudCollections.add(collection))
+    scheduleCloudSync(set, get, getPendingCollectionNames(entries), entries.length)
+  } catch (error) {
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        status: 'error',
+        error: error.message || 'No s’ha pogut recuperar la cua local de sincronització.',
       },
     }))
   }
@@ -1068,12 +1193,16 @@ export const useAvaluaproStore = create((set, get) => ({
     user: null,
     status: 'signed-out',
     error: '',
+    errorKind: '',
     lastSyncedAt: '',
+    lastSyncStats: null,
+    retryAvailableAt: '',
     lastCloudBackupAt: '',
     backupStatus: 'idle',
     backupError: '',
     recentBackups: [],
     pendingCollections: [],
+    pendingOperationCount: 0,
     teacherPackages: [],
     sentTeacherPackages: [],
     teacherPackagesError: '',
@@ -1114,12 +1243,13 @@ export const useAvaluaproStore = create((set, get) => ({
                 user,
                 status: user ? 'signed-in' : keepLoginError ? 'error' : 'signed-out',
                 error: user ? '' : keepLoginError ? state.cloud.error : '',
+                errorKind: user ? '' : keepLoginError ? state.cloud.errorKind : '',
               },
             }
           })
           if (user) {
             setTimeout(() => {
-              get().maybeCreateDailyCloudBackup()
+              resumePersistentCloudSync(set, get, user.uid)
               get().loadCloudBackups()
               get().loadReceivedTeacherGradePackages()
               get().loadSentTeacherGradePackages()
@@ -1148,7 +1278,6 @@ export const useAvaluaproStore = create((set, get) => ({
         status: 'ready',
       })
       if (get().cloud.user) {
-        await get().maybeCreateDailyCloudBackup()
         await get().loadCloudBackups()
       }
     } catch (error) {
@@ -1166,8 +1295,10 @@ export const useAvaluaproStore = create((set, get) => ({
           user: user || state.cloud.user,
           status: user ? 'signed-in' : 'signing-in',
           error: '',
+          errorKind: '',
         },
       }))
+      if (user?.uid) await resumePersistentCloudSync(set, get, user.uid)
     } catch (error) {
       set((state) => ({
         cloud: {
@@ -1181,6 +1312,10 @@ export const useAvaluaproStore = create((set, get) => ({
 
   signOutFromGoogle: async () => {
     try {
+      if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+      queuedCloudCollections.clear()
+      cloudSyncBlockedUntil = 0
+      cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
       await signOutFromGoogle()
       set((state) => ({
         cloud: {
@@ -1188,7 +1323,10 @@ export const useAvaluaproStore = create((set, get) => ({
           user: null,
           status: 'signed-out',
           error: '',
+          errorKind: '',
           lastSyncedAt: '',
+          pendingCollections: [],
+          pendingOperationCount: 0,
           teacherPackages: [],
           sentTeacherPackages: [],
           teacherPackagesError: '',
@@ -1213,28 +1351,42 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  pushAllToCloud: async () => {
+  pushAllToCloud: async (confirmationAcknowledged = false) => {
     const state = get()
     if (!state.cloud.user) return
+    if (!confirmationAcknowledged) {
+      throw new Error('Cal confirmar explícitament la reconciliació completa abans de continuar.')
+    }
     if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
     queuedCloudCollections.clear()
+    const queuedBeforeReconciliation = await loadCloudSyncQueue(state.cloud.user.uid)
 
     set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
     try {
-      await saveCloudCollections(state.cloud.user.uid, getDatasetFromState(state), COLLECTIONS, {
+      const syncStats = await saveCloudCollections(state.cloud.user.uid, getDatasetFromState(state), COLLECTIONS, {
         profile: state.profile,
         preferences: readPreferences(),
         user: state.cloud.user,
       })
+      await acknowledgeCloudSyncQueue(queuedBeforeReconciliation)
+      const remainingOperations = await loadCloudSyncQueue(state.cloud.user.uid)
+      getPendingCollectionNames(remainingOperations).forEach((collection) => queuedCloudCollections.add(collection))
       set((current) => ({
         cloud: {
           ...current.cloud,
-          status: 'synced',
+          status: remainingOperations.length > 0 ? 'pending' : 'synced',
           error: '',
+          errorKind: '',
           lastSyncedAt: new Date().toISOString(),
-          pendingCollections: [],
+          lastSyncStats: syncStats,
+          pendingCollections: getPendingCollectionNames(remainingOperations),
+          pendingOperationCount: remainingOperations.length,
         },
       }))
+      if (remainingOperations.length > 0) {
+        scheduleCloudSync(set, get, getPendingCollectionNames(remainingOperations), remainingOperations.length)
+      }
+      return syncStats
     } catch (error) {
       set((current) => ({
         cloud: {
@@ -1243,12 +1395,24 @@ export const useAvaluaproStore = create((set, get) => ({
           error: error.message || 'No s’han pogut pujar les dades a Firebase.',
         },
       }))
+      throw error
     }
+  },
+
+  retryCloudSync: async () => {
+    if (!get().cloud.user || cloudSyncInFlight) return
+    cloudSyncBlockedUntil = 0
+    set((current) => ({
+      cloud: { ...current.cloud, status: 'pending', error: '', errorKind: '', retryAvailableAt: '' },
+    }))
+    await flushQueuedCloudSync(set, get)
   },
 
   createCloudBackup: async (reason = 'manual') => {
     const state = get()
     if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
+    if (cloudBackupInFlight) throw new Error('Ja hi ha una còpia al núvol en curs.')
+    cloudBackupInFlight = true
 
     set((current) => ({
       cloud: { ...current.cloud, backupStatus: 'saving', backupError: '' },
@@ -1260,10 +1424,6 @@ export const useAvaluaproStore = create((set, get) => ({
         label: buildCloudBackupLabel(state, reason),
       })
       const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
-      const today = getTodayKey()
-      if (reason === 'auto-daily') {
-        writePreferences({ ...readPreferences(), [DAILY_CLOUD_BACKUP_KEY]: today })
-      }
       set((current) => ({
         cloud: {
           ...current.cloud,
@@ -1283,16 +1443,13 @@ export const useAvaluaproStore = create((set, get) => ({
         },
       }))
       throw error
+    } finally {
+      cloudBackupInFlight = false
     }
   },
 
   maybeCreateDailyCloudBackup: async () => {
-    const state = get()
-    if (!state.cloud.user || state.status !== 'ready') return
-    const preferences = readPreferences()
-    const today = getTodayKey()
-    if (preferences[DAILY_CLOUD_BACKUP_KEY] === today) return
-    await get().createCloudBackup('auto-daily')
+    return null
   },
 
   loadCloudBackups: async () => {
@@ -1365,6 +1522,7 @@ export const useAvaluaproStore = create((set, get) => ({
     try {
       const cloudDataset = await loadCloudDataset(state.cloud.user.uid)
       const dataset = normalizeDataset(cloudDataset)
+      await clearCloudSyncQueue(state.cloud.user.uid)
       await resetDatabase()
       await saveDataset(dataset)
       const ui = getInitialUi(dataset)
@@ -1378,8 +1536,10 @@ export const useAvaluaproStore = create((set, get) => ({
           ...current.cloud,
           status: 'synced',
           error: '',
+          errorKind: '',
           lastSyncedAt: new Date().toISOString(),
           pendingCollections: [],
+          pendingOperationCount: 0,
         },
       }))
     } catch (error) {
@@ -1596,6 +1756,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
     queuedCloudCollections.clear()
+    if (get().cloud.user?.uid) await clearCloudSyncQueue(get().cloud.user.uid)
     await resetDatabase()
     await saveDataset(EMPTY_DATASET)
     const ui = {
@@ -1688,6 +1849,9 @@ export const useAvaluaproStore = create((set, get) => ({
   restoreBackup: async (backup, meta = {}) => {
     try {
       const dataset = normalizeDataset(parseBackupDataset(backup))
+      if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+      queuedCloudCollections.clear()
+      if (get().cloud.user?.uid) await clearCloudSyncQueue(get().cloud.user.uid)
       await resetDatabase()
       await saveDataset(dataset)
       const ui = getInitialUi(dataset)
@@ -4278,6 +4442,9 @@ export const useAvaluaproStore = create((set, get) => ({
 
   resetToSeed: async () => {
     const dataset = normalizeDataset(seedDataset)
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+    queuedCloudCollections.clear()
+    if (get().cloud.user?.uid) await clearCloudSyncQueue(get().cloud.user.uid)
     await resetDatabase()
     await saveDataset(dataset)
     const ui = getInitialUi(dataset)

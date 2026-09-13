@@ -619,6 +619,278 @@ service cloud.firestore {
         && request.resource.data.submittedAt is string;
     }
 
+    function isStudentProfileSurveyMember() {
+      return signedIn()
+        && resource.data.memberUids is list
+        && request.auth.uid in resource.data.memberUids;
+    }
+
+    function canListStudentProfileSurvey() {
+      return signedIn()
+        && (
+          resource.data.ownerUid == request.auth.uid
+          || (
+            resource.data.memberUidMap is map
+            && resource.data.memberUidMap[request.auth.uid] == true
+          )
+        );
+    }
+
+    function isStudentProfileSurveyOwner() {
+      return signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    function canAccessStudentProfileSurveyById(surveyId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/studentProfileSurveys/$(surveyId))
+        && get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.memberUids is list
+        && request.auth.uid in get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.memberUids;
+    }
+
+    function activeStudentProfileSurveyById(surveyId) {
+      return exists(/databases/$(database)/documents/studentProfileSurveys/$(surveyId))
+        && get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.status == 'active'
+        && get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.expiresAtEpochMs is number
+        && request.time.toMillis()
+          < get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.expiresAtEpochMs;
+    }
+
+    function validStudentProfileSurveyCreate(surveyId) {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'academicYear',
+          'classId',
+          'className',
+          'createdAt',
+          'expiresAt',
+          'expiresAtEpochMs',
+          'formVersion',
+          'id',
+          'memberUidMap',
+          'memberUids',
+          'ownerUid',
+          'privacyNoticeVersion',
+          'responseCount',
+          'status',
+          'studentOptionIds',
+          'studentOptions',
+          'updatedAt'
+        ])
+        && request.resource.data.id == surveyId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUidMap is map
+        && request.resource.data.memberUidMap[request.auth.uid] == true
+        && request.resource.data.memberUids is list
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.classId is string
+        && request.resource.data.className is string
+        && request.resource.data.academicYear is string
+        && request.resource.data.formVersion is string
+        && request.resource.data.privacyNoticeVersion is string
+        && request.resource.data.studentOptionIds is list
+        && request.resource.data.studentOptions is list
+        && request.resource.data.studentOptionIds.size() > 0
+        && request.resource.data.studentOptions.size() == request.resource.data.studentOptionIds.size()
+        && request.resource.data.studentOptions.size() <= 60
+        && request.resource.data.status == 'active'
+        && request.resource.data.responseCount == 0
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number
+        && request.resource.data.expiresAtEpochMs > request.time.toMillis();
+    }
+
+    function validStudentProfileSurveyUpdate() {
+      return isStudentProfileSurveyMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'expiresAt',
+          'expiresAtEpochMs',
+          'responseCount',
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.status in ['active', 'closed']
+        && request.resource.data.responseCount is number
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validStudentProfilePublicFormCreate(surveyId) {
+      let survey = getAfter(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data;
+      return signedIn()
+        && survey.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'classId',
+          'className',
+          'expiresAt',
+          'expiresAtEpochMs',
+          'formVersion',
+          'privacyNoticeVersion',
+          'studentNamesById',
+          'studentOptionIds',
+          'studentOptions',
+          'surveyId'
+        ])
+        && request.resource.data.surveyId == surveyId
+        && request.resource.data.classId == survey.classId
+        && request.resource.data.className == survey.className
+        && request.resource.data.studentOptionIds == survey.studentOptionIds
+        && request.resource.data.studentOptions == survey.studentOptions
+        && request.resource.data.studentNamesById is map
+        && request.resource.data.formVersion == survey.formVersion
+        && request.resource.data.privacyNoticeVersion == survey.privacyNoticeVersion
+        && request.resource.data.expiresAt == survey.expiresAt
+        && request.resource.data.expiresAtEpochMs == survey.expiresAtEpochMs;
+    }
+
+    function validStudentProfilePublicFormUpdate(surveyId) {
+      return canAccessStudentProfileSurveyById(surveyId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt', 'expiresAtEpochMs'])
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number;
+    }
+
+    function validStudentProfileAnswerKeys(answers) {
+      return answers is map && answers.keys().hasOnly([
+          'address', 'birthDate', 'birthPlace', 'breakPreferenceOther', 'breakPreferences',
+          'currentSupportOther', 'currentSupports', 'extracurricularActivities', 'familyLanguageOther',
+          'familyLanguages', 'familySituation', 'familySituationDetails', 'guardian1Name',
+          'guardian1Phone', 'guardian1Profession', 'guardian1Relationship', 'guardian1Workplace',
+          'guardian2Name', 'guardian2Phone', 'guardian2Profession', 'guardian2Relationship',
+          'guardian2Workplace', 'hasExtracurriculars', 'hasReinforcement', 'healthDetails', 'healthSituation', 'helpSeeking', 'homePhone',
+          'homeDeviceAccess', 'homeMobileCount', 'homeTabletCount', 'homeComputerCount',
+          'householdMembers', 'householdOther', 'learningChallenges', 'learningHelpOther',
+          'learningHelps', 'medicalPlan', 'medicalPlanDetails', 'middayActivities',
+          'middayActivityOther', 'parish', 'parishOther', 'previousSchool', 'previousSchoolOther',
+          'previousSchoolSupport', 'reinforcementActivities', 'repeatedCourse',
+          'repeatedCourseDetails', 'schoolSupportOther', 'schoolSupportTypes', 'siblingCount',
+          'siblingsDetails', 'studentMessage', 'tutorExpectations', 'workPreferences',
+          'classFriendIds', 'schoolFriends'
+        ]);
+    }
+
+    function validStudentProfilePersonalAnswers(answers) {
+      return answers.birthDate is string && answers.birthDate.size() <= 20
+        && answers.birthPlace is string && answers.birthPlace.size() <= 160
+        && answers.address is string && answers.address.size() <= 240
+        && answers.parish is string && answers.parish.size() <= 80
+        && answers.parishOther is string && answers.parishOther.size() <= 120
+        && answers.homePhone is string && answers.homePhone.size() <= 40;
+    }
+
+    function validStudentProfileGuardianAnswers(answers) {
+      return answers.guardian1Name is string && answers.guardian1Name.size() <= 160
+        && answers.guardian1Relationship is string && answers.guardian1Relationship.size() <= 80
+        && answers.guardian1Phone is string && answers.guardian1Phone.size() <= 40
+        && answers.guardian1Profession is string && answers.guardian1Profession.size() <= 160
+        && answers.guardian1Workplace is string && answers.guardian1Workplace.size() <= 160
+        && answers.guardian2Name is string && answers.guardian2Name.size() <= 160
+        && answers.guardian2Relationship is string && answers.guardian2Relationship.size() <= 80
+        && answers.guardian2Phone is string && answers.guardian2Phone.size() <= 40
+        && answers.guardian2Profession is string && answers.guardian2Profession.size() <= 160
+        && answers.guardian2Workplace is string && answers.guardian2Workplace.size() <= 160;
+    }
+
+    function validStudentProfileFamilyAnswers(answers) {
+      return answers.siblingCount is string && answers.siblingCount.size() <= 8
+        && answers.siblingsDetails is string && answers.siblingsDetails.size() <= 600
+        && answers.householdMembers is list && answers.householdMembers.size() <= 8
+        && answers.householdOther is string && answers.householdOther.size() <= 240
+        && answers.familyLanguages is list && answers.familyLanguages.size() <= 10
+        && answers.familyLanguageOther is string && answers.familyLanguageOther.size() <= 160
+        && answers.familySituation is string && answers.familySituation.size() <= 20
+        && answers.familySituationDetails is string && answers.familySituationDetails.size() <= 1200;
+    }
+
+    function validStudentProfileWellbeingAnswers(answers) {
+      return answers.healthSituation is string && answers.healthSituation.size() <= 20
+        && answers.healthDetails is string && answers.healthDetails.size() <= 1200
+        && answers.medicalPlan is string && answers.medicalPlan.size() <= 20
+        && answers.medicalPlanDetails is string && answers.medicalPlanDetails.size() <= 1200
+        && answers.currentSupports is list && answers.currentSupports.size() <= 10
+        && answers.currentSupportOther is string && answers.currentSupportOther.size() <= 300;
+    }
+
+    function validStudentProfileSchoolAnswers(answers) {
+      return answers.previousSchool is string && answers.previousSchool.size() <= 200
+        && answers.previousSchoolOther is string && answers.previousSchoolOther.size() <= 240
+        && answers.repeatedCourse is string && answers.repeatedCourse.size() <= 20
+        && answers.repeatedCourseDetails is string && answers.repeatedCourseDetails.size() <= 240
+        && answers.previousSchoolSupport is string && answers.previousSchoolSupport.size() <= 20
+        && answers.schoolSupportTypes is list && answers.schoolSupportTypes.size() <= 10
+        && answers.schoolSupportOther is string && answers.schoolSupportOther.size() <= 300
+        && answers.hasExtracurriculars is string && answers.hasExtracurriculars.size() <= 20
+        && answers.extracurricularActivities is list && answers.extracurricularActivities.size() <= 12
+        && answers.hasReinforcement is string && answers.hasReinforcement.size() <= 20
+        && answers.reinforcementActivities is list && answers.reinforcementActivities.size() <= 8
+        && answers.middayActivities is list && answers.middayActivities.size() <= 8
+        && answers.middayActivityOther is string && answers.middayActivityOther.size() <= 240
+        && answers.breakPreferences is list && answers.breakPreferences.size() <= 14
+        && answers.breakPreferenceOther is string && answers.breakPreferenceOther.size() <= 240
+        && answers.classFriendIds is list && answers.classFriendIds.size() <= 59
+        && answers.schoolFriends is string && answers.schoolFriends.size() <= 1000;
+    }
+
+    function validStudentProfileLearningAnswers(answers) {
+      return answers.learningHelps is list && answers.learningHelps.size() <= 12
+        && answers.learningHelpOther is string && answers.learningHelpOther.size() <= 400
+        && answers.workPreferences is list && answers.workPreferences.size() <= 6
+        && answers.learningChallenges is string && answers.learningChallenges.size() <= 1200
+        && answers.helpSeeking is string && answers.helpSeeking.size() <= 160
+        && answers.tutorExpectations is string && answers.tutorExpectations.size() <= 1200
+        && answers.studentMessage is string && answers.studentMessage.size() <= 1600;
+    }
+
+    function validStudentProfileAnswers(answers) {
+      return validStudentProfileAnswerKeys(answers)
+        && validStudentProfilePersonalAnswers(answers)
+        && validStudentProfileGuardianAnswers(answers)
+        && validStudentProfileFamilyAnswers(answers)
+        && validStudentProfileWellbeingAnswers(answers)
+        && validStudentProfileSchoolAnswers(answers)
+        && validStudentProfileLearningAnswers(answers);
+    }
+
+    function validStudentProfileResponseCreate(surveyId, responseId) {
+      let survey = get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data;
+      let publicForm = get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)/public/form).data;
+      return activeStudentProfileSurveyById(surveyId)
+        && request.resource.data.keys().hasOnly([
+          'answers', 'classId', 'formVersion', 'privacyNoticeAcknowledged', 'privacyNoticeVersion',
+          'reviewedAt', 'reviewedByUid', 'studentId', 'studentName', 'submittedAt', 'surveyId'
+        ])
+        && request.resource.data.surveyId == surveyId
+        && responseId == request.resource.data.studentId
+        && request.resource.data.classId == survey.classId
+        && request.resource.data.studentId is string
+        && request.resource.data.studentName is string
+        && request.resource.data.studentId in publicForm.studentOptionIds
+        && request.resource.data.studentName == publicForm.studentNamesById[request.resource.data.studentId]
+        && request.resource.data.formVersion == survey.formVersion
+        && request.resource.data.privacyNoticeAcknowledged == true
+        && request.resource.data.privacyNoticeVersion == survey.privacyNoticeVersion
+        && request.resource.data.reviewedAt == ''
+        && request.resource.data.reviewedByUid == ''
+        && request.resource.data.submittedAt == request.time
+        && validStudentProfileAnswers(request.resource.data.answers);
+    }
+
+    function validStudentProfileResponseReviewUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewedAt', 'reviewedByUid'])
+        && (
+          (
+            request.resource.data.reviewedAt == request.time
+            && request.resource.data.reviewedByUid == request.auth.uid
+          )
+          || (
+            request.resource.data.reviewedAt == ''
+            && request.resource.data.reviewedByUid == ''
+          )
+        );
+    }
+
     // Suggestions are separate from teacher datasets and their backup/restore flows.
     match /feedbackMessages/{messageId} {
       function feedbackAdmin() {
@@ -719,6 +991,32 @@ service cloud.firestore {
         allow get, list: if canAccessSociometricSurveyById(surveyId);
         allow delete: if signedIn()
           && get(/databases/$(database)/documents/sociometricSurveys/$(surveyId)).data.ownerUid == request.auth.uid;
+      }
+    }
+
+    match /studentProfileSurveys/{surveyId} {
+      allow create: if validStudentProfileSurveyCreate(surveyId);
+      allow get: if isStudentProfileSurveyMember();
+      allow list: if canListStudentProfileSurvey();
+      allow update: if validStudentProfileSurveyUpdate();
+      allow delete: if isStudentProfileSurveyOwner();
+
+      match /public/form {
+        allow create: if validStudentProfilePublicFormCreate(surveyId);
+        allow get: if activeStudentProfileSurveyById(surveyId)
+          || canAccessStudentProfileSurveyById(surveyId);
+        allow list: if false;
+        allow update: if validStudentProfilePublicFormUpdate(surveyId);
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/studentProfileSurveys/$(surveyId)).data.ownerUid == request.auth.uid;
+      }
+
+      match /responses/{responseId} {
+        allow create: if validStudentProfileResponseCreate(surveyId, responseId);
+        allow get, list: if canAccessStudentProfileSurveyById(surveyId);
+        allow update: if canAccessStudentProfileSurveyById(surveyId)
+          && validStudentProfileResponseReviewUpdate();
+        allow delete: if canAccessStudentProfileSurveyById(surveyId);
       }
     }
 

@@ -11,6 +11,7 @@ import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
 import { TrackingView } from './features/tracking/TrackingView'
 import { SociometricPublicForm } from './features/tutoring/SociometricPublicForm'
+import { StudentProfilePublicForm } from './features/tutoring/StudentProfilePublicForm'
 import { TutoringView } from './features/tutoring/TutoringView'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
@@ -150,6 +151,7 @@ function App() {
   const publicParams = new URLSearchParams(window.location.search)
   const sociometricSurveyId = publicParams.get('sociometric')
   const sociometricAccessToken = publicParams.get('token')
+  const studentProfileSurveyId = publicParams.get('student-profile')
   const initialize = useAvaluaproStore((state) => state.initialize)
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
@@ -159,12 +161,16 @@ function App() {
   const onboarding = useAvaluaproStore((state) => state.onboarding)
 
   useEffect(() => {
-    if (sociometricSurveyId) return
+    if (sociometricSurveyId || studentProfileSurveyId) return
     initialize()
-  }, [initialize, sociometricSurveyId])
+  }, [initialize, sociometricSurveyId, studentProfileSurveyId])
 
   if (sociometricSurveyId) {
     return <SociometricPublicForm accessToken={sociometricAccessToken} surveyId={sociometricSurveyId} />
+  }
+
+  if (studentProfileSurveyId) {
+    return <StudentProfilePublicForm surveyId={studentProfileSurveyId} />
   }
 
   if (status === 'loading' || status === 'idle') {

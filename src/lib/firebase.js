@@ -32,6 +32,12 @@ import {
 import { COLLECTIONS } from '../data/seedData'
 import { getSharedRowVersion } from './sharedTutoringRows'
 import { removeExpiredSociometricSurveys } from './sociometricRetention'
+import {
+  areCloudDocumentsEqual,
+  buildCloudDocumentDiff,
+  isFirestoreQuotaError,
+  isFirestoreSpecialValue,
+} from './cloudSyncDiff'
 
 export const SHARED_TUTORING_COLLECTIONS = [
   'students',
@@ -67,6 +73,7 @@ const authReady = setPersistence(auth, browserLocalPersistence).catch((error) =>
 const FIRESTORE_DOCUMENT_SOFT_LIMIT = 900_000
 export const SOCIOMETRIC_SURVEYS_COLLECTION = 'sociometricSurveys'
 export const SOCIOMETRIC_PRIVACY_NOTICE_VERSION = '2026-06-20-v1'
+export const STUDENT_PROFILE_SURVEYS_COLLECTION = 'studentProfileSurveys'
 
 function getFirebaseAuthErrorMessage(error) {
   const message = String(error?.message || '')
@@ -90,6 +97,7 @@ function getFirebaseAuthErrorMessage(error) {
 function cleanForFirestore(value) {
   if (Array.isArray(value)) return value.map(cleanForFirestore)
   if (!value || typeof value !== 'object') return value ?? null
+  if (isFirestoreSpecialValue(value)) return value
 
   return Object.entries(value).reduce((nextValue, [key, entry]) => {
     if (entry === undefined) return nextValue
@@ -172,6 +180,18 @@ export function getSociometricSurveyResponsesCollectionRef(surveyId) {
   return collection(getSociometricSurveyDocRef(surveyId), 'responses')
 }
 
+function getStudentProfileSurveyDocRef(surveyId) {
+  return doc(db, STUDENT_PROFILE_SURVEYS_COLLECTION, normalizeFirestoreId(surveyId))
+}
+
+function getStudentProfileSurveyPublicDocRef(surveyId) {
+  return doc(getStudentProfileSurveyDocRef(surveyId), 'public', 'form')
+}
+
+function getStudentProfileSurveyResponsesCollectionRef(surveyId) {
+  return collection(getStudentProfileSurveyDocRef(surveyId), 'responses')
+}
+
 function getSafeDocId(row, fallbackPrefix, index) {
   return String(row?.id || `${fallbackPrefix}_${index}`).replaceAll('/', '_')
 }
@@ -188,25 +208,21 @@ function assertFirestoreDocumentSize(collectionName, docId, value) {
 async function replaceCloudCollection(uid, collectionName, rows = []) {
   const collectionRef = getCollectionRef(uid, collectionName)
   const existingSnapshot = await getDocs(collectionRef)
-  const nextIds = new Set(rows.map((row, index) => getSafeDocId(row, collectionName, index)))
-  const operations = []
-
-  existingSnapshot.forEach((snapshotDoc) => {
-    if (!nextIds.has(snapshotDoc.id)) {
-      operations.push({ type: 'delete', ref: snapshotDoc.ref })
-    }
-  })
-
-  rows.forEach((row, index) => {
+  const localDocuments = rows.map((row, index) => {
     const docId = getSafeDocId(row, collectionName, index)
     const value = cleanForFirestore({ ...row, id: docId })
     assertFirestoreDocumentSize(collectionName, docId, value)
-    operations.push({
-      type: 'set',
-      ref: doc(collectionRef, docId),
-      value,
-    })
+    return { id: docId, value }
   })
+  const remoteDocuments = existingSnapshot.docs.map((snapshotDoc) => ({
+    id: snapshotDoc.id,
+    value: snapshotDoc.data(),
+  }))
+  const diff = buildCloudDocumentDiff(localDocuments, remoteDocuments)
+  const operations = [
+    ...diff.deleteIds.map((docId) => ({ type: 'delete', ref: doc(collectionRef, docId) })),
+    ...diff.upserts.map(({ id, value }) => ({ type: 'set', ref: doc(collectionRef, id), value })),
+  ]
 
   for (let index = 0; index < operations.length; index += 450) {
     const batch = writeBatch(db)
@@ -219,6 +235,19 @@ async function replaceCloudCollection(uid, collectionName, rows = []) {
     })
     await batch.commit()
   }
+
+  return { collection: collectionName, ...diff.stats }
+}
+
+async function setDocumentIfChanged(reference, value) {
+  const snapshot = await getDoc(reference)
+  const currentValue = snapshot.exists() ? snapshot.data() : null
+  const comparableCurrentValue = currentValue
+    ? Object.keys(value).reduce((result, key) => ({ ...result, [key]: currentValue[key] }), {})
+    : null
+  if (snapshot.exists() && areCloudDocumentsEqual(comparableCurrentValue, value)) return false
+  await setDoc(reference, value, { merge: true })
+  return true
 }
 
 async function saveBackupRows(uid, backupId, collectionName, rows = []) {
@@ -611,6 +640,211 @@ export async function listSociometricSurveyResponses(surveyId) {
   return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
 }
 
+function normalizeStudentProfileSurveyPayload(survey = {}, user = {}) {
+  const now = new Date().toISOString()
+  const ownerUid = String(survey.ownerUid || user.uid || '').trim()
+  const studentOptions = (Array.isArray(survey.studentOptions) ? survey.studentOptions : [])
+    .map(normalizeStudentOption)
+    .filter((option) => option.id && option.name)
+  const memberUids = Array.from(
+    new Set([ownerUid, ...(Array.isArray(survey.memberUids) ? survey.memberUids : [])]),
+  ).filter(Boolean)
+
+  return cleanForFirestore({
+    academicYear: String(survey.academicYear || '').trim(),
+    classId: String(survey.classId || '').trim(),
+    className: String(survey.className || '').trim(),
+    createdAt: survey.createdAt || now,
+    expiresAt: String(survey.expiresAt || '').trim(),
+    expiresAtEpochMs: Number(survey.expiresAtEpochMs) || 0,
+    formVersion: String(survey.formVersion || '').trim(),
+    id: normalizeFirestoreId(survey.id),
+    memberUidMap: Object.fromEntries(memberUids.map((uid) => [uid, true])),
+    memberUids,
+    ownerUid,
+    privacyNoticeVersion: String(survey.privacyNoticeVersion || '').trim(),
+    responseCount: Math.max(0, Number(survey.responseCount) || 0),
+    status: survey.status === 'closed' ? 'closed' : 'active',
+    studentOptionIds: studentOptions.map((student) => student.id),
+    studentOptions,
+    updatedAt: survey.updatedAt || survey.createdAt || now,
+  })
+}
+
+function normalizeStudentProfileResponsePayload({ response = {}, survey }) {
+  const studentId = String(response.studentId || '').trim()
+  const student = survey.studentOptions.find((option) => option.id === studentId)
+  return {
+    ...cleanForFirestore({
+      answers: response.answers && typeof response.answers === 'object' ? response.answers : {},
+      classId: survey.classId,
+      formVersion: survey.formVersion,
+      privacyNoticeAcknowledged: response.privacyNoticeAcknowledged === true,
+      privacyNoticeVersion: survey.privacyNoticeVersion,
+      reviewedAt: '',
+      reviewedByUid: '',
+      studentId,
+      studentName: student?.name || '',
+      surveyId: survey.id,
+    }),
+    submittedAt: serverTimestamp(),
+  }
+}
+
+export async function createStudentProfileSurveyDocument({ survey, user }) {
+  if (!user?.uid) throw new Error('Cal iniciar sessió amb Google abans de crear el formulari tutorial.')
+
+  const value = normalizeStudentProfileSurveyPayload(survey, user)
+  if (!value.id || !value.classId || value.studentOptions.length === 0) {
+    throw new Error('El formulari tutorial necessita una classe amb alumnes.')
+  }
+  if (value.ownerUid !== user.uid) {
+    throw new Error('El formulari tutorial ha de pertànyer al tutor connectat.')
+  }
+
+  const publicValue = cleanForFirestore({
+    classId: value.classId,
+    className: value.className,
+    expiresAt: value.expiresAt,
+    expiresAtEpochMs: value.expiresAtEpochMs,
+    formVersion: value.formVersion,
+    privacyNoticeVersion: value.privacyNoticeVersion,
+    studentNamesById: Object.fromEntries(value.studentOptions.map((student) => [student.id, student.name])),
+    studentOptionIds: value.studentOptionIds,
+    studentOptions: value.studentOptions,
+    surveyId: value.id,
+  })
+  assertFirestoreDocumentSize(STUDENT_PROFILE_SURVEYS_COLLECTION, value.id, value)
+  assertFirestoreDocumentSize(`${STUDENT_PROFILE_SURVEYS_COLLECTION}/${value.id}/public`, 'form', publicValue)
+
+  const batch = writeBatch(db)
+  batch.set(getStudentProfileSurveyDocRef(value.id), value)
+  batch.set(getStudentProfileSurveyPublicDocRef(value.id), publicValue)
+  await batch.commit()
+  return value
+}
+
+export async function listStudentProfileSurveysForUser(userUid) {
+  if (!userUid) return []
+  const surveysCollection = collection(db, STUDENT_PROFILE_SURVEYS_COLLECTION)
+  const [ownedSnapshot, memberSnapshot] = await Promise.all([
+    getDocs(query(surveysCollection, where('ownerUid', '==', userUid))),
+    getDocs(query(surveysCollection, where(`memberUidMap.${userUid}`, '==', true))),
+  ])
+  return Array.from(new Map(
+    [...ownedSnapshot.docs, ...memberSnapshot.docs].map((snapshotDoc) => [
+      snapshotDoc.id,
+      { id: snapshotDoc.id, ...snapshotDoc.data() },
+    ]),
+  ).values())
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
+}
+
+export async function loadPublicStudentProfileSurvey(surveyId) {
+  if (!surveyId) throw new Error('No s’ha indicat cap formulari tutorial.')
+  const snapshot = await getDoc(getStudentProfileSurveyPublicDocRef(surveyId))
+  if (!snapshot.exists()) throw new Error('Aquest formulari no està disponible o ja s’ha tancat.')
+  const survey = snapshot.data()
+  if (Date.now() >= Number(survey.expiresAtEpochMs || 0)) {
+    throw new Error('Aquest formulari tutorial ha caducat.')
+  }
+  return { ...survey, id: normalizeFirestoreId(surveyId) }
+}
+
+export async function submitStudentProfileSurveyResponse({ answers, privacyNoticeAcknowledged, studentId, surveyId }) {
+  const survey = await loadPublicStudentProfileSurvey(surveyId)
+  const value = normalizeStudentProfileResponsePayload({
+    response: { answers, privacyNoticeAcknowledged, studentId },
+    survey,
+  })
+  if (!value.studentId || !value.studentName) {
+    throw new Error('Selecciona el teu nom abans d’enviar el formulari.')
+  }
+  await setDoc(doc(getStudentProfileSurveyResponsesCollectionRef(survey.id), normalizeFirestoreId(value.studentId)), value)
+  return { ...value, submittedAt: new Date().toISOString() }
+}
+
+export async function listStudentProfileSurveyResponses(surveyId) {
+  if (!surveyId) return []
+  const snapshot = await getDocs(query(getStudentProfileSurveyResponsesCollectionRef(surveyId), orderBy('submittedAt', 'asc')))
+  return snapshot.docs.map((snapshotDoc) => {
+    const value = snapshotDoc.data()
+    return {
+      id: snapshotDoc.id,
+      ...value,
+      reviewedAt: value.reviewedAt?.toDate?.().toISOString?.() || value.reviewedAt || '',
+      submittedAt: value.submittedAt?.toDate?.().toISOString?.() || value.submittedAt || '',
+    }
+  })
+}
+
+export function subscribeToStudentProfileSurveyResponses(surveyId, onChange, onError) {
+  if (!surveyId) {
+    onChange?.([])
+    return () => {}
+  }
+  const responsesQuery = query(
+    getStudentProfileSurveyResponsesCollectionRef(surveyId),
+    orderBy('submittedAt', 'asc'),
+  )
+  return onSnapshot(
+    responsesQuery,
+    (snapshot) => {
+      onChange?.(snapshot.docs.map((snapshotDoc) => {
+        const value = snapshotDoc.data()
+        return {
+          id: snapshotDoc.id,
+          ...value,
+          reviewedAt: value.reviewedAt?.toDate?.().toISOString?.() || value.reviewedAt || '',
+          submittedAt: value.submittedAt?.toDate?.().toISOString?.() || value.submittedAt || '',
+        }
+      }))
+    },
+    onError,
+  )
+}
+
+export async function updateStudentProfileSurveyStatus({ expiresAt, expiresAtEpochMs, status, surveyId }) {
+  const now = new Date().toISOString()
+  const batch = writeBatch(db)
+  batch.update(getStudentProfileSurveyDocRef(surveyId), {
+    expiresAt,
+    expiresAtEpochMs,
+    status,
+    updatedAt: now,
+  })
+  batch.update(getStudentProfileSurveyPublicDocRef(surveyId), { expiresAt, expiresAtEpochMs })
+  await batch.commit()
+}
+
+export async function markStudentProfileResponseReviewed({ reviewed, studentId, surveyId, user }) {
+  if (!user?.uid) throw new Error('Cal iniciar sessió per revisar aquesta resposta.')
+  await updateDoc(
+    doc(getStudentProfileSurveyResponsesCollectionRef(surveyId), normalizeFirestoreId(studentId)),
+    reviewed
+      ? { reviewedAt: serverTimestamp(), reviewedByUid: user.uid }
+      : { reviewedAt: '', reviewedByUid: '' },
+  )
+}
+
+export async function deleteStudentProfileSurveyResponse({ studentId, surveyId }) {
+  await deleteDoc(doc(getStudentProfileSurveyResponsesCollectionRef(surveyId), normalizeFirestoreId(studentId)))
+}
+
+export async function deleteStudentProfileSurveyDocument({ surveyId }) {
+  const responses = await getDocs(getStudentProfileSurveyResponsesCollectionRef(surveyId))
+  const operations = [
+    ...responses.docs.map((responseDoc) => responseDoc.ref),
+    getStudentProfileSurveyPublicDocRef(surveyId),
+    getStudentProfileSurveyDocRef(surveyId),
+  ]
+  for (let index = 0; index < operations.length; index += 450) {
+    const batch = writeBatch(db)
+    operations.slice(index, index + 450).forEach((ref) => batch.delete(ref))
+    await batch.commit()
+  }
+}
+
 export async function deleteSociometricSurveyDocument({ surveyId, user }) {
   if (!surveyId) throw new Error('No s’ha indicat cap qüestionari sociomètric.')
   if (!user?.uid) throw new Error('Cal iniciar sessió per eliminar el qüestionari.')
@@ -690,36 +924,164 @@ export async function updateSociometricSurveyDocumentStatus({
 export async function saveCloudCollections(uid, dataset, collectionsToSave = COLLECTIONS, meta = {}) {
   if (!uid) throw new Error('Cal iniciar sessió amb Google abans de guardar al núvol.')
 
-  await setDoc(
-    getUserDocRef(uid),
-    cleanForFirestore({
-      email: meta.user?.email || '',
-      displayName: meta.user?.displayName || '',
-      updatedAt: new Date().toISOString(),
-    }),
-    { merge: true },
-  )
+  const userValue = cleanForFirestore({
+    email: meta.user?.email || '',
+    displayName: meta.user?.displayName || '',
+  })
+  const userWritten = await setDocumentIfChanged(getUserDocRef(uid), userValue)
+  const collectionStats = []
 
   for (const collectionName of collectionsToSave) {
     const rows =
       collectionName === SOCIOMETRIC_SURVEYS_COLLECTION
         ? removeExpiredSociometricSurveys(dataset[collectionName])
         : dataset[collectionName] || []
-    await replaceCloudCollection(uid, collectionName, rows)
+    collectionStats.push(await replaceCloudCollection(uid, collectionName, rows))
   }
 
-  await setDoc(
-    getMetaDocRef(uid),
-    cleanForFirestore({
-      app: 'avaluapro-v2',
-      version: 2,
-      profile: meta.profile || {},
-      preferences: meta.preferences || {},
-      collections: collectionsToSave,
-      updatedAt: new Date().toISOString(),
+  const totals = collectionStats.reduce(
+    (result, stats) => ({
+      read: result.read + stats.read,
+      written: result.written + stats.written,
+      deleted: result.deleted + stats.deleted,
+      skipped: result.skipped + stats.skipped,
     }),
-    { merge: true },
+    { read: 0, written: 0, deleted: 0, skipped: 0 },
   )
+  const hasRowChanges = totals.written + totals.deleted > 0
+  const metaValue = cleanForFirestore({
+    app: 'avaluapro-v2',
+    version: 2,
+    profile: meta.profile || {},
+    preferences: meta.preferences || {},
+    collections: COLLECTIONS,
+  })
+  const metaWritten = hasRowChanges ? await setDocumentIfChanged(getMetaDocRef(uid), metaValue) : false
+
+  return {
+    collections: collectionStats,
+    totals,
+    metadataWrites: Number(userWritten) + Number(metaWritten),
+  }
+}
+
+export async function saveCloudOperations(uid, operations = [], meta = {}) {
+  if (!uid) throw new Error('Cal iniciar sessió amb Google abans de guardar al núvol.')
+  const validOperations = operations.filter(
+    (operation) =>
+      operation?.uid === uid &&
+      COLLECTIONS.includes(operation.collectionName) &&
+      operation.documentId &&
+      ['upsert', 'delete'].includes(operation.operation),
+  )
+  if (validOperations.length === 0) {
+    return {
+      collections: [],
+      totals: { read: 0, written: 0, deleted: 0, skipped: 0 },
+      metadataWrites: 0,
+    }
+  }
+
+  const userValue = cleanForFirestore({
+    email: meta.user?.email || '',
+    displayName: meta.user?.displayName || '',
+  })
+  const userWritten = await setDocumentIfChanged(getUserDocRef(uid), userValue)
+  const statsByCollection = new Map()
+  const firestoreOperations = validOperations.map((operation) => {
+    const stats = statsByCollection.get(operation.collectionName) || {
+      collection: operation.collectionName,
+      read: 0,
+      written: 0,
+      deleted: 0,
+      skipped: 0,
+    }
+    if (operation.operation === 'delete') stats.deleted += 1
+    else stats.written += 1
+    statsByCollection.set(operation.collectionName, stats)
+
+    const reference = doc(getCollectionRef(uid, operation.collectionName), operation.documentId)
+    if (operation.operation === 'delete') return { id: operation.id, type: 'delete', reference }
+    const value = cleanForFirestore({ ...operation.value, id: operation.documentId })
+    assertFirestoreDocumentSize(operation.collectionName, operation.documentId, value)
+    return { id: operation.id, type: 'set', reference, value }
+  })
+
+  const successfulOperationIds = []
+  const buildOperationError = (error, failedOperationIds) => {
+    const operationError = new Error(error?.message || 'No s’han pogut sincronitzar algunes dades.', { cause: error })
+    operationError.code = error?.code || ''
+    operationError.successfulOperationIds = [...successfulOperationIds]
+    operationError.failedOperationIds = failedOperationIds
+    return operationError
+  }
+  for (let index = 0; index < firestoreOperations.length; index += 450) {
+    const operationBatch = firestoreOperations.slice(index, index + 450)
+    const batch = writeBatch(db)
+    operationBatch.forEach((operation) => {
+      if (operation.type === 'delete') batch.delete(operation.reference)
+      else batch.set(operation.reference, operation.value)
+    })
+    try {
+      await batch.commit()
+      successfulOperationIds.push(...operationBatch.map((operation) => operation.id))
+    } catch (error) {
+      const code = String(error?.code || '').toLowerCase()
+      const transientError =
+        isFirestoreQuotaError(error) ||
+        ['aborted', 'cancelled', 'deadline-exceeded', 'internal', 'resource-exhausted', 'unauthenticated', 'unavailable']
+          .some((value) => code.includes(value))
+      if (transientError) {
+        throw buildOperationError(error, operationBatch.map((operation) => operation.id))
+      }
+
+      const failedOperationIds = []
+      for (const operation of operationBatch) {
+        try {
+          if (operation.type === 'delete') await deleteDoc(operation.reference)
+          else await setDoc(operation.reference, operation.value)
+          successfulOperationIds.push(operation.id)
+        } catch {
+          failedOperationIds.push(operation.id)
+        }
+      }
+      if (failedOperationIds.length > 0) {
+        throw buildOperationError(error, failedOperationIds)
+      }
+    }
+  }
+
+  const metaValue = cleanForFirestore({
+    app: 'avaluapro-v2',
+    version: 2,
+    profile: meta.profile || {},
+    preferences: meta.preferences || {},
+    collections: COLLECTIONS,
+  })
+  let metaWritten = false
+  let metadataError = ''
+  try {
+    metaWritten = await setDocumentIfChanged(getMetaDocRef(uid), metaValue)
+  } catch (error) {
+    metadataError = String(error?.code || error?.name || 'metadata-sync-error')
+  }
+  const collections = Array.from(statsByCollection.values())
+  const totals = collections.reduce(
+    (result, stats) => ({
+      read: 0,
+      written: result.written + stats.written,
+      deleted: result.deleted + stats.deleted,
+      skipped: 0,
+    }),
+    { read: 0, written: 0, deleted: 0, skipped: 0 },
+  )
+
+  return {
+    collections,
+    totals,
+    metadataWrites: Number(userWritten) + Number(metaWritten),
+    metadataError,
+  }
 }
 
 export async function loadCloudDataset(uid) {
@@ -1334,6 +1696,7 @@ export async function deleteCloudCollection(uid, collectionName) {
   const snapshot = await getDocs(getCollectionRef(uid, collectionName))
   await Promise.all(snapshot.docs.map((snapshotDoc) => deleteDoc(snapshotDoc.ref)))
 }
+
 
 export function isFeedbackAdmin(user) {
   return user?.email === 'mperezc@educand.ad'

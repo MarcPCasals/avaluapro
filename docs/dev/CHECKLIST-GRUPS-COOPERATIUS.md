@@ -1,6 +1,7 @@
 # Redisseny dels grups cooperatius
 
 Data de planificació: 20 de juny de 2026
+Última revisió: 24 de juny de 2026
 
 ## Objectiu del bloc
 
@@ -14,6 +15,21 @@ Passar d'una proposta automàtica carregada d'informació a una eina que permeti
 6. guardar una versió completa, explicable i recuperable.
 
 La proposta automàtica ha de continuar sent només un suport a la decisió docent. El programa no ha de presentar-la com una decisió definitiva.
+
+## Estat actual després de la primera implementació
+
+El bloc ja té una primera versió funcional del redisseny:
+
+- la vista general s'ha simplificat per veure tots els grups ràpidament;
+- els detalls pedagògics i les accions de modificació s'han mogut al detall del grup;
+- els alumnes tornen a mostrar color de rendiment i estrella quan són referents;
+- els noms es mostren en format `Nom Cognom1 Cognom2`;
+- l'algoritme evita deixar grups d'un sol alumne;
+- l'edició guiada permet moure, intercanviar, bloquejar, crear grups, reanomenar, eliminar grups buits, desfer i refer;
+- les versions guardades conserven metadades, qualitat, observació, bloquejos i origen manual;
+- la vista per projectar evita exposar informació sensible.
+
+La feina pendent ja no és tant construir la funcionalitat base, sinó validar-la amb dades reals, polir accessibilitat, revisar persistència completa i afegir proves més específiques de l'algoritme.
 
 ## Diagnosi de la versió actual
 
@@ -465,13 +481,15 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 
 ### Fase 0. Tancar decisions de producte
 
-- [ ] Confirmar els quatre estats de qualitat: `Sòlid`, `Correcte`, `A revisar`, `Crític`.
-- [ ] Confirmar que la mida del grup és un objectiu flexible.
-- [ ] Confirmar que la primera edició serà guiada i no basada en drag-and-drop.
-- [ ] Confirmar si es podran crear i eliminar grups manualment en aquesta versió.
-- [ ] Confirmar si es podran bloquejar alumnes i grups en aquesta versió.
-- [ ] Confirmar si les alertes formaran part de la versió guardada o només es recalcularan.
-- [ ] Confirmar quina informació pot aparèixer a la versió per projectar o copiar.
+- [x] Confirmar els quatre estats de qualitat: `Sòlid`, `Correcte`, `A revisar`, `Crític`.
+- [x] Confirmar que la mida del grup és un objectiu flexible.
+- [x] Confirmar que la primera edició serà guiada i no basada en drag-and-drop.
+- [x] Confirmar si es podran crear i eliminar grups manualment en aquesta versió.
+- [x] Confirmar si es podran bloquejar alumnes i grups en aquesta versió.
+- [x] Confirmar si les alertes formaran part de la versió guardada o només es recalcularan.
+- [x] Confirmar quina informació pot aparèixer a la versió per projectar o copiar.
+
+Decisió actual: la vista general prioritza simplicitat i comparació ràpida. Mostra estat i composició bàsica; el detall concentra explicació, alertes, perfils i modificació. La vista de projecció és neta i no mostra informació sensible.
 
 ### Fase 1. Definir el contracte de dades
 
@@ -479,10 +497,10 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 - [x] Crear els noms pedagògics de cada perfil.
 - [x] Definir l'estructura de `group.analysis`.
 - [x] Definir l'estructura de l'anàlisi global.
-- [ ] Definir `generationMeta`.
-- [ ] Definir `qualitySnapshot`.
-- [ ] Definir les accions manuals i les dades mínimes de cada acció.
-- [ ] Garantir compatibilitat amb versions guardades antigues.
+- [x] Definir `generationMeta`.
+- [x] Definir `qualitySnapshot`.
+- [x] Definir les accions manuals i les dades mínimes de cada acció.
+- [x] Garantir compatibilitat amb versions guardades antigues.
 
 ### Fase 2. Crear proves de la lògica actual
 
@@ -492,8 +510,10 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 - [ ] Afegir casos amb mig grup activat i desactivat.
 - [x] Afegir casos amb incompatibilitats.
 - [x] Afegir casos amb alumnes vulnerables sense suport.
-- [ ] Afegir casos amb nombre d'alumnes no divisible per la mida objectiu.
+- [x] Afegir casos amb nombre d'alumnes no divisible per la mida objectiu.
 - [ ] Afegir casos de dades acadèmiques o sociomètriques incompletes.
+
+Nota: ja hi ha una prova específica que comprova que 9 alumnes en grups de 4 no generen cap grup d'un sol alumne.
 
 ### Fase 3. Construir l'anàlisi explicable
 
@@ -509,8 +529,8 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 
 ### Fase 4. Redissenyar la jerarquia visual
 
-- [ ] Reordenar els controls de configuració.
-- [ ] Afegir un botó explícit `Generar proposta`.
+- [x] Simplificar els controls de configuració en un únic panell.
+- [ ] Valorar si cal afegir un botó explícit `Generar proposta`.
 - [x] Crear el primer resum global.
 - [ ] Afegir llegenda clara de perfils.
 - [x] Augmentar l'amplada mínima de les targetes de la graella.
@@ -540,7 +560,7 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 
 - [x] Permetre bloquejar un alumne.
 - [x] Permetre bloquejar un grup complet.
-- [ ] Evitar que una regeneració mogui elements bloquejats.
+- [x] Definir que una regeneració no conserva bloquejos manuals.
 - [x] Permetre crear un grup nou.
 - [x] Permetre canviar el nom del grup.
 - [x] Permetre eliminar només grups buits.
@@ -604,6 +624,8 @@ No és necessari fer tota l'extracció de components a la primera iteració. S'h
 - [ ] Revisar que no s'hagin introduït dades derivades innecessàries a Firestore.
 - [x] Actualitzar la guia d'ajuda de grups cooperatius.
 - [x] Fer captures finals d'ordinador i iPad.
+
+Nota: les proves tècniques bàsiques passen. Queda pendent verificar el cicle complet amb dades reals i sincronització efectiva, perquè és aquí on poden aparèixer problemes de persistència o compatibilitat no visibles en proves unitàries.
 
 ## Ordre recomanat de les primeres iteracions
 
@@ -686,18 +708,18 @@ També caldrà revisar:
 
 El redisseny es considerarà funcionalment complet quan:
 
-- [ ] El docent pot explicar per què s'ha format cada grup.
-- [ ] Cada grup mostra una composició pedagògica entenedora.
-- [ ] Les alertes principals es detecten sense obrir tots els detalls.
-- [ ] La vista permet comparar els grups a l'iPad.
-- [ ] Moure un alumne requereix pocs passos.
-- [ ] Es pot intercanviar dos alumnes directament.
-- [ ] Cada canvi mostra l'impacte pedagògic.
-- [ ] Els canvis es poden desfer.
-- [ ] Les versions guardades conserven el context necessari.
-- [ ] Les versions antigues continuen funcionant.
-- [ ] La còpia per a l'alumnat no exposa informació sensible.
-- [ ] La lògica principal està coberta per proves.
+- [ ] El docent pot explicar per què s'ha format cada grup amb dades reals pròpies.
+- [x] Cada grup mostra una composició pedagògica entenedora.
+- [x] Les alertes principals es detecten sense obrir tots els detalls.
+- [x] La vista permet comparar els grups a l'iPad.
+- [x] Moure un alumne requereix pocs passos.
+- [x] Es pot intercanviar dos alumnes directament.
+- [x] Cada canvi mostra l'impacte pedagògic.
+- [x] Els canvis es poden desfer.
+- [x] Les versions guardades conserven el context necessari.
+- [x] Les versions antigues continuen funcionant.
+- [x] La còpia per a l'alumnat no exposa informació sensible.
+- [ ] La lògica principal està coberta per proves específiques suficients.
 
 ## Decisió recomanada per començar
 

@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from './Modal'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
+import { COLLECTIONS } from '../data/seedData'
 import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
@@ -79,6 +80,12 @@ function formatSyncTime(value) {
 
 function getSyncIndicator(cloud) {
   if (cloud.status === 'error') {
+    if (cloud.errorKind === 'quota') {
+      return { className: 'error', icon: AlertCircle, label: 'Quota esgotada', detail: 'Desat al dispositiu' }
+    }
+    if (cloud.errorKind === 'network') {
+      return { className: 'error', icon: Cloud, label: 'Sense connexió', detail: 'Desat al dispositiu' }
+    }
     return { className: 'error', icon: AlertCircle, label: 'Error', detail: 'Revisa l’error' }
   }
   if (cloud.status === 'syncing') {
@@ -89,7 +96,9 @@ function getSyncIndicator(cloud) {
       className: 'pending',
       icon: Cloud,
       label: 'Pendent',
-      detail: `${cloud.pendingCollections?.length || 1} bloc pendent`,
+      detail: `${cloud.pendingOperationCount || cloud.pendingCollections?.length || 1} canvi${
+        (cloud.pendingOperationCount || cloud.pendingCollections?.length || 1) === 1 ? '' : 's'
+      } pendent${(cloud.pendingOperationCount || cloud.pendingCollections?.length || 1) === 1 ? '' : 's'}`,
     }
   }
   if (cloud.lastSyncedAt) {
@@ -252,6 +261,11 @@ export function TopBar() {
   }
 
   async function handleCreateCloudBackup() {
+    const totalRows = COLLECTIONS.reduce((total, collectionName) => total + (state[collectionName]?.length || 0), 0)
+    const shouldCreate = window.confirm(
+      `Aquesta còpia duplicarà aproximadament ${totalRows} registres al núvol i consumirà una escriptura per registre.\n\nLa sincronització quotidiana ja protegeix els canvis. Vols crear igualment aquesta còpia excepcional?`,
+    )
+    if (!shouldCreate) return
     try {
       await createCloudBackup('manual')
       window.alert('Còpia al núvol creada correctament.')

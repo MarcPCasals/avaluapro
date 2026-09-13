@@ -52,9 +52,18 @@ function formatDateTime(value) {
 
 function getCloudStatusText(cloud) {
   if (!cloud.user) return 'No has iniciat sessió amb Google.'
-  if (cloud.status === 'pending') return 'Hi ha canvis locals pendents de pujar.'
+  if (cloud.status === 'pending') {
+    const count = cloud.pendingOperationCount || cloud.pendingCollections?.length || 1
+    return `Hi ha ${count} canvi${count === 1 ? '' : 's'} local${count === 1 ? '' : 's'} pendent${count === 1 ? '' : 's'} de pujar.`
+  }
   if (cloud.status === 'syncing') return 'Sincronitzant dades amb el núvol.'
-  if (cloud.status === 'error') return cloud.error || 'Hi ha hagut un error de sincronització.'
+  if (cloud.status === 'error') {
+    const pendingCount = cloud.pendingOperationCount || cloud.pendingCollections?.length || 0
+    const pendingDetail = pendingCount > 0
+      ? ` Els ${pendingCount} canvi${pendingCount === 1 ? '' : 's'} pendent${pendingCount === 1 ? '' : 's'} continuen desats en aquest dispositiu.`
+      : ''
+    return `${cloud.error || 'Hi ha hagut un error de sincronització.'}${pendingDetail}`
+  }
   if (cloud.lastSyncedAt) return `Última sincronització: ${formatDateTime(cloud.lastSyncedAt)}.`
   return 'Sessió iniciada. Encara no hi ha cap sincronització registrada.'
 }
@@ -118,6 +127,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const createCloudBackup = useAvaluaproStore((store) => store.createCloudBackup)
   const loadCloudBackups = useAvaluaproStore((store) => store.loadCloudBackups)
   const pushAllToCloud = useAvaluaproStore((store) => store.pushAllToCloud)
+  const retryCloudSync = useAvaluaproStore((store) => store.retryCloudSync)
   const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
   const resetToSeed = useAvaluaproStore((store) => store.resetToSeed)
@@ -258,6 +268,10 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   }
 
   const handleCreateCloudBackup = async () => {
+    const shouldCreate = window.confirm(
+      `Aquesta còpia duplicarà aproximadament ${totalRows} registres al núvol i consumirà una escriptura per registre.\n\nLa sincronització quotidiana ja protegeix els canvis i aquesta còpia només és necessària en casos excepcionals.\n\nVols crear-la?`,
+    )
+    if (!shouldCreate) return
     try {
       await createCloudBackup('manual')
       setRestoreStatus('Còpia de seguretat creada al núvol correctament.')
@@ -267,9 +281,14 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   }
 
   const handlePushToCloud = async () => {
+    const shouldPush = window.confirm(
+      `Aquesta eina revisarà les ${COLLECTIONS.length} col·leccions i compararà aproximadament ${totalRows} registres amb el núvol.\n\nNomés escriurà les diferències, però pot eliminar del núvol els registres que ja no existeixin en aquest dispositiu. Reserva-la per a restauracions o recuperacions excepcionals.\n\nVols continuar?`,
+    )
+    if (!shouldPush) return
     try {
-      await pushAllToCloud()
-      setRestoreStatus('Dades sincronitzades amb el núvol correctament.')
+      const result = await pushAllToCloud(true)
+      const changed = (result?.totals?.written || 0) + (result?.totals?.deleted || 0)
+      setRestoreStatus(`Reconciliació completada: ${changed} registres modificats o eliminats al núvol.`)
     } catch (error) {
       setRestoreStatus(error.message || 'No s’han pogut sincronitzar les dades amb el núvol.')
     }
@@ -466,6 +485,19 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               <small>{state.cloud.pendingCollections.length} col·leccions pendents</small>
             )}
           </div>
+          {state.cloud.status === 'error' && state.cloud.pendingCollections?.length > 0 && (
+            <div className="cloud-status-actions">
+              <button className="secondary-action compact" onClick={retryCloudSync} type="button">
+                Reintentar ara
+              </button>
+              {state.cloud.errorKind === 'quota' && (
+                <button className="secondary-action compact" onClick={handleDownloadBackup} type="button">
+                  <Download size={16} />
+                  Descarregar còpia
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="data-security-checklist">
@@ -551,7 +583,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               <h3>Còpies de seguretat al núvol</h3>
               <p>
                 Ruta protegida: <code>users/&lt;uid&gt;/cloudBackups</code>. Només l’usuari autenticat pot llegir o restaurar
-                les seves còpies.
+                les seves còpies. No se’n creen automàticament: una còpia manual duplica tots els registres.
               </p>
             </div>
             <div className="cloud-backup-actions">
@@ -571,7 +603,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                 type="button"
               >
                 <Upload size={16} />
-                Sincronitzar ara
+                Reconciliar tot el núvol
               </button>
               <button
                 className="secondary-action compact"
@@ -622,8 +654,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             </div>
           ) : (
             <p className="empty-cloud-backups">
-              Encara no hi ha còpies al núvol. Avaluapro en farà una automàtica el primer cop que obris el programa cada dia
-              amb Google iniciat.
+              Encara no hi ha còpies al núvol. Pots crear-ne una manualment quan necessitis un punt de restauració complet.
             </p>
           )}
         </section>

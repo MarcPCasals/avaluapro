@@ -71,6 +71,7 @@ import {
 } from './cooperativeGroupOutputUtils'
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
+import { StudentProfileSurveyPanel } from './StudentProfileSurveyPanel'
 import {
   getSavedSeatingAssignments,
   getUnseatedStudentIds,
@@ -6820,6 +6821,14 @@ export function TutoringView() {
           Relacions i grups
         </button>
         <button
+          className={activePanel === 'student-data' ? 'active' : ''}
+          onClick={() => setActivePanel('student-data')}
+          type="button"
+        >
+          <UsersRound size={17} />
+          Dades de l’alumnat
+        </button>
+        <button
           className={activePanel === 'profile' ? 'active' : ''}
           onClick={() => setActivePanel('profile')}
           type="button"
@@ -12052,6 +12061,10 @@ export function TutoringView() {
             </article>
           </div>
         </section>
+      )}
+
+      {activePanel === 'student-data' && (
+        <StudentProfileSurveyPanel activeClass={activeClass} classStudents={classStudents} cloud={cloud} />
       )}
 
       {activePanel === 'profile' && (

@@ -6,7 +6,8 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { createEmptyStudentProfileAnswers } from '../src/features/tutoring/studentProfileQuestionnaire.js'
 
 const PROJECT_ID = 'avaluapro-rules-test'
 const OWNER = { uid: 'owner-uid', email: 'owner@educand.ad' }
@@ -15,6 +16,7 @@ const THIRD = { uid: 'third-uid', email: 'third@educand.ad' }
 const SPACE_ID = 'space-1'
 const SURVEY_ID = 'survey-1'
 const ACCESS_TOKEN = 'a'.repeat(48)
+const PROFILE_SURVEY_ID = 'profile-survey-1'
 
 let testEnv
 
@@ -110,6 +112,67 @@ function sociometricResponseData(overrides = {}) {
   }
 }
 
+function studentProfileSurveyData(overrides = {}) {
+  const expiresAtEpochMs = Date.now() + 24 * 60 * 60 * 1000
+  return {
+    academicYear: '2026-2027',
+    classId: 'class-1',
+    className: 'Tutoria 1A',
+    createdAt: '2026-09-08T08:00:00.000Z',
+    expiresAt: new Date(expiresAtEpochMs).toISOString(),
+    expiresAtEpochMs,
+    formVersion: '2026-09-08-v1',
+    id: PROFILE_SURVEY_ID,
+    memberUidMap: { [OWNER.uid]: true, [COTUTOR.uid]: true },
+    memberUids: [OWNER.uid, COTUTOR.uid],
+    ownerUid: OWNER.uid,
+    privacyNoticeVersion: '2026-09-08-v1',
+    responseCount: 0,
+    status: 'active',
+    studentOptionIds: ['student-1', 'student-2'],
+    studentOptions: [
+      { id: 'student-1', name: 'Alumna Un' },
+      { id: 'student-2', name: 'Alumne Dos' },
+    ],
+    updatedAt: '2026-09-08T08:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function studentProfilePublicFormData(overrides = {}) {
+  const survey = studentProfileSurveyData()
+  return {
+    classId: survey.classId,
+    className: survey.className,
+    expiresAt: survey.expiresAt,
+    expiresAtEpochMs: survey.expiresAtEpochMs,
+    formVersion: survey.formVersion,
+    privacyNoticeVersion: survey.privacyNoticeVersion,
+    studentNamesById: { 'student-1': 'Alumna Un', 'student-2': 'Alumne Dos' },
+    studentOptionIds: survey.studentOptionIds,
+    studentOptions: survey.studentOptions,
+    surveyId: PROFILE_SURVEY_ID,
+    ...overrides,
+  }
+}
+
+function studentProfileResponseData(overrides = {}) {
+  return {
+    answers: { ...createEmptyStudentProfileAnswers(), homeDeviceAccess: 'no' },
+    classId: 'class-1',
+    formVersion: '2026-09-08-v1',
+    privacyNoticeAcknowledged: true,
+    privacyNoticeVersion: '2026-09-08-v1',
+    reviewedAt: '',
+    reviewedByUid: '',
+    studentId: 'student-1',
+    studentName: 'Alumna Un',
+    submittedAt: serverTimestamp(),
+    surveyId: PROFILE_SURVEY_ID,
+    ...overrides,
+  }
+}
+
 before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
@@ -128,6 +191,11 @@ beforeEach(async () => {
     await setDoc(
       doc(db, 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN),
       sociometricAccessTokenData(),
+    )
+    await setDoc(doc(db, 'studentProfileSurveys', PROFILE_SURVEY_ID), studentProfileSurveyData())
+    await setDoc(
+      doc(db, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'public', 'form'),
+      studentProfilePublicFormData(),
     )
   })
 })
@@ -538,6 +606,175 @@ describe('questionari sociometric public', () => {
 test('les assercions de proves estan actives', () => {
   assert.ok(testEnv)
 })
+
+describe('formulari tutorial public', () => {
+  test('el propietari pot crear atomicament el formulari privat i la copia publica', async () => {
+    const db = authDb(OWNER)
+    const surveyId = 'profile-survey-new'
+    const survey = studentProfileSurveyData({ id: surveyId })
+    const publicForm = {
+      ...studentProfilePublicFormData(),
+      expiresAt: survey.expiresAt,
+      expiresAtEpochMs: survey.expiresAtEpochMs,
+      surveyId,
+    }
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'studentProfileSurveys', surveyId), survey)
+    batch.set(doc(db, 'studentProfileSurveys', surveyId, 'public', 'form'), publicForm)
+    await assertSucceeds(batch.commit())
+  })
+
+  test('el formulari public es visible, pero les dades privades no ho son', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertSucceeds(
+      getDoc(doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'public', 'form')),
+    )
+    await assertFails(getDoc(doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID)))
+    await assertFails(
+      getDocs(collection(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses')),
+    )
+  })
+
+  test('un tutor pot enumerar els formularis on consta com a membre', async () => {
+    const db = authDb(OWNER)
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, 'studentProfileSurveys'),
+          where('ownerUid', '==', OWNER.uid),
+        ),
+      ),
+    )
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(authDb(COTUTOR), 'studentProfileSurveys'),
+          where(`memberUidMap.${COTUTOR.uid}`, '==', true),
+        ),
+      ),
+    )
+  })
+
+  test('un alumne pot enviar una resposta valida una sola vegada', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    const responseRef = doc(
+      publicDb,
+      'studentProfileSurveys',
+      PROFILE_SURVEY_ID,
+      'responses',
+      'student-1',
+    )
+    await assertSucceeds(setDoc(responseRef, studentProfileResponseData()))
+    await assertFails(setDoc(responseRef, studentProfileResponseData({ studentMessage: 'canvi' })))
+  })
+
+  test('no es pot suplantar un nom ni triar un identificador de resposta diferent', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData({ studentName: 'Alumne Dos' }),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'un-altre-id'),
+        studentProfileResponseData(),
+      ),
+    )
+  })
+
+  test('es poden enviar les amistats de classe i del centre', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertSucceeds(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData({
+          answers: {
+            ...createEmptyStudentProfileAnswers(),
+            homeDeviceAccess: 'no',
+            classFriendIds: ['student-2'],
+            schoolFriends: 'Una amistat de 2n B',
+          },
+        }),
+      ),
+    )
+  })
+
+  test('es pot indicar el tipus i la quantitat de dispositius disponibles a casa', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertSucceeds(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData({
+          answers: {
+            ...createEmptyStudentProfileAnswers(),
+            homeDeviceAccess: 'yes',
+            homeMobileCount: 2,
+            homeTabletCount: 1,
+          },
+        }),
+      ),
+    )
+  })
+
+  test('un formulari tancat no es pot consultar ni respondre', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'studentProfileSurveys', PROFILE_SURVEY_ID), {
+        status: 'closed',
+      })
+    })
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      getDoc(doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'public', 'form')),
+    )
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData(),
+      ),
+    )
+  })
+
+  test('nomes els tutors vinculats poden consultar, revisar i eliminar respostes', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData({ submittedAt: new Date('2026-09-08T08:10:00.000Z') }),
+      )
+    })
+    const responsePath = ['studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1']
+    await assertSucceeds(getDoc(doc(authDb(OWNER), ...responsePath)))
+    await assertSucceeds(getDoc(doc(authDb(COTUTOR), ...responsePath)))
+    await assertFails(getDoc(doc(authDb(THIRD), ...responsePath)))
+    await assertSucceeds(
+      updateDoc(doc(authDb(COTUTOR), ...responsePath), {
+        reviewedAt: serverTimestamp(),
+        reviewedByUid: COTUTOR.uid,
+      }),
+    )
+    await assertFails(updateDoc(doc(authDb(THIRD), ...responsePath), { reviewedAt: '' }))
+    await assertSucceeds(deleteDoc(doc(authDb(COTUTOR), ...responsePath)))
+  })
+
+  test('es rebutgen camps inesperats i respostes massa llargues', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    const baseAnswers = createEmptyStudentProfileAnswers()
+    for (const answers of [
+      { ...baseAnswers, campInventat: 'no permes' },
+      { ...baseAnswers, studentMessage: 'a'.repeat(1601) },
+      { ...baseAnswers, schoolFriends: 'a'.repeat(1001) },
+    ]) {
+      await assertFails(
+        setDoc(
+          doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+          studentProfileResponseData({ answers }),
+        ),
+      )
+    }
+  })
+})
+
 
 describe('Internal feedback inbox', () => {
   function feedbackDb(uid = 'teacher', email = 'teacher@educand.ad', verified = true) {
