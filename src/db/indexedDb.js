@@ -1,7 +1,8 @@
-import { COLLECTIONS, EMPTY_DATASET } from '../data/seedData'
+import { COLLECTIONS, EMPTY_DATASET } from '../data/seedData.js'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 12
+const DB_VERSION = 13
+const CLOUD_SYNC_QUEUE_STORE = 'cloudSyncQueue'
 
 const INDEXES = {
   students: ['classId'],
@@ -53,6 +54,11 @@ function openDatabase() {
         const store = ensureStore(db, collection) || request.transaction.objectStore(collection)
         ensureIndexes(store, collection)
       })
+      const queueStore = ensureStore(db, CLOUD_SYNC_QUEUE_STORE) || request.transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      if (!queueStore.indexNames.contains('uid')) queueStore.createIndex('uid', 'uid', { unique: false })
+      if (!queueStore.indexNames.contains('collectionName')) {
+        queueStore.createIndex('collectionName', 'collectionName', { unique: false })
+      }
     }
 
     request.onsuccess = () => resolve(request.result)
