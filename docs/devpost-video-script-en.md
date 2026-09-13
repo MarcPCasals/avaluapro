@@ -24,7 +24,7 @@ d’alumnes.
 
 ## Traducció dels textos de la interfície
 
-| Text de la interfície | Equivalent en anglès |
+| Interface text in Catalan | Translation to English |
 | --- | --- |
 | `Avaluació` | Assessment |
 | `Seguiment` | Daily follow-up |
