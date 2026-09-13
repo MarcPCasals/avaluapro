@@ -59,6 +59,12 @@ import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
+import {
+  STUDENT_PROFILE_MOMENT_SOURCE,
+  buildStudentProfileFriendshipSnapshot,
+  hasMatchingStudentProfileRelations,
+  reconcileStudentProfileFriendships,
+} from '../features/tutoring/studentProfileSociogram'
 
 const PREFERENCES_KEY = 'avaluapro-v2-preferences'
 const BACKUP_APP_ID = 'avaluapro-v2'
@@ -956,6 +962,7 @@ function buildTutorialSociometricMoment({
       source: relation.source || '',
       sourceLabel: relation.sourceLabel || '',
       sourceStudentId: relation.sourceStudentId || '',
+      sourceSurveyId: relation.sourceSurveyId || '',
       strength: Number(relation.strength) || 2,
       targetStudentId: relation.targetStudentId || '',
       type: relation.type || '',
@@ -3279,6 +3286,96 @@ export const useAvaluaproStore = create((set, get) => ({
     }))
     await persistCollections(set, get, ['tutorialSociometricMoments'])
     return moment
+  },
+
+  syncStudentProfileFriendships: async ({ responses = [], survey } = {}) => {
+    if (!survey?.id || !survey?.classId) {
+      throw new Error('No s’ha pogut identificar el formulari tutorial.')
+    }
+
+    const state = get()
+    const students = getTutoringRosterStudents(state, survey.classId)
+    const snapshot = buildStudentProfileFriendshipSnapshot({ responses, students, survey })
+    const existingMoment = (state.tutorialSociometricMoments || []).find(
+      (moment) =>
+        moment.source === STUDENT_PROFILE_MOMENT_SOURCE &&
+        moment.sourceSurveyId === survey.id,
+    )
+    const baseStats = {
+      changed: false,
+      createdCount: 0,
+      importedRelationCount: snapshot.relationCount,
+      momentId: existingMoment?.id || '',
+      responseCount: snapshot.responseCount,
+      skippedCount: snapshot.skippedCount,
+      skippedExistingCount: 0,
+      updatedCount: 0,
+    }
+
+    if (!existingMoment && snapshot.responseCount === 0) return baseStats
+    if (
+      existingMoment?.sourceSignature === snapshot.signature &&
+      hasMatchingStudentProfileRelations({
+        currentRelations: state.tutorialRelations,
+        relationDrafts: snapshot.relationDrafts,
+        surveyId: survey.id,
+      })
+    ) {
+      return baseStats
+    }
+
+    const now = new Date().toISOString()
+    const reconciliation = reconcileStudentProfileFriendships({
+      currentRelations: state.tutorialRelations,
+      idFactory: () => createId('trel'),
+      now,
+      relationDrafts: snapshot.relationDrafts,
+      surveyId: survey.id,
+    })
+
+    await Promise.all(
+      reconciliation.removedRelations.map((relation) =>
+        tombstoneSharedRowIfNeeded(state, 'tutorialRelations', relation),
+      ),
+    )
+
+    const capturedAt = existingMoment?.capturedAt || survey.createdAt || now
+    const generatedMoment = buildTutorialSociometricMoment({
+      capturedAt,
+      classId: survey.classId,
+      label: `Fitxa inicial de tutoria · ${capturedAt.slice(0, 10)}`,
+      relations: reconciliation.snapshotRelations,
+      source: STUDENT_PROFILE_MOMENT_SOURCE,
+      sourceSurveyId: survey.id,
+      students,
+    })
+    const nextMoment = {
+      ...generatedMoment,
+      createdAt: existingMoment?.createdAt || generatedMoment.createdAt,
+      id: existingMoment?.id || generatedMoment.id,
+      responseCount: snapshot.responseCount,
+      sourceSignature: snapshot.signature,
+      updatedAt: now,
+    }
+
+    set((current) => ({
+      tutorialRelations: reconciliation.nextRelations,
+      tutorialSociometricMoments: existingMoment
+        ? (current.tutorialSociometricMoments || []).map((moment) =>
+            moment.id === existingMoment.id ? nextMoment : moment,
+          )
+        : [nextMoment, ...(current.tutorialSociometricMoments || [])],
+    }))
+    await persistCollections(set, get, ['tutorialRelations', 'tutorialSociometricMoments'])
+
+    return {
+      ...baseStats,
+      changed: true,
+      createdCount: reconciliation.createdCount,
+      momentId: nextMoment.id,
+      skippedExistingCount: reconciliation.skippedExistingCount,
+      updatedCount: reconciliation.updatedCount,
+    }
   },
 
   syncSociometricSurveyResponses: async (surveyId) => {

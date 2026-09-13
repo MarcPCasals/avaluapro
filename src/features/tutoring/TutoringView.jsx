@@ -4339,6 +4339,7 @@ export function TutoringView() {
   const deleteSociometricSurvey = useAvaluaproStore((state) => state.deleteSociometricSurvey)
   const setSociometricSurveyStatus = useAvaluaproStore((state) => state.setSociometricSurveyStatus)
   const syncSociometricSurveyResponses = useAvaluaproStore((state) => state.syncSociometricSurveyResponses)
+  const syncStudentProfileFriendships = useAvaluaproStore((state) => state.syncStudentProfileFriendships)
   const captureTutorialSociometricMoment = useAvaluaproStore((state) => state.captureTutorialSociometricMoment)
   const saveTutorialGroupSet = useAvaluaproStore((state) => state.saveTutorialGroupSet)
   const deleteTutorialGroupSet = useAvaluaproStore((state) => state.deleteTutorialGroupSet)
@@ -12064,7 +12065,12 @@ export function TutoringView() {
       )}
 
       {activePanel === 'student-data' && (
-        <StudentProfileSurveyPanel activeClass={activeClass} classStudents={classStudents} cloud={cloud} />
+        <StudentProfileSurveyPanel
+          activeClass={activeClass}
+          classStudents={classStudents}
+          cloud={cloud}
+          onSyncFriendships={syncStudentProfileFriendships}
+        />
       )}
 
       {activePanel === 'profile' && (

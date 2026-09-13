@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -353,7 +353,7 @@ function StudentProfileResponseModal({ onClose, onDelete, onReview, response, st
   )
 }
 
-export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud }) {
+export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, onSyncFriendships }) {
   const [surveys, setSurveys] = useState([])
   const [selectedSurveyId, setSelectedSurveyId] = useState('')
   const [responses, setResponses] = useState([])
@@ -362,6 +362,9 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
   const [confirmDeleteSurvey, setConfirmDeleteSurvey] = useState(false)
   const [message, setMessage] = useState('')
   const [nowEpochMs, setNowEpochMs] = useState(() => Date.now())
+  const [loadedResponsesSurveyId, setLoadedResponsesSurveyId] = useState('')
+  const [sociogramStatus, setSociogramStatus] = useState(null)
+  const suppressFriendshipSyncRef = useRef('')
 
   const classSurveys = useMemo(
     () => surveys.filter((survey) => survey.classId === activeClass?.id),
@@ -403,10 +406,12 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
   const refreshResponses = async (surveyId = selectedSurvey?.id) => {
     if (!surveyId) {
       setResponses([])
+      setLoadedResponsesSurveyId('')
       return
     }
     const nextResponses = await listStudentProfileSurveyResponses(surveyId)
     setResponses(nextResponses)
+    setLoadedResponsesSurveyId(surveyId)
   }
 
   useEffect(() => {
@@ -432,10 +437,42 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
     if (!selectedSurvey?.id) return undefined
     return subscribeToStudentProfileSurveyResponses(
       selectedSurvey.id,
-      setResponses,
+      (nextResponses) => {
+        setResponses(nextResponses)
+        setLoadedResponsesSurveyId(selectedSurvey.id)
+      },
       (error) => setMessage(error.message || 'No s’han pogut carregar les respostes.'),
     )
   }, [selectedSurvey?.id])
+
+  useEffect(() => {
+    if (
+      !selectedSurvey?.id ||
+      loadedResponsesSurveyId !== selectedSurvey.id ||
+      suppressFriendshipSyncRef.current === selectedSurvey.id ||
+      typeof onSyncFriendships !== 'function'
+    ) {
+      return undefined
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      onSyncFriendships({ responses, survey: selectedSurvey })
+        .then((stats) => {
+          if (!cancelled) setSociogramStatus({ ...stats, surveyId: selectedSurvey.id })
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setMessage(error.message || 'Les amistats no s’han pogut incorporar al sociograma inicial.')
+          }
+        })
+    }, 300)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [loadedResponsesSurveyId, onSyncFriendships, responses, selectedSurvey])
 
   const handleCreate = async () => {
     if (!activeClass || classStudents.length === 0 || !cloud.user) return
@@ -510,12 +547,15 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
     if (!selectedSurvey || selectedSurvey.ownerUid !== cloud.user?.uid) return
     setBusy('delete-survey')
     try {
+      suppressFriendshipSyncRef.current = selectedSurvey.id
       await deleteStudentProfileSurveyDocument({ surveyId: selectedSurvey.id })
       setResponses([])
+      setLoadedResponsesSurveyId('')
       setSelectedSurveyId('')
       await refreshSurveys()
       setMessage('Formulari i respostes eliminats.')
     } catch (error) {
+      suppressFriendshipSyncRef.current = ''
       setMessage(error.message || 'No s’ha pogut eliminar el formulari.')
     } finally {
       setBusy('')
@@ -564,7 +604,15 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
       {classSurveys.length > 0 && (
         <label className="student-profile-survey-selector">
           Historial de formularis
-          <select onChange={(event) => setSelectedSurveyId(event.target.value)} value={selectedSurvey?.id || ''}>
+          <select
+            onChange={(event) => {
+              setResponses([])
+              setLoadedResponsesSurveyId('')
+              setSociogramStatus(null)
+              setSelectedSurveyId(event.target.value)
+            }}
+            value={selectedSurvey?.id || ''}
+          >
             {classSurveys.map((survey) => <option key={survey.id} value={survey.id}>{survey.academicYear} · {formatDate(survey.createdAt)} · {survey.status === 'active' && nowEpochMs < survey.expiresAtEpochMs ? 'Actiu' : 'Tancat'}</option>)}
           </select>
         </label>
@@ -579,6 +627,20 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud })
             <article><span>Caducitat</span><strong>{formatDate(selectedSurvey.expiresAt)}</strong></article>
             <article><span>Respostes</span><strong>{responses.length}/{surveyStudents.length}</strong></article>
             <article><span>Revisades</span><strong>{responses.filter((response) => response.reviewedAt).length}/{responses.length}</strong></article>
+          </div>
+
+          <div className="student-profile-sociogram-status">
+            <UsersRound size={20} />
+            <div>
+              <strong>Sociograma inicial connectat</strong>
+              <span>
+                {responses.length === 0
+                  ? 'S’actualitzarà automàticament quan arribin respostes amb amistats de la classe.'
+                  : sociogramStatus?.surveyId === selectedSurvey.id
+                    ? `${sociogramStatus.importedRelationCount} vincles d’amistat incorporats a partir de ${sociogramStatus.responseCount} respostes.`
+                    : 'Actualitzant els vincles d’amistat amb les respostes rebudes…'}
+              </span>
+            </div>
           </div>
 
           <label className="student-profile-public-link">Enllaç compartit<input readOnly value={publicUrl} /></label>

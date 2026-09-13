@@ -27565,6 +27565,20 @@ button.profile-followup-card:focus-visible {
 .student-profile-survey-status-grid strong { font-size: 1.08rem; }
 .student-profile-survey-status-grid strong.positive { color: #0f8b68; }
 
+.student-profile-sociogram-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #a7f3d0;
+  border-radius: 14px;
+  color: #065f46;
+  background: #ecfdf5;
+}
+.student-profile-sociogram-status > svg { flex: 0 0 auto; }
+.student-profile-sociogram-status div { display: grid; gap: 2px; }
+.student-profile-sociogram-status span { color: #35705f; font-size: 0.88rem; }
+
 .student-profile-public-link { padding: 14px; border: 1px solid #bfdbfe; border-radius: 14px; background: #eff6ff; }
 .student-profile-public-link input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
 .student-profile-manager-actions { display: flex; flex-wrap: wrap; gap: 9px; }
