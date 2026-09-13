@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
-import { buildStudentProfiles } from '../lib/analytics'
+import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 const modes = [
@@ -21,12 +21,13 @@ function getUrgentProfiles(state) {
   return profiles
     .map((profile) => {
       const reasons = []
+      const hasEnoughTrackingActivities = hasMinimumTrackingActivities(profile.tracking)
       if (profile.evaluation.score > 0 && profile.evaluation.score <= 1.5) {
         reasons.push(`Rendiment alarmant: ${profile.evaluation.grade} (${profile.evaluation.score.toFixed(2)}).`)
       } else if (profile.evaluation.score > 0 && profile.evaluation.score <= 2) {
         reasons.push(`Rendiment baix: ${profile.evaluation.grade} (${profile.evaluation.score.toFixed(2)}).`)
       }
-      if (profile.tracking.hasTrackingData && profile.tracking.consistency < 55) {
+      if (hasEnoughTrackingActivities && profile.tracking.consistency < 55) {
         reasons.push(`Constància molt baixa: ${profile.tracking.consistency}% a la UT activa.`)
       }
       if (profile.redPointCount >= 3) {
@@ -38,7 +39,7 @@ function getUrgentProfiles(state) {
       if (
         profile.evaluation.score > 0 &&
         profile.evaluation.score <= 2 &&
-        profile.tracking.hasTrackingData &&
+        hasEnoughTrackingActivities &&
         profile.tracking.consistency < 70
       ) {
         reasons.push('Combina baix rendiment amb constància irregular: convé mirar-lo primer.')

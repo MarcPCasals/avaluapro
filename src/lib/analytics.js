@@ -19,7 +19,20 @@ export function getStudentTrackingStats(studentId, taskRecords, tasks) {
   const points = done + late * 0.5
   const consistency = total === 0 ? 0 : Math.round((points / total) * 100)
 
-  return { done, late, missing, exempt, total, consistency, hasTrackingData: total > 0 }
+  return {
+    done,
+    late,
+    missing,
+    exempt,
+    total,
+    activityCount: tasks.length,
+    consistency,
+    hasTrackingData: total > 0,
+  }
+}
+
+export function hasMinimumTrackingActivities(tracking, minimum = 2) {
+  return tracking.hasTrackingData && tracking.activityCount >= minimum
 }
 
 export function getStudentRedPointCount(student, trackingStats) {
