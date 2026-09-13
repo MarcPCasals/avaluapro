@@ -568,8 +568,8 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
           )}
 
           <footer className="student-profile-print-footer">
-            Resum orientatiu per a seguiment docent. Cal interpretar-lo amb el context real d’aula i contrastar-lo amb
-            observació i evidències recents.
+            Resum orientatiu. Cal interpretar-lo amb el context real d’aula i contrastar-lo amb observació i evidències
+            recents.
           </footer>
         </section>
 
