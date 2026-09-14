@@ -8,6 +8,7 @@ const RULES_RELEASE = 'cloud.firestore'
 const FIRESTORE_ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`
 const RULES_ROOT = `https://firebaserules.googleapis.com/v1/projects/${PROJECT_ID}`
 const ALLOWED_TUTORING_SUBCOLLECTIONS = new Set([
+  'agendaNotes',
   'studentAntecedents',
   'students',
   'tutorialGroupSets',
