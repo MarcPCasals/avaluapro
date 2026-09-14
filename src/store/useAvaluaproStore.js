@@ -48,6 +48,7 @@ import {
   sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
+  syncOwnedTutorialSurveyMembers,
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
@@ -294,6 +295,9 @@ function normalizeDataset(dataset) {
       tutorialLinkedClassId: classItem.tutorialLinkedClassId || classItem.id,
       sharedTutoringMemberEmails: Array.isArray(classItem.sharedTutoringMemberEmails)
         ? classItem.sharedTutoringMemberEmails
+        : [],
+      sharedTutoringMemberUids: Array.isArray(classItem.sharedTutoringMemberUids)
+        ? classItem.sharedTutoringMemberUids
         : [],
       sharedTutoringSpaceId: classItem.sharedTutoringSpaceId || '',
       halfGroups:
@@ -889,6 +893,13 @@ function getSharedTutoringDatasetForClass(state, classId) {
         studentIds.has(relation.sourceStudentId) ||
         studentIds.has(relation.targetStudentId),
     ),
+    sociometricSurveys: (state.sociometricSurveys || [])
+      .filter((survey) => survey.classId === classId)
+      .map((survey) => {
+        const sharedSurvey = { ...survey }
+        delete sharedSurvey.accessTokens
+        return sharedSurvey
+      }),
     tutorialGroupSets: (state.tutorialGroupSets || []).filter((groupSet) => groupSet.classId === classId),
     tutorialSociometricMoments: (state.tutorialSociometricMoments || []).filter((moment) => moment.classId === classId),
     tutorialSociogramLayouts: (state.tutorialSociogramLayouts || []).filter((layout) => layout.classId === classId),
@@ -933,6 +944,11 @@ function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, roster
     tutorialRecords: (sharedCollections.tutorialRecords || []).map((record) => ({ ...record, classId })),
     tutorialMarks: (sharedCollections.tutorialMarks || []).map((mark) => ({ ...mark, classId })),
     tutorialRelations: (sharedCollections.tutorialRelations || []).map((relation) => ({ ...relation, classId })),
+    sociometricSurveys: (sharedCollections.sociometricSurveys || []).map((survey) => ({
+      ...survey,
+      accessTokens: [],
+      classId,
+    })),
     tutorialGroupSets: (sharedCollections.tutorialGroupSets || []).map((groupSet) => ({ ...groupSet, classId })),
     tutorialSociometricMoments: (sharedCollections.tutorialSociometricMoments || []).map((moment) => ({ ...moment, classId })),
     tutorialSociogramLayouts: (sharedCollections.tutorialSociogramLayouts || []).map((layout) => ({ ...layout, classId })),
@@ -940,6 +956,30 @@ function mapSharedTutoringDatasetToClass(sharedCollections = {}, classId, roster
     tutorialSeatingPlans: (sharedCollections.tutorialSeatingPlans || []).map((plan) => ({ ...plan, classId })),
     studentAntecedents: (sharedCollections.studentAntecedents || []).map((antecedent) => ({ ...antecedent, classId })),
   }
+}
+
+function mergeSharedSociometricSurveys(localSurveys = [], sharedSurveys = []) {
+  const localById = new Map(localSurveys.map((survey) => [survey.id, survey]))
+  return mergeSharedRows(localSurveys, sharedSurveys).map((survey) => {
+    const localSurvey = localById.get(survey.id)
+    return localSurvey?.accessTokens?.length > 0
+      ? { ...survey, accessTokens: localSurvey.accessTokens }
+      : survey
+  })
+}
+
+async function syncOwnedSurveyMembersForSpace(state, classItem, space) {
+  if (!classItem || !space || space.ownerUid !== state.cloud.user?.uid) return
+  const memberUids = Array.isArray(space.memberUids) ? space.memberUids : [state.cloud.user.uid]
+  const sociometricSurveyIds = (state.sociometricSurveys || [])
+    .filter((survey) => survey.classId === classItem.id && survey.ownerUid === state.cloud.user.uid)
+    .map((survey) => survey.id)
+  await syncOwnedTutorialSurveyMembers({
+    classId: classItem.id,
+    memberUids,
+    sociometricSurveyIds,
+    user: state.cloud.user,
+  })
 }
 
 function buildTutorialSociometricMoment({
@@ -2449,7 +2489,18 @@ export const useAvaluaproStore = create((set, get) => ({
 
     try {
       const sharedTutoringSpaces = await listTutoringSpacesForUser(state.cloud.user.email, 20)
+      const spacesById = new Map(sharedTutoringSpaces.map((space) => [space.id, space]))
       set((current) => ({
+        classes: current.classes.map((classItem) => {
+          const space = spacesById.get(classItem.sharedTutoringSpaceId)
+          return space
+            ? {
+                ...classItem,
+                sharedTutoringMemberEmails: space.memberEmails || [],
+                sharedTutoringMemberUids: space.memberUids || [],
+              }
+            : classItem
+        }),
         cloud: {
           ...current.cloud,
           sharedTutoringError: '',
@@ -2457,6 +2508,17 @@ export const useAvaluaproStore = create((set, get) => ({
           sharedTutoringStatus: 'loaded',
         },
       }))
+      await saveCollections({ classes: get().classes }, ['classes'])
+      await Promise.all(
+        get().classes.map((classItem) => {
+          const space = spacesById.get(classItem.sharedTutoringSpaceId)
+          return space
+            ? syncOwnedSurveyMembersForSpace(get(), classItem, space).catch((error) => {
+                console.warn('No s’han pogut actualitzar els membres dels formularis tutorials.', error)
+              })
+            : null
+        }),
+      )
       return sharedTutoringSpaces
     } catch (error) {
       set((current) => ({
@@ -2562,6 +2624,7 @@ export const useAvaluaproStore = create((set, get) => ({
                 ...item,
                 isTutoringGroup: true,
                 sharedTutoringMemberEmails: space.memberEmails || memberEmails,
+                sharedTutoringMemberUids: space.memberUids || [user.uid],
                 sharedTutoringSpaceId: space.id || spaceId,
                 tutorialLinkedClassId: item.tutorialLinkedClassId || item.id,
               }
@@ -2577,6 +2640,7 @@ export const useAvaluaproStore = create((set, get) => ({
         },
       }))
       await persistCollections(set, get, ['classes'])
+      await syncOwnedSurveyMembersForSpace(get(), get().classes.find((item) => item.id === classId), space)
       await get().loadSharedTutoringSpaces()
       await get().loadSharedTutoringInvitations()
       return { ...space, invitation, invitationSentTo: cleanRecipientEmail }
@@ -2683,6 +2747,7 @@ export const useAvaluaproStore = create((set, get) => ({
           name: spaceClassName || 'Tutoria compartida',
           order: getNextClassOrder(get().classes),
           sharedTutoringMemberEmails: space.memberEmails || [user.email],
+          sharedTutoringMemberUids: space.memberUids || [user.uid],
           sharedTutoringSpaceId: confirmedSpaceId,
           subject: 'Tutoria',
           tutorialLinkedClassId: nextClassId,
@@ -2772,7 +2837,13 @@ export const useAvaluaproStore = create((set, get) => ({
       })
       set((current) => ({
         classes: current.classes.map((item) =>
-          item.id === classId ? { ...item, sharedTutoringMemberEmails: space.memberEmails || [] } : item,
+          item.id === classId
+            ? {
+                ...item,
+                sharedTutoringMemberEmails: space.memberEmails || [],
+                sharedTutoringMemberUids: space.memberUids || [],
+              }
+            : item,
         ),
         cloud: {
           ...current.cloud,
@@ -2783,6 +2854,7 @@ export const useAvaluaproStore = create((set, get) => ({
           sharedTutoringStatus: 'saved',
         },
       }))
+      await syncOwnedSurveyMembersForSpace(get(), get().classes.find((item) => item.id === classId), space)
       await persistCollections(set, get, ['classes'])
       await get().loadSharedTutoringSpaces()
       return space
@@ -2818,6 +2890,7 @@ export const useAvaluaproStore = create((set, get) => ({
             ? {
                 ...item,
                 sharedTutoringMemberEmails: [],
+                sharedTutoringMemberUids: [],
                 sharedTutoringSpaceId: '',
               }
             : item,
@@ -2868,6 +2941,7 @@ export const useAvaluaproStore = create((set, get) => ({
                 ...item,
                 isTutoringGroup: true,
                 sharedTutoringMemberEmails: space.memberEmails || [],
+                sharedTutoringMemberUids: space.memberUids || [],
                 sharedTutoringSpaceId: space.id || spaceId,
                 tutorialLinkedClassId: item.tutorialLinkedClassId || item.id,
               }
@@ -2882,6 +2956,10 @@ export const useAvaluaproStore = create((set, get) => ({
         tutorialMarks: mergeSharedRows(current.tutorialMarks, mappedDataset.tutorialMarks),
         tutorialRecords: mergeSharedRows(current.tutorialRecords, mappedDataset.tutorialRecords),
         tutorialRelations: mergeSharedRows(current.tutorialRelations, mappedDataset.tutorialRelations),
+        sociometricSurveys: mergeSharedSociometricSurveys(
+          current.sociometricSurveys,
+          mappedDataset.sociometricSurveys,
+        ),
         tutorialSeatingPlans: mergeSharedRows(current.tutorialSeatingPlans, mappedDataset.tutorialSeatingPlans),
         tutorialSociometricMoments: mergeSharedRows(
           current.tutorialSociometricMoments,
@@ -3206,6 +3284,10 @@ export const useAvaluaproStore = create((set, get) => ({
       new Set([
         user.uid,
         ...(Array.isArray(classItem.sharedTutoringMemberUids) ? classItem.sharedTutoringMemberUids : []),
+        ...(
+          state.cloud.sharedTutoringSpaces.find((space) => space.id === classItem.sharedTutoringSpaceId)
+            ?.memberUids || []
+        ),
       ]),
     ).filter(Boolean)
     const survey = normalizeSociometricSurvey({
@@ -3280,6 +3362,7 @@ export const useAvaluaproStore = create((set, get) => ({
       throw new Error('Només el docent propietari pot eliminar les dades brutes del qüestionari.')
     }
 
+    await tombstoneSharedRowIfNeeded(state, 'sociometricSurveys', survey)
     await deleteSociometricSurveyDocument({ surveyId, user: state.cloud.user })
     set((current) => ({
       sociometricSurveys: (current.sociometricSurveys || []).filter((item) => item.id !== surveyId),

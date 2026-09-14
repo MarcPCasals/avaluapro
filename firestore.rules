@@ -137,6 +137,7 @@ service cloud.firestore {
         'students',
         'agendaNotes',
         'studentAntecedents',
+        'sociometricSurveys',
         'tutorialGroupSets',
         'tutorialMarks',
         'tutorialRecords',
@@ -512,7 +513,22 @@ service cloud.firestore {
     }
 
     function validSociometricSurveyUpdate() {
-      return canAccessSociometricSurvey()
+      return (
+        canAccessSociometricSurvey()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'importedRelationCount',
+          'lastSyncedAt',
+          'responseCount',
+          'updatedAt'
+        ])
+        && request.resource.data.status in ['active', 'closed']
+        && request.resource.data.responseCount is number
+        && request.resource.data.importedRelationCount is number
+        && request.resource.data.expiresAt is string
+        && request.resource.data.expiresAtEpochMs is number
+        && request.resource.data.updatedAt is string
+      ) || (
+        isSociometricSurveyOwner()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'importedRelationCount',
           'lastSyncedAt',
@@ -527,7 +543,17 @@ service cloud.firestore {
         && request.resource.data.importedRelationCount is number
         && request.resource.data.expiresAt is string
         && request.resource.data.expiresAtEpochMs is number
-        && request.resource.data.updatedAt is string;
+        && request.resource.data.updatedAt is string
+      ) || (
+        isSociometricSurveyOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'memberUids',
+          'updatedAt'
+        ])
+        && request.resource.data.memberUids is list
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.updatedAt is string
+      );
     }
 
     function validSociometricAccessTokenCreate(surveyId, tokenId) {
@@ -702,7 +728,8 @@ service cloud.firestore {
     }
 
     function validStudentProfileSurveyUpdate() {
-      return isStudentProfileSurveyMember()
+      return (
+        isStudentProfileSurveyMember()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'expiresAt',
           'expiresAtEpochMs',
@@ -714,7 +741,20 @@ service cloud.firestore {
         && request.resource.data.responseCount is number
         && request.resource.data.expiresAt is string
         && request.resource.data.expiresAtEpochMs is number
-        && request.resource.data.updatedAt is string;
+        && request.resource.data.updatedAt is string
+      ) || (
+        isStudentProfileSurveyOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'memberUidMap',
+          'memberUids',
+          'updatedAt'
+        ])
+        && request.resource.data.memberUidMap is map
+        && request.resource.data.memberUidMap[request.auth.uid] == true
+        && request.resource.data.memberUids is list
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.updatedAt is string
+      );
     }
 
     function validStudentProfilePublicFormCreate(surveyId) {

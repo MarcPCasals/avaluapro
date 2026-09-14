@@ -8083,8 +8083,17 @@ export function TutoringView() {
                 </button>
                 <button
                   className="secondary-action"
-                  disabled={!activeSociometricSurvey?.id || sociometricSurveyBusy === 'status'}
+                  disabled={
+                    !activeSociometricSurvey?.id ||
+                    activeSociometricSurvey.ownerUid !== cloud.user?.uid ||
+                    sociometricSurveyBusy === 'status'
+                  }
                   onClick={handleToggleSociometricSurveyStatus}
+                  title={
+                    activeSociometricSurvey?.ownerUid !== cloud.user?.uid
+                      ? 'Només el tutor que ha creat els enllaços els pot tancar o reobrir.'
+                      : ''
+                  }
                   type="button"
                 >
                   <Lock size={17} />

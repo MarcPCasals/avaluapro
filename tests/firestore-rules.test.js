@@ -458,6 +458,29 @@ describe('cotutoria compartida', () => {
       }),
     )
   })
+
+  test('els dos tutors poden compartir la referencia segura d un questionari sociometric', async () => {
+    const surveyRef = doc(
+      authDb(COTUTOR),
+      'tutoringSpaces',
+      SPACE_ID,
+      'sociometricSurveys',
+      SURVEY_ID,
+    )
+    await assertSucceeds(
+      setDoc(surveyRef, {
+        classId: 'class-1',
+        id: SURVEY_ID,
+        ownerUid: OWNER.uid,
+        status: 'active',
+        updatedAt: '2026-06-19T08:15:00.000Z',
+      }),
+    )
+    await assertSucceeds(getDoc(surveyRef))
+    await assertFails(
+      getDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'sociometricSurveys', SURVEY_ID)),
+    )
+  })
 })
 
 describe('questionari sociometric public', () => {
@@ -483,6 +506,22 @@ describe('questionari sociometric public', () => {
   test('el document general amb la llista d alumnes no es public', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
     await assertFails(getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID)))
+  })
+
+  test('nomes el propietari pot reconciliar els membres del questionari', async () => {
+    await assertFails(
+      updateDoc(doc(authDb(COTUTOR), 'sociometricSurveys', SURVEY_ID), {
+        memberUids: [OWNER.uid],
+        updatedAt: '2026-06-19T08:16:00.000Z',
+      }),
+    )
+    await assertSucceeds(
+      updateDoc(doc(authDb(OWNER), 'sociometricSurveys', SURVEY_ID), {
+        memberUids: [OWNER.uid],
+        updatedAt: '2026-06-19T08:16:00.000Z',
+      }),
+    )
+    await assertFails(getDoc(doc(authDb(COTUTOR), 'sociometricSurveys', SURVEY_ID)))
   })
 
   test('un token individual valid es pot consultar pero no enumerar', async () => {
@@ -653,6 +692,24 @@ describe('formulari tutorial public', () => {
         ),
       ),
     )
+  })
+
+  test('nomes el propietari pot reconciliar els membres del formulari tutorial', async () => {
+    await assertFails(
+      updateDoc(doc(authDb(COTUTOR), 'studentProfileSurveys', PROFILE_SURVEY_ID), {
+        memberUidMap: { [OWNER.uid]: true },
+        memberUids: [OWNER.uid],
+        updatedAt: '2026-09-08T08:16:00.000Z',
+      }),
+    )
+    await assertSucceeds(
+      updateDoc(doc(authDb(OWNER), 'studentProfileSurveys', PROFILE_SURVEY_ID), {
+        memberUidMap: { [OWNER.uid]: true },
+        memberUids: [OWNER.uid],
+        updatedAt: '2026-09-08T08:16:00.000Z',
+      }),
+    )
+    await assertFails(getDoc(doc(authDb(COTUTOR), 'studentProfileSurveys', PROFILE_SURVEY_ID)))
   })
 
   test('un alumne pot enviar una resposta valida una sola vegada', async () => {

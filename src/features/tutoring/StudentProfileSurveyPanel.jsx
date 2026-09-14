@@ -482,6 +482,9 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
     try {
       const nowDate = new Date()
       const expiresAtEpochMs = nowDate.getTime() + SURVEY_DURATION_MS
+      const sharedSpace = (cloud.sharedTutoringSpaces || []).find(
+        (space) => space.id === activeClass.sharedTutoringSpaceId,
+      )
       const survey = await createStudentProfileSurveyDocument({
         survey: {
           academicYear: getAcademicYear(nowDate),
@@ -492,7 +495,11 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
           expiresAtEpochMs,
           formVersion: STUDENT_PROFILE_FORM_VERSION,
           id: `profile_${crypto.randomUUID()}`,
-          memberUids: [cloud.user.uid, ...(activeClass.sharedTutoringMemberUids || [])],
+          memberUids: [
+            cloud.user.uid,
+            ...(activeClass.sharedTutoringMemberUids || []),
+            ...(sharedSpace?.memberUids || []),
+          ],
           ownerUid: cloud.user.uid,
           privacyNoticeVersion: STUDENT_PROFILE_PRIVACY_NOTICE_VERSION,
           responseCount: 0,

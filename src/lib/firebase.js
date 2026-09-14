@@ -45,6 +45,7 @@ export const SHARED_TUTORING_COLLECTIONS = [
   'tutorialRecords',
   'tutorialMarks',
   'tutorialRelations',
+  'sociometricSurveys',
   'tutorialGroupSets',
   'tutorialSociometricMoments',
   'tutorialSociogramLayouts',
@@ -397,6 +398,65 @@ function normalizeSociometricSurveyPayload(survey = {}, user = {}) {
     studentOptions,
     updatedAt: survey.updatedAt || survey.createdAt || now,
   })
+}
+
+export async function syncOwnedTutorialSurveyMembers({
+  classId,
+  memberUids = [],
+  sociometricSurveyIds = [],
+  user,
+}) {
+  if (!classId || !user?.uid) return { sociometricCount: 0, studentProfileCount: 0 }
+
+  const nextMemberUids = Array.from(
+    new Set([user.uid, ...memberUids].map((uid) => String(uid || '').trim()).filter(Boolean)),
+  )
+  const nextMemberUidMap = Object.fromEntries(nextMemberUids.map((uid) => [uid, true]))
+  const hasSameMembers = (current = []) =>
+    [...current].map(String).sort().join('\n') === [...nextMemberUids].sort().join('\n')
+  const now = new Date().toISOString()
+  const ownedProfileSnapshot = await getDocs(
+    query(collection(db, STUDENT_PROFILE_SURVEYS_COLLECTION), where('ownerUid', '==', user.uid)),
+  )
+  const profileDocs = ownedProfileSnapshot.docs.filter(
+    (snapshotDoc) => snapshotDoc.data().classId === classId,
+  )
+  const sociometricDocs = (
+    await Promise.all(
+      Array.from(new Set(sociometricSurveyIds.filter(Boolean))).map(async (surveyId) => {
+        const snapshot = await getDoc(getSociometricSurveyDocRef(surveyId))
+        return snapshot.exists() && snapshot.data().ownerUid === user.uid && snapshot.data().classId === classId
+          ? snapshot
+          : null
+      }),
+    )
+  ).filter(Boolean)
+
+  const updates = [
+    ...sociometricDocs
+      .filter((snapshotDoc) => !hasSameMembers(snapshotDoc.data().memberUids || []))
+      .map((snapshotDoc) => ({
+        ref: snapshotDoc.ref,
+        value: { memberUids: nextMemberUids, updatedAt: now },
+      })),
+    ...profileDocs
+      .filter((snapshotDoc) => !hasSameMembers(snapshotDoc.data().memberUids || []))
+      .map((snapshotDoc) => ({
+        ref: snapshotDoc.ref,
+        value: { memberUidMap: nextMemberUidMap, memberUids: nextMemberUids, updatedAt: now },
+      })),
+  ]
+
+  for (let index = 0; index < updates.length; index += 450) {
+    const batch = writeBatch(db)
+    updates.slice(index, index + 450).forEach(({ ref, value }) => batch.update(ref, value))
+    await batch.commit()
+  }
+
+  return {
+    sociometricCount: sociometricDocs.length,
+    studentProfileCount: profileDocs.length,
+  }
 }
 
 function getSociometricResponseDocId(response = {}) {
