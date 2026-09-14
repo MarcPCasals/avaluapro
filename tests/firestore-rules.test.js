@@ -481,6 +481,37 @@ describe('cotutoria compartida', () => {
       getDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'sociometricSurveys', SURVEY_ID)),
     )
   })
+
+  test('cada tutor pot publicar el seu senyal de canvi i l altre el pot llegir', async () => {
+    const signalRef = doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'changeSignals', OWNER.uid)
+    await assertSucceeds(
+      setDoc(signalRef, {
+        changeId: 'change-owner-1',
+        changedAt: '2026-09-14T16:00:00.000Z',
+        changedByEmail: OWNER.email,
+        changedByUid: OWNER.uid,
+        changedCollections: ['tutorialRecords', 'students'],
+      }),
+    )
+    await assertSucceeds(
+      getDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'changeSignals', OWNER.uid)),
+    )
+    await assertFails(
+      getDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'changeSignals', OWNER.uid)),
+    )
+  })
+
+  test('un cotutor no pot publicar un senyal en nom d una altra persona', async () => {
+    await assertFails(
+      setDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'changeSignals', OWNER.uid), {
+        changeId: 'change-forged',
+        changedAt: '2026-09-14T16:00:00.000Z',
+        changedByEmail: COTUTOR.email,
+        changedByUid: COTUTOR.uid,
+        changedCollections: ['tutorialRecords'],
+      }),
+    )
+  })
 })
 
 describe('questionari sociometric public', () => {

@@ -282,6 +282,23 @@ function buildSharedEditMeta(row = {}, user, now) {
   }
 }
 
+async function publishTutoringChangeSignal({ changeCollections = [], spaceId, user, changedAt }) {
+  const announcedCollections = Array.from(
+    new Set(changeCollections.filter((collectionName) => SHARED_TUTORING_COLLECTIONS.includes(collectionName))),
+  )
+  if (announcedCollections.length === 0) return null
+
+  const changeSignal = cleanForFirestore({
+    changeId: crypto.randomUUID(),
+    changedAt: changedAt || new Date().toISOString(),
+    changedByEmail: normalizeEmail(user.email),
+    changedByUid: user.uid,
+    changedCollections: announcedCollections,
+  })
+  await setDoc(doc(db, 'tutoringSpaces', spaceId, 'changeSignals', user.uid), changeSignal)
+  return changeSignal
+}
+
 async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], { user, now } = {}) {
   const collectionRef = collection(db, 'tutoringSpaces', spaceId, collectionName)
   const existingSnapshot = await getDocs(collectionRef)
@@ -322,6 +339,11 @@ async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], 
       })
       return
     }
+
+    const comparableExistingValue = existingValue
+      ? Object.keys(value).reduce((result, key) => ({ ...result, [key]: existingValue[key] }), {})
+      : null
+    if (existingValue && areCloudDocumentsEqual(comparableExistingValue, value)) return
 
     assertFirestoreDocumentSize(`tutoringSpaces/${spaceId}/${collectionName}`, docId, value)
     operations.push({
@@ -1605,10 +1627,17 @@ export async function tombstoneTutoringSpaceRow({
   })
 
   await setDoc(doc(db, 'tutoringSpaces', spaceId, collectionName, safeDocumentId), value)
+  await publishTutoringChangeSignal({
+    changeCollections: [collectionName],
+    changedAt: deletedAt,
+    spaceId,
+    user,
+  })
   return value
 }
 
 export async function saveTutoringSpace({
+  changeCollections = [],
   classItem,
   dataset,
   memberEmails = [],
@@ -1728,7 +1757,17 @@ export async function saveTutoringSpace({
     )
   }
 
-  return valueWithConflictSummary
+  const writtenCollections = new Set(
+    syncResults.filter((result) => result.writtenCount > 0).map((result) => result.collectionName),
+  )
+  const changeSignal = await publishTutoringChangeSignal({
+    changeCollections: changeCollections.filter((collectionName) => writtenCollections.has(collectionName)),
+    changedAt: now,
+    spaceId,
+    user,
+  })
+
+  return { ...valueWithConflictSummary, changeSignal }
 }
 
 export async function loadTutoringSpace(spaceId) {
@@ -1745,11 +1784,31 @@ export async function loadTutoringSpace(spaceId) {
       ]
     }),
   )
+  const changeSignalsSnapshot = await getDocs(collection(db, 'tutoringSpaces', spaceId, 'changeSignals'))
 
   return {
     ...space,
+    changeSignals: changeSignalsSnapshot.docs.map((snapshotDoc) => ({
+      id: snapshotDoc.id,
+      ...snapshotDoc.data(),
+    })),
     collections: entries.reduce((dataset, [collectionName, rows]) => ({ ...dataset, [collectionName]: rows }), {}),
   }
+}
+
+export function subscribeToTutoringSpaceChangeSignals(spaceId, onChange, onError) {
+  if (!spaceId) {
+    onChange?.([])
+    return () => {}
+  }
+
+  return onSnapshot(
+    collection(db, 'tutoringSpaces', spaceId, 'changeSignals'),
+    (snapshot) => {
+      onChange?.(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })))
+    },
+    onError,
+  )
 }
 
 export async function syncTutoringSpaceCollection({ collectionName, rows = [], spaceId, user }) {

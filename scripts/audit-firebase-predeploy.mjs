@@ -9,6 +9,7 @@ const FIRESTORE_ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 const RULES_ROOT = `https://firebaserules.googleapis.com/v1/projects/${PROJECT_ID}`
 const ALLOWED_TUTORING_SUBCOLLECTIONS = new Set([
   'agendaNotes',
+  'changeSignals',
   'sociometricSurveys',
   'studentAntecedents',
   'students',

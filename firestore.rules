@@ -979,6 +979,27 @@ service cloud.firestore {
         || validTutoringSpaceSelfLeave();
       allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
 
+      match /changeSignals/{memberUid} {
+        allow read: if canAccessTutoringSpace(spaceId);
+        allow create, update: if canAccessTutoringSpace(spaceId)
+          && memberUid == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'changeId',
+            'changedAt',
+            'changedByEmail',
+            'changedByUid',
+            'changedCollections'
+          ])
+          && request.resource.data.changeId is string
+          && request.resource.data.changedAt is string
+          && request.resource.data.changedByEmail == request.auth.token.email
+          && request.resource.data.changedByUid == request.auth.uid
+          && request.resource.data.changedCollections is list
+          && request.resource.data.changedCollections.size() > 0
+          && request.resource.data.changedCollections.size() <= 12;
+        allow delete: if false;
+      }
+
       match /{collectionName}/{documentId} {
         allow read, create, update: if isAllowedTutoringCollection(collectionName)
           && canAccessTutoringSpace(spaceId);

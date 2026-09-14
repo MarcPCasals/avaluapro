@@ -300,6 +300,10 @@ function normalizeDataset(dataset) {
       sharedTutoringMemberUids: Array.isArray(classItem.sharedTutoringMemberUids)
         ? classItem.sharedTutoringMemberUids
         : [],
+      sharedTutoringAppliedChangeIds:
+        classItem.sharedTutoringAppliedChangeIds && typeof classItem.sharedTutoringAppliedChangeIds === 'object'
+          ? classItem.sharedTutoringAppliedChangeIds
+          : {},
       sharedTutoringSpaceId: classItem.sharedTutoringSpaceId || '',
       halfGroups:
         Array.isArray(classItem.halfGroups) && classItem.halfGroups.length > 0
@@ -410,7 +414,7 @@ function setProfileWithPreferences(set, patch) {
   })
 }
 
-async function persistCollections(set, get, collections) {
+async function persistCollections(set, get, collections, { syncSharedTutoring = true } = {}) {
   const state = get()
   const dataset = collections.reduce(
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] }),
@@ -425,7 +429,7 @@ async function persistCollections(set, get, collections) {
       if (queuedOperations.length > 0) {
         scheduleCloudSync(set, get, pendingCollections, queuedOperations.length)
       }
-      await syncSharedTutoringClassesForCollections(set, get, collections)
+      if (syncSharedTutoring) await syncSharedTutoringClassesForCollections(set, get, collections)
     } else {
       await saveCollections(dataset, collections)
       set({ error: '' })
@@ -460,11 +464,15 @@ async function syncSharedTutoringClassesForCollections(set, get, collections) {
       (classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
   )
   if (sharedClasses.length === 0) return
+  const changeCollections = collections.includes('classes')
+    ? [...SHARED_TUTORING_COLLECTIONS]
+    : collections.filter((collection) => SHARED_TUTORING_COLLECTIONS.includes(collection))
 
   try {
     const syncedSpaces = await Promise.all(
       sharedClasses.map((classItem) =>
         saveTutoringSpace({
+          changeCollections,
           classItem,
           dataset: getSharedTutoringDatasetForClass(get(), classItem.id),
           memberEmails: classItem.sharedTutoringMemberEmails || [user.email],
@@ -2613,6 +2621,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     try {
       const space = await saveTutoringSpace({
+        changeCollections: [...SHARED_TUTORING_COLLECTIONS],
         classItem: { ...classItem, sharedTutoringSpaceId: spaceId },
         dataset: getSharedTutoringDatasetForClass(state, classId),
         memberEmails,
@@ -2649,7 +2658,7 @@ export const useAvaluaproStore = create((set, get) => ({
           sharedTutoringStatus: space.sharedConflictSummary?.count > 0 ? 'conflict' : 'saved',
         },
       }))
-      await persistCollections(set, get, ['classes'])
+      await persistCollections(set, get, ['classes'], { syncSharedTutoring: false })
       await syncOwnedSurveyMembersForSpace(get(), get().classes.find((item) => item.id === classId), space)
       await get().loadSharedTutoringSpaces()
       await get().loadSharedTutoringInvitations()
@@ -2768,7 +2777,9 @@ export const useAvaluaproStore = create((set, get) => ({
           semesters: [...current.semesters, ...timeline.semesters],
           uts: [...current.uts, ...timeline.uts],
         }))
-        await persistCollections(set, get, ['classes', 'semesters', 'uts'])
+        await persistCollections(set, get, ['classes', 'semesters', 'uts'], {
+          syncSharedTutoring: false,
+        })
       }
 
       await get().linkClassToSharedTutoringSpace({ classId: nextClassId, spaceId: confirmedSpaceId })
@@ -2865,7 +2876,7 @@ export const useAvaluaproStore = create((set, get) => ({
         },
       }))
       await syncOwnedSurveyMembersForSpace(get(), get().classes.find((item) => item.id === classId), space)
-      await persistCollections(set, get, ['classes'])
+      await persistCollections(set, get, ['classes'], { syncSharedTutoring: false })
       await get().loadSharedTutoringSpaces()
       return space
     } catch (error) {
@@ -2942,6 +2953,11 @@ export const useAvaluaproStore = create((set, get) => ({
       const space = await loadTutoringSpace(spaceId)
       const rosterClassId = classItem.tutorialLinkedClassId || classId
       const mappedDataset = mapSharedTutoringDatasetToClass(space.collections, classId, rosterClassId)
+      const appliedChangeIds = Object.fromEntries(
+        (space.changeSignals || [])
+          .filter((signal) => signal.changedByUid && signal.changeId)
+          .map((signal) => [signal.changedByUid, signal.changeId]),
+      )
 
       set((current) => ({
         agendaNotes: mergeSharedRows(current.agendaNotes, mappedDataset.agendaNotes),
@@ -2952,6 +2968,7 @@ export const useAvaluaproStore = create((set, get) => ({
                 isTutoringGroup: true,
                 sharedTutoringMemberEmails: space.memberEmails || [],
                 sharedTutoringMemberUids: space.memberUids || [],
+                sharedTutoringAppliedChangeIds: appliedChangeIds,
                 sharedTutoringSpaceId: space.id || spaceId,
                 tutorialLinkedClassId: item.tutorialLinkedClassId || item.id,
               }
@@ -2984,7 +3001,9 @@ export const useAvaluaproStore = create((set, get) => ({
         },
       }))
 
-      await persistCollections(set, get, ['classes', ...SHARED_TUTORING_COLLECTIONS])
+      await persistCollections(set, get, ['classes', ...SHARED_TUTORING_COLLECTIONS], {
+        syncSharedTutoring: false,
+      })
       await get().loadSharedTutoringSpaces()
       return space
     } catch (error) {
@@ -3012,13 +3031,17 @@ export const useAvaluaproStore = create((set, get) => ({
 
     try {
       const space = await saveTutoringSpace({
+        changeCollections: [...SHARED_TUTORING_COLLECTIONS],
         classItem,
         dataset: getSharedTutoringDatasetForClass(state, classId),
         memberEmails: classItem.sharedTutoringMemberEmails || [user.email],
         spaceId: classItem.sharedTutoringSpaceId,
         user,
       })
-      await get().linkClassToSharedTutoringSpace({ classId, spaceId: classItem.sharedTutoringSpaceId })
+      const linkedSpace = await get().linkClassToSharedTutoringSpace({
+        classId,
+        spaceId: classItem.sharedTutoringSpaceId,
+      })
       await get().loadSharedTutoringSpaces()
       set((current) => ({
         cloud: {
@@ -3030,7 +3053,7 @@ export const useAvaluaproStore = create((set, get) => ({
           sharedTutoringStatus: space.sharedConflictSummary?.count > 0 ? 'conflict' : 'synced',
         },
       }))
-      return space
+      return { ...space, changeSignals: linkedSpace.changeSignals || [] }
     } catch (error) {
       set((current) => ({
         cloud: {

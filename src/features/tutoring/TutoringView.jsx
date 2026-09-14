@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Armchair,
@@ -51,7 +51,7 @@ import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
-import { listSociometricSurveyResponses } from '../../lib/firebase'
+import { listSociometricSurveyResponses, subscribeToTutoringSpaceChangeSignals } from '../../lib/firebase'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
@@ -78,6 +78,22 @@ import {
   getUnseatedStudentIds,
   normalizeSavedSeatingRestrictions,
 } from './seatingPlanHistoryUtils'
+
+const TUTORING_CHANGE_LABELS = {
+  agendaNotes: 'seguiment tutorial',
+  sociometricSurveys: 'qüestionaris sociomètrics',
+  studentAntecedents: 'antecedents',
+  students: 'dades de l’alumnat',
+  tutorialGroupSets: 'grups cooperatius',
+  tutorialMarks: 'avaluació tutorial',
+  tutorialRecords: 'registre tutorial',
+  tutorialRelations: 'relacions',
+  tutorialSeatingPlans: 'plànol de l’aula',
+  tutorialSociogramLayouts: 'sociograma',
+  tutorialSociometricMoments: 'moments sociomètrics',
+  tutorialStudentRoles: 'rols',
+}
+const TUTORING_CHANGE_COLLECTIONS = new Set(['classes', ...Object.keys(TUTORING_CHANGE_LABELS)])
 import {
   getSeatingObjectiveWeights,
   getSeatingZoneIterationState,
@@ -4448,6 +4464,9 @@ export function TutoringView() {
   const [shareTutoringEmail, setShareTutoringEmail] = useState('')
   const [shareTutoringMessage, setShareTutoringMessage] = useState('')
   const [shareTutoringBusy, setShareTutoringBusy] = useState('')
+  const [tutoringChangeSignals, setTutoringChangeSignals] = useState([])
+  const [tutoringChangeSignalsSpaceId, setTutoringChangeSignalsSpaceId] = useState('')
+  const [tutoringChangeSignalError, setTutoringChangeSignalError] = useState({ message: '', spaceId: '' })
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const classes = useAvaluaproStore((state) => state.classes)
   const cloud = useAvaluaproStore((state) => state.cloud)
@@ -4497,6 +4516,101 @@ export function TutoringView() {
   const activeSharedTutoringSpace = (cloud.sharedTutoringSpaces || []).find(
     (space) => space.id === activeClass?.sharedTutoringSpaceId,
   )
+  useEffect(() => {
+    if (!activeClass?.sharedTutoringSpaceId || !cloud.user?.uid) return undefined
+    const spaceId = activeClass.sharedTutoringSpaceId
+
+    return subscribeToTutoringSpaceChangeSignals(
+      spaceId,
+      (signals) => {
+        setTutoringChangeSignals(signals)
+        setTutoringChangeSignalsSpaceId(spaceId)
+        setTutoringChangeSignalError({ message: '', spaceId })
+      },
+      () => {
+        setTutoringChangeSignalsSpaceId(spaceId)
+        setTutoringChangeSignalError({
+          message: 'No s’han pogut comprovar les novetats de la cotutoria.',
+          spaceId,
+        })
+      },
+    )
+  }, [activeClass?.sharedTutoringSpaceId, cloud.user?.uid])
+  const pendingRemoteTutoringSignals = useMemo(() => {
+    if (tutoringChangeSignalsSpaceId !== activeClass?.sharedTutoringSpaceId) return []
+    const appliedChangeIds = activeClass?.sharedTutoringAppliedChangeIds || {}
+    return tutoringChangeSignals
+      .filter(
+        (signal) =>
+          signal.changedByUid &&
+          signal.changedByUid !== cloud.user?.uid &&
+          signal.changeId &&
+          appliedChangeIds[signal.changedByUid] !== signal.changeId,
+      )
+      .sort((a, b) => String(b.changedAt || '').localeCompare(String(a.changedAt || '')))
+  }, [
+    activeClass?.sharedTutoringAppliedChangeIds,
+    activeClass?.sharedTutoringSpaceId,
+    cloud.user?.uid,
+    tutoringChangeSignals,
+    tutoringChangeSignalsSpaceId,
+  ])
+  const pendingRemoteTutoringLabels = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          pendingRemoteTutoringSignals.flatMap((signal) =>
+            (signal.changedCollections || []).map((collectionName) => TUTORING_CHANGE_LABELS[collectionName]),
+          ),
+        ),
+      ).filter(Boolean),
+    [pendingRemoteTutoringSignals],
+  )
+  const hasPendingLocalTutoringChanges = (cloud.pendingCollections || []).some((collectionName) =>
+    TUTORING_CHANGE_COLLECTIONS.has(collectionName),
+  )
+  const hasRemoteTutoringChanges = pendingRemoteTutoringSignals.length > 0
+  const currentTutoringChangeSignalError =
+    tutoringChangeSignalError.spaceId === activeClass?.sharedTutoringSpaceId
+      ? tutoringChangeSignalError.message
+      : ''
+  const tutoringSyncState = shareTutoringBusy === 'sync'
+    ? {
+        detail: 'Estem comparant i incorporant les dues versions.',
+        label: 'Sincronitzant la cotutoria…',
+        tone: 'loading',
+      }
+    : cloud.sharedTutoringStatus === 'conflict' || cloud.sharedTutoringStatus === 'error' || currentTutoringChangeSignalError
+      ? {
+          detail: currentTutoringChangeSignalError || cloud.sharedTutoringError || 'Cal revisar la sincronització.',
+          label: 'Cal revisar la sincronització',
+          tone: 'error',
+        }
+      : hasRemoteTutoringChanges && hasPendingLocalTutoringChanges
+        ? {
+            detail: 'Hi ha canvis als dos dispositius. AvaluaPro conservarà les versions més recents.',
+            label: 'Teniu novetats tots dos',
+            tone: 'attention',
+          }
+        : hasRemoteTutoringChanges
+          ? {
+              detail: pendingRemoteTutoringLabels.length > 0
+                ? `Novetats a: ${pendingRemoteTutoringLabels.join(', ')}.`
+                : 'L’altre tutor ha modificat informació de la tutoria.',
+              label: 'Hi ha novetats del cotutor',
+              tone: 'attention',
+            }
+          : hasPendingLocalTutoringChanges
+            ? {
+                detail: 'Les dades són segures al dispositiu i s’enviaran tan aviat com sigui possible.',
+                label: 'Canvis teus pendents',
+                tone: 'pending',
+              }
+            : {
+                detail: 'No s’han detectat diferències amb l’espai compartit.',
+                label: 'Al dia amb la cotutoria',
+                tone: 'synced',
+              }
   const classStudents = useMemo(
     () => students.filter((student) => student.classId === linkedClassId).sort((a, b) => a.name.localeCompare(b.name, 'ca')),
     [linkedClassId, students],
@@ -6907,6 +7021,21 @@ export function TutoringView() {
               </div>
             )}
           </div>
+          {activeClass?.sharedTutoringSpaceId && (
+            <div className={`tutoring-sync-state ${tutoringSyncState.tone}`} aria-live="polite">
+              {tutoringSyncState.tone === 'loading' ? (
+                <Loader2 className="spin" size={17} />
+              ) : tutoringSyncState.tone === 'synced' ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <AlertTriangle size={17} />
+              )}
+              <div>
+                <strong>{tutoringSyncState.label}</strong>
+                <small>{tutoringSyncState.detail}</small>
+              </div>
+            </div>
+          )}
           <div className="tutoring-hero-share-controls">
             <EducandEmailInput
               label="Cotutor"
@@ -6932,7 +7061,7 @@ export function TutoringView() {
                 type="button"
               >
                 <RefreshCw size={15} />
-                Sync
+                {hasRemoteTutoringChanges ? 'Actualitzar' : 'Sincronitzar ara'}
               </button>
             )}
           </div>

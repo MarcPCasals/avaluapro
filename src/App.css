@@ -1374,6 +1374,62 @@
   width: 100%;
 }
 
+.tutoring-sync-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  text-align: left;
+}
+
+.tutoring-sync-state div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tutoring-sync-state strong {
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.tutoring-sync-state small {
+  color: #475569 !important;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.tutoring-sync-state.synced {
+  border-color: #bbf7d0;
+  color: #047857;
+  background: #f0fdf4;
+}
+
+.tutoring-sync-state.attention,
+.tutoring-sync-state.pending {
+  border-color: #fde68a;
+  color: #a16207;
+  background: #fffbeb;
+}
+
+.tutoring-sync-state.error {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.tutoring-sync-state.loading svg,
+.tutoring-sync-state.pending svg {
+  margin-top: 1px;
+}
+
 .tutoring-hero-shared-members {
   display: grid;
   gap: 2px;
