@@ -1752,6 +1752,20 @@ export async function loadTutoringSpace(spaceId) {
   }
 }
 
+export async function syncTutoringSpaceCollection({ collectionName, rows = [], spaceId, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans de sincronitzar la tutoria compartida.')
+  }
+  if (!spaceId || !SHARED_TUTORING_COLLECTIONS.includes(collectionName)) {
+    throw new Error('No s’ha pogut identificar la col·lecció de tutoria compartida.')
+  }
+
+  return mergeTutoringSpaceCollection(spaceId, collectionName, rows, {
+    now: new Date().toISOString(),
+    user,
+  })
+}
+
 export async function deleteCloudCollection(uid, collectionName) {
   const snapshot = await getDocs(getCollectionRef(uid, collectionName))
   await Promise.all(snapshot.docs.map((snapshotDoc) => deleteDoc(snapshotDoc.ref)))

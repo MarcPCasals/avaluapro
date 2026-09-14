@@ -49,6 +49,7 @@ import {
   signInWithGoogle,
   signOutFromGoogle,
   syncOwnedTutorialSurveyMembers,
+  syncTutoringSpaceCollection,
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
@@ -980,6 +981,15 @@ async function syncOwnedSurveyMembersForSpace(state, classItem, space) {
     sociometricSurveyIds,
     user: state.cloud.user,
   })
+  const surveyRows = getSharedTutoringDatasetForClass(state, classItem.id).sociometricSurveys
+  if (surveyRows.length > 0) {
+    await syncTutoringSpaceCollection({
+      collectionName: 'sociometricSurveys',
+      rows: surveyRows,
+      spaceId: space.id,
+      user: state.cloud.user,
+    })
+  }
 }
 
 function buildTutorialSociometricMoment({
