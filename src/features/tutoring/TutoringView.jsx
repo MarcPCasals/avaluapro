@@ -93,6 +93,28 @@ const TUTORING_RECORD_TYPES = [
   { id: 'center-expulsion', label: 'Expulsions de centre', tone: 'slate' },
   { id: 'doip', label: 'DOIPs equip educatiu', tone: 'blue' },
 ]
+const TUTORING_REGISTRY_TYPES = [
+  { id: 'family-contact', label: 'Contacte amb la família', shortLabel: 'Família', tone: 'teal' },
+  { id: 'student-interview', label: 'Entrevista amb l’alumne', shortLabel: 'Entrevista', tone: 'sky' },
+  { id: 'tutorial-observation', label: 'Observació tutorial', shortLabel: 'Observació', tone: 'indigo' },
+  { id: 'team-information', label: 'Informació de l’equip educatiu', shortLabel: 'Equip educatiu', tone: 'blue' },
+  { id: 'guidance', label: 'Orientació rebuda', shortLabel: 'Orientació', tone: 'violet' },
+  { id: 'agreement', label: 'Acord o mesura', shortLabel: 'Acord', tone: 'green' },
+  { id: 'other-tutorial', label: 'Altres informacions', shortLabel: 'Altres', tone: 'slate' },
+]
+const ALL_TUTORING_RECORD_TYPES = [...TUTORING_REGISTRY_TYPES, ...TUTORING_RECORD_TYPES]
+const TUTORING_REGISTRY_TYPE_IDS = new Set(TUTORING_REGISTRY_TYPES.map((type) => type.id))
+const FAMILY_CONTACT_CHANNELS = [
+  { id: 'phone', label: 'Trucada' },
+  { id: 'meeting', label: 'Reunió' },
+  { id: 'email', label: 'Correu' },
+  { id: 'message', label: 'Missatge' },
+]
+const FAMILY_CONTACT_OUTCOMES = [
+  { id: 'contacted', label: 'Contacte establert' },
+  { id: 'no-answer', label: 'Sense resposta' },
+  { id: 'message-left', label: 'Missatge deixat' },
+]
 const TUTORING_AGENDA_NOTE_TYPES = [
   { id: 'work', label: 'Treball' },
   { id: 'behavior', label: 'Comportament' },
@@ -301,7 +323,11 @@ function countByType(records, type) {
 }
 
 function getRecordTypeMeta(type) {
-  return TUTORING_RECORD_TYPES.find((item) => item.id === type) || TUTORING_RECORD_TYPES[0]
+  return ALL_TUTORING_RECORD_TYPES.find((item) => item.id === type) || TUTORING_REGISTRY_TYPES.at(-1)
+}
+
+function isTutorialRegistryRecord(record) {
+  return TUTORING_REGISTRY_TYPE_IDS.has(record?.type)
 }
 
 function getRelationTypeMeta(type) {
@@ -1116,13 +1142,23 @@ function summarizeTutorialData({
 
 function summarizeTutorialRecords({ students, records }) {
   const studentsById = new Map(students.map((student) => [student.id, student]))
+  const today = getTodayDateInput()
   const studentRows = students
     .map((student) => {
       const studentRecords = records.filter((record) => record.studentId === student.id)
+      const registryRecords = studentRecords.filter(isTutorialRegistryRecord)
+      const pendingRecords = registryRecords.filter(
+        (record) => record.followUpDate && record.followUpStatus !== 'done',
+      )
       return {
         student,
         records: studentRecords,
         total: studentRecords.length,
+        registryRecords,
+        registryTotal: registryRecords.length,
+        important: registryRecords.filter((record) => record.isImportant && record.followUpStatus !== 'done').length,
+        pending: pendingRecords.length,
+        overdue: pendingRecords.filter((record) => record.followUpDate < today).length,
         agenda: countByType(studentRecords, 'agenda'),
         incident: countByType(studentRecords, 'incident'),
         classroomExpulsion: countByType(studentRecords, 'classroom-expulsion'),
@@ -1148,8 +1184,23 @@ function summarizeTutorialRecords({ students, records }) {
   return {
     studentRows,
     recentRecords,
+    registryRecords: records.filter(isTutorialRegistryRecord),
+    importantRecords: records.filter(
+      (record) => isTutorialRegistryRecord(record) && record.isImportant && record.followUpStatus !== 'done',
+    ),
+    pendingRecords: records.filter(
+      (record) => isTutorialRegistryRecord(record) && record.followUpDate && record.followUpStatus !== 'done',
+    ),
+    overdueRecords: records.filter(
+      (record) =>
+        isTutorialRegistryRecord(record) &&
+        record.followUpDate &&
+        record.followUpDate < today &&
+        record.followUpStatus !== 'done',
+    ),
     studentsWithoutDoip: studentRows.filter((row) => row.doip === 0),
     studentsWithRecords: studentRows.filter((row) => row.total > 0),
+    studentsWithRegistry: studentRows.filter((row) => row.registryTotal > 0),
   }
 }
 
@@ -3800,7 +3851,8 @@ function TutorialStudentProfileModal({
       sociometric: true,
     },
   )
-  const records = recordRow?.records || []
+  // La informació qualitativa del registre tutorial és interna i no entra als informes per defecte.
+  const records = (recordRow?.records || []).filter((record) => !isTutorialRegistryRecord(record))
   const hasTracking = records.length > 0
   const reportDate = getTodayDateInput()
   const executiveSummary = getProfileExecutiveSummary(profile, records)
@@ -4144,34 +4196,124 @@ function TutorialStudentProfileModal({
   )
 }
 
-function TutorialRecordStudentModal({ onClose, onDelete, row }) {
+function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
   if (!row) return null
 
+  const registryRecords = row.records.filter(isTutorialRegistryRecord)
+  const importantRecords = registryRecords.filter((record) => record.isImportant && record.followUpStatus !== 'done')
+  const pendingRecords = registryRecords.filter(
+    (record) => record.followUpDate && record.followUpStatus !== 'done',
+  )
+
   return (
-    <Modal onClose={onClose} size="lg" title={`Seguiment tutorial: ${row.student.name}`}>
+    <Modal onClose={onClose} size="lg" title={`Registre tutorial: ${row.student.name}`}>
       <div className="tutorial-record-modal">
-        <section className="tutorial-record-modal-summary">
-          {TUTORING_RECORD_TYPES.map((type) => (
-            <article className={type.tone} key={type.id}>
-              <span>{type.label}</span>
-              <strong>{countByType(row.records, type.id)}</strong>
-            </article>
-          ))}
+        <section className="tutorial-registry-modal-summary">
+          <article>
+            <span>Informacions</span>
+            <strong>{registryRecords.length}</strong>
+          </article>
+          <article className={importantRecords.length > 0 ? 'important' : ''}>
+            <span>Importants</span>
+            <strong>{importantRecords.length}</strong>
+          </article>
+          <article className={pendingRecords.length > 0 ? 'pending' : ''}>
+            <span>Seguiments pendents</span>
+            <strong>{pendingRecords.length}</strong>
+          </article>
         </section>
 
-        {row.records.length === 0 ? (
-          <div className="empty-state compact">Aquest alumne encara no té registres tutorials.</div>
+        {importantRecords.length > 0 && (
+          <section className="tutorial-important-records">
+            <h3>A tenir en compte</h3>
+            {importantRecords.map((record) => (
+              <article key={record.id}>
+                <strong>{getRecordTypeMeta(record.type).label}</strong>
+                <p>{record.note}</p>
+              </article>
+            ))}
+          </section>
+        )}
+
+        {registryRecords.length === 0 ? (
+          <div className="empty-state compact">Aquest alumne encara no té informacions al registre tutorial.</div>
         ) : (
           <div className="tutorial-record-history">
-            {row.records
+            {registryRecords
               .slice()
               .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
               .map((record) => {
                 const typeMeta = getRecordTypeMeta(record.type)
+                const channel = FAMILY_CONTACT_CHANNELS.find((item) => item.id === record.contactChannel)?.label
+                const outcome = FAMILY_CONTACT_OUTCOMES.find((item) => item.id === record.contactOutcome)?.label
                 return (
                   <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
                     <div>
                       <strong>{typeMeta.label}</strong>
+                      <span>
+                        {formatShortDate(record.date)}
+                        {channel ? ` · ${channel}` : ''}
+                        {record.contactPerson ? ` · ${record.contactPerson}` : ''}
+                        {outcome ? ` · ${outcome}` : ''}
+                      </span>
+                      <p>{record.note || 'Sense comentari afegit.'}</p>
+                      {record.followUpDate && (
+                        <span className={`tutorial-follow-up ${record.followUpStatus === 'done' ? 'done' : ''}`}>
+                          {record.followUpStatus === 'done' ? 'Seguiment completat' : `Seguiment: ${formatShortDate(record.followUpDate)}`}
+                        </span>
+                      )}
+                      {record.authorName && <small>Registrat per {record.authorName}</small>}
+                    </div>
+                    <div className="tutorial-record-entry-actions">
+                      <button
+                        className={`icon-button subtle ${record.isImportant ? 'active' : ''}`}
+                        onClick={() => onUpdate(record.id, { isImportant: !record.isImportant })}
+                        title={record.isImportant ? 'Deixar de destacar' : 'Destacar com a informació important'}
+                        type="button"
+                      >
+                        <Star size={16} />
+                      </button>
+                      {record.followUpDate && (
+                        <button
+                          className={`icon-button subtle ${record.followUpStatus === 'done' ? 'active' : ''}`}
+                          onClick={() =>
+                            onUpdate(record.id, {
+                              followUpStatus: record.followUpStatus === 'done' ? 'pending' : 'done',
+                            })
+                          }
+                          title={record.followUpStatus === 'done' ? 'Reobrir seguiment' : 'Marcar seguiment com a completat'}
+                          type="button"
+                        >
+                          <CheckCircle2 size={16} />
+                        </button>
+                      )}
+                      <button
+                        className="icon-button danger subtle"
+                        onClick={() => onDelete(record.id)}
+                        title="Eliminar registre"
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+          </div>
+        )}
+
+        {row.records.some((record) => !isTutorialRegistryRecord(record)) && (
+          <details className="tutorial-disciplinary-details">
+            <summary>Incidències i altres registres ({row.records.length - registryRecords.length})</summary>
+            <div className="tutorial-record-history">
+              {row.records
+                .filter((record) => !isTutorialRegistryRecord(record))
+                .slice()
+                .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+                .map((record) => (
+                  <article className={`tutorial-record-entry ${getRecordTypeMeta(record.type).tone}`} key={record.id}>
+                    <div>
+                      <strong>{getRecordTypeMeta(record.type).label}</strong>
                       <span>{formatShortDate(record.date)}</span>
                       <p>{record.note || 'Sense comentari afegit.'}</p>
                     </div>
@@ -4184,9 +4326,9 @@ function TutorialRecordStudentModal({ onClose, onDelete, row }) {
                       <Trash2 size={16} />
                     </button>
                   </article>
-                )
-              })}
-          </div>
+                ))}
+            </div>
+          </details>
         )}
       </div>
     </Modal>
@@ -4218,8 +4360,13 @@ export function TutoringView() {
   const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
     agendaKind: 'work',
+    contactChannel: 'phone',
+    contactOutcome: 'contacted',
+    contactPerson: '',
+    followUpDate: '',
+    isImportant: false,
     studentId: '',
-    type: 'agenda',
+    type: 'family-contact',
     date: getTodayDateInput(),
     note: '',
   })
@@ -4324,6 +4471,7 @@ export function TutoringView() {
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
+  const updateTutorialRecord = useAvaluaproStore((state) => state.updateTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
   const importTutorialRelations = useAvaluaproStore((state) => state.importTutorialRelations)
@@ -5506,11 +5654,19 @@ export function TutoringView() {
       date: recordForm.date,
       note: recordForm.note,
       agendaKind: recordForm.agendaKind,
+      contactChannel: recordForm.contactChannel,
+      contactOutcome: recordForm.contactOutcome,
+      contactPerson: recordForm.contactPerson,
+      followUpDate: recordForm.followUpDate,
+      isImportant: recordForm.isImportant,
     })
     setRecordForm((current) => ({
       ...current,
       studentId,
       date: getTodayDateInput(),
+      contactPerson: '',
+      followUpDate: '',
+      isImportant: false,
       note: '',
     }))
   }
@@ -7238,29 +7394,68 @@ export function TutoringView() {
 
       {activePanel === 'tracking' && (
         <section className="tutorial-tracking-panel" data-tour="tutoring-tracking-panel">
-          <div className="tutorial-record-summary">
-            {TUTORING_RECORD_TYPES.map((type) => (
-              <button
-                className={`tutorial-record-pill ${type.tone} ${recordForm.type === type.id ? 'active' : ''}`}
-                key={type.id}
-                onClick={() => setRecordForm((current) => ({ ...current, type: type.id }))}
-                type="button"
-              >
-                <strong>{countByType(classTutorialRecords, type.id)}</strong>
-                {type.label}
-              </button>
-            ))}
+          <header className="tutorial-registry-header">
+            <div>
+              <span className="section-kicker"><ClipboardList size={17} /> Quadern de tutoria</span>
+              <h2>Registre tutorial de l’alumnat</h2>
+              <p>Informacions importants, contactes, orientacions i acords, sempre vinculats a cada alumne.</p>
+            </div>
+            {activeClass?.sharedTutoringSpaceId && (
+              <span className="tutorial-registry-shared"><UsersRound size={15} /> Compartit amb els cotutors</span>
+            )}
+          </header>
+
+          <div className="tutorial-registry-summary">
+            <article>
+              <span>Informacions registrades</span>
+              <strong>{tutorialRecordSummary.registryRecords.length}</strong>
+            </article>
+            <article className={tutorialRecordSummary.importantRecords.length > 0 ? 'important' : ''}>
+              <span>A tenir en compte</span>
+              <strong>{tutorialRecordSummary.importantRecords.length}</strong>
+            </article>
+            <article className={tutorialRecordSummary.pendingRecords.length > 0 ? 'pending' : ''}>
+              <span>Seguiments pendents</span>
+              <strong>{tutorialRecordSummary.pendingRecords.length}</strong>
+            </article>
+            <article className={tutorialRecordSummary.overdueRecords.length > 0 ? 'overdue' : ''}>
+              <span>Seguiments vençuts</span>
+              <strong>{tutorialRecordSummary.overdueRecords.length}</strong>
+            </article>
           </div>
+
+          {tutorialRecordSummary.importantRecords.length > 0 && (
+            <section className="tutorial-registry-important-strip">
+              <div>
+                <Star size={19} />
+                <strong>A tenir en compte ara</strong>
+              </div>
+              <div className="tutorial-registry-important-list">
+                {tutorialRecordSummary.importantRecords.slice(0, 6).map((record) => {
+                  const student = classStudents.find((item) => item.id === record.studentId)
+                  return (
+                    <button
+                      key={record.id}
+                      onClick={() => setSelectedTutorialRecordStudentId(record.studentId)}
+                      type="button"
+                    >
+                      <strong>{student?.name || 'Alumne no trobat'}</strong>
+                      <span>{record.note}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          )}
 
           <div className="tutorial-tracking-grid">
             <article className="tutoring-card tutorial-record-form-card">
               <div>
                 <Plus size={24} />
-                <h2>Nou registre tutorial</h2>
+                <h2>Nova anotació</h2>
               </div>
               <p>
-                Registra notes a l’agenda, incidents o expulsions sense duplicar la classe. Tot queda vinculat al
-                perfil tutorial de l’alumne.
+                Deixa constància només de la informació útil per orientar les properes actuacions tutorials.
               </p>
 
               <form className="tutorial-record-form" onSubmit={handleSubmitTutorialRecord}>
@@ -7292,13 +7487,53 @@ export function TutoringView() {
                     }
                     value={recordForm.type}
                   >
-                    {TUTORING_RECORD_TYPES.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.label}
-                      </option>
-                    ))}
+                    <optgroup label="Registre tutorial">
+                      {TUTORING_REGISTRY_TYPES.map((type) => (
+                        <option key={type.id} value={type.id}>{type.label}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Incidències i altres registres">
+                      {TUTORING_RECORD_TYPES.map((type) => (
+                        <option key={type.id} value={type.id}>{type.label}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </label>
+
+                {recordForm.type === 'family-contact' && (
+                  <>
+                    <label>
+                      Canal
+                      <select
+                        onChange={(event) => setRecordForm((current) => ({ ...current, contactChannel: event.target.value }))}
+                        value={recordForm.contactChannel}
+                      >
+                        {FAMILY_CONTACT_CHANNELS.map((option) => (
+                          <option key={option.id} value={option.id}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Resultat
+                      <select
+                        onChange={(event) => setRecordForm((current) => ({ ...current, contactOutcome: event.target.value }))}
+                        value={recordForm.contactOutcome}
+                      >
+                        {FAMILY_CONTACT_OUTCOMES.map((option) => (
+                          <option key={option.id} value={option.id}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="full">
+                      Persona de contacte · opcional
+                      <input
+                        onChange={(event) => setRecordForm((current) => ({ ...current, contactPerson: event.target.value }))}
+                        placeholder="Ex: mare, pare, tutor legal..."
+                        value={recordForm.contactPerson}
+                      />
+                    </label>
+                  </>
+                )}
 
                 {recordForm.type === 'agenda' && (
                   <div className="tutorial-agenda-kind-toggle">
@@ -7328,17 +7563,50 @@ export function TutoringView() {
                 </label>
 
                 <label className="full">
-                  Motiu o observació
+                  Resum
                   <textarea
                     maxLength={TUTORING_TEXT_LIMIT}
                     onChange={(event) => setRecordForm((current) => ({ ...current, note: event.target.value }))}
-                    placeholder="Ex: nota a l’agenda per acumulació de tasques no fetes, incident al passadís, expulsió puntual..."
+                    placeholder={
+                      isTutorialRegistryRecord(recordForm)
+                        ? 'Què ha passat, què cal tenir present i quin acord s’ha pres?'
+                        : 'Motiu o observació del registre...'
+                    }
+                    required={isTutorialRegistryRecord(recordForm)}
                     value={recordForm.note}
                   />
                 </label>
 
+                {isTutorialRegistryRecord(recordForm) && (
+                  <>
+                    <label>
+                      Proper seguiment · opcional
+                      <input
+                        min={recordForm.date}
+                        onInput={(event) => {
+                          const followUpDate = event.currentTarget.value
+                          setRecordForm((current) => ({ ...current, followUpDate }))
+                        }}
+                        type="date"
+                        value={recordForm.followUpDate}
+                      />
+                    </label>
+                    <label className="tutorial-important-toggle">
+                      <input
+                        checked={recordForm.isImportant}
+                        onChange={(event) => setRecordForm((current) => ({ ...current, isImportant: event.target.checked }))}
+                        type="checkbox"
+                      />
+                      <span>
+                        <strong>Destacar a «A tenir en compte»</strong>
+                        <small>Per a informació vigent que no s’ha de perdre dins l’historial.</small>
+                      </span>
+                    </label>
+                  </>
+                )}
+
                 <button className="primary-action" disabled={classStudents.length === 0} type="submit">
-                  Afegir registre
+                  Desar anotació
                 </button>
               </form>
             </article>
@@ -7346,13 +7614,17 @@ export function TutoringView() {
             <article className="tutoring-card">
               <div>
                 <UsersRound size={24} />
-                <h2>Alumnes amb seguiment</h2>
+                <h2>Registre per alumne</h2>
               </div>
-              {tutorialRecordSummary.studentsWithRecords.length === 0 ? (
-                <div className="empty-state compact">Encara no hi ha registres tutorials en aquesta classe.</div>
+              {tutorialRecordSummary.studentsWithRegistry.length === 0 ? (
+                <div className="empty-state compact">Encara no hi ha informacions registrades en aquesta classe.</div>
               ) : (
                 <div className="tutorial-tracking-student-list">
-                  {tutorialRecordSummary.studentsWithRecords.slice(0, 12).map((row) => (
+                  {tutorialRecordSummary.studentsWithRegistry
+                    .slice()
+                    .sort((a, b) => b.overdue - a.overdue || b.important - a.important || b.pending - a.pending || b.registryTotal - a.registryTotal)
+                    .slice(0, 16)
+                    .map((row) => (
                     <button
                       className="tutorial-tracking-student-row"
                       key={row.student.id}
@@ -7363,15 +7635,32 @@ export function TutoringView() {
                         <strong>{row.student.name}</strong>
                         <small>{row.student.halfGroup || 'Sense mig grup'}</small>
                       </div>
-                      <span>{row.agenda} agenda</span>
-                      <span>{row.incident} incid.</span>
-                      <span>{row.classroomExpulsion + row.centerExpulsion} exp.</span>
+                      {row.important > 0 && <span className="important">{row.important} important</span>}
+                      {row.pending > 0 && <span className={row.overdue > 0 ? 'overdue' : ''}>{row.pending} pendent</span>}
+                      <span>{row.registryTotal} anot.</span>
                     </button>
                   ))}
                 </div>
               )}
             </article>
           </div>
+
+          <details className="tutorial-disciplinary-register">
+            <summary>Incidències i altres registres de seguiment</summary>
+            <div className="tutorial-record-summary">
+              {TUTORING_RECORD_TYPES.map((type) => (
+                <button
+                  className={`tutorial-record-pill ${type.tone} ${recordForm.type === type.id ? 'active' : ''}`}
+                  key={type.id}
+                  onClick={() => setRecordForm((current) => ({ ...current, type: type.id }))}
+                  type="button"
+                >
+                  <strong>{countByType(classTutorialRecords, type.id)}</strong>
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </details>
 
           <section className="tutorial-student-profile-tools">
             <article className="tutoring-card tutorial-doip-card" data-tour="tutoring-doip-card">
@@ -12207,6 +12496,7 @@ export function TutoringView() {
         <TutorialRecordStudentModal
           onClose={() => setSelectedTutorialRecordStudentId('')}
           onDelete={deleteTutorialRecord}
+          onUpdate={updateTutorialRecord}
           row={selectedTutorialRecordRow}
         />
       )}

@@ -2955,7 +2955,19 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  addTutorialRecord: async ({ agendaKind = '', classId, studentId, type, date, note }) => {
+  addTutorialRecord: async ({
+    agendaKind = '',
+    classId,
+    contactChannel = '',
+    contactOutcome = '',
+    contactPerson = '',
+    date,
+    followUpDate = '',
+    isImportant = false,
+    note,
+    studentId,
+    type,
+  }) => {
     if (!classId || !studentId || !type) return
 
     const cleanNote = String(note || '').trim()
@@ -2971,6 +2983,14 @@ export const useAvaluaproStore = create((set, get) => ({
         date: cleanDate,
         note: cleanNote,
         createdAt: now,
+        updatedAt: now,
+        authorEmail: state.cloud.user?.email || '',
+        authorName: state.cloud.user?.displayName || state.cloud.user?.email || '',
+        ...(contactChannel ? { contactChannel } : {}),
+        ...(contactOutcome ? { contactOutcome } : {}),
+        ...(String(contactPerson || '').trim() ? { contactPerson: String(contactPerson).trim() } : {}),
+        ...(followUpDate ? { followUpDate, followUpStatus: 'pending' } : {}),
+        ...(isImportant ? { isImportant: true } : {}),
         ...(type === 'agenda' ? { agendaKind: agendaKind || 'work' } : {}),
       }
       const tutorialRecords = [...state.tutorialRecords, nextRecord]
@@ -3010,6 +3030,17 @@ export const useAvaluaproStore = create((set, get) => ({
 
       return { tutorialRecords: [...tutorialRecords, automaticIncident] }
     })
+    await persistCollections(set, get, ['tutorialRecords'])
+  },
+
+  updateTutorialRecord: async (recordId, patch = {}) => {
+    if (!recordId) return
+    const updatedAt = new Date().toISOString()
+    set((state) => ({
+      tutorialRecords: state.tutorialRecords.map((record) =>
+        record.id === recordId ? { ...record, ...patch, updatedAt } : record,
+      ),
+    }))
     await persistCollections(set, get, ['tutorialRecords'])
   },
 
