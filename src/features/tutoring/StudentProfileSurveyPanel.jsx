@@ -45,14 +45,15 @@ const ANSWER_GROUPS = [
     title: 'Dades personals',
     fields: [
       ['birthDate', 'Data de naixement'], ['birthPlace', 'Lloc de naixement'], ['address', 'Adreça'],
+      ['address2', 'Segona adreça'],
       ['parish', 'Parròquia'], ['parishOther', 'Un altre lloc'], ['homePhone', 'Telèfon de casa'],
     ],
   },
   {
     title: 'Responsables',
     fields: [
-      ['guardian1Name', 'Responsable principal'], ['guardian1Relationship', 'Vincle'],
-      ['guardian1Phone', 'Telèfon principal'], ['guardian1Profession', 'Professió'],
+      ['guardian1Name', 'Primer responsable'], ['guardian1Relationship', 'Vincle'],
+      ['guardian1Phone', 'Primer telèfon'], ['guardian1Profession', 'Professió'],
       ['guardian1Workplace', 'Lloc de treball'], ['guardian2Name', 'Segon responsable'],
       ['guardian2Relationship', 'Vincle del segon responsable'], ['guardian2Phone', 'Segon telèfon'],
       ['guardian2Profession', 'Professió del segon responsable'], ['guardian2Workplace', 'Segon lloc de treball'],
@@ -314,7 +315,7 @@ function StudentProfileResponseModal({ onClose, onDelete, onReview, response, st
           {flags.length === 0 ? <span className="ok"><Check size={16} />Sense alertes declarades</span> : flags.map((flag) => <span className={flag.tone} key={flag.id}>{flag.label}</span>)}
         </div>
         <div className="student-profile-priority-grid">
-          <article><span>Contacte principal</span><strong>{answers.guardian1Name || 'No indicat'}</strong><small>{[answers.guardian1Relationship, answers.guardian1Phone].filter(Boolean).join(' · ')}</small></article>
+          <article><span>Primer responsable</span><strong>{answers.guardian1Name || 'No indicat'}</strong><small>{[answers.guardian1Relationship, answers.guardian1Phone].filter(Boolean).join(' · ')}</small></article>
           <article><span>Llengües familiars</span><strong>{formatAnswer(answers.familyLanguages) || 'No indicades'}</strong></article>
           <article><span>Suports</span><strong>{formatAnswer(answers.currentSupports) || 'No indicats'}</strong><small>{formatAnswer(answers.schoolSupportTypes)}</small></article>
           <article><span>Veu de l’alumne</span><strong>{answers.studentMessage || answers.tutorExpectations || 'Sense missatge afegit'}</strong></article>

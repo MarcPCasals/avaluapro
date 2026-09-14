@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildStudentProfileClassPortrait,
   createEmptyStudentProfileAnswers,
+  getStudentProfilePersonalStepError,
   getStudentProfilePriorityFlags,
   normalizeStudentProfileAnswers,
 } from '../src/features/tutoring/studentProfileQuestionnaire.js'
@@ -127,4 +128,43 @@ test('neteja camps antics o mal formats abans d’enviar una resposta', () => {
   assert.equal(normalized.homeTabletCount, 20)
   assert.equal('campAntic' in normalized, false)
   assert.equal(Object.keys(normalized).length, Object.keys(createEmptyStudentProfileAnswers()).length)
+})
+
+test('la segona adreça és opcional i la professió del primer responsable és obligatòria', () => {
+  const answers = {
+    ...createEmptyStudentProfileAnswers(),
+    address: 'Carrer Major, 1',
+    birthDate: '2013-05-10',
+    birthPlace: 'Ordino',
+    guardian1Name: 'Maria Exemple',
+    guardian1Phone: '123456',
+    guardian1Relationship: 'Mare',
+    parish: 'Ordino',
+  }
+
+  assert.match(getStudentProfilePersonalStepError(answers), /primer responsable/)
+  answers.guardian1Profession = 'Infermera'
+  assert.equal(getStudentProfilePersonalStepError(answers), '')
+  assert.equal(answers.address2, '')
+})
+
+test('si s’informa un segon responsable, també cal indicar-ne la professió', () => {
+  const answers = {
+    ...createEmptyStudentProfileAnswers(),
+    address: 'Carrer Major, 1',
+    birthDate: '2013-05-10',
+    birthPlace: 'Ordino',
+    guardian1Name: 'Maria Exemple',
+    guardian1Phone: '123456',
+    guardian1Profession: 'Infermera',
+    guardian1Relationship: 'Mare',
+    guardian2Name: 'Joan Exemple',
+    guardian2Phone: '654321',
+    guardian2Relationship: 'Pare',
+    parish: 'Ordino',
+  }
+
+  assert.match(getStudentProfilePersonalStepError(answers), /segon responsable/)
+  answers.guardian2Profession = 'Fuster'
+  assert.equal(getStudentProfilePersonalStepError(answers), '')
 })

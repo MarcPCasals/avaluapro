@@ -753,28 +753,19 @@ service cloud.firestore {
     }
 
     function validStudentProfileAnswerKeys(answers) {
-      return answers is map && answers.keys().hasOnly([
-          'address', 'birthDate', 'birthPlace', 'breakPreferenceOther', 'breakPreferences',
-          'currentSupportOther', 'currentSupports', 'extracurricularActivities', 'familyLanguageOther',
-          'familyLanguages', 'familySituation', 'familySituationDetails', 'guardian1Name',
-          'guardian1Phone', 'guardian1Profession', 'guardian1Relationship', 'guardian1Workplace',
-          'guardian2Name', 'guardian2Phone', 'guardian2Profession', 'guardian2Relationship',
-          'guardian2Workplace', 'hasExtracurriculars', 'hasReinforcement', 'healthDetails', 'healthSituation', 'helpSeeking', 'homePhone',
-          'homeDeviceAccess', 'homeMobileCount', 'homeTabletCount', 'homeComputerCount',
-          'householdMembers', 'householdOther', 'learningChallenges', 'learningHelpOther',
-          'learningHelps', 'medicalPlan', 'medicalPlanDetails', 'middayActivities',
-          'middayActivityOther', 'parish', 'parishOther', 'previousSchool', 'previousSchoolOther',
-          'previousSchoolSupport', 'reinforcementActivities', 'repeatedCourse',
-          'repeatedCourseDetails', 'schoolSupportOther', 'schoolSupportTypes', 'siblingCount',
-          'siblingsDetails', 'studentMessage', 'tutorExpectations', 'workPreferences',
-          'classFriendIds', 'schoolFriends'
-        ]);
+      // Tots els camps coneguts es validen a continuació. Acceptem temporalment
+      // les 58 claus de la versió anterior o les 59 actuals amb address2.
+      return answers is map
+        && (answers.keys().size() == 58
+          || (answers.keys().size() == 59 && 'address2' in answers));
     }
 
     function validStudentProfilePersonalAnswers(answers) {
       return answers.birthDate is string && answers.birthDate.size() <= 20
         && answers.birthPlace is string && answers.birthPlace.size() <= 160
         && answers.address is string && answers.address.size() <= 240
+        && (!('address2' in answers)
+          || (answers.address2 is string && answers.address2.size() <= 240))
         && answers.parish is string && answers.parish.size() <= 80
         && answers.parishOther is string && answers.parishOther.size() <= 120
         && answers.homePhone is string && answers.homePhone.size() <= 40;

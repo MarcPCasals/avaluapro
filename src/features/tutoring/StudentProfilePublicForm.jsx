@@ -31,6 +31,7 @@ import {
   SCHOOL_SUPPORT_OPTIONS,
   WORK_PREFERENCE_OPTIONS,
   createEmptyStudentProfileAnswers,
+  getStudentProfilePersonalStepError,
   normalizeStudentProfileAnswers,
 } from './studentProfileQuestionnaire'
 
@@ -270,18 +271,7 @@ function ReviewValue({ label, value }) {
 
 function getStepError(step, answers, selectedStudentId, identityConfirmed) {
   if (step === 0 && (!selectedStudentId || !identityConfirmed)) return 'Confirma quin alumne ets per continuar.'
-  if (
-    step === 1 &&
-    (!answers.birthDate ||
-      !answers.birthPlace.trim() ||
-      !answers.address.trim() ||
-      !answers.parish ||
-      !answers.guardian1Name.trim() ||
-      !answers.guardian1Relationship ||
-      !answers.guardian1Phone.trim())
-  ) {
-    return 'Completa les dades personals i les del responsable principal.'
-  }
+  if (step === 1) return getStudentProfilePersonalStepError(answers)
   if (
     step === 2 &&
     (answers.householdMembers.length === 0 ||
@@ -558,6 +548,7 @@ export function StudentProfilePublicForm({ surveyId }) {
               <label>Data de naixement *<input onChange={(e) => setAnswer('birthDate', e.target.value)} type="date" value={answers.birthDate} /></label>
               <label>Lloc de naixement *<input maxLength={160} onChange={(e) => setAnswer('birthPlace', e.target.value)} value={answers.birthPlace} /></label>
               <label className="full-width">Adreça *<input maxLength={240} onChange={(e) => setAnswer('address', e.target.value)} value={answers.address} /></label>
+              <label className="full-width">Segona adreça, si en tens<input maxLength={240} onChange={(e) => setAnswer('address2', e.target.value)} value={answers.address2} /></label>
               <label>Parròquia *<select onChange={(e) => setAnswer('parish', e.target.value)} value={answers.parish}><option value="">Tria una opció</option>{PARISH_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select></label>
               {answers.parish === 'Altres' && <label>Una altra parròquia o lloc<input maxLength={120} onChange={(e) => setAnswer('parishOther', e.target.value)} value={answers.parishOther} /></label>}
               <label>Telèfon de casa, si en tens<input maxLength={40} onChange={(e) => setAnswer('homePhone', e.target.value)} value={answers.homePhone} /></label>
@@ -568,11 +559,12 @@ export function StudentProfilePublicForm({ surveyId }) {
                 const prefix = `guardian${number}`
                 return (
                   <article key={prefix}>
-                    <h3>{number === 1 ? 'Responsable principal *' : 'Segon responsable, si n’hi ha'}</h3>
-                    <label>Nom i cognoms {number === 1 && '*'}<input maxLength={160} onChange={(e) => setAnswer(`${prefix}Name`, e.target.value)} value={answers[`${prefix}Name`]} /></label>
-                    <label>Vincle amb tu {number === 1 && '*'}<select onChange={(e) => setAnswer(`${prefix}Relationship`, e.target.value)} value={answers[`${prefix}Relationship`]}><option value="">Tria una opció</option>{RELATIONSHIP_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select></label>
-                    <label>Telèfon {number === 1 && '*'}<input maxLength={40} onChange={(e) => setAnswer(`${prefix}Phone`, e.target.value)} value={answers[`${prefix}Phone`]} /></label>
-                    <label>Professió, opcional<input maxLength={160} onChange={(e) => setAnswer(`${prefix}Profession`, e.target.value)} value={answers[`${prefix}Profession`]} /></label>
+                    <h3>{number === 1 ? 'Primer responsable *' : 'Segon responsable, si n’hi ha'}</h3>
+                    {number === 2 && <p>Si l’afegeixes, completa els camps amb *.</p>}
+                    <label>Nom i cognoms *<input maxLength={160} onChange={(e) => setAnswer(`${prefix}Name`, e.target.value)} value={answers[`${prefix}Name`]} /></label>
+                    <label>Vincle amb tu *<select onChange={(e) => setAnswer(`${prefix}Relationship`, e.target.value)} value={answers[`${prefix}Relationship`]}><option value="">Tria una opció</option>{RELATIONSHIP_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select></label>
+                    <label>Telèfon *<input maxLength={40} onChange={(e) => setAnswer(`${prefix}Phone`, e.target.value)} value={answers[`${prefix}Phone`]} /></label>
+                    <label>Professió *<input maxLength={160} onChange={(e) => setAnswer(`${prefix}Profession`, e.target.value)} value={answers[`${prefix}Profession`]} /></label>
                     <label>Lloc de treball, opcional<input maxLength={160} onChange={(e) => setAnswer(`${prefix}Workplace`, e.target.value)} value={answers[`${prefix}Workplace`]} /></label>
                   </article>
                 )
@@ -673,7 +665,8 @@ export function StudentProfilePublicForm({ surveyId }) {
             <div className="student-profile-step-heading"><CheckCircle2 size={27} /><div><h2>Revisa abans d’enviar</h2><p>La resposta quedarà assignada a {selectedStudent?.name}.</p></div></div>
             <div className="student-profile-review-grid">
               <ReviewValue label="Alumne" value={selectedStudent?.name} />
-              <ReviewValue label="Responsable principal" value={`${answers.guardian1Name} · ${answers.guardian1Phone}`} />
+              <ReviewValue label="Primer responsable" value={[answers.guardian1Name, answers.guardian1Phone].filter(Boolean).join(' · ')} />
+              <ReviewValue label="Segon responsable" value={[answers.guardian2Name, answers.guardian2Phone].filter(Boolean).join(' · ')} />
               <ReviewValue label="Llengües familiars" value={answers.familyLanguages} />
               <ReviewValue label="Escola anterior" value={answers.previousSchoolOther || answers.previousSchool} />
               <ReviewValue label="Dispositius per estudiar a casa" value={formatHomeDevices(answers)} />

@@ -668,6 +668,18 @@ describe('formulari tutorial public', () => {
     await assertFails(setDoc(responseRef, studentProfileResponseData({ studentMessage: 'canvi' })))
   })
 
+  test('una pestanya oberta amb la versió anterior encara pot enviar la resposta', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    const legacyAnswers = createEmptyStudentProfileAnswers()
+    delete legacyAnswers.address2
+    await assertSucceeds(
+      setDoc(
+        doc(publicDb, 'studentProfileSurveys', PROFILE_SURVEY_ID, 'responses', 'student-1'),
+        studentProfileResponseData({ answers: legacyAnswers }),
+      ),
+    )
+  })
+
   test('no es pot suplantar un nom ni triar un identificador de resposta diferent', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
     await assertFails(
@@ -762,6 +774,7 @@ describe('formulari tutorial public', () => {
     const baseAnswers = createEmptyStudentProfileAnswers()
     for (const answers of [
       { ...baseAnswers, campInventat: 'no permes' },
+      { ...baseAnswers, address2: 'a'.repeat(241) },
       { ...baseAnswers, studentMessage: 'a'.repeat(1601) },
       { ...baseAnswers, schoolFriends: 'a'.repeat(1001) },
     ]) {

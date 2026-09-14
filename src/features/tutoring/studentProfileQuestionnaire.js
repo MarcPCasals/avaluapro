@@ -1,4 +1,4 @@
-export const STUDENT_PROFILE_FORM_VERSION = '2026-09-08-v1'
+export const STUDENT_PROFILE_FORM_VERSION = '2026-09-14-v2'
 export const STUDENT_PROFILE_PRIVACY_NOTICE_VERSION = '2026-09-08-v1'
 
 export const PARISH_OPTIONS = [
@@ -295,6 +295,7 @@ export const STUDENT_PROFILE_ANSWER_KEYS = [
   'birthDate',
   'birthPlace',
   'address',
+  'address2',
   'parish',
   'parishOther',
   'homePhone',
@@ -357,6 +358,7 @@ export function createEmptyStudentProfileAnswers() {
     birthDate: '',
     birthPlace: '',
     address: '',
+    address2: '',
     parish: '',
     parishOther: '',
     homePhone: '',
@@ -429,6 +431,41 @@ export function normalizeStudentProfileAnswers(answers = {}) {
       return [key, typeof value === 'string' ? value : fallback]
     }),
   )
+}
+
+export function getStudentProfilePersonalStepError(answers = {}) {
+  const text = (value) => String(value || '').trim()
+  if (
+    !text(answers.birthDate) ||
+    !text(answers.birthPlace) ||
+    !text(answers.address) ||
+    !text(answers.parish) ||
+    !text(answers.guardian1Name) ||
+    !text(answers.guardian1Relationship) ||
+    !text(answers.guardian1Phone) ||
+    !text(answers.guardian1Profession)
+  ) {
+    return 'Completa les dades personals i les del primer responsable.'
+  }
+
+  const hasSecondGuardian = [
+    answers.guardian2Name,
+    answers.guardian2Relationship,
+    answers.guardian2Phone,
+    answers.guardian2Profession,
+    answers.guardian2Workplace,
+  ].some((value) => text(value))
+  if (
+    hasSecondGuardian &&
+    (!text(answers.guardian2Name) ||
+      !text(answers.guardian2Relationship) ||
+      !text(answers.guardian2Phone) ||
+      !text(answers.guardian2Profession))
+  ) {
+    return 'Si afegeixes un segon responsable, completa’n el nom, el vincle, el telèfon i la professió.'
+  }
+
+  return ''
 }
 
 export function getStudentProfilePriorityFlags(answers = {}) {

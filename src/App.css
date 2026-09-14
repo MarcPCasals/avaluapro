@@ -27396,6 +27396,7 @@ button.profile-followup-card:focus-visible {
   background: #f8fafc;
 }
 .student-profile-guardian-grid h3 { margin: 0 0 2px; color: #0f766e; }
+.student-profile-guardian-grid article > p { margin: -6px 0 0; color: #64748b; font-size: 0.85rem; }
 
 .student-profile-question {
   display: grid;
