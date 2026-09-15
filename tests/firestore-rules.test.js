@@ -1151,3 +1151,88 @@ describe('Internal feedback inbox', () => {
     await assertFails(deleteDoc(ref))
   })
 })
+
+describe('Internal messaging', () => {
+  function messagingDb(uid, email, verified = true) {
+    return testEnv.authenticatedContext(uid, { email, email_verified: verified }).firestore()
+  }
+
+  function directMessage(overrides = {}) {
+    return {
+      body: 'Bon dia, ja he revisat la informació.',
+      createdAt: serverTimestamp(),
+      participantEmails: ['cotutor@educand.ad', 'teacher@educand.ad'],
+      readAt: null,
+      recipientEmailLower: 'cotutor@educand.ad',
+      senderEmail: 'teacher@educand.ad',
+      senderEmailLower: 'teacher@educand.ad',
+      senderName: 'Teacher',
+      senderUid: 'teacher',
+      status: 'unread',
+      ...overrides,
+    }
+  }
+
+  test('participants can read a direct message and only the recipient can mark it read', async () => {
+    const senderDb = messagingDb('teacher', 'teacher@educand.ad')
+    const recipientDb = messagingDb('cotutor', 'cotutor@educand.ad')
+    const ref = doc(senderDb, 'internalMessages', 'direct-1')
+    await assertSucceeds(setDoc(ref, directMessage()))
+    await assertSucceeds(getDoc(doc(recipientDb, 'internalMessages', 'direct-1')))
+    await assertSucceeds(getDocs(query(
+      collection(recipientDb, 'internalMessages'),
+      where('participantEmails', 'array-contains', 'cotutor@educand.ad'),
+    )))
+    await assertFails(getDoc(doc(messagingDb('third', 'third@educand.ad'), 'internalMessages', 'direct-1')))
+    await assertFails(updateDoc(ref, { readAt: serverTimestamp(), status: 'read' }))
+    await assertSucceeds(updateDoc(
+      doc(recipientDb, 'internalMessages', 'direct-1'),
+      { readAt: serverTimestamp(), status: 'read' },
+    ))
+    await assertFails(deleteDoc(doc(recipientDb, 'internalMessages', 'direct-1')))
+  })
+
+  test('forged, unverified and malformed direct messages are rejected', async () => {
+    const db = messagingDb('teacher', 'teacher@educand.ad')
+    for (const patch of [
+      { senderUid: 'other' },
+      { senderEmail: 'other@educand.ad' },
+      { recipientEmailLower: 'teacher@educand.ad' },
+      { participantEmails: ['teacher@educand.ad'] },
+      { participantEmails: ['teacher@educand.ad', 'third@educand.ad'] },
+      { body: '' },
+      { body: 'a'.repeat(2001) },
+      { status: 'read' },
+      { readAt: serverTimestamp() },
+      { unexpected: true },
+    ]) {
+      await assertFails(setDoc(doc(db, 'internalMessages', `invalid-${Math.random()}`), directMessage(patch)))
+    }
+    await assertFails(setDoc(
+      doc(messagingDb('teacher', 'teacher@educand.ad', false), 'internalMessages', 'unverified'),
+      directMessage(),
+    ))
+  })
+
+  test('only verified Marc can publish announcements and verified users can read them', async () => {
+    const announcement = {
+      body: 'Ja està disponible una nova funció.',
+      createdAt: serverTimestamp(),
+      senderEmail: 'mperezc@educand.ad',
+      senderName: 'Marc Pérez Casals',
+      senderUid: 'marc',
+    }
+    const adminDb = messagingDb('marc', 'mperezc@educand.ad')
+    await assertSucceeds(setDoc(doc(adminDb, 'internalAnnouncements', 'announcement-1'), announcement))
+    await assertSucceeds(getDocs(collection(messagingDb('teacher', 'teacher@educand.ad'), 'internalAnnouncements')))
+    await assertFails(setDoc(
+      doc(messagingDb('teacher', 'teacher@educand.ad'), 'internalAnnouncements', 'forged'),
+      { ...announcement, senderEmail: 'teacher@educand.ad', senderUid: 'teacher' },
+    ))
+    await assertFails(getDocs(collection(
+      messagingDb('teacher', 'teacher@educand.ad', false),
+      'internalAnnouncements',
+    )))
+    await assertFails(deleteDoc(doc(adminDb, 'internalAnnouncements', 'announcement-1')))
+  })
+})

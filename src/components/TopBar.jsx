@@ -11,7 +11,7 @@ import {
   LogIn,
   LogOut,
   Loader2,
-  MessageSquareText,
+  MessageCircle,
   Plus,
   RotateCcw,
   RotateCw,
@@ -34,9 +34,15 @@ import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageMo
 import { TutoringShareModal } from '../features/data/TutoringShareModal'
 import { FeedbackModal } from '../features/help/FeedbackModal'
 import { HelpCenterModal } from '../features/help/HelpCenterModal'
+import { InternalMessagingModal } from '../features/messages/InternalMessagingModal'
 import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
 import { downloadJson, getTodaySlug } from '../lib/downloads'
+import {
+  subscribeInternalAnnouncements,
+  subscribeInternalMessages,
+  subscribeInternalMessageState,
+} from '../lib/firebase'
 import { getPendingReminderSummary } from '../lib/reminders'
 
 const colorClass = {
@@ -76,6 +82,14 @@ function getBackupFilename(state) {
 function formatSyncTime(value) {
   if (!value) return ''
   return new Date(value).toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' })
+}
+
+function timestampToMillis(value) {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.seconds === 'number') return value.seconds * 1000
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? 0 : parsed
 }
 
 function getSyncIndicator(cloud) {
@@ -134,6 +148,11 @@ export function TopBar() {
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showMessaging, setShowMessaging] = useState(false)
+  const [internalMessages, setInternalMessages] = useState([])
+  const [internalAnnouncements, setInternalAnnouncements] = useState([])
+  const [internalMessageState, setInternalMessageState] = useState({})
+  const [internalMessageError, setInternalMessageError] = useState('')
   const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
   const dataMenuRef = useRef(null)
@@ -194,6 +213,36 @@ export function TopBar() {
             ? 'yellow'
             : 'gray'
   const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares + pendingReminderCount
+  const ownEmail = String(cloud.user?.email || '').trim().toLowerCase()
+  const announcementsReadAt = timestampToMillis(internalMessageState.announcementsReadAt)
+  const unreadInternalMessageCount = cloud.user ? internalMessages.filter(
+      (item) => item.recipientEmailLower === ownEmail && item.status === 'unread',
+    ).length + internalAnnouncements.filter(
+      (item) => timestampToMillis(item.createdAt) > announcementsReadAt,
+    ).length : 0
+
+  useEffect(() => {
+    if (!cloud.user?.uid || !cloud.user?.email) {
+      return undefined
+    }
+
+    const handleError = () => setInternalMessageError('No s’han pogut carregar els missatges. Torna-ho a provar més tard.')
+    const unsubscribeMessages = subscribeInternalMessages(cloud.user.email, (items) => {
+      setInternalMessages(items)
+      setInternalMessageError('')
+    }, handleError)
+    const unsubscribeAnnouncements = subscribeInternalAnnouncements((items) => {
+      setInternalAnnouncements(items)
+      setInternalMessageError('')
+    }, handleError)
+    const unsubscribeState = subscribeInternalMessageState(cloud.user.uid, setInternalMessageState, handleError)
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeAnnouncements()
+      unsubscribeState()
+    }
+  }, [cloud.user?.email, cloud.user?.uid])
 
   useEffect(() => {
     if (!showDataMenu) return undefined
@@ -342,12 +391,17 @@ export function TopBar() {
           <HelpCircle size={22} />
         </button>
         <button
-          className="icon-button"
-          onClick={() => setShowFeedback(true)}
-          title="Enviar suggeriment o dubte"
+          className="icon-button internal-message-button"
+          onClick={() => setShowMessaging(true)}
+          title="Missatgeria interna"
           type="button"
         >
-          <MessageSquareText size={22} />
+          <MessageCircle size={22} />
+          {unreadInternalMessageCount > 0 && (
+            <em className="internal-message-button-badge">
+              {unreadInternalMessageCount > 99 ? '99+' : unreadInternalMessageCount}
+            </em>
+          )}
         </button>
         <span className="top-divider" />
         {cloud.user && (
@@ -531,10 +585,25 @@ export function TopBar() {
       {showHelp && (
         <HelpCenterModal
           onClose={() => setShowHelp(false)}
+          onOpenFeedback={() => {
+            setShowHelp(false)
+            setShowFeedback(true)
+          }}
           onOpenGuide={(guideMode) => {
             setShowHelp(false)
             window.setTimeout(() => openGuide(guideMode), 120)
           }}
+        />
+      )}
+      {showMessaging && (
+        <InternalMessagingModal
+          announcements={internalAnnouncements}
+          messageState={internalMessageState}
+          messages={internalMessages}
+          onClose={() => setShowMessaging(false)}
+          sharedTutoringSpaces={cloud.sharedTutoringSpaces}
+          subscriptionError={internalMessageError}
+          user={cloud.user}
         />
       )}
       {showFeedback && <FeedbackModal user={cloud.user} onClose={() => setShowFeedback(false)} />}

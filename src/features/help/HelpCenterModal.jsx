@@ -7,6 +7,7 @@ import {
   FileArchive,
   GraduationCap,
   HelpCircle,
+  MessageSquareText,
   PlayCircle,
   Send,
   ShieldCheck,
@@ -120,7 +121,7 @@ const guideLaunchers = [
   },
 ]
 
-export function HelpCenterModal({ onClose, onOpenGuide }) {
+export function HelpCenterModal({ onClose, onOpenFeedback, onOpenGuide }) {
   const openGuide = useAvaluaproStore((state) => state.openGuide)
   const resetToSeed = useAvaluaproStore((state) => state.resetToSeed)
 
@@ -164,10 +165,16 @@ export function HelpCenterModal({ onClose, onOpenGuide }) {
               interactiva funciona com un manual: et fa passar per avaluació, seguiment, estadístiques
               i còpies de seguretat abans de començar amb dades pròpies.
             </p>
-            <button className="primary-action compact" onClick={() => openGuidedTour('demo')} type="button">
-              <PlayCircle size={16} />
-              Obrir guia interactiva
-            </button>
+            <div className="help-hero-actions">
+              <button className="primary-action compact" onClick={() => openGuidedTour('demo')} type="button">
+                <PlayCircle size={16} />
+                Obrir guia interactiva
+              </button>
+              <button className="secondary-action compact" onClick={onOpenFeedback} type="button">
+                <MessageSquareText size={16} />
+                Enviar suggeriment o dubte
+              </button>
+            </div>
           </div>
         </section>
 

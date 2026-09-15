@@ -24370,6 +24370,428 @@ button.profile-followup-card:focus-visible {
   gap: 16px;
 }
 
+.internal-messaging-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.7fr);
+  min-height: min(68vh, 680px);
+  overflow: hidden;
+  border: 1px solid #dbe3ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.internal-message-sidebar {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-right: 1px solid #dbe3ee;
+  background: white;
+}
+
+.internal-new-message {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.internal-new-message:hover,
+.internal-new-message.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.internal-cotutor-shortcuts {
+  display: grid;
+  gap: 7px;
+}
+
+.internal-cotutor-shortcuts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.internal-cotutor-shortcuts > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.internal-cotutor-shortcuts button {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #4338ca;
+  background: #eef2ff;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.internal-conversation-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.internal-conversation-list > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 10px;
+  color: #334155;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.internal-conversation-list > button:hover,
+.internal-conversation-list > button.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.internal-conversation-list > button.announcement svg {
+  color: #ea580c;
+}
+
+.internal-conversation-list > button span,
+.internal-conversation-list > button strong,
+.internal-conversation-list > button small {
+  display: block;
+  min-width: 0;
+}
+
+.internal-conversation-list > button strong,
+.internal-conversation-list > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.internal-conversation-list > button strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.internal-conversation-list > button small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.internal-conversation-list > button em,
+.internal-message-button-badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  color: white;
+  background: #dc2626;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.internal-chat-panel {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto minmax(220px, 1fr) auto auto auto;
+  background: #f1f5f9;
+}
+
+.internal-chat-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #dbe3ee;
+  padding: 13px 16px;
+  background: white;
+}
+
+.internal-chat-panel > header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.internal-chat-panel > header span,
+.internal-chat-panel > header strong,
+.internal-chat-panel > header small {
+  display: block;
+  min-width: 0;
+}
+
+.internal-chat-panel > header strong {
+  overflow: hidden;
+  color: #1f2937;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.internal-chat-panel > header small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.internal-recipient-field {
+  display: grid;
+  gap: 5px;
+  border-bottom: 1px solid #dbe3ee;
+  padding: 11px 16px;
+  color: #475569;
+  background: white;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.internal-recipient-field input {
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 11px;
+  color: #0f172a;
+  background: white;
+  font: inherit;
+}
+
+.internal-recipient-field input:focus,
+.internal-message-composer textarea:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.internal-message-stream {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 18px;
+  background-color: #e9f0f4;
+  background-image: radial-gradient(rgba(100, 116, 139, 0.12) 0.7px, transparent 0.7px);
+  background-size: 14px 14px;
+}
+
+.internal-message-bubble {
+  align-self: flex-start;
+  max-width: min(78%, 620px);
+  border: 1px solid #dbe3ee;
+  border-radius: 4px 13px 13px 13px;
+  padding: 9px 11px 7px;
+  background: white;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
+}
+
+.internal-message-bubble.own {
+  align-self: flex-end;
+  border-color: #bbf7d0;
+  border-radius: 13px 4px 13px 13px;
+  background: #dcfce7;
+}
+
+.internal-message-bubble.announcement {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.internal-message-bubble > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.internal-message-bubble p {
+  margin: 2px 0 4px;
+  color: #1f2937;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.internal-message-bubble small {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.internal-message-bubble small svg {
+  color: #0284c7;
+}
+
+.internal-message-empty {
+  align-self: center;
+  margin: auto;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.internal-message-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 9px;
+  border-top: 1px solid #dbe3ee;
+  padding: 11px;
+  background: white;
+}
+
+.internal-message-composer textarea {
+  min-height: 44px;
+  max-height: 130px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #0f172a;
+  background: white;
+  font: inherit;
+}
+
+.internal-message-composer button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: white;
+  background: #2563eb;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.internal-message-composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.internal-message-notice,
+.internal-message-privacy {
+  margin: 0;
+  padding: 8px 12px;
+  color: #64748b;
+  background: white;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.internal-message-notice.error {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.internal-message-privacy {
+  border-top: 1px solid #e2e8f0;
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.internal-messaging-signin {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px;
+  color: #475569;
+  text-align: center;
+}
+
+.internal-messaging-signin svg {
+  color: #2563eb;
+}
+
+.internal-messaging-signin strong {
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.internal-messaging-signin p {
+  margin: 0;
+}
+
+.internal-message-button {
+  position: relative;
+}
+
+.internal-message-button-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 17px;
+  height: 17px;
+  padding-inline: 4px;
+  font-size: 9px;
+  box-shadow: 0 0 0 2px #111827;
+}
+
+@media (max-width: 760px) {
+  .internal-messaging-layout {
+    grid-template-columns: 1fr;
+    min-height: 72vh;
+  }
+
+  .internal-message-sidebar {
+    max-height: 235px;
+    border-right: 0;
+    border-bottom: 1px solid #dbe3ee;
+  }
+
+  .internal-conversation-list {
+    max-height: 120px;
+  }
+
+  .internal-chat-panel {
+    min-height: 420px;
+  }
+
+  .internal-message-bubble {
+    max-width: 88%;
+  }
+
+  .internal-message-composer button span {
+    display: none;
+  }
+}
+
 .feedback-intro {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -24522,6 +24944,13 @@ button.profile-followup-card:focus-visible {
   color: #475569;
   font-weight: 750;
   line-height: 1.45;
+}
+
+.help-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .help-guide-picker {

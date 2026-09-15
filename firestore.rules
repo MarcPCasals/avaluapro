@@ -1106,6 +1106,77 @@ service cloud.firestore {
         && validStudentProfileAnswers(request.resource.data.answers);
     }
 
+    // Informal messages are independent from student records and teacher backups.
+    match /internalMessages/{messageId} {
+      function verifiedMessageUser() {
+        return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email is string;
+      }
+
+      function isMessageParticipant() {
+        return verifiedMessageUser()
+          && request.auth.token.email in resource.data.participantEmails;
+      }
+
+      allow create: if verifiedMessageUser()
+        && request.resource.data.keys().hasOnly([
+          'body', 'createdAt', 'participantEmails', 'readAt', 'recipientEmailLower',
+          'senderEmail', 'senderEmailLower', 'senderName', 'senderUid', 'status'
+        ])
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email
+        && request.resource.data.senderEmailLower == request.auth.token.email
+        && request.resource.data.recipientEmailLower is string
+        && request.resource.data.recipientEmailLower != request.auth.token.email
+        && request.resource.data.recipientEmailLower.size() >= 5
+        && request.resource.data.recipientEmailLower.size() <= 254
+        && request.resource.data.participantEmails is list
+        && request.resource.data.participantEmails.size() == 2
+        && request.auth.token.email in request.resource.data.participantEmails
+        && request.resource.data.recipientEmailLower in request.resource.data.participantEmails
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.senderName is string
+        && request.resource.data.senderName.size() <= 100
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.readAt == null
+        && request.resource.data.status == 'unread';
+      allow read: if isMessageParticipant();
+      allow update: if verifiedMessageUser()
+        && resource.data.recipientEmailLower == request.auth.token.email
+        && resource.data.status == 'unread'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'status'])
+        && request.resource.data.readAt == request.time
+        && request.resource.data.status == 'read';
+      allow delete: if false;
+    }
+
+    match /internalAnnouncements/{announcementId} {
+      function verifiedAnnouncementUser() {
+        return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email is string;
+      }
+
+      allow create: if verifiedAnnouncementUser()
+        && request.auth.token.email == 'mperezc@educand.ad'
+        && request.resource.data.keys().hasOnly([
+          'body', 'createdAt', 'senderEmail', 'senderName', 'senderUid'
+        ])
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email
+        && request.resource.data.senderName is string
+        && request.resource.data.senderName.size() <= 100
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.createdAt == request.time;
+      allow read: if verifiedAnnouncementUser();
+      allow update, delete: if false;
+    }
+
     // Suggestions are separate from teacher datasets and their backup/restore flows.
     match /feedbackMessages/{messageId} {
       function feedbackAdmin() {

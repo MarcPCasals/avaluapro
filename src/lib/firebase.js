@@ -148,6 +148,10 @@ function getTutoringInvitationDocRef(recipientEmail, spaceId) {
   return doc(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items', spaceId)
 }
 
+function getInternalMessageStateDocRef(uid) {
+  return doc(db, 'users', uid, 'messageState', 'inbox')
+}
+
 function getTutoringInvitationCollectionRef(recipientEmail) {
   return collection(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items')
 }
@@ -1935,4 +1939,115 @@ export function subscribeFeedback(onMessages, onError) {
 
 export async function markFeedbackRead(id) {
   await updateDoc(doc(db, 'feedbackMessages', id), { status: 'read' })
+}
+
+export function subscribeInternalMessages(userEmail, callback, onError) {
+  const cleanEmail = normalizeEmail(userEmail)
+  if (!cleanEmail) {
+    callback([])
+    return () => {}
+  }
+
+  return onSnapshot(
+    query(collection(db, 'internalMessages'), where('participantEmails', 'array-contains', cleanEmail)),
+    (snapshot) => callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
+    onError,
+  )
+}
+
+export function subscribeInternalAnnouncements(callback, onError) {
+  return onSnapshot(
+    collection(db, 'internalAnnouncements'),
+    (snapshot) => callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
+    onError,
+  )
+}
+
+export function subscribeInternalMessageState(userUid, callback, onError) {
+  if (!userUid) {
+    callback({})
+    return () => {}
+  }
+
+  return onSnapshot(
+    getInternalMessageStateDocRef(userUid),
+    (snapshot) => callback(snapshot.exists() ? snapshot.data() : {}),
+    onError,
+  )
+}
+
+export async function sendInternalMessage({ message, recipientEmail, user }) {
+  if (!user?.uid || !user?.email) {
+    throw new Error('Cal iniciar sessió amb Google abans d’enviar un missatge.')
+  }
+  const senderEmailLower = normalizeEmail(user.email)
+  const recipientEmailLower = normalizeEmail(recipientEmail)
+  const body = String(message || '').trim()
+  if (!recipientEmailLower || !recipientEmailLower.includes('@')) {
+    throw new Error('Cal indicar un correu complet del destinatari.')
+  }
+  if (recipientEmailLower === senderEmailLower) {
+    throw new Error('No et pots enviar un missatge a tu mateix.')
+  }
+  if (!body) throw new Error('Escriu un missatge abans d’enviar-lo.')
+  if (body.length > 2000) throw new Error('El missatge no pot superar els 2.000 caràcters.')
+
+  return addDoc(collection(db, 'internalMessages'), cleanForFirestore({
+    body,
+    createdAt: serverTimestamp(),
+    participantEmails: [senderEmailLower, recipientEmailLower].sort(),
+    readAt: null,
+    recipientEmailLower,
+    senderEmail: user.email,
+    senderEmailLower,
+    senderName: user.displayName || user.email.split('@')[0],
+    senderUid: user.uid,
+    status: 'unread',
+  }))
+}
+
+export async function markInternalMessagesRead(messages, user) {
+  if (!user?.uid || !user?.email) return
+  const cleanEmail = normalizeEmail(user.email)
+  const unread = (messages || []).filter(
+    (item) => item.recipientEmailLower === cleanEmail && item.status === 'unread',
+  )
+  if (unread.length === 0) return
+
+  for (let offset = 0; offset < unread.length; offset += 400) {
+    const batch = writeBatch(db)
+    unread.slice(offset, offset + 400).forEach((item) => {
+      batch.update(doc(db, 'internalMessages', item.id), {
+        readAt: serverTimestamp(),
+        status: 'read',
+      })
+    })
+    await batch.commit()
+  }
+}
+
+export async function sendInternalAnnouncement({ message, user }) {
+  if (!user?.uid || normalizeEmail(user.email) !== 'mperezc@educand.ad') {
+    throw new Error('Només l’administrador d’AvaluaPro pot enviar avisos generals.')
+  }
+  const body = String(message || '').trim()
+  if (!body) throw new Error('Escriu una novetat abans d’enviar-la.')
+  if (body.length > 2000) throw new Error('La novetat no pot superar els 2.000 caràcters.')
+
+  return addDoc(collection(db, 'internalAnnouncements'), cleanForFirestore({
+    body,
+    createdAt: serverTimestamp(),
+    senderEmail: user.email,
+    senderName: user.displayName || 'Marc Pérez Casals',
+    senderUid: user.uid,
+  }))
+}
+
+export async function markInternalAnnouncementsRead(user) {
+  if (!user?.uid) return
+  await setDoc(
+    getInternalMessageStateDocRef(user.uid),
+    { announcementsReadAt: serverTimestamp() },
+    { merge: true },
+  )
 }
