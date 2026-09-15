@@ -47,6 +47,29 @@ function tutoringSpaceData(overrides = {}) {
   }
 }
 
+function tutoringCoordinationItemData(overrides = {}) {
+  return {
+    assigneeUid: '',
+    authorEmail: OWNER.email,
+    authorName: 'Tutor propietari',
+    authorUid: OWNER.uid,
+    completedAt: '',
+    completedByEmail: '',
+    completedByUid: '',
+    createdAt: '2026-09-15T08:00:00.000Z',
+    deletedAt: '',
+    deletedByUid: '',
+    dueAt: '',
+    id: 'coord-1',
+    kind: 'message',
+    status: 'sent',
+    studentId: '',
+    text: 'Informació tutorial fictícia',
+    updatedAt: '2026-09-15T08:00:00.000Z',
+    ...overrides,
+  }
+}
+
 function sociometricSurveyData(overrides = {}) {
   const expiresAtEpochMs = Date.now() + 24 * 60 * 60 * 1000
   return {
@@ -510,6 +533,114 @@ describe('cotutoria compartida', () => {
         changedByUid: COTUTOR.uid,
         changedCollections: ['tutorialRecords'],
       }),
+    )
+  })
+
+  test('un membre pot enviar un missatge de coordinacio i un tercer no el pot llegir', async () => {
+    const itemRef = doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1')
+    await assertSucceeds(setDoc(itemRef, tutoringCoordinationItemData()))
+    await assertSucceeds(
+      getDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1')),
+    )
+    await assertFails(
+      getDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1')),
+    )
+  })
+
+  test('ningú pot falsificar l autoria d un missatge de coordinacio', async () => {
+    await assertFails(
+      setDoc(
+        doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-forged'),
+        tutoringCoordinationItemData({
+          authorEmail: OWNER.email,
+          authorUid: OWNER.uid,
+          id: 'coord-forged',
+        }),
+      ),
+    )
+  })
+
+  test('un recordatori no es pot assignar a una persona aliena a la cotutoria', async () => {
+    await assertFails(
+      setDoc(
+        doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-invalid-assignee'),
+        tutoringCoordinationItemData({
+          assigneeUid: THIRD.uid,
+          id: 'coord-invalid-assignee',
+          kind: 'reminder',
+          status: 'open',
+        }),
+      ),
+    )
+  })
+
+  test('qualsevol cotutor pot completar i reobrir un recordatori', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'reminder-1'),
+        tutoringCoordinationItemData({
+          assigneeUid: 'all',
+          id: 'reminder-1',
+          kind: 'reminder',
+          status: 'open',
+        }),
+      )
+    })
+    const reminderRef = doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'reminder-1')
+    await assertSucceeds(
+      updateDoc(reminderRef, {
+        completedAt: '2026-09-15T09:00:00.000Z',
+        completedByEmail: COTUTOR.email,
+        completedByUid: COTUTOR.uid,
+        status: 'completed',
+        updatedAt: '2026-09-15T09:00:00.000Z',
+      }),
+    )
+    await assertSucceeds(
+      updateDoc(reminderRef, {
+        completedAt: '',
+        completedByEmail: '',
+        completedByUid: '',
+        status: 'open',
+        updatedAt: '2026-09-15T09:05:00.000Z',
+      }),
+    )
+  })
+
+  test('un cotutor no pot editar el text escrit per l altre', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'),
+        tutoringCoordinationItemData(),
+      )
+    })
+    await assertFails(
+      updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'), {
+        text: 'Text manipulat',
+        updatedAt: '2026-09-15T09:00:00.000Z',
+      }),
+    )
+  })
+
+  test('cada tutor nomes pot escriure el seu propi estat de lectura', async () => {
+    const ownState = {
+      email: COTUTOR.email,
+      lastReadAt: '2026-09-15T08:00:00.000Z',
+      spaceId: SPACE_ID,
+      uid: COTUTOR.uid,
+      updatedAt: '2026-09-15T08:01:00.000Z',
+    }
+    await assertSucceeds(
+      setDoc(
+        doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationMemberStates', COTUTOR.uid),
+        ownState,
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationMemberStates', OWNER.uid),
+        { ...ownState, email: OWNER.email, uid: OWNER.uid },
+      ),
     )
   })
 })

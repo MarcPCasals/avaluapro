@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
+import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 const modes = [
@@ -96,6 +97,19 @@ export function MainNavigation() {
   const onboarding = useAvaluaproStore((state) => state.onboarding)
   const activeClass = useAvaluaproStore((state) => state.classes.find((classItem) => classItem.id === activeClassId))
   const urgentProfiles = useMemo(() => getUrgentProfiles(state), [state])
+  const tutoringUnreadCount = useMemo(
+    () =>
+      getUnreadTutoringCoordinationItems(
+        state.cloud.tutoringCoordinationItems,
+        state.cloud.tutoringCoordinationMemberStates,
+        state.cloud.user?.uid,
+      ).length,
+    [
+      state.cloud.tutoringCoordinationItems,
+      state.cloud.tutoringCoordinationMemberStates,
+      state.cloud.user?.uid,
+    ],
+  )
   const hasTutoringMode = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
   const handleOpenTutoring = () => {
     setActiveMode('tutoring')
@@ -142,13 +156,16 @@ export function MainNavigation() {
         })}
         {hasTutoringMode && (
           <button
-            className={`insight-tab tutoring-tab ${activeMode === 'tutoring' ? 'active' : ''}`}
+            className={`insight-tab tutoring-tab ${activeMode === 'tutoring' ? 'active' : ''} ${
+              tutoringUnreadCount > 0 ? 'has-coordination-items' : ''
+            }`}
             data-tour="tutoring-mode-button"
             onClick={handleOpenTutoring}
             type="button"
           >
             <GraduationCap size={18} />
             Mode tutoria
+            {tutoringUnreadCount > 0 && <span className="tutoring-mode-badge">{tutoringUnreadCount}</span>}
           </button>
         )}
         <button

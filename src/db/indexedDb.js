@@ -6,7 +6,9 @@ import {
 } from '../lib/cloudSyncQueue.js'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 13
+const DB_VERSION = 14
+const TUTORING_COORDINATION_CACHE_STORE = 'tutoringCoordinationCache'
+const TUTORING_COORDINATION_OUTBOX_STORE = 'tutoringCoordinationOutbox'
 
 const INDEXES = {
   students: ['classId'],
@@ -39,6 +41,14 @@ function ensureStore(db, collection) {
   return null
 }
 
+function ensureCustomStore(db, collection, keyPath) {
+  if (!db.objectStoreNames.contains(collection)) {
+    return db.createObjectStore(collection, { keyPath })
+  }
+
+  return null
+}
+
 function ensureIndexes(store, collection) {
   const indexes = INDEXES[collection] || []
   indexes.forEach((indexName) => {
@@ -62,6 +72,19 @@ function openDatabase() {
       if (!queueStore.indexNames.contains('uid')) queueStore.createIndex('uid', 'uid', { unique: false })
       if (!queueStore.indexNames.contains('collectionName')) {
         queueStore.createIndex('collectionName', 'collectionName', { unique: false })
+      }
+      const coordinationCacheStore = ensureCustomStore(db, TUTORING_COORDINATION_CACHE_STORE, 'cacheKey') ||
+        request.transaction.objectStore(TUTORING_COORDINATION_CACHE_STORE)
+      if (!coordinationCacheStore.indexNames.contains('uid')) {
+        coordinationCacheStore.createIndex('uid', 'uid', { unique: false })
+      }
+      if (!coordinationCacheStore.indexNames.contains('spaceKey')) {
+        coordinationCacheStore.createIndex('spaceKey', 'spaceKey', { unique: false })
+      }
+      const coordinationOutboxStore = ensureCustomStore(db, TUTORING_COORDINATION_OUTBOX_STORE, 'id') ||
+        request.transaction.objectStore(TUTORING_COORDINATION_OUTBOX_STORE)
+      if (!coordinationOutboxStore.indexNames.contains('uid')) {
+        coordinationOutboxStore.createIndex('uid', 'uid', { unique: false })
       }
     }
 
@@ -251,6 +274,127 @@ export async function clearCloudSyncQueue(uid) {
       const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readwrite')
       const store = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
       entries.forEach((entry) => store.delete(entry.id))
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+function coordinationCacheRow(uid, spaceId, item) {
+  return {
+    ...item,
+    cacheKey: `${uid}:${spaceId}:${item.id}`,
+    spaceId,
+    spaceKey: `${uid}:${spaceId}`,
+    uid,
+  }
+}
+
+function stripCoordinationCacheMeta(row = {}) {
+  const item = { ...row }
+  delete item.cacheKey
+  delete item.spaceKey
+  delete item.uid
+  return item
+}
+
+export async function loadTutoringCoordinationCache(uid) {
+  if (!uid) return []
+  const db = await openDatabase()
+  try {
+    const rows = await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(TUTORING_COORDINATION_CACHE_STORE, 'readonly')
+        .objectStore(TUTORING_COORDINATION_CACHE_STORE)
+        .index('uid')
+        .getAll(uid)
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+    return rows.map(stripCoordinationCacheMeta)
+  } finally {
+    db.close()
+  }
+}
+
+export async function replaceTutoringCoordinationCache(uid, spaceId, items = []) {
+  if (!uid || !spaceId) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(TUTORING_COORDINATION_CACHE_STORE, 'readwrite')
+      const store = transaction.objectStore(TUTORING_COORDINATION_CACHE_STORE)
+      const request = store.index('spaceKey').getAllKeys(`${uid}:${spaceId}`)
+      request.onsuccess = () => {
+        request.result.forEach((key) => store.delete(key))
+        items.forEach((item) => store.put(coordinationCacheRow(uid, spaceId, item)))
+      }
+      request.onerror = () => transaction.abort()
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function queueTutoringCoordinationOperation(uid, operation) {
+  if (!uid || !operation?.id) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(
+        [TUTORING_COORDINATION_CACHE_STORE, TUTORING_COORDINATION_OUTBOX_STORE],
+        'readwrite',
+      )
+      if (operation.type === 'item' && operation.item?.id && operation.spaceId) {
+        transaction
+          .objectStore(TUTORING_COORDINATION_CACHE_STORE)
+          .put(coordinationCacheRow(uid, operation.spaceId, operation.item))
+      }
+      transaction.objectStore(TUTORING_COORDINATION_OUTBOX_STORE).put({ ...operation, uid })
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function loadTutoringCoordinationOutbox(uid) {
+  if (!uid) return []
+  const db = await openDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(TUTORING_COORDINATION_OUTBOX_STORE, 'readonly')
+        .objectStore(TUTORING_COORDINATION_OUTBOX_STORE)
+        .index('uid')
+        .getAll(uid)
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function acknowledgeTutoringCoordinationOperation(operationId, revision) {
+  if (!operationId) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(TUTORING_COORDINATION_OUTBOX_STORE, 'readwrite')
+      const store = transaction.objectStore(TUTORING_COORDINATION_OUTBOX_STORE)
+      const request = store.get(operationId)
+      request.onsuccess = () => {
+        if (!revision || request.result?.revision === revision) store.delete(operationId)
+      }
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(transaction.error)
       transaction.onabort = () => reject(transaction.error)

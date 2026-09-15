@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, CheckCircle2, Clock3, Mail, Skull } from 'lucide-react'
+import { Bell, BellRing, CheckCircle2, Clock3, Mail, MessageCircle, Skull } from 'lucide-react'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
+import {
+  getDueTutoringReminders,
+  getUnreadTutoringCoordinationItems,
+} from '../lib/tutoringCoordination'
 
 function reminderDateTime(reminder = {}) {
   if (!reminder.date) return null
@@ -80,9 +84,19 @@ export function GlobalReminderLayer() {
   const teacherPackages = useAvaluaproStore((state) => state.cloud.teacherPackages || [])
   const tutoringInvitations = useAvaluaproStore((state) => state.cloud.sharedTutoringInvitations || [])
   const tutoringUpdates = useAvaluaproStore((state) => state.cloud.sharedTutoringInvitationUpdates || [])
+  const coordinationItems = useAvaluaproStore((state) => state.cloud.tutoringCoordinationItems || [])
+  const coordinationMemberStates = useAvaluaproStore(
+    (state) => state.cloud.tutoringCoordinationMemberStates || [],
+  )
+  const cloudUser = useAvaluaproStore((state) => state.cloud.user)
+  const classes = useAvaluaproStore((state) => state.classes)
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
+  const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
+  const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
+  const markTutoringCoordinationRead = useAvaluaproStore((state) => state.markTutoringCoordinationRead)
   const [tick, setTick] = useState(() => Date.now())
 
   useEffect(() => {
@@ -146,7 +160,27 @@ export function GlobalReminderLayer() {
 
   const pendingPackages = teacherPackages.filter((packageItem) => packageItem.status !== 'imported').length
   const pendingTutoringShares = tutoringInvitations.length + tutoringUpdates.length
-  usePendingBrowserBadge(dueReminders.length + pendingPackages + pendingTutoringShares)
+  const unreadCoordinationItems = useMemo(
+    () => getUnreadTutoringCoordinationItems(coordinationItems, coordinationMemberStates, cloudUser?.uid),
+    [cloudUser?.uid, coordinationItems, coordinationMemberStates],
+  )
+  const dueCoordinationReminders = useMemo(
+    () => getDueTutoringReminders(coordinationItems, cloudUser?.uid, new Date(tick)),
+    [cloudUser?.uid, coordinationItems, tick],
+  )
+  const coordinationAttentionItems = useMemo(() => {
+    const byId = new Map()
+    unreadCoordinationItems.forEach((item) => byId.set(`${item.spaceId}:${item.id}`, { ...item, attention: 'unread' }))
+    dueCoordinationReminders.forEach((item) => {
+      const key = `${item.spaceId}:${item.id}`
+      byId.set(key, { ...item, attention: byId.has(key) ? 'unread-due' : 'due' })
+    })
+    return Array.from(byId.values()).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+  }, [dueCoordinationReminders, unreadCoordinationItems])
+  const totalAttentionCount =
+    dueReminders.length + coordinationAttentionItems.length + pendingPackages + pendingTutoringShares
+  const visibleAttentionCount = dueReminders.length + coordinationAttentionItems.length
+  usePendingBrowserBadge(totalAttentionCount)
 
   const snoozeReminder = async (reminder) => {
     const snoozeUntil = getSnoozeUntilIso(55)
@@ -176,17 +210,50 @@ export function GlobalReminderLayer() {
     await updateTask(reminder.task.id, { reminder: nextReminder })
   }
 
-  if (dueReminders.length === 0) return null
+  const openCoordinationItem = async (item) => {
+    const classItem = classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
+    if (classItem) await setActiveClass(classItem.id)
+    setActiveMode('tutoring')
+    setActiveTutoringPanel('coordination')
+    await markTutoringCoordinationRead(item.spaceId)
+  }
+
+  if (visibleAttentionCount === 0) return null
 
   return (
     <aside className="global-reminder-layer" role="status" aria-live="polite">
       <header>
         <span>
           <Bell size={17} />
-          Recordatoris pendents
+          Avisos pendents
         </span>
-        <strong>{dueReminders.length}</strong>
+        <strong>{visibleAttentionCount}</strong>
       </header>
+      {coordinationAttentionItems.slice(0, 3).map((item) => {
+        const classItem = classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
+        const isDue = item.attention.includes('due')
+        return (
+          <article className={`global-reminder-card coordination ${isDue ? 'due' : ''}`} key={`coord_${item.spaceId}_${item.id}`}>
+            {item.kind === 'reminder' ? <BellRing size={19} /> : <MessageCircle size={19} />}
+            <div>
+              <strong>
+                {isDue
+                  ? 'Recordatori de cotutoria pendent'
+                  : item.kind === 'reminder'
+                    ? 'Nou recordatori de cotutoria'
+                    : 'Nou missatge de cotutoria'}
+              </strong>
+              <span>{classItem?.name || 'Tutoria compartida'}</span>
+              <small>{item.authorName || item.authorEmail}</small>
+            </div>
+            <div className="global-reminder-actions">
+              <button className="primary-action compact" onClick={() => openCoordinationItem(item)} type="button">
+                Obrir coordinació
+              </button>
+            </div>
+          </article>
+        )
+      })}
       {dueReminders.slice(0, 3).map((reminder) => (
         <article className={`global-reminder-card ${reminder.kind}`} key={reminder.id}>
           {reminder.kind === 'agenda' ? <Skull size={19} /> : <Clock3 size={19} />}

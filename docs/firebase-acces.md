@@ -27,6 +27,8 @@ users/{uid}/cloudBackups/{backupId}/{collectionName}/{documentId}
 teacherGradePackages/{packageId}
 tutoringSpaces/{spaceId}
 tutoringSpaces/{spaceId}/{collectionName}/{documentId}
+tutoringSpaces/{spaceId}/coordinationItems/{itemId}
+tutoringSpaces/{spaceId}/coordinationMemberStates/{memberUid}
 tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
 tutoringInvitationOutbox/{senderUid}/items/{outboxId}
 sociometricSurveys/{surveyId}
@@ -55,6 +57,7 @@ Limit: un compte compromes, un dispositiu desbloquejat o una exportacio mal cust
 | Paquets de notes | Emissor i destinatari concret; el destinatari nomes pot registrar la importacio. | Implementat; prova real amb dos comptes pendent. |
 | Cotutoria | Acces per membres; nomes el propietari gestiona membres i espai. | Implementat, provat amb emulador i desplegat; prova real completa pendent. |
 | Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat, provat i desplegat. |
+| Missatgeria i recordatoris | Membres poden llegir i crear; autoria protegida; estat de lectura propi; qualsevol membre pot completar recordatoris. | Implementat i provat amb emulador; desplegament i prova real pendents. |
 | Eliminacio compartida | Es bloqueja el `delete` fisic i s'utilitzen tombstones minims. | Implementat i provat localment; prova real pendent. |
 | Revocacio o sortida | Propietari retira cotutor; cotutor nomes es pot retirar a si mateix. | Implementat i provat localment; prova real pendent. |
 | Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat, desplegat i verificat en produccio amb dades ficticies. |
@@ -74,15 +77,24 @@ tutorialSociometricMoments
 tutorialStudentRoles
 ```
 
+La coordinacio utilitza dues subcol.leccions amb regles especifiques, fora de la llista generica anterior:
+
+```text
+coordinationItems
+coordinationMemberStates
+```
+
+No s'hi permet l'eliminacio fisica. Un missatge nomes el pot modificar o marcar com a eliminat el seu autor; qualsevol membre de l'espai pot completar o reobrir un recordatori. Cada docent nomes pot escriure el seu propi estat de lectura.
+
 ## 5. Proves automatitzades
 
 La versio local reforcada disposa de:
 
-- 26 proves de regles de Firestore;
-- 5 proves de fusio i tombstones de cotutoria;
-- total: 31 proves de seguretat dels fluxos compartits actuals.
+- 52 proves de regles de Firestore, 24 de les quals cobreixen la cotutoria compartida;
+- 6 proves de fusio i tombstones de cotutoria;
+- 6 proves especifiques de missatgeria, lectura, recordatoris i cua local.
 
-Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminacions, tokens sociometrics, caducitat, avís informatiu, resposta d'un sol us i eliminacio reservada al propietari.
+Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminacions, autoria dels missatges, responsables dels recordatoris, estat de lectura, tokens sociometrics, caducitat, avís informatiu, resposta d'un sol us i eliminacio reservada al propietari.
 
 No cobreixen encara tota la realitat operativa: cal provar comptes reals, dispositius, conflictes simultanis, restauracions i la configuracio efectivament desplegada.
 

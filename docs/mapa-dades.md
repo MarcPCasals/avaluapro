@@ -27,6 +27,7 @@ El criteri de disseny es:
 | `cloudBackups` | Copies completes o gairebe completes. | Acumulacio i restauracio o exportacio indeguda. |
 | `teacherGradePackages` | Notes enviades a un docent concret. | Destinatari equivocat o conservacio excessiva. |
 | `tutoringSpaces` | Dades tutorials persistents entre membres. | Acces excessiu, revocacio, conflictes i copies locals. |
+| `coordinationItems` i `coordinationMemberStates` | Missatges, recordatoris i estat de lectura de la cotutoria. | Text lliure sensible, avisos visibles i conservacio excessiva. |
 | Safates d'invitacions | Correus, UID, classe, estat i dates. | Revelacio de relacions professionals i errors de destinatari. |
 | `sociometricSurveys` | Qüestionari, tokens i respostes brutes temporals. | Relacions socials de menors i accés mitjançant enllac. |
 | JSON descarregat | Backup o exportacio fora de l'app. | La custodia passa al dispositiu i al docent. |
@@ -69,6 +70,7 @@ sociometricSurveys
 | Conducta | Incidencies, agenda, observacions | Intervencio educativa | Molt alta | Fets observables, breus i accionables. |
 | Necessitats educatives | Diagnostics o etiquetes, adaptacions | Ajustar l'accio docent | Molt alta | Etiquetes controlades; evitar detalls clinics. |
 | Tutoria | DOIPs, acords, registres, antecedents | Seguiment tutorial | Molt alta | No copiar historials extensos ni dades familiars innecessaries. |
+| Coordinacio de cotutoria | Missatges, recordatoris, alumne vinculat, termini, autoria i lectura | Coordinar l'accio tutorial | Molt alta | Escriure nomes el minim necessari; els avisos globals no mostren el contingut. |
 | Sociometria | Afinitats, dificultats, rols, sociograma | Comprendre dinamiques de grup | Molt alta | Acces restringit, temporalitat i explicacio de la finalitat. |
 | Agrupaments | Grups cooperatius i disposicions | Suport a decisions docents | Alta | Recomanacio, no decisio automatica. |
 | Comparticio | Paquets de notes i cotutories | Coordinacio entre docents | Molt alta | Destinatari, rol, revocacio i minim privilegi. |
@@ -92,8 +94,12 @@ Poden compartir:
 - layouts i disposicions;
 - rols;
 - antecedents.
+- missatges i recordatoris de coordinacio, amb autoria, alumne opcional, responsable i termini;
+- estat de lectura individual de cada cotutor.
 
 Les eliminacions utilitzen tombstones per sincronitzar la baixa sense conservar el contingut pedagogic sensible. La revocacio talla la sincronitzacio futura, pero no pot retirar copies o exportacions ja obtingudes.
+
+Els avisos globals de coordinacio indiquen la classe i l'autor, pero no reprodueixen el text del missatge ni el nom de l'alumne fora de la pantalla de tutoria.
 
 ### Sociometria publica temporal
 

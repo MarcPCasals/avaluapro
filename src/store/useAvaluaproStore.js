@@ -1,11 +1,16 @@
 import { create } from 'zustand'
 import { createId } from '../lib/ids'
 import {
+  acknowledgeTutoringCoordinationOperation,
   acknowledgeCloudSyncQueue,
   clearCloudSyncQueue,
   loadCloudSyncQueue,
   loadDataset,
+  loadTutoringCoordinationCache,
+  loadTutoringCoordinationOutbox,
+  queueTutoringCoordinationOperation,
   recordCloudSyncQueueFailure,
+  replaceTutoringCoordinationCache,
   resetDatabase,
   saveCollections,
   saveCollectionsWithCloudQueue,
@@ -44,14 +49,19 @@ import {
   saveCloudCollections,
   saveCloudOperations,
   saveTutoringSpace,
+  saveTutoringCoordinationItem,
+  saveTutoringCoordinationMemberState,
   sendTutoringInvitation,
   sendTeacherGradePackage,
   signInWithGoogle,
   signOutFromGoogle,
+  subscribeToTutoringCoordinationItems,
+  subscribeToTutoringCoordinationMemberStates,
   syncOwnedTutorialSurveyMembers,
   syncTutoringSpaceCollection,
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
+import { mergeTutoringCoordinationItems } from '../lib/tutoringCoordination'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
@@ -95,6 +105,8 @@ let cloudSyncBlockedUntil = 0
 let cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
 let cloudBackupInFlight = false
 const queuedCloudCollections = new Set()
+let tutoringCoordinationUnsubscribers = []
+let tutoringCoordinationOnlineListenerReady = false
 
 function getQueuedCloudCollections() {
   return Array.from(queuedCloudCollections)
@@ -171,6 +183,7 @@ function getInitialUi(dataset) {
     activeUtId: timelineSelection.activeUtId,
     activeMode: preferences.activeMode || 'evaluation',
     activeInsight: preferences.activeInsight || 'dashboard',
+    activeTutoringPanel: preferences.activeTutoringPanel || 'evaluation',
   }
 }
 
@@ -541,6 +554,152 @@ function scheduleCloudSync(set, get, collections, pendingOperationCount = 0) {
     cloudSyncTimer = null
     flushQueuedCloudSync(set, get)
   }, CLOUD_SYNC_DELAY_MS)
+}
+
+function stopTutoringCoordinationSubscriptions() {
+  tutoringCoordinationUnsubscribers.forEach((unsubscribe) => unsubscribe())
+  tutoringCoordinationUnsubscribers = []
+}
+
+async function flushTutoringCoordinationOutbox(set, get) {
+  const user = get().cloud.user
+  if (!user?.uid) return
+  const operations = (await loadTutoringCoordinationOutbox(user.uid)).sort((a, b) =>
+    String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+  )
+
+  for (const operation of operations) {
+    try {
+      if (operation.type === 'memberState') {
+        await saveTutoringCoordinationMemberState({ spaceId: operation.spaceId, state: operation.state })
+      } else {
+        await saveTutoringCoordinationItem({ item: operation.item, spaceId: operation.spaceId })
+        set((current) => ({
+          cloud: {
+            ...current.cloud,
+            tutoringCoordinationItems: current.cloud.tutoringCoordinationItems.map((item) =>
+              item.id === operation.item.id && item.spaceId === operation.spaceId
+                ? { ...item, syncError: '', syncStatus: 'synced' }
+                : item,
+            ),
+          },
+        }))
+      }
+      await acknowledgeTutoringCoordinationOperation(operation.id, operation.revision)
+    } catch (error) {
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          tutoringCoordinationError:
+            error.message || 'No s’ha pogut sincronitzar la coordinació de cotutoria.',
+          tutoringCoordinationStatus: 'pending',
+        },
+      }))
+      break
+    }
+  }
+
+  const pending = await loadTutoringCoordinationOutbox(user.uid)
+  set((current) => ({
+    cloud: {
+      ...current.cloud,
+      tutoringCoordinationPendingCount: pending.length,
+      tutoringCoordinationStatus: pending.length > 0 ? 'pending' : 'live',
+      ...(pending.length === 0 ? { tutoringCoordinationError: '' } : {}),
+    },
+  }))
+}
+
+async function startTutoringCoordinationSubscriptions(set, get) {
+  stopTutoringCoordinationSubscriptions()
+  const state = get()
+  const user = state.cloud.user
+  if (!user?.uid) return
+
+  const allowedSpaceIds = new Set((state.cloud.sharedTutoringSpaces || []).map((space) => space.id))
+  const cachedItems = (await loadTutoringCoordinationCache(user.uid)).filter((item) => allowedSpaceIds.has(item.spaceId))
+  const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+  const pendingMemberStates = pendingOperations
+    .filter((operation) => operation.type === 'memberState' && allowedSpaceIds.has(operation.spaceId))
+    .map((operation) => operation.state)
+  set((current) => ({
+    cloud: {
+      ...current.cloud,
+      tutoringCoordinationItems: cachedItems,
+      tutoringCoordinationMemberStates: pendingMemberStates,
+      tutoringCoordinationStatus: 'loading',
+    },
+  }))
+
+  const spaceIds = Array.from(allowedSpaceIds)
+
+  spaceIds.forEach((spaceId) => {
+    const unsubscribeItems = subscribeToTutoringCoordinationItems(
+      spaceId,
+      async (remoteItems) => {
+        const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+        const pendingItems = pendingOperations
+          .filter((operation) => operation.type === 'item' && operation.spaceId === spaceId)
+          .map((operation) => operation.item)
+        const mergedItems = mergeTutoringCoordinationItems(remoteItems, pendingItems)
+        await replaceTutoringCoordinationCache(user.uid, spaceId, mergedItems)
+        set((current) => ({
+          cloud: {
+            ...current.cloud,
+            tutoringCoordinationError: '',
+            tutoringCoordinationItems: [
+              ...current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId),
+              ...mergedItems,
+            ],
+            tutoringCoordinationStatus: pendingItems.length > 0 ? 'pending' : 'live',
+          },
+        }))
+      },
+      (error) => {
+        const accessRevoked = String(error?.code || '').includes('permission-denied')
+        if (accessRevoked) replaceTutoringCoordinationCache(user.uid, spaceId, []).catch(() => {})
+        set((current) => ({
+          cloud: {
+            ...current.cloud,
+            tutoringCoordinationError: error.message || 'No s’han pogut rebre els missatges de cotutoria.',
+            tutoringCoordinationItems: accessRevoked
+              ? current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId)
+              : current.cloud.tutoringCoordinationItems,
+            tutoringCoordinationStatus: 'error',
+          },
+        }))
+      },
+    )
+    const unsubscribeMemberStates = subscribeToTutoringCoordinationMemberStates(
+      spaceId,
+      (memberStates) => {
+        set((current) => ({
+          cloud: {
+            ...current.cloud,
+            tutoringCoordinationMemberStates: [
+              ...current.cloud.tutoringCoordinationMemberStates.filter((item) => item.spaceId !== spaceId),
+              ...memberStates,
+            ],
+          },
+        }))
+      },
+      (error) => {
+        set((current) => ({
+          cloud: {
+            ...current.cloud,
+            tutoringCoordinationError: error.message || 'No s’ha pogut actualitzar l’estat de lectura.',
+          },
+        }))
+      },
+    )
+    tutoringCoordinationUnsubscribers.push(unsubscribeItems, unsubscribeMemberStates)
+  })
+
+  if (!tutoringCoordinationOnlineListenerReady) {
+    window.addEventListener('online', () => flushTutoringCoordinationOutbox(set, get))
+    tutoringCoordinationOnlineListenerReady = true
+  }
+  await flushTutoringCoordinationOutbox(set, get)
 }
 
 async function flushQueuedCloudSync(set, get) {
@@ -1243,6 +1402,7 @@ export const useAvaluaproStore = create((set, get) => ({
     activeUtId: '',
     activeMode: 'evaluation',
     activeInsight: 'dashboard',
+    activeTutoringPanel: 'evaluation',
   },
   profile: {
     defaultSubject: '',
@@ -1279,6 +1439,11 @@ export const useAvaluaproStore = create((set, get) => ({
     sharedTutoringInvitationError: '',
     sharedTutoringInvitationStatus: 'idle',
     sharedTutoringStatus: 'idle',
+    tutoringCoordinationError: '',
+    tutoringCoordinationItems: [],
+    tutoringCoordinationMemberStates: [],
+    tutoringCoordinationPendingCount: 0,
+    tutoringCoordinationStatus: 'idle',
   },
   status: 'idle',
   error: '',
@@ -1378,6 +1543,7 @@ export const useAvaluaproStore = create((set, get) => ({
   signOutFromGoogle: async () => {
     try {
       if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
+      stopTutoringCoordinationSubscriptions()
       queuedCloudCollections.clear()
       cloudSyncBlockedUntil = 0
       cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
@@ -1403,6 +1569,11 @@ export const useAvaluaproStore = create((set, get) => ({
           sharedTutoringInvitationError: '',
           sharedTutoringInvitationStatus: 'idle',
           sharedTutoringStatus: 'idle',
+          tutoringCoordinationError: '',
+          tutoringCoordinationItems: [],
+          tutoringCoordinationMemberStates: [],
+          tutoringCoordinationPendingCount: 0,
+          tutoringCoordinationStatus: 'idle',
         },
       }))
     } catch (error) {
@@ -1789,6 +1960,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
   setActiveMode: (activeMode) => setUiWithPreferences(set, { activeMode }),
   setActiveInsight: (activeInsight) => setUiWithPreferences(set, { activeInsight }),
+  setActiveTutoringPanel: (activeTutoringPanel) => setUiWithPreferences(set, { activeTutoringPanel }),
   setDefaultSubject: (defaultSubject) => setProfileWithPreferences(set, { defaultSubject }),
   setGuideOpen: (guideOpen) => {
     set((state) => ({ onboarding: { ...state.onboarding, guideOpen } }))
@@ -2537,6 +2709,7 @@ export const useAvaluaproStore = create((set, get) => ({
             : null
         }),
       )
+      await startTutoringCoordinationSubscriptions(set, get)
       return sharedTutoringSpaces
     } catch (error) {
       set((current) => ({
@@ -2549,6 +2722,152 @@ export const useAvaluaproStore = create((set, get) => ({
       return []
     }
   },
+
+  addTutoringCoordinationItem: async ({
+    assigneeUid = 'all',
+    classId = get().ui.activeClassId,
+    dueAt = '',
+    kind = 'message',
+    studentId = '',
+    text = '',
+  }) => {
+    const state = get()
+    const user = state.cloud.user
+    const classItem = state.classes.find((item) => item.id === classId)
+    const cleanText = String(text || '').trim()
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió per escriure al cotutor.')
+    if (!classItem?.sharedTutoringSpaceId) throw new Error('Primer cal compartir aquesta tutoria amb el cotutor.')
+    if (!cleanText) throw new Error('Escriu el missatge o recordatori.')
+    const createdAt = new Date().toISOString()
+    const item = {
+      assigneeUid: kind === 'reminder' ? assigneeUid || 'all' : '',
+      authorEmail: user.email,
+      authorName: user.displayName || user.email.split('@')[0],
+      authorUid: user.uid,
+      completedAt: '',
+      completedByEmail: '',
+      completedByUid: '',
+      createdAt,
+      deletedAt: '',
+      deletedByUid: '',
+      dueAt: kind === 'reminder' ? dueAt || '' : '',
+      id: createId('coord').replaceAll('/', '_'),
+      kind: kind === 'reminder' ? 'reminder' : 'message',
+      spaceId: classItem.sharedTutoringSpaceId,
+      status: kind === 'reminder' ? 'open' : 'sent',
+      studentId: studentId || '',
+      syncStatus: 'pending',
+      text: cleanText,
+      updatedAt: createdAt,
+    }
+    const operation = {
+      createdAt,
+      id: `coord-item:${user.uid}:${item.spaceId}:${item.id}`,
+      item,
+      revision: createdAt,
+      spaceId: item.spaceId,
+      type: 'item',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationItems: [
+          ...current.cloud.tutoringCoordinationItems.filter(
+            (currentItem) => currentItem.id !== item.id || currentItem.spaceId !== item.spaceId,
+          ),
+          item,
+        ],
+        tutoringCoordinationPendingCount: current.cloud.tutoringCoordinationPendingCount + 1,
+        tutoringCoordinationStatus: 'pending',
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+    return item
+  },
+
+  setTutoringCoordinationReminderCompleted: async (itemId, completed) => {
+    const state = get()
+    const user = state.cloud.user
+    const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió per actualitzar el recordatori.')
+    if (!currentItem || currentItem.kind !== 'reminder') return
+    if (currentItem.syncStatus === 'pending') throw new Error('Espera que el recordatori s’hagi enviat.')
+    const updatedAt = new Date().toISOString()
+    const item = {
+      ...currentItem,
+      completedAt: completed ? updatedAt : '',
+      completedByEmail: completed ? user.email : '',
+      completedByUid: completed ? user.uid : '',
+      status: completed ? 'completed' : 'open',
+      syncStatus: 'pending',
+      updatedAt,
+    }
+    const operation = {
+      createdAt: updatedAt,
+      id: `coord-item:${user.uid}:${item.spaceId}:${item.id}`,
+      item,
+      revision: updatedAt,
+      spaceId: item.spaceId,
+      type: 'item',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationItems: current.cloud.tutoringCoordinationItems.map((currentItem) =>
+          currentItem.id === item.id && currentItem.spaceId === item.spaceId ? item : currentItem,
+        ),
+        tutoringCoordinationStatus: 'pending',
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+  },
+
+  markTutoringCoordinationRead: async (spaceId) => {
+    const state = get()
+    const user = state.cloud.user
+    if (!spaceId || !user?.uid || !user?.email) return
+    const latestCreatedAt = state.cloud.tutoringCoordinationItems
+      .filter((item) => item.spaceId === spaceId)
+      .reduce((latest, item) => (String(item.createdAt || '') > latest ? String(item.createdAt) : latest), '')
+    if (!latestCreatedAt) return
+    const currentReadState = state.cloud.tutoringCoordinationMemberStates.find(
+      (item) => item.spaceId === spaceId && item.uid === user.uid,
+    )
+    if (String(currentReadState?.lastReadAt || '') >= latestCreatedAt) return
+    const updatedAt = new Date().toISOString()
+    const readState = {
+      email: user.email,
+      lastReadAt: latestCreatedAt,
+      spaceId,
+      uid: user.uid,
+      updatedAt,
+    }
+    const operation = {
+      createdAt: updatedAt,
+      id: `coord-read:${user.uid}:${spaceId}`,
+      revision: updatedAt,
+      spaceId,
+      state: readState,
+      type: 'memberState',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationMemberStates: [
+          ...current.cloud.tutoringCoordinationMemberStates.filter(
+            (item) => item.spaceId !== spaceId || item.uid !== user.uid,
+          ),
+          readState,
+        ],
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+  },
+
+  retryTutoringCoordinationSync: async () => flushTutoringCoordinationOutbox(set, get),
 
   loadSharedTutoringInvitations: async () => {
     const state = get()

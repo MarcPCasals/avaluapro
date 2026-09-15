@@ -17,8 +17,9 @@
     "test:retention": "node --test tests/sociometric-retention.test.js",
     "test:rules": "bash scripts/run-firestore-rules-tests.sh",
     "test:shared-sync": "node --test tests/shared-tutoring-sync.test.js",
+    "test:coordination": "node --test tests/tutoring-coordination.test.js tests/tutoring-coordination-db.test.js",
     "test:cloud-sync": "node --test tests/cloud-sync-diff.test.js tests/cloud-sync-queue.test.js",
-    "test:security": "npm run test:cloud-sync && npm run test:shared-sync && npm run test:retention && npm run test:purge && npm run test:ai-briefing && npm run test:rules"
+    "test:security": "npm run test:cloud-sync && npm run test:shared-sync && npm run test:coordination && npm run test:retention && npm run test:purge && npm run test:ai-briefing && npm run test:rules"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",

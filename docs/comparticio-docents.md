@@ -1,6 +1,6 @@
 # Comparticio de dades entre docents
 
-Data d'actualitzacio: 18 de juny de 2026
+Data d'actualitzacio: 15 de setembre de 2026
 Estat: descripcio del funcionament actual; auditoria de seguretat pendent
 
 Aquest document descriu els fluxos compartits actuals d'Avaluapro. No certifica que les rules siguin suficients per a un desplegament institucional. La revisio anterior del 4 de juny nomes cobria els paquets de notes i ha quedat superada per la incorporacio de cotutories compartides i qüestionaris sociometrics.
@@ -58,6 +58,8 @@ Rutes:
 ```text
 tutoringSpaces/{spaceId}
 tutoringSpaces/{spaceId}/{collectionName}/{documentId}
+tutoringSpaces/{spaceId}/coordinationItems/{itemId}
+tutoringSpaces/{spaceId}/coordinationMemberStates/{memberUid}
 tutoringInvitationInbox/{recipientEmail}/items/{spaceId}
 tutoringInvitationOutbox/{senderUid}/items/{outboxId}
 ```
@@ -81,6 +83,13 @@ tutorialSeatingPlans
 studentAntecedents
 ```
 
+La missatgeria de coordinacio afegeix dues subcol.leccions especifiques:
+
+```text
+coordinationItems
+coordinationMemberStates
+```
+
 Aixo pot incloure:
 
 - noms i perfils d'alumnes;
@@ -94,8 +103,21 @@ Aixo pot incloure:
 - grups cooperatius;
 - disposicions d'aula;
 - antecedents academics.
+- missatges i recordatoris entre cotutors, amb autoria, alumne opcional, responsable i termini;
+- la darrera lectura de cada membre per calcular els avisos pendents.
 
 Per tant, la cotutoria compartida no es un simple enviament: dona acces persistent a un conjunt ampli de dades d'alta sensibilitat.
+
+Els avisos que apareixen fora de la tutoria no mostren el text ni l'alumne: nomes informen que hi ha novetats, la classe i l'autor. El contingut complet es consulta dins l'espai compartit.
+
+### Permisos de la coordinacio
+
+- nomes els membres actius de la cotutoria poden llegir o crear entrades;
+- l'autoria no es pot suplantar;
+- nomes l'autor pot modificar o marcar com a eliminat el seu missatge;
+- qualsevol cotutor pot completar o reobrir un recordatori;
+- cada membre nomes pot actualitzar el seu propi estat de lectura;
+- l'eliminacio fisica directa queda bloquejada.
 
 ### Funcionament de sincronitzacio
 

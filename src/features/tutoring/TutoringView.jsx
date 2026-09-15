@@ -25,6 +25,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  MessageCircle,
   Move,
   Network,
   Plus,
@@ -53,6 +54,7 @@ import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
 import { listSociometricSurveyResponses, subscribeToTutoringSpaceChangeSignals } from '../../lib/firebase'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
+import { getUnreadTutoringCoordinationItems } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
 import { getCooperativeGroupSetOrigin } from './cooperativeGroupHistoryUtils'
@@ -73,6 +75,7 @@ import {
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
 import { StudentProfileSurveyPanel } from './StudentProfileSurveyPanel'
+import { TutoringCoordinationPanel } from './TutoringCoordinationPanel'
 import {
   getSavedSeatingAssignments,
   getUnseatedStudentIds,
@@ -4354,7 +4357,8 @@ function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
 export function TutoringView() {
   const sociogramCanvasRef = useRef(null)
   const sociogramDragRef = useRef(null)
-  const [activePanel, setActivePanel] = useState('evaluation')
+  const activePanel = useAvaluaproStore((state) => state.ui.activeTutoringPanel || 'evaluation')
+  const setActivePanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
   const [areaFilter, setAreaFilter] = useState('all')
   const [diagnosisAreaFilter, setDiagnosisAreaFilter] = useState('all')
   const [diagnosisSubjectFilter, setDiagnosisSubjectFilter] = useState('all')
@@ -4516,6 +4520,11 @@ export function TutoringView() {
   const activeSharedTutoringSpace = (cloud.sharedTutoringSpaces || []).find(
     (space) => space.id === activeClass?.sharedTutoringSpaceId,
   )
+  const coordinationUnreadCount = getUnreadTutoringCoordinationItems(
+    cloud.tutoringCoordinationItems,
+    cloud.tutoringCoordinationMemberStates,
+    cloud.user?.uid,
+  ).filter((item) => item.spaceId === activeClass?.sharedTutoringSpaceId).length
   useEffect(() => {
     if (!activeClass?.sharedTutoringSpaceId || !cloud.user?.uid) return undefined
     const spaceId = activeClass.sharedTutoringSpaceId
@@ -7079,6 +7088,15 @@ export function TutoringView() {
 
       <div className="tutoring-panel-tabs" aria-label="Vistes de tutoria" data-tour="tutoring-panel-tabs">
         <button
+          className={`coordination-tab ${activePanel === 'coordination' ? 'active' : ''}`}
+          onClick={() => setActivePanel('coordination')}
+          type="button"
+        >
+          <MessageCircle size={17} />
+          Coordinació
+          {coordinationUnreadCount > 0 && <span className="tutoring-panel-badge">{coordinationUnreadCount}</span>}
+        </button>
+        <button
           className={activePanel === 'evaluation' ? 'active' : ''}
           onClick={() => setActivePanel('evaluation')}
           type="button"
@@ -7119,6 +7137,10 @@ export function TutoringView() {
           Informes tutorials
         </button>
       </div>
+
+      {activePanel === 'coordination' && (
+        <TutoringCoordinationPanel activeClass={activeClass} students={classStudents} />
+      )}
 
       {activePanel === 'evaluation' && (
         <section className="tutorial-evaluation-panel" data-tour="tutoring-evaluation-panel">

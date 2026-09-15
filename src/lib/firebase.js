@@ -53,6 +53,8 @@ export const SHARED_TUTORING_COLLECTIONS = [
   'tutorialSeatingPlans',
   'studentAntecedents',
 ]
+export const TUTORING_COORDINATION_ITEMS_COLLECTION = 'coordinationItems'
+export const TUTORING_COORDINATION_MEMBER_STATES_COLLECTION = 'coordinationMemberStates'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDCwA7vxVpHQ3CST49xnNblj4JqNPs8sd4',
@@ -1794,6 +1796,63 @@ export async function loadTutoringSpace(spaceId) {
     })),
     collections: entries.reduce((dataset, [collectionName, rows]) => ({ ...dataset, [collectionName]: rows }), {}),
   }
+}
+
+function getTutoringCoordinationCollectionRef(spaceId) {
+  return collection(db, 'tutoringSpaces', spaceId, TUTORING_COORDINATION_ITEMS_COLLECTION)
+}
+
+function getTutoringCoordinationMemberStateCollectionRef(spaceId) {
+  return collection(db, 'tutoringSpaces', spaceId, TUTORING_COORDINATION_MEMBER_STATES_COLLECTION)
+}
+
+function stripLocalCoordinationFields(item = {}) {
+  const value = { ...item }
+  delete value.syncStatus
+  delete value.syncError
+  return value
+}
+
+export function subscribeToTutoringCoordinationItems(spaceId, onChange, onError) {
+  if (!spaceId) return () => {}
+  return onSnapshot(
+    query(getTutoringCoordinationCollectionRef(spaceId), orderBy('createdAt', 'asc'), limit(300)),
+    (snapshot) => {
+      onChange(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data(), spaceId })))
+    },
+    onError,
+  )
+}
+
+export function subscribeToTutoringCoordinationMemberStates(spaceId, onChange, onError) {
+  if (!spaceId) return () => {}
+  return onSnapshot(
+    getTutoringCoordinationMemberStateCollectionRef(spaceId),
+    (snapshot) => {
+      onChange(snapshot.docs.map((snapshotDoc) => ({ uid: snapshotDoc.id, ...snapshotDoc.data(), spaceId })))
+    },
+    onError,
+  )
+}
+
+export async function saveTutoringCoordinationItem({ item, spaceId }) {
+  if (!auth.currentUser?.uid || !auth.currentUser?.email) {
+    throw new Error('Cal iniciar sessió abans d’escriure a la coordinació de cotutoria.')
+  }
+  if (!spaceId || !item?.id) throw new Error('No s’ha pogut identificar el missatge de cotutoria.')
+  const value = cleanForFirestore(stripLocalCoordinationFields({ ...item, spaceId: undefined }))
+  assertFirestoreDocumentSize(`tutoringSpaces/${spaceId}/coordinationItems`, item.id, value)
+  await setDoc(doc(getTutoringCoordinationCollectionRef(spaceId), item.id), value)
+  return { ...item, syncStatus: 'synced' }
+}
+
+export async function saveTutoringCoordinationMemberState({ spaceId, state }) {
+  if (!auth.currentUser?.uid || !auth.currentUser?.email) {
+    throw new Error('Cal iniciar sessió abans de marcar la conversa com a llegida.')
+  }
+  if (!spaceId || !state?.uid) throw new Error('No s’ha pogut identificar l’estat de lectura.')
+  await setDoc(doc(getTutoringCoordinationMemberStateCollectionRef(spaceId), state.uid), cleanForFirestore(state))
+  return state
 }
 
 export function subscribeToTutoringSpaceChangeSignals(spaceId, onChange, onError) {
