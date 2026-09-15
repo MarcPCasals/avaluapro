@@ -11,6 +11,7 @@ import {
   Loader2,
   MonitorSmartphone,
   Lock,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -29,8 +30,10 @@ import {
   listStudentProfileSurveysForUser,
   markStudentProfileResponseReviewed,
   subscribeToStudentProfileSurveyResponses,
+  updateStudentProfileSurveyResponse,
   updateStudentProfileSurveyStatus,
 } from '../../lib/firebase'
+import { StudentProfilePublicForm } from './StudentProfilePublicForm'
 import {
   STUDENT_PROFILE_FORM_VERSION,
   STUDENT_PROFILE_PRIVACY_NOTICE_VERSION,
@@ -143,7 +146,23 @@ function formatResponseCount(count) {
   return `${count} ${count === 1 ? 'resposta' : 'respostes'}`
 }
 
-function PortraitBarChart({ data, multiple = false, tone = 'teal', title }) {
+function PriorityFlag({ expanded, flag, onToggle }) {
+  if (!flag.detail) return <span className={flag.tone}>{flag.label}</span>
+
+  return (
+    <button
+      aria-expanded={expanded}
+      className={`${flag.tone}${expanded ? ' expanded' : ''}`}
+      onClick={onToggle}
+      title="Clica per veure el detall"
+      type="button"
+    >
+      {flag.label}
+    </button>
+  )
+}
+
+function PortraitBarChart({ data, multiple = false, onSelectRow, tone = 'teal', title }) {
   const visibleRows = [...data.rows]
     .filter((row) => row.count > 0)
     .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label, 'ca'))
@@ -159,12 +178,12 @@ function PortraitBarChart({ data, multiple = false, tone = 'teal', title }) {
       ) : (
         <div className="student-profile-portrait-bars">
           {visibleRows.map((row) => (
-            <div className="student-profile-portrait-bar" key={row.value}>
+            <button className="student-profile-portrait-bar" key={row.value} onClick={() => onSelectRow?.({ data, row, title })} type="button">
               <div><span>{row.label}</span><strong>{row.count} · {row.percentage} %</strong></div>
               <span aria-label={`${row.label}: ${row.percentage} %`} className="student-profile-portrait-track" role="img">
                 <span style={{ width: `${row.percentage}%` }} />
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -174,6 +193,8 @@ function PortraitBarChart({ data, multiple = false, tone = 'teal', title }) {
 }
 
 function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents }) {
+  const [expandedPriorityKey, setExpandedPriorityKey] = useState('')
+  const [selectedBreakdown, setSelectedBreakdown] = useState(null)
   const portrait = useMemo(
     () => buildStudentProfileClassPortrait(responses, totalStudents),
     [responses, totalStudents],
@@ -185,6 +206,17 @@ function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents 
     [responses],
   )
   const coverageTone = portrait.coverage.percentage < 50 ? 'low' : portrait.coverage.percentage < 80 ? 'medium' : 'high'
+  const responsesById = useMemo(
+    () => new Map(responses.map((response) => [response.id || response.studentId, response])),
+    [responses],
+  )
+  const openBreakdown = ({ data, row, title }) => {
+    const matchingResponses = (data.responseIdsByValue?.[row.value] || [])
+      .map((responseId) => responsesById.get(responseId))
+      .filter(Boolean)
+      .sort((first, second) => String(first.studentName || '').localeCompare(String(second.studentName || ''), 'ca'))
+    setSelectedBreakdown({ matchingResponses, row, title })
+  }
 
   return (
     <section className="student-profile-portrait">
@@ -219,9 +251,9 @@ function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents 
             <div><h4>Com aprèn i treballa el grup</h4><p>Dades per variar les explicacions, la pràctica i l’organització de l’aula.</p></div>
           </div>
           <div className="student-profile-portrait-grid featured">
-            <PortraitBarChart data={portrait.learningHelps} multiple title="Què ajuda a aprendre" />
-            <PortraitBarChart data={portrait.workPreferences} multiple tone="blue" title="Com prefereixen treballar" />
-            <PortraitBarChart data={portrait.helpSeeking} tone="amber" title="Què fan quan no entenen alguna cosa" />
+            <PortraitBarChart data={portrait.learningHelps} multiple onSelectRow={openBreakdown} title="Què ajuda a aprendre" />
+            <PortraitBarChart data={portrait.workPreferences} multiple onSelectRow={openBreakdown} tone="blue" title="Com prefereixen treballar" />
+            <PortraitBarChart data={portrait.helpSeeking} onSelectRow={openBreakdown} tone="amber" title="Què fan quan no entenen alguna cosa" />
           </div>
 
           <div className="student-profile-portrait-section-title secondary">
@@ -229,9 +261,9 @@ function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents 
             <div><h4>Context inicial del grup</h4><p>Procedència, diversitat lingüística i condicions per fer feina digital.</p></div>
           </div>
           <div className="student-profile-portrait-grid">
-            <PortraitBarChart data={portrait.devices} tone="violet" title="Dispositius disponibles per estudiar" />
-            <PortraitBarChart data={portrait.previousSchools} tone="rose" title="Escola de procedència" />
-            <PortraitBarChart data={portrait.familyLanguages} multiple tone="green" title="Llengües habituals a casa" />
+            <PortraitBarChart data={portrait.devices} onSelectRow={openBreakdown} tone="violet" title="Dispositius disponibles per estudiar" />
+            <PortraitBarChart data={portrait.previousSchools} onSelectRow={openBreakdown} tone="rose" title="Escola de procedència" />
+            <PortraitBarChart data={portrait.familyLanguages} multiple onSelectRow={openBreakdown} tone="green" title="Llengües habituals a casa" />
           </div>
 
           <div className="student-profile-portrait-section-title secondary">
@@ -239,10 +271,10 @@ function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents 
             <div><h4>Temps fora de l’aula i interessos</h4><p>Activitats, reforç, hores declarades i preferències durant el pati.</p></div>
           </div>
           <div className="student-profile-portrait-grid extended">
-            <PortraitBarChart data={portrait.extracurriculars} tone="blue" title="Fan activitats extraescolars" />
-            <PortraitBarChart data={portrait.reinforcement} tone="amber" title="Fan reforç escolar" />
-            <PortraitBarChart data={portrait.weeklyCommitment} tone="violet" title="Dedicació setmanal indicada" />
-            <PortraitBarChart data={portrait.breakPreferences} multiple tone="teal" title="Què els agrada fer al pati" />
+            <PortraitBarChart data={portrait.extracurriculars} onSelectRow={openBreakdown} tone="blue" title="Fan activitats extraescolars" />
+            <PortraitBarChart data={portrait.reinforcement} onSelectRow={openBreakdown} tone="amber" title="Fan reforç escolar" />
+            <PortraitBarChart data={portrait.weeklyCommitment} onSelectRow={openBreakdown} tone="violet" title="Dedicació setmanal indicada" />
+            <PortraitBarChart data={portrait.breakPreferences} multiple onSelectRow={openBreakdown} tone="teal" title="Què els agrada fer al pati" />
           </div>
 
           <section className="student-profile-private-actions">
@@ -254,31 +286,74 @@ function StudentProfileClassPortrait({ onOpenResponse, responses, totalStudents 
               <div className="student-profile-private-empty"><Check size={18} />No hi ha cap senyal prioritari declarat a les fitxes rebudes.</div>
             ) : (
               <div className="student-profile-private-list">
-                {attentionResponses.map((response) => (
-                  <article className={response.reviewedAt ? 'reviewed' : ''} key={response.id || response.studentId}>
+                {attentionResponses.map((response) => {
+                  const responseKey = response.id || response.studentId
+                  const expandedFlag = response.priorityFlags.find((flag) => `${responseKey}:${flag.id}` === expandedPriorityKey)
+                  return (
+                  <article className={response.reviewedAt ? 'reviewed' : ''} key={responseKey}>
                     <div>
                       <strong>{response.studentName || 'Alumne'}</strong>
                       <span>{response.reviewedAt ? 'Fitxa revisada' : 'Pendent de revisar'}</span>
                     </div>
                     <div className="student-profile-private-flags">
-                      {response.priorityFlags.map((flag) => <span className={flag.tone} key={flag.id}>{flag.label}</span>)}
+                      {response.priorityFlags.map((flag) => {
+                        const flagKey = `${responseKey}:${flag.id}`
+                        return <PriorityFlag expanded={expandedPriorityKey === flagKey} flag={flag} key={flag.id} onToggle={() => setExpandedPriorityKey((current) => current === flagKey ? '' : flagKey)} />
+                      })}
                     </div>
                     <button className="secondary-action compact" onClick={() => onOpenResponse(response.id)} type="button"><Eye size={16} />Veure fitxa</button>
+                    {expandedFlag && <div className="student-profile-priority-detail"><strong>{expandedFlag.label}</strong><p>{expandedFlag.detail}</p></div>}
                   </article>
-                ))}
+                )})}
               </div>
             )}
           </section>
+
+          {selectedBreakdown && (
+            <Modal onClose={() => setSelectedBreakdown(null)} size="sm" title={`${selectedBreakdown.title}: ${selectedBreakdown.row.label}`}>
+              <div className="student-profile-breakdown-list">
+                <p>{selectedBreakdown.matchingResponses.length} {selectedBreakdown.matchingResponses.length === 1 ? 'alumne' : 'alumnes'} en aquesta opció:</p>
+                {selectedBreakdown.matchingResponses.map((response) => (
+                  <button key={response.id || response.studentId} onClick={() => { setSelectedBreakdown(null); onOpenResponse(response.id || response.studentId) }} type="button">
+                    <strong>{response.studentName || 'Alumne'}</strong><Eye size={16} />
+                  </button>
+                ))}
+              </div>
+            </Modal>
+          )}
         </>
       )}
     </section>
   )
 }
 
-function StudentProfileResponseModal({ onClose, onDelete, onReview, response, studentNamesById }) {
+function StudentProfileResponseModal({ onClose, onDelete, onReview, onSave, response, studentNamesById, survey }) {
   const answers = response.answers || {}
   const flags = getStudentProfilePriorityFlags(answers)
   const [busy, setBusy] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [expandedFlagId, setExpandedFlagId] = useState('')
+
+  if (editing) {
+    return (
+      <Modal onClose={() => setEditing(false)} panelClassName="student-profile-response-modal student-profile-edit-modal" size="xl" title={`Editar fitxa: ${response.studentName}`}>
+        <StudentProfilePublicForm
+          editResponse={response}
+          editSurvey={survey}
+          onCancelEdit={() => setEditing(false)}
+          onSaveEdit={async (nextAnswers) => {
+            setBusy('edit')
+            try {
+              await onSave(nextAnswers)
+              setEditing(false)
+            } finally {
+              setBusy('')
+            }
+          }}
+        />
+      </Modal>
+    )
+  }
 
   const handleReview = async () => {
     setBusy('review')
@@ -312,8 +387,9 @@ function StudentProfileResponseModal({ onClose, onDelete, onReview, response, st
       <section className="student-profile-priority-summary">
         <header><ShieldAlert size={21} /><h3>Resum essencial</h3></header>
         <div className="student-profile-priority-flags">
-          {flags.length === 0 ? <span className="ok"><Check size={16} />Sense alertes declarades</span> : flags.map((flag) => <span className={flag.tone} key={flag.id}>{flag.label}</span>)}
+          {flags.length === 0 ? <span className="ok"><Check size={16} />Sense alertes declarades</span> : flags.map((flag) => <PriorityFlag expanded={expandedFlagId === flag.id} flag={flag} key={flag.id} onToggle={() => setExpandedFlagId((current) => current === flag.id ? '' : flag.id)} />)}
         </div>
+        {flags.find((flag) => flag.id === expandedFlagId)?.detail && <div className="student-profile-priority-detail"><strong>{flags.find((flag) => flag.id === expandedFlagId).label}</strong><p>{flags.find((flag) => flag.id === expandedFlagId).detail}</p></div>}
         <div className="student-profile-priority-grid">
           <article><span>Primer responsable</span><strong>{answers.guardian1Name || 'No indicat'}</strong><small>{[answers.guardian1Relationship, answers.guardian1Phone].filter(Boolean).join(' · ')}</small></article>
           <article><span>Llengües familiars</span><strong>{formatAnswer(answers.familyLanguages) || 'No indicades'}</strong></article>
@@ -340,6 +416,7 @@ function StudentProfileResponseModal({ onClose, onDelete, onReview, response, st
       </div>
 
       <div className="modal-actions student-profile-response-actions">
+        <button className="secondary-action" disabled={Boolean(busy)} onClick={() => setEditing(true)} type="button"><Pencil size={17} />Editar resposta</button>
         <button className="primary-action" disabled={busy === 'review'} onClick={handleReview} type="button">
           {busy === 'review' ? <Loader2 className="spin-icon" size={17} /> : response.reviewedAt ? <RotateCcw size={17} /> : <Check size={17} />}
           {response.reviewedAt ? 'Marcar com a pendent' : 'Marcar com a revisada'}
@@ -594,6 +671,19 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
     setMessage(`Resposta de ${selectedResponse.studentName} eliminada. Ja pot tornar a respondre.`)
   }
 
+  const handleUpdateResponse = async (answers) => {
+    if (!selectedSurvey || !selectedResponse || !cloud.user) return
+    await updateStudentProfileSurveyResponse({
+      answers,
+      studentId: selectedResponse.studentId,
+      surveyId: selectedSurvey.id,
+      user: cloud.user,
+    })
+    await refreshResponses(selectedSurvey.id)
+    setSelectedResponseId(selectedResponse.id)
+    setMessage(`Canvis de la fitxa de ${selectedResponse.studentName} desats. La fitxa torna a estar pendent de revisió.`)
+  }
+
   return (
     <section className="student-profile-survey-panel">
       <header className="student-profile-manager-header">
@@ -689,8 +779,10 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
           onClose={() => setSelectedResponseId('')}
           onDelete={handleDeleteResponse}
           onReview={handleReviewResponse}
+          onSave={handleUpdateResponse}
           response={selectedResponse}
           studentNamesById={Object.fromEntries(selectedSurvey.studentOptions.map((student) => [student.id, student.name]))}
+          survey={selectedSurvey}
         />
       )}
 

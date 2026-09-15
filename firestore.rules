@@ -1066,6 +1066,17 @@ service cloud.firestore {
         );
     }
 
+    function validStudentProfileResponseEditUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'answers', 'editedAt', 'editedByUid', 'reviewedAt', 'reviewedByUid'
+        ])
+        && request.resource.data.editedAt == request.time
+        && request.resource.data.editedByUid == request.auth.uid
+        && request.resource.data.reviewedAt == ''
+        && request.resource.data.reviewedByUid == ''
+        && validStudentProfileAnswers(request.resource.data.answers);
+    }
+
     // Suggestions are separate from teacher datasets and their backup/restore flows.
     match /feedbackMessages/{messageId} {
       function feedbackAdmin() {
@@ -1225,7 +1236,7 @@ service cloud.firestore {
         allow create: if validStudentProfileResponseCreate(surveyId, responseId);
         allow get, list: if canAccessStudentProfileSurveyById(surveyId);
         allow update: if canAccessStudentProfileSurveyById(surveyId)
-          && validStudentProfileResponseReviewUpdate();
+          && (validStudentProfileResponseReviewUpdate() || validStudentProfileResponseEditUpdate());
         allow delete: if canAccessStudentProfileSurveyById(surveyId);
       }
     }

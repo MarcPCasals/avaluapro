@@ -27546,6 +27546,24 @@ button.profile-followup-card:focus-visible {
     #f4f8fb;
 }
 
+.public-student-profile-screen.tutor-edit {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.public-student-profile-screen.tutor-edit .public-student-profile-form {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.public-student-profile-screen.tutor-edit .student-profile-progress {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .public-student-profile-form,
 .public-student-profile-state {
   width: min(1080px, 100%);
@@ -28061,7 +28079,21 @@ button.profile-followup-card:focus-visible {
   font-weight: 800;
 }
 .student-profile-portrait-bars { display: grid; gap: 11px; }
-.student-profile-portrait-bar { display: grid; gap: 5px; }
+.student-profile-portrait-bar {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: 5px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.student-profile-portrait-bar:hover,
+.student-profile-portrait-bar:focus-visible { background: #f1f5f9; outline: 2px solid var(--portrait-tone, #14b8a6); outline-offset: 1px; }
 .student-profile-portrait-bar > div {
   display: flex;
   align-items: flex-end;
@@ -28131,15 +28163,22 @@ button.profile-followup-card:focus-visible {
 .student-profile-private-list > article > div:first-child { display: grid; gap: 3px; }
 .student-profile-private-list > article > div:first-child span { color: #64748b; font-size: 0.77rem; }
 .student-profile-private-flags { display: flex; flex-wrap: wrap; gap: 6px; }
-.student-profile-private-flags span {
+.student-profile-private-flags span,
+.student-profile-private-flags button {
   padding: 5px 8px;
+  border: 0;
   border-radius: 999px;
+  font: inherit;
   font-size: 0.72rem;
   font-weight: 800;
 }
-.student-profile-private-flags span.danger { color: #991b1b; background: #fee2e2; }
-.student-profile-private-flags span.amber { color: #92400e; background: #fef3c7; }
-.student-profile-private-flags span.blue { color: #1d4ed8; background: #dbeafe; }
+.student-profile-private-flags button { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.student-profile-private-flags .danger { color: #991b1b; background: #fee2e2; }
+.student-profile-private-flags .amber { color: #92400e; background: #fef3c7; }
+.student-profile-private-flags .blue { color: #1d4ed8; background: #dbeafe; }
+.student-profile-private-flags button.expanded,
+.student-profile-private-flags button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.student-profile-private-list > article > .student-profile-priority-detail { grid-column: 1 / -1; }
 .student-profile-private-empty { display: flex; align-items: center; gap: 8px; padding: 14px 17px; color: #047857; background: #f0fdf4; font-weight: 750; }
 
 .student-profile-draft-recovery {
@@ -28245,11 +28284,25 @@ button.profile-followup-card:focus-visible {
 .student-profile-priority-summary > header { display: flex; align-items: center; gap: 8px; }
 .student-profile-priority-summary h3 { margin: 0; }
 .student-profile-priority-flags { display: flex; flex-wrap: wrap; gap: 7px; }
-.student-profile-priority-flags span { padding: 7px 9px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
-.student-profile-priority-flags span.danger { color: #991b1b; background: #fee2e2; }
-.student-profile-priority-flags span.amber { color: #92400e; background: #fef3c7; }
-.student-profile-priority-flags span.blue { color: #1d4ed8; background: #dbeafe; }
+.student-profile-priority-flags span,
+.student-profile-priority-flags button { padding: 7px 9px; border: 0; border-radius: 999px; font: inherit; font-size: 0.8rem; font-weight: 800; }
+.student-profile-priority-flags button { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.student-profile-priority-flags .danger { color: #991b1b; background: #fee2e2; }
+.student-profile-priority-flags .amber { color: #92400e; background: #fef3c7; }
+.student-profile-priority-flags .blue { color: #1d4ed8; background: #dbeafe; }
+.student-profile-priority-flags button.expanded,
+.student-profile-priority-flags button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .student-profile-priority-flags span.ok { display: flex; align-items: center; gap: 5px; color: #047857; background: #d1fae5; }
+.student-profile-priority-detail {
+  display: grid;
+  gap: 4px;
+  padding: 11px 13px;
+  border: 1px solid #f3c88d;
+  border-radius: 11px;
+  color: #78350f;
+  background: #fffbeb;
+}
+.student-profile-priority-detail p { margin: 0; color: #713f12; line-height: 1.45; white-space: pre-wrap; }
 .student-profile-priority-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .student-profile-priority-grid article { display: grid; gap: 4px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.82); }
 .student-profile-priority-grid span { color: #64748b; font-size: 0.76rem; font-weight: 850; text-transform: uppercase; }
@@ -28264,6 +28317,26 @@ button.profile-followup-card:focus-visible {
 .student-profile-response-sections strong { overflow-wrap: anywhere; white-space: pre-wrap; }
 .student-profile-response-actions { flex-wrap: wrap; }
 .student-profile-response-actions small { flex-basis: 100%; color: #64748b; }
+.student-profile-edit-modal .modal-body { padding: 0; }
+
+.student-profile-breakdown-list { display: grid; gap: 9px; }
+.student-profile-breakdown-list > p { margin: 0 0 3px; color: #475569; }
+.student-profile-breakdown-list > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #dbe6ee;
+  border-radius: 11px;
+  color: #17324d;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+.student-profile-breakdown-list > button:hover,
+.student-profile-breakdown-list > button:focus-visible { border-color: #0f766e; background: #f0fdfa; }
 
 @media (max-width: 900px) {
   .student-profile-progress { grid-template-columns: repeat(4, minmax(0, 1fr)); }

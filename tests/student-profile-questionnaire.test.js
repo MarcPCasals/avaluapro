@@ -11,6 +11,7 @@ import {
 test('construeix el retrat inicial amb denominadors independents per pregunta', () => {
   const responses = [
     {
+      id: 'response-1',
       answers: {
         familyLanguages: ['Català', 'Castellà'],
         breakPreferences: ['Llegir un llibre', 'Parlar amb els amics i amigues'],
@@ -29,6 +30,7 @@ test('construeix el retrat inicial amb denominadors independents per pregunta', 
       },
     },
     {
+      id: 'response-2',
       answers: {
         familyLanguages: ['Català'],
         breakPreferences: ['Llegir un llibre'],
@@ -45,7 +47,7 @@ test('construeix el retrat inicial amb denominadors independents per pregunta', 
         workPreferences: ['Treballar en parella', 'Treballar en un grup petit'],
       },
     },
-    { answers: { familyLanguages: [], learningHelps: [] } },
+    { id: 'response-3', answers: { familyLanguages: [], learningHelps: [] } },
   ]
 
   const portrait = buildStudentProfileClassPortrait(responses, 4)
@@ -66,8 +68,12 @@ test('construeix el retrat inicial amb denominadors independents per pregunta', 
   assert.equal(portrait.helpSeeking.answeredCount, 2)
   assert.equal(portrait.devices.rows.find((row) => row.value === 'multiple').count, 1)
   assert.equal(portrait.devices.rows.find((row) => row.value === 'none').count, 1)
+  assert.deepEqual(portrait.devices.responseIdsByValue.multiple, ['response-1'])
+  assert.deepEqual(portrait.devices.responseIdsByValue.none, ['response-2'])
   assert.equal(portrait.breakPreferences.rows.find((row) => row.value === 'Llegir un llibre').count, 2)
   assert.equal(portrait.extracurriculars.rows.find((row) => row.value === 'yes').count, 1)
+  assert.deepEqual(portrait.extracurriculars.responseIdsByValue.yes, ['response-1'])
+  assert.deepEqual(portrait.extracurriculars.responseIdsByValue.no, ['response-2'])
   assert.equal(portrait.reinforcement.rows.find((row) => row.value === 'no').count, 1)
   assert.equal(portrait.weeklyCommitment.answeredCount, 2)
   assert.equal(portrait.weeklyCommitment.rows.find((row) => row.value === 'four-to-six').count, 1)
@@ -100,7 +106,8 @@ test('destaca totes les respostes que demanen seguiment personal del tutor', () 
     homeDeviceAccess: 'no',
   }
 
-  const flagIds = getStudentProfilePriorityFlags(answers).map((flag) => flag.id)
+  const flags = getStudentProfilePriorityFlags(answers)
+  const flagIds = flags.map((flag) => flag.id)
 
   assert.deepEqual(flagIds, [
     'health-talk',
@@ -109,6 +116,21 @@ test('destaca totes les respostes que demanen seguiment personal del tutor', () 
     'family-talk',
     'no-home-device',
   ])
+  assert.match(flags.find((flag) => flag.id === 'health-talk').detail, /personalment/)
+  assert.match(flags.find((flag) => flag.id === 'medical-unknown').detail, /No ho sé/)
+})
+
+test('mostra el text declarat dins dels avisos de salut i pauta mèdica', () => {
+  const flags = getStudentProfilePriorityFlags({
+    ...createEmptyStudentProfileAnswers(),
+    healthDetails: 'Al·lèrgia als fruits secs',
+    healthSituation: 'yes',
+    medicalPlan: 'yes',
+    medicalPlanDetails: 'Porta autoinjector a la motxilla',
+  })
+
+  assert.equal(flags.find((flag) => flag.id === 'health').detail, 'Al·lèrgia als fruits secs')
+  assert.equal(flags.find((flag) => flag.id === 'medical').detail, 'Porta autoinjector a la motxilla')
 })
 
 test('neteja camps antics o mal formats abans d’enviar una resposta', () => {

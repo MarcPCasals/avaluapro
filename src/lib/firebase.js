@@ -911,6 +911,20 @@ export async function markStudentProfileResponseReviewed({ reviewed, studentId, 
   )
 }
 
+export async function updateStudentProfileSurveyResponse({ answers, studentId, surveyId, user }) {
+  if (!user?.uid) throw new Error('Cal iniciar sessió per editar aquesta resposta.')
+  await updateDoc(
+    doc(getStudentProfileSurveyResponsesCollectionRef(surveyId), normalizeFirestoreId(studentId)),
+    {
+      answers,
+      editedAt: serverTimestamp(),
+      editedByUid: user.uid,
+      reviewedAt: '',
+      reviewedByUid: '',
+    },
+  )
+}
+
 export async function deleteStudentProfileSurveyResponse({ studentId, surveyId }) {
   await deleteDoc(doc(getStudentProfileSurveyResponsesCollectionRef(surveyId), normalizeFirestoreId(studentId)))
 }

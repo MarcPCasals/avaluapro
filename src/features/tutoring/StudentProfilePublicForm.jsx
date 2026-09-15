@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   ArrowLeft,
@@ -308,18 +308,23 @@ function getStepError(step, answers, selectedStudentId, identityConfirmed) {
   return ''
 }
 
-export function StudentProfilePublicForm({ surveyId }) {
-  const [survey, setSurvey] = useState(null)
-  const [status, setStatus] = useState('loading')
+export function StudentProfilePublicForm({ editResponse = null, editSurvey = null, onCancelEdit, onSaveEdit, surveyId }) {
+  const isTutorEdit = Boolean(editResponse && editSurvey && onSaveEdit)
+  const screenRef = useRef(null)
+  const [survey, setSurvey] = useState(editSurvey)
+  const [status, setStatus] = useState(isTutorEdit ? 'ready' : 'loading')
   const [message, setMessage] = useState('')
-  const [step, setStep] = useState(0)
-  const [selectedStudentId, setSelectedStudentId] = useState('')
-  const [identityConfirmed, setIdentityConfirmed] = useState(false)
-  const [privacyNoticeRead, setPrivacyNoticeRead] = useState(false)
-  const [answers, setAnswers] = useState(createEmptyStudentProfileAnswers)
+  const [step, setStep] = useState(isTutorEdit ? 1 : 0)
+  const [selectedStudentId, setSelectedStudentId] = useState(editResponse?.studentId || '')
+  const [identityConfirmed, setIdentityConfirmed] = useState(isTutorEdit)
+  const [privacyNoticeRead, setPrivacyNoticeRead] = useState(isTutorEdit)
+  const [answers, setAnswers] = useState(() =>
+    isTutorEdit ? normalizeStudentProfileAnswers(editResponse.answers) : createEmptyStudentProfileAnswers(),
+  )
   const [pendingDraft, setPendingDraft] = useState(null)
 
   useEffect(() => {
+    if (isTutorEdit) return undefined
     let cancelled = false
     loadPublicStudentProfileSurvey(surveyId)
       .then((loadedSurvey) => {
@@ -336,16 +341,21 @@ export function StudentProfilePublicForm({ surveyId }) {
     return () => {
       cancelled = true
     }
-  }, [surveyId])
+  }, [isTutorEdit, surveyId])
 
   const selectedStudent = useMemo(
     () => survey?.studentOptions?.find((student) => student.id === selectedStudentId),
     [selectedStudentId, survey],
   )
   const setAnswer = (key, value) => setAnswers((current) => ({ ...current, [key]: value }))
+  const scrollToFormTop = () => {
+    const modalBody = screenRef.current?.closest('.modal-body')
+    if (modalBody) modalBody.scrollTo({ behavior: 'smooth', top: 0 })
+    else window.scrollTo({ behavior: 'smooth', top: 0 })
+  }
 
   useEffect(() => {
-    if (status !== 'ready' || !survey || !selectedStudentId || !identityConfirmed) return undefined
+    if (isTutorEdit || status !== 'ready' || !survey || !selectedStudentId || !identityConfirmed) return undefined
     const timeoutId = window.setTimeout(() => {
       try {
         window.localStorage.setItem(getDraftStorageKey(survey.id), JSON.stringify({
@@ -362,7 +372,7 @@ export function StudentProfilePublicForm({ surveyId }) {
       }
     }, 350)
     return () => window.clearTimeout(timeoutId)
-  }, [answers, identityConfirmed, selectedStudentId, status, step, survey])
+  }, [answers, identityConfirmed, isTutorEdit, selectedStudentId, status, step, survey])
 
   const handleResumeDraft = () => {
     if (!pendingDraft) return
@@ -373,7 +383,7 @@ export function StudentProfilePublicForm({ surveyId }) {
     setStep(Math.max(0, Math.min(STEPS.length - 1, Number(pendingDraft.step) || 0)))
     setMessage('Esborrany recuperat. Revisa les dades abans d’enviar.')
     setPendingDraft(null)
-    window.scrollTo({ behavior: 'smooth', top: 0 })
+    scrollToFormTop()
   }
 
   const handleDiscardDraft = () => {
@@ -390,20 +400,25 @@ export function StudentProfilePublicForm({ surveyId }) {
     }
     setMessage('')
     setStep((current) => Math.min(STEPS.length - 1, current + 1))
-    window.scrollTo({ behavior: 'smooth', top: 0 })
+    scrollToFormTop()
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!selectedStudent || !privacyNoticeRead) {
+    if (!selectedStudent || (!isTutorEdit && !privacyNoticeRead)) {
       setMessage('Confirma que has llegit com s’utilitzaran les dades abans d’enviar.')
       return
     }
-    if (!window.confirm(`Enviar aquesta fitxa com a ${selectedStudent.name}?`)) return
+    if (!window.confirm(isTutorEdit ? `Desar els canvis de la fitxa de ${selectedStudent.name}?` : `Enviar aquesta fitxa com a ${selectedStudent.name}?`)) return
 
     setStatus('submitting')
     setMessage('')
     try {
+      if (isTutorEdit) {
+        await onSaveEdit(normalizeStudentProfileAnswers(answers))
+        setStatus('ready')
+        return
+      }
       await submitStudentProfileSurveyResponse({
         answers: normalizeStudentProfileAnswers(answers),
         privacyNoticeAcknowledged: privacyNoticeRead,
@@ -415,6 +430,11 @@ export function StudentProfilePublicForm({ surveyId }) {
       setStatus('submitted')
     } catch (error) {
       const text = String(error.message || '')
+      if (isTutorEdit) {
+        setMessage(text || 'No s’han pogut desar els canvis.')
+        setStatus('ready')
+        return
+      }
       if (text.includes('resource-exhausted') || text.toLowerCase().includes('quota')) {
         setMessage('Firebase ha arribat al límit diari d’escriptures i ara no pot registrar cap resposta. L’esborrany continua desat en aquest dispositiu; torna-ho a provar quan es reiniciï la quota.')
       } else if (text.includes('permission') || text.includes('already-exists')) {
@@ -467,24 +487,24 @@ export function StudentProfilePublicForm({ surveyId }) {
   }
 
   return (
-    <main className="public-student-profile-screen">
+    <main className={`public-student-profile-screen${isTutorEdit ? ' tutor-edit' : ''}`} ref={screenRef}>
       <form className="public-student-profile-form" onSubmit={handleSubmit}>
         <header className="public-student-profile-header">
           <span><ClipboardList size={29} /></span>
           <div>
-            <p>Avaluapro · fitxa tutorial</p>
-            <h1>{survey?.className || 'Grup classe'}</h1>
-            <small>La informació servirà perquè els tutors et puguin acompanyar millor.</small>
+            <p>{isTutorEdit ? 'Edició tutorial autoritzada' : 'Avaluapro · fitxa tutorial'}</p>
+            <h1>{isTutorEdit ? editResponse.studentName : survey?.className || 'Grup classe'}</h1>
+            <small>{isTutorEdit ? 'En desar, la fitxa tornarà a quedar pendent de revisió.' : 'La informació servirà perquè els tutors et puguin acompanyar millor.'}</small>
           </div>
         </header>
 
         <nav aria-label="Progrés del formulari" className="student-profile-progress">
-          {STEPS.map((item, index) => (
+          {STEPS.map((item, index) => (isTutorEdit && index === 0 ? null : (
             <span className={index === step ? 'active' : index < step ? 'complete' : ''} key={item.id}>
-              <b>{index + 1}</b>
+              <b>{isTutorEdit ? index : index + 1}</b>
               {item.label}
             </span>
-          ))}
+          )))}
         </nav>
 
         {step === 0 && (
@@ -675,20 +695,20 @@ export function StudentProfilePublicForm({ surveyId }) {
               <ReviewValue label="Què m’ajuda a aprendre" value={answers.learningHelps} />
               <ReviewValue label="Missatge per al tutor" value={answers.studentMessage} />
             </div>
-            <section className="student-profile-privacy-notice">
+            {!isTutorEdit && <section className="student-profile-privacy-notice">
               <LockKeyhole size={23} />
               <div>
                 <h3>Com s’utilitzarà aquesta informació?</h3>
                 <p>La veuran els tutors autoritzats d’aquesta tutoria per conèixer-te millor i fer el seguiment educatiu. No es mostrarà als companys ni s’utilitzarà per posar-te una nota.</p>
                 <label><input checked={privacyNoticeRead} onChange={(e) => setPrivacyNoticeRead(e.target.checked)} type="checkbox" /><span>He llegit i entenc com s’utilitzarà aquesta informació.</span></label>
               </div>
-            </section>
+            </section>}
           </section>
         )}
 
         {message && <div className="student-profile-form-message"><AlertCircle size={18} />{message}</div>}
 
-        {selectedStudentId && identityConfirmed && status === 'ready' && (
+        {!isTutorEdit && selectedStudentId && identityConfirmed && status === 'ready' && (
           <div className="student-profile-draft-status">
             <CheckCircle2 size={17} />
             <span>Les respostes es desen automàticament en aquest dispositiu fins que enviïs la fitxa.</span>
@@ -697,8 +717,9 @@ export function StudentProfilePublicForm({ surveyId }) {
         )}
 
         <footer className="student-profile-form-actions">
-          {step > 0 && <button className="secondary-action" onClick={() => { setStep((current) => current - 1); setMessage(''); window.scrollTo({behavior:'smooth',top:0}) }} type="button"><ArrowLeft size={17} />Anterior</button>}
-          {step < STEPS.length - 1 ? <button className="primary-action" onClick={handleNext} type="button">Continuar<ArrowRight size={17} /></button> : <button className="primary-action" disabled={status === 'submitting'} type="submit">{status === 'submitting' ? <Loader2 className="spin-icon" size={17} /> : <Send size={17} />}Enviar la fitxa</button>}
+          {isTutorEdit && <button className="secondary-action" onClick={onCancelEdit} type="button">Cancel·lar</button>}
+          {step > (isTutorEdit ? 1 : 0) && <button className="secondary-action" onClick={() => { setStep((current) => current - 1); setMessage(''); scrollToFormTop() }} type="button"><ArrowLeft size={17} />Anterior</button>}
+          {step < STEPS.length - 1 ? <button className="primary-action" onClick={handleNext} type="button">Continuar<ArrowRight size={17} /></button> : <button className="primary-action" disabled={status === 'submitting'} type="submit">{status === 'submitting' ? <Loader2 className="spin-icon" size={17} /> : <Send size={17} />}{isTutorEdit ? 'Desar els canvis' : 'Enviar la fitxa'}</button>}
         </footer>
       </form>
     </main>

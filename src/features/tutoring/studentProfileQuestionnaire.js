@@ -146,8 +146,21 @@ function withPercentages(rows, answeredCount) {
   }))
 }
 
+function responseKey(response) {
+  return String(response?.id || response?.studentId || '').trim()
+}
+
+function createResponseIdsByValue(options) {
+  return new Map(options.map((option) => [typeof option === 'string' ? option : option.value, []]))
+}
+
+function serializeResponseIdsByValue(values) {
+  return Object.fromEntries([...values.entries()].map(([key, responseIds]) => [key, responseIds]))
+}
+
 function aggregateSingleChoice(responses, field, options) {
   const counts = new Map(options.map((option) => [typeof option === 'string' ? option : option.value, 0]))
+  const responseIdsByValue = createResponseIdsByValue(options)
   let answeredCount = 0
 
   responses.forEach((response) => {
@@ -155,10 +168,13 @@ function aggregateSingleChoice(responses, field, options) {
     if (typeof value !== 'string' || !value.trim() || !counts.has(value)) return
     answeredCount += 1
     counts.set(value, counts.get(value) + 1)
+    const id = responseKey(response)
+    if (id) responseIdsByValue.get(value).push(id)
   })
 
   return {
     answeredCount,
+    responseIdsByValue: serializeResponseIdsByValue(responseIdsByValue),
     rows: withPercentages(options.map((option) => {
       const value = typeof option === 'string' ? option : option.value
       return {
@@ -172,6 +188,7 @@ function aggregateSingleChoice(responses, field, options) {
 
 function aggregateMultipleChoice(responses, field, options) {
   const counts = new Map(options.map((option) => [typeof option === 'string' ? option : option.value, 0]))
+  const responseIdsByValue = createResponseIdsByValue(options)
   let answeredCount = 0
 
   responses.forEach((response) => {
@@ -179,12 +196,16 @@ function aggregateMultipleChoice(responses, field, options) {
     if (!Array.isArray(selectedValues) || selectedValues.length === 0) return
     answeredCount += 1
     new Set(selectedValues).forEach((value) => {
-      if (counts.has(value)) counts.set(value, counts.get(value) + 1)
+      if (!counts.has(value)) return
+      counts.set(value, counts.get(value) + 1)
+      const id = responseKey(response)
+      if (id) responseIdsByValue.get(value).push(id)
     })
   })
 
   return {
     answeredCount,
+    responseIdsByValue: serializeResponseIdsByValue(responseIdsByValue),
     rows: withPercentages(options.map((option) => {
       const value = typeof option === 'string' ? option : option.value
       return {
@@ -197,32 +218,40 @@ function aggregateMultipleChoice(responses, field, options) {
 }
 
 function aggregateDeviceAccess(responses) {
-  const deviceResponses = responses.flatMap((response) => {
+  const values = []
+  const responseIdsByValue = createResponseIdsByValue(DEVICE_ACCESS_OPTIONS)
+  responses.forEach((response) => {
     const answers = response?.answers || {}
-    if (answers.homeDeviceAccess === 'no') return ['none']
-    if (answers.homeDeviceAccess !== 'yes') return []
+    let value = ''
+    if (answers.homeDeviceAccess === 'no') value = 'none'
+    if (answers.homeDeviceAccess !== 'no' && answers.homeDeviceAccess !== 'yes') return
 
-    const availableTypes = [
-      Number(answers.homeMobileCount) > 0,
-      Number(answers.homeTabletCount) > 0,
-      Number(answers.homeComputerCount) > 0,
-    ]
-    const typeCount = availableTypes.filter(Boolean).length
-    if (typeCount === 0) return []
-    if (typeCount > 1) return ['multiple']
-    if (availableTypes[0]) return ['mobile-only']
-    return ['computer-or-tablet']
+    if (answers.homeDeviceAccess === 'yes') {
+      const availableTypes = [
+        Number(answers.homeMobileCount) > 0,
+        Number(answers.homeTabletCount) > 0,
+        Number(answers.homeComputerCount) > 0,
+      ]
+      const typeCount = availableTypes.filter(Boolean).length
+      if (typeCount === 0) return
+      value = typeCount > 1 ? 'multiple' : availableTypes[0] ? 'mobile-only' : 'computer-or-tablet'
+    }
+
+    values.push(value)
+    const id = responseKey(response)
+    if (id) responseIdsByValue.get(value).push(id)
   })
 
   const counts = new Map(DEVICE_ACCESS_OPTIONS.map((option) => [option.value, 0]))
-  deviceResponses.forEach((value) => counts.set(value, counts.get(value) + 1))
+  values.forEach((value) => counts.set(value, counts.get(value) + 1))
 
   return {
-    answeredCount: deviceResponses.length,
+    answeredCount: values.length,
+    responseIdsByValue: serializeResponseIdsByValue(responseIdsByValue),
     rows: withPercentages(DEVICE_ACCESS_OPTIONS.map((option) => ({
       ...option,
       count: counts.get(option.value) || 0,
-    })), deviceResponses.length),
+    })), values.length),
   }
 }
 
@@ -237,29 +266,39 @@ function readDeclaredHours(rows) {
 }
 
 function aggregateWeeklyCommitment(responses) {
-  const values = responses.flatMap((response) => {
+  const values = []
+  const responseIdsByValue = createResponseIdsByValue(WEEKLY_COMMITMENT_OPTIONS)
+  responses.forEach((response) => {
     const answers = response?.answers || {}
     const extracurricularAnswer = answers.hasExtracurriculars
     const reinforcementAnswer = answers.hasReinforcement
-    if (!['yes', 'no'].includes(extracurricularAnswer) || !['yes', 'no'].includes(reinforcementAnswer)) return []
+    if (!['yes', 'no'].includes(extracurricularAnswer) || !['yes', 'no'].includes(reinforcementAnswer)) return
 
     const extracurricular = readDeclaredHours(answers.extracurricularActivities)
     const reinforcement = readDeclaredHours(answers.reinforcementActivities)
     const needsHours = extracurricularAnswer === 'yes' || reinforcementAnswer === 'yes'
-    if (needsHours && !extracurricular.hasHours && !reinforcement.hasHours) return []
+    if (needsHours && !extracurricular.hasHours && !reinforcement.hasHours) return
 
     const total = extracurricular.total + reinforcement.total
-    if (total <= 0) return ['none']
-    if (total <= 3) return ['one-to-three']
-    if (total <= 6) return ['four-to-six']
-    if (total <= 9) return ['seven-to-nine']
-    return ['ten-or-more']
+    const value = total <= 0
+      ? 'none'
+      : total <= 3
+        ? 'one-to-three'
+        : total <= 6
+          ? 'four-to-six'
+          : total <= 9
+            ? 'seven-to-nine'
+            : 'ten-or-more'
+    values.push(value)
+    const id = responseKey(response)
+    if (id) responseIdsByValue.get(value).push(id)
   })
 
   const counts = new Map(WEEKLY_COMMITMENT_OPTIONS.map((option) => [option.value, 0]))
   values.forEach((value) => counts.set(value, counts.get(value) + 1))
   return {
     answeredCount: values.length,
+    responseIdsByValue: serializeResponseIdsByValue(responseIdsByValue),
     rows: withPercentages(WEEKLY_COMMITMENT_OPTIONS.map((option) => ({
       ...option,
       count: counts.get(option.value) || 0,
@@ -470,14 +509,26 @@ export function getStudentProfilePersonalStepError(answers = {}) {
 
 export function getStudentProfilePriorityFlags(answers = {}) {
   return [
-    answers.healthSituation === 'yes' && { id: 'health', label: 'Situació de salut indicada', tone: 'danger' },
+    answers.healthSituation === 'yes' && {
+      detail: answers.healthDetails?.trim() || 'Ha indicat que sí, però no ha afegit cap detall.',
+      id: 'health',
+      label: 'Situació de salut indicada',
+      tone: 'danger',
+    },
     answers.healthSituation === 'talk' && {
+      detail: 'Ha triat «Prefereixo parlar-ne personalment» a la pregunta sobre salut o al·lèrgies.',
       id: 'health-talk',
       label: 'Vol parlar personalment sobre salut',
       tone: 'amber',
     },
-    answers.medicalPlan === 'yes' && { id: 'medical', label: 'Pauta o informe vigent', tone: 'danger' },
+    answers.medicalPlan === 'yes' && {
+      detail: answers.medicalPlanDetails?.trim() || 'Ha indicat que hi ha una pauta, medicació o informe vigent, però no n’ha afegit cap detall.',
+      id: 'medical',
+      label: 'Pauta o informe vigent',
+      tone: 'danger',
+    },
     answers.medicalPlan === 'unknown' && {
+      detail: 'Ha respost «No ho sé» a la pregunta sobre pauta mèdica, medicació o informe vigent.',
       id: 'medical-unknown',
       label: 'Cal aclarir la informació mèdica',
       tone: 'amber',

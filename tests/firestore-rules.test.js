@@ -1020,6 +1020,38 @@ describe('formulari tutorial public', () => {
         reviewedByUid: COTUTOR.uid,
       }),
     )
+    await assertSucceeds(
+      updateDoc(doc(authDb(COTUTOR), ...responsePath), {
+        answers: {
+          ...createEmptyStudentProfileAnswers(),
+          healthDetails: 'Al·lèrgia declarada i revisada pel tutor',
+          healthSituation: 'yes',
+          homeDeviceAccess: 'no',
+        },
+        editedAt: serverTimestamp(),
+        editedByUid: COTUTOR.uid,
+        reviewedAt: '',
+        reviewedByUid: '',
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(authDb(THIRD), ...responsePath), {
+        answers: { ...createEmptyStudentProfileAnswers(), homeDeviceAccess: 'no' },
+        editedAt: serverTimestamp(),
+        editedByUid: THIRD.uid,
+        reviewedAt: '',
+        reviewedByUid: '',
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(authDb(COTUTOR), ...responsePath), {
+        editedAt: serverTimestamp(),
+        editedByUid: COTUTOR.uid,
+        reviewedAt: '',
+        reviewedByUid: '',
+        studentName: 'Nom manipulat',
+      }),
+    )
     await assertFails(updateDoc(doc(authDb(THIRD), ...responsePath), { reviewedAt: '' }))
     await assertSucceeds(deleteDoc(doc(authDb(COTUTOR), ...responsePath)))
   })
