@@ -90,9 +90,9 @@ No s'hi permet l'eliminacio fisica. Un missatge nomes el pot modificar o marcar 
 
 La versio local reforcada disposa de:
 
-- 52 proves de regles de Firestore, 24 de les quals cobreixen la cotutoria compartida;
+- 53 proves de regles de Firestore, 25 de les quals cobreixen la cotutoria compartida;
 - 6 proves de fusio i tombstones de cotutoria;
-- 6 proves especifiques de missatgeria, lectura, recordatoris i cua local.
+- 7 proves especifiques de missatgeria, agrupacio per alumne, lectura, recordatoris i cua local.
 
 Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminacions, autoria dels missatges, responsables dels recordatoris, estat de lectura, tokens sociometrics, caducitat, avís informatiu, resposta d'un sol us i eliminacio reservada al propietari.
 

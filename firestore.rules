@@ -246,6 +246,7 @@ service cloud.firestore {
     function validTutoringCoordinationAuthorUpdate(spaceId) {
       return canAccessTutoringSpace(spaceId)
         && resource.data.authorUid == request.auth.uid
+        && resource.data.deletedAt == ''
         && request.resource.data.id == resource.data.id
         && request.resource.data.kind == resource.data.kind
         && request.resource.data.authorUid == resource.data.authorUid
@@ -280,6 +281,10 @@ service cloud.firestore {
             request.resource.data.deletedAt is string
             && request.resource.data.deletedAt.size() > 0
             && request.resource.data.deletedByUid == request.auth.uid
+            && request.resource.data.text == 'Missatge suprimit'
+            && request.resource.data.studentId == ''
+            && request.resource.data.dueAt == ''
+            && request.resource.data.assigneeUid == ''
           )
         );
     }

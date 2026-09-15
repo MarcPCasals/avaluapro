@@ -10,6 +10,8 @@ const RULES_ROOT = `https://firebaserules.googleapis.com/v1/projects/${PROJECT_I
 const ALLOWED_TUTORING_SUBCOLLECTIONS = new Set([
   'agendaNotes',
   'changeSignals',
+  'coordinationItems',
+  'coordinationMemberStates',
   'sociometricSurveys',
   'studentAntecedents',
   'students',

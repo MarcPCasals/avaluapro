@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BellRing, Check, Clock3, MessageCircle, RefreshCw, Send, UsersRound } from 'lucide-react'
-import { getOpenTutoringReminders, sortTutoringCoordinationItems } from '../../lib/tutoringCoordination'
+import {
+  BellRing,
+  Check,
+  ChevronDown,
+  Clock3,
+  Inbox,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  Trash2,
+  UserRound,
+  UsersRound,
+} from 'lucide-react'
+import {
+  getOpenTutoringReminders,
+  groupTutoringCoordinationItemsByStudent,
+  sortTutoringCoordinationItems,
+} from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function formatDateTime(value) {
@@ -26,12 +42,62 @@ function getMemberLabel(member, currentUser) {
   return member.name || member.displayName || member.emailLower || member.email || 'Cotutor'
 }
 
+function CoordinationMessage({ currentUser, item, memberStates, onDelete, onReminderStatus, student, spaceId }) {
+  const own = item.authorUid === currentUser?.uid
+  const seenByCotutor = own && memberStates.some(
+    (state) => state.spaceId === spaceId && state.uid !== currentUser?.uid && state.lastReadAt >= item.createdAt,
+  )
+
+  return (
+    <article className={`coordination-message ${own ? 'own' : ''} ${item.kind}`}>
+      <header>
+        <strong>{own ? 'Tu' : item.authorName || item.authorEmail}</strong>
+        <time>{formatDateTime(item.createdAt)}</time>
+      </header>
+      {item.kind === 'reminder' && <span className="coordination-kind"><BellRing size={13} /> Recordatori</span>}
+      <p>{item.text}</p>
+      {student && <span className="coordination-student">{student.name}</span>}
+      <footer>
+        {item.status === 'completed' && <span><Check size={13} /> Fet</span>}
+        {item.syncStatus === 'pending' && <span>Enviant…</span>}
+        {seenByCotutor && item.syncStatus !== 'pending' && <span>Vist pel cotutor</span>}
+        <div className="coordination-message-actions">
+          {item.kind === 'reminder' && item.status === 'completed' && (
+            <button
+              className="coordination-reopen"
+              disabled={item.syncStatus === 'pending'}
+              onClick={() => onReminderStatus(item, false)}
+              type="button"
+            >
+              Reobrir
+            </button>
+          )}
+          {own && (
+            <button
+              aria-label={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
+              className="coordination-delete"
+              disabled={item.syncStatus === 'pending'}
+              onClick={() => onDelete(item)}
+              title={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
+              type="button"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </footer>
+    </article>
+  )
+}
+
 export function TutoringCoordinationPanel({ activeClass, students = [] }) {
   const cloud = useAvaluaproStore((state) => state.cloud)
   const addItem = useAvaluaproStore((state) => state.addTutoringCoordinationItem)
   const markRead = useAvaluaproStore((state) => state.markTutoringCoordinationRead)
   const retrySync = useAvaluaproStore((state) => state.retryTutoringCoordinationSync)
   const setReminderCompleted = useAvaluaproStore((state) => state.setTutoringCoordinationReminderCompleted)
+  const deleteItem = useAvaluaproStore((state) => state.deleteTutoringCoordinationItem)
+  const [view, setView] = useState('inbox')
   const [kind, setKind] = useState('message')
   const [text, setText] = useState('')
   const [studentId, setStudentId] = useState('')
@@ -45,6 +111,11 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
   const items = useMemo(
     () => sortTutoringCoordinationItems(cloud.tutoringCoordinationItems.filter((item) => item.spaceId === spaceId)),
     [cloud.tutoringCoordinationItems, spaceId],
+  )
+  const visibleItems = useMemo(() => items.filter((item) => !item.deletedAt), [items])
+  const studentGroups = useMemo(
+    () => groupTutoringCoordinationItemsByStudent(visibleItems, students),
+    [students, visibleItems],
   )
   const openReminders = useMemo(
     () =>
@@ -93,6 +164,17 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
     }
   }
 
+  const handleDelete = async (item) => {
+    const itemLabel = item.kind === 'reminder' ? 'aquest recordatori' : 'aquest missatge'
+    if (!window.confirm(`Vols eliminar ${itemLabel}? Desapareixerà també per al cotutor.`)) return
+    setError('')
+    try {
+      await deleteItem(item.id)
+    } catch (deleteError) {
+      setError(deleteError.message || 'No s’ha pogut eliminar el missatge.')
+    }
+  }
+
   if (!spaceId) {
     return (
       <section className="tutoring-coordination-empty">
@@ -125,6 +207,65 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
           </button>
         </div>
       )}
+
+      <form className="coordination-composer" onSubmit={handleSubmit}>
+        <div className="coordination-composer-heading">
+          <strong>Escriu al cotutor</strong>
+          <div className="coordination-kind-switch" aria-label="Tipus d’informació">
+            <button className={kind === 'message' ? 'active' : ''} onClick={() => setKind('message')} type="button">
+              <MessageCircle size={15} /> Missatge
+            </button>
+            <button className={kind === 'reminder' ? 'active reminder' : ''} onClick={() => setKind('reminder')} type="button">
+              <BellRing size={15} /> Recordatori
+            </button>
+          </div>
+        </div>
+        <textarea
+          maxLength={1600}
+          onChange={(event) => setText(event.target.value)}
+          placeholder={kind === 'reminder' ? 'Què heu de tenir present o fer?' : 'Escriu una informació per al cotutor…'}
+          rows={3}
+          value={text}
+        />
+        <div className="coordination-composer-options">
+          <label>
+            Alumne relacionat
+            <select onChange={(event) => setStudentId(event.target.value)} value={studentId}>
+              <option value="">Cap alumne concret</option>
+              {students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}
+            </select>
+          </label>
+          {kind === 'reminder' && (
+            <>
+              <label>
+                Responsable
+                <select onChange={(event) => setAssigneeUid(event.target.value)} value={assigneeUid}>
+                  <option value="all">Tots dos</option>
+                  {members.map((member) => (
+                    <option key={member.uid} value={member.uid}>{getMemberLabel(member, cloud.user)}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quan ha d’avisar
+                <input onChange={(event) => setDueAt(event.target.value)} type="datetime-local" value={dueAt} />
+              </label>
+            </>
+          )}
+          <button className="primary-action coordination-send" disabled={busy || !text.trim()} type="submit">
+            <Send size={16} /> {busy ? 'Guardant…' : kind === 'reminder' ? 'Afegir recordatori' : 'Enviar'}
+          </button>
+        </div>
+      </form>
+
+      <nav className="coordination-view-switch" aria-label="Organització dels missatges">
+        <button className={view === 'inbox' ? 'active' : ''} onClick={() => setView('inbox')} type="button">
+          <Inbox size={16} /> Safata <span>{visibleItems.length}</span>
+        </button>
+        <button className={view === 'students' ? 'active' : ''} onClick={() => setView('students')} type="button">
+          <UserRound size={16} /> Per alumne <span>{studentGroups.filter((group) => group.studentId).length}</span>
+        </button>
+      </nav>
 
       <div className="tutoring-coordination-layout">
         <aside className="coordination-reminders">
@@ -170,98 +311,66 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
           )}
         </aside>
 
-        <div className="coordination-conversation">
-          <div className="coordination-timeline" aria-live="polite">
-            {items.length === 0 ? (
-              <div className="coordination-conversation-empty">
-                <UsersRound size={28} />
-                <strong>Encara no hi ha cap missatge.</strong>
-                <span>Comença deixant una informació o un acord per al cotutor.</span>
-              </div>
-            ) : (
-              items.slice(-100).map((item) => {
-                const own = item.authorUid === cloud.user?.uid
-                const student = studentById.get(item.studentId)
-                const otherReadStates = cloud.tutoringCoordinationMemberStates.filter(
-                  (state) => state.spaceId === spaceId && state.uid !== cloud.user?.uid,
-                )
-                const seenByCotutor = own && otherReadStates.some((state) => state.lastReadAt >= item.createdAt)
-                return (
-                  <article className={`coordination-message ${own ? 'own' : ''} ${item.kind}`} key={item.id}>
-                    <header>
-                      <strong>{own ? 'Tu' : item.authorName || item.authorEmail}</strong>
-                      <time>{formatDateTime(item.createdAt)}</time>
-                    </header>
-                    {item.kind === 'reminder' && <span className="coordination-kind"><BellRing size={13} /> Recordatori</span>}
-                    <p>{item.deletedAt ? 'Missatge suprimit' : item.text}</p>
-                    {student && <span className="coordination-student">{student.name}</span>}
-                    <footer>
-                      {item.status === 'completed' && <span><Check size={13} /> Fet</span>}
-                      {item.syncStatus === 'pending' && <span>Enviant…</span>}
-                      {seenByCotutor && item.syncStatus !== 'pending' && <span>Vist pel cotutor</span>}
-                      {item.kind === 'reminder' && item.status === 'completed' && (
-                        <button
-                          className="coordination-reopen"
-                          disabled={item.syncStatus === 'pending'}
-                          onClick={() => handleReminderStatus(item, false)}
-                          type="button"
-                        >
-                          Reobrir
-                        </button>
-                      )}
-                    </footer>
-                  </article>
-                )
-              })
-            )}
-          </div>
-
-          <form className="coordination-composer" onSubmit={handleSubmit}>
-            <div className="coordination-kind-switch" aria-label="Tipus d’informació">
-              <button className={kind === 'message' ? 'active' : ''} onClick={() => setKind('message')} type="button">
-                <MessageCircle size={15} /> Missatge
-              </button>
-              <button className={kind === 'reminder' ? 'active reminder' : ''} onClick={() => setKind('reminder')} type="button">
-                <BellRing size={15} /> Recordatori
-              </button>
-            </div>
-            <textarea
-              maxLength={1600}
-              onChange={(event) => setText(event.target.value)}
-              placeholder={kind === 'reminder' ? 'Què heu de tenir present o fer?' : 'Escriu una informació per al cotutor…'}
-              rows={3}
-              value={text}
-            />
-            <div className="coordination-composer-options">
-              <label>
-                Alumne relacionat
-                <select onChange={(event) => setStudentId(event.target.value)} value={studentId}>
-                  <option value="">Cap alumne concret</option>
-                  {students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}
-                </select>
-              </label>
-              {kind === 'reminder' && (
-                <>
-                  <label>
-                    Responsable
-                    <select onChange={(event) => setAssigneeUid(event.target.value)} value={assigneeUid}>
-                      <option value="all">Tots dos</option>
-                      {members.map((member) => (
-                        <option key={member.uid} value={member.uid}>{getMemberLabel(member, cloud.user)}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Quan ha d’avisar
-                    <input onChange={(event) => setDueAt(event.target.value)} type="datetime-local" value={dueAt} />
-                  </label>
-                </>
+        <div className={`coordination-conversation ${view === 'students' ? 'student-view' : ''}`}>
+          {view === 'inbox' ? (
+            <div className="coordination-timeline" aria-live="polite">
+              {visibleItems.length === 0 ? (
+                <div className="coordination-conversation-empty">
+                  <UsersRound size={28} />
+                  <strong>Encara no hi ha cap missatge.</strong>
+                  <span>Comença deixant una informació o un acord per al cotutor.</span>
+                </div>
+              ) : (
+                visibleItems.slice(-100).map((item) => (
+                  <CoordinationMessage
+                    currentUser={cloud.user}
+                    item={item}
+                    key={item.id}
+                    memberStates={cloud.tutoringCoordinationMemberStates}
+                    onDelete={handleDelete}
+                    onReminderStatus={handleReminderStatus}
+                    spaceId={spaceId}
+                    student={studentById.get(item.studentId)}
+                  />
+                ))
               )}
-              <button className="primary-action coordination-send" disabled={busy || !text.trim()} type="submit">
-                <Send size={16} /> {busy ? 'Guardant…' : kind === 'reminder' ? 'Afegir recordatori' : 'Enviar'}
-              </button>
             </div>
-          </form>
+          ) : (
+            <div className="coordination-student-groups" aria-live="polite">
+              {studentGroups.length === 0 ? (
+                <div className="coordination-conversation-empty">
+                  <UserRound size={28} />
+                  <strong>Encara no hi ha cap història d’alumne.</strong>
+                  <span>Relaciona un missatge amb un alumne i aquí en veuràs tot el fil.</span>
+                </div>
+              ) : studentGroups.map((group) => (
+                <details key={group.studentId || 'general'}>
+                  <summary>
+                    <span className="coordination-group-icon">{group.student ? <UserRound size={17} /> : <UsersRound size={17} />}</span>
+                    <span>
+                      <strong>{group.label}</strong>
+                      <small>{group.items.length} {group.items.length === 1 ? 'entrada' : 'entrades'} · Darrera: {formatDateTime(group.items.at(-1)?.createdAt)}</small>
+                    </span>
+                    <ChevronDown size={18} />
+                  </summary>
+                  <div className="coordination-student-history">
+                    {group.items.map((item) => (
+                      <CoordinationMessage
+                        currentUser={cloud.user}
+                        item={item}
+                        key={item.id}
+                        memberStates={cloud.tutoringCoordinationMemberStates}
+                        onDelete={handleDelete}
+                        onReminderStatus={handleReminderStatus}
+                        spaceId={spaceId}
+                        student={null}
+                      />
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

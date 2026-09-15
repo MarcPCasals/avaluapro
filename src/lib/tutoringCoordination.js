@@ -45,3 +45,30 @@ export function getTutoringCoordinationCounts(items = [], memberStates = [], uid
     unread: getUnreadTutoringCoordinationItems(items, memberStates, uid).length,
   }
 }
+
+export function groupTutoringCoordinationItemsByStudent(items = [], students = []) {
+  const studentById = new Map(students.map((student) => [student.id, student]))
+  const groups = new Map()
+
+  sortTutoringCoordinationItems(items)
+    .filter((item) => !item.deletedAt)
+    .forEach((item) => {
+      const student = studentById.get(item.studentId)
+      const key = student ? student.id : ''
+      if (!groups.has(key)) {
+        groups.set(key, {
+          items: [],
+          label: student?.name || 'Missatges generals',
+          student,
+          studentId: key,
+        })
+      }
+      groups.get(key).items.push(item)
+    })
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (!a.studentId) return 1
+    if (!b.studentId) return -1
+    return a.label.localeCompare(b.label, 'ca')
+  })
+}

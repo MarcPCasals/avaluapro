@@ -198,7 +198,7 @@ Des del 20 de juny de 2026, el formulari informa abans de respondre sobre finali
 | Restriccio explicita de subcol.leccions | Implementada localment; qualsevol col.leccio no prevista queda bloquejada. |
 | Missatgeria i recordatoris | Implementats, provats i desplegats; prova d'intercanvi real entre dos comptes pendent. |
 | Qüestionari sociometric public | Token individual, identitat fixada, un sol us, caducitat de 24 hores i eliminacio manual completa implementats localment. |
-| Proves automatitzades | 52 proves de rules, 6 de fusio compartida i 6 especifiques de coordinacio superades. |
+| Proves automatitzades | 53 proves de rules, 6 de fusio compartida i 7 especifiques de coordinacio superades. |
 
 ## 7. Eliminacio i tombstones
 

@@ -28585,13 +28585,40 @@ button.profile-followup-card:focus-visible {
 }
 
 .coordination-reopen {
-  margin-left: auto;
   border: 0;
   padding: 2px 4px;
   color: #1d4ed8;
   background: transparent;
   font-size: 11px;
   font-weight: 900;
+}
+
+.coordination-message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.coordination-delete {
+  width: 27px;
+  height: 27px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: #94a3b8;
+  background: transparent;
+}
+
+.coordination-delete:hover {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.coordination-delete:disabled {
+  opacity: 0.45;
 }
 
 .coordination-message p {
@@ -28632,8 +28659,24 @@ button.profile-followup-card:focus-visible {
 .coordination-composer {
   display: grid;
   gap: 10px;
-  border-top: 1px solid #e2e8f0;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
   padding: 14px;
+  background: white;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.07);
+}
+
+.coordination-composer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #1e3a8a;
+}
+
+.coordination-composer-heading > strong {
+  font-size: 15px;
+  font-weight: 950;
 }
 
 .coordination-kind-switch {
@@ -28703,6 +28746,125 @@ button.profile-followup-card:focus-visible {
   white-space: nowrap;
 }
 
+.coordination-view-switch {
+  display: inline-flex;
+  width: fit-content;
+  gap: 5px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 4px;
+  background: #eff6ff;
+}
+
+.coordination-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 12px;
+  color: #64748b;
+  background: transparent;
+  font-weight: 900;
+}
+
+.coordination-view-switch button.active {
+  color: #1d4ed8;
+  background: white;
+  box-shadow: 0 2px 7px rgba(37, 99, 235, 0.12);
+}
+
+.coordination-view-switch button > span {
+  min-width: 21px;
+  height: 21px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  color: #475569;
+  background: #e2e8f0;
+  font-size: 11px;
+}
+
+.coordination-view-switch button.active > span {
+  color: white;
+  background: #2563eb;
+}
+
+.coordination-conversation.student-view {
+  max-height: 600px;
+  overflow-y: auto;
+  background: #f8fafc;
+}
+
+.coordination-student-groups {
+  min-height: 360px;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 14px;
+}
+
+.coordination-student-groups details {
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: white;
+}
+
+.coordination-student-groups summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: #1e3a8a;
+  cursor: pointer;
+  list-style: none;
+}
+
+.coordination-student-groups summary::-webkit-details-marker {
+  display: none;
+}
+
+.coordination-student-groups summary > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.coordination-student-groups summary small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.coordination-student-groups summary > svg {
+  transition: transform 160ms ease;
+}
+
+.coordination-student-groups details[open] summary > svg {
+  transform: rotate(180deg);
+}
+
+.coordination-group-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #2563eb;
+  background: #dbeafe;
+}
+
+.coordination-student-history {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid #e2e8f0;
+  padding: 13px;
+  background: #f8fafc;
+}
+
 .global-reminder-card.coordination {
   border-color: #bfdbfe;
   color: #2563eb;
@@ -28742,6 +28904,20 @@ button.profile-followup-card:focus-visible {
 
   .coordination-live-state {
     align-self: flex-start;
+  }
+
+  .coordination-composer-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .coordination-view-switch {
+    width: 100%;
+  }
+
+  .coordination-view-switch button {
+    flex: 1;
+    justify-content: center;
   }
 
   .coordination-message {

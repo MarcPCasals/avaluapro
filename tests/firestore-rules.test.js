@@ -622,6 +622,30 @@ describe('cotutoria compartida', () => {
     )
   })
 
+  test('l autor pot eliminar el contingut del seu missatge i no el pot fer reapareixer', async () => {
+    const itemRef = doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-delete')
+    await assertSucceeds(setDoc(itemRef, tutoringCoordinationItemData({ id: 'coord-delete', studentId: 'student-1' })))
+    await assertSucceeds(
+      updateDoc(itemRef, {
+        assigneeUid: '',
+        deletedAt: '2026-09-15T09:00:00.000Z',
+        deletedByUid: OWNER.uid,
+        dueAt: '',
+        studentId: '',
+        text: 'Missatge suprimit',
+        updatedAt: '2026-09-15T09:00:00.000Z',
+      }),
+    )
+    await assertFails(
+      updateDoc(itemRef, {
+        deletedAt: '',
+        deletedByUid: '',
+        text: 'Informació recuperada',
+        updatedAt: '2026-09-15T09:05:00.000Z',
+      }),
+    )
+  })
+
   test('cada tutor nomes pot escriure el seu propi estat de lectura', async () => {
     const ownState = {
       email: COTUTOR.email,

@@ -2824,6 +2824,47 @@ export const useAvaluaproStore = create((set, get) => ({
     await flushTutoringCoordinationOutbox(set, get)
   },
 
+  deleteTutoringCoordinationItem: async (itemId) => {
+    const state = get()
+    const user = state.cloud.user
+    const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
+    if (!user?.uid) throw new Error('Cal iniciar sessió per eliminar el missatge.')
+    if (!currentItem) return
+    if (currentItem.authorUid !== user.uid) throw new Error('Només pots eliminar els missatges que has escrit tu.')
+    if (currentItem.syncStatus === 'pending') throw new Error('Espera que el missatge s’hagi enviat.')
+    const updatedAt = new Date().toISOString()
+    const item = {
+      ...currentItem,
+      assigneeUid: '',
+      deletedAt: updatedAt,
+      deletedByUid: user.uid,
+      dueAt: '',
+      studentId: '',
+      syncStatus: 'pending',
+      text: 'Missatge suprimit',
+      updatedAt,
+    }
+    const operation = {
+      createdAt: updatedAt,
+      id: `coord-item:${user.uid}:${item.spaceId}:${item.id}`,
+      item,
+      revision: updatedAt,
+      spaceId: item.spaceId,
+      type: 'item',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationItems: current.cloud.tutoringCoordinationItems.map((currentItem) =>
+          currentItem.id === item.id && currentItem.spaceId === item.spaceId ? item : currentItem,
+        ),
+        tutoringCoordinationStatus: 'pending',
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+  },
+
   markTutoringCoordinationRead: async (spaceId) => {
     const state = get()
     const user = state.cloud.user

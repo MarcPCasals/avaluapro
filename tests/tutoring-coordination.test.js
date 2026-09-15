@@ -4,6 +4,7 @@ import {
   getDueTutoringReminders,
   getOpenTutoringReminders,
   getUnreadTutoringCoordinationItems,
+  groupTutoringCoordinationItemsByStudent,
   mergeTutoringCoordinationItems,
 } from '../src/lib/tutoringCoordination.js'
 
@@ -55,5 +56,23 @@ describe('coordinacio de cotutoria', () => {
     )
     assert.equal(merged[0].text, 'pendent')
     assert.equal(merged[0].syncStatus, 'pending')
+  })
+
+  test('agrupa cronologicament la historia de cada alumne i separa els missatges generals', () => {
+    const grouped = groupTutoringCoordinationItemsByStudent(
+      [
+        { ...items[1], studentId: 'student-1' },
+        { ...items[0], studentId: 'student-1' },
+        { ...items[0], createdAt: '2026-09-15T10:00:00.000Z', id: 'general', studentId: '' },
+        { ...items[0], deletedAt: '2026-09-15T11:00:00.000Z', id: 'deleted', studentId: 'student-2' },
+      ],
+      [
+        { id: 'student-2', name: 'Alumne Dos' },
+        { id: 'student-1', name: 'Alumna Un' },
+      ],
+    )
+
+    assert.deepEqual(grouped.map((group) => group.label), ['Alumna Un', 'Missatges generals'])
+    assert.deepEqual(grouped[0].items.map((item) => item.id), ['message-1', 'reminder-1'])
   })
 })
