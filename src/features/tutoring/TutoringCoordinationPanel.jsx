@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import {
   getOpenTutoringReminders,
+  getUrgentTutoringMessages,
   groupTutoringCoordinationItemsByStudent,
   isCoordinationItemInTutorialRecords,
   sortTutoringCoordinationItems,
@@ -240,6 +241,7 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
   )
   const visibleItems = useMemo(() => items.filter((item) => !item.deletedAt), [items])
   const messageItems = useMemo(() => visibleItems.filter((item) => item.kind !== 'reminder'), [visibleItems])
+  const urgentItems = useMemo(() => getUrgentTutoringMessages(messageItems), [messageItems])
   const studentGroups = useMemo(
     () => groupTutoringCoordinationItemsByStudent(messageItems, students),
     [messageItems, students],
@@ -438,6 +440,13 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
         <button className={view === 'students' ? 'active' : ''} onClick={() => setView('students')} type="button">
           <UserRound size={16} /> Per alumne <span>{studentGroups.filter((group) => group.studentId).length}</span>
         </button>
+        <button
+          className={`urgent ${view === 'urgent' ? 'active' : ''}`}
+          onClick={() => setView('urgent')}
+          type="button"
+        >
+          <AlertTriangle size={16} /> Missatges urgents <span>{urgentItems.length}</span>
+        </button>
       </nav>
 
       <div className="tutoring-coordination-layout">
@@ -513,7 +522,7 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
                 ))
               )}
             </div>
-          ) : (
+          ) : view === 'students' ? (
             <div className="coordination-student-groups" aria-live="polite">
               {studentGroups.length === 0 ? (
                 <div className="coordination-conversation-empty">
@@ -551,6 +560,32 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
                     ))}
                   </div>
                 </details>
+              ))}
+            </div>
+          ) : (
+            <div className="coordination-timeline urgent-view" aria-live="polite">
+              {urgentItems.length === 0 ? (
+                <div className="coordination-conversation-empty urgent-empty">
+                  <Check size={28} />
+                  <strong>No hi ha cap missatge urgent.</strong>
+                  <span>Els missatges marcats com a urgents quedaran reunits aquí.</span>
+                </div>
+              ) : urgentItems.map((item) => (
+                <CoordinationMessage
+                  currentUser={cloud.user}
+                  isInTracking={isCoordinationItemInTutorialRecords(item.id, tutorialRecords)}
+                  item={item}
+                  key={item.id}
+                  memberStates={cloud.tutoringCoordinationMemberStates}
+                  onDelete={handleDelete}
+                  onEdit={handleEdit}
+                  onReminderStatus={handleReminderStatus}
+                  onSendToTracking={handleSendToTracking}
+                  spaceId={spaceId}
+                  student={studentById.get(item.studentId)}
+                  students={students}
+                  trackingBusy={trackingBusyId === item.id}
+                />
               ))}
             </div>
           )}

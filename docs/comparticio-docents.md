@@ -117,7 +117,7 @@ Els avisos que apareixen fora de la tutoria no mostren el text ni l'alumne: nome
 - qualsevol dels cotutors pot corregir el text o l'alumne relacionat, sense alterar l'autoria original;
 - nomes l'autor pot marcar com a eliminat el seu missatge;
 - un missatge vinculat a un alumne es pot copiar una sola vegada al registre de seguiment tutorial, conservant l'autoria i la referencia d'origen;
-- els missatges urgents queden destacats en vermell i reunits en un acces global propi;
+- els missatges urgents queden destacats en vermell i reunits en una vista pròpia al costat de «Safata» i «Per alumne»;
 - qualsevol cotutor pot completar o reobrir un recordatori;
 - els recordatoris reapareixen com a avis global dues hores abans i es mantenen fins que un tutor els accepta;
 - cada membre nomes pot actualitzar el seu propi estat de lectura;

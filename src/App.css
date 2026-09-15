@@ -29098,6 +29098,34 @@ button.profile-followup-card:focus-visible {
   background: #2563eb;
 }
 
+.coordination-view-switch button.urgent {
+  color: #b91c1c;
+}
+
+.coordination-view-switch button.urgent > span {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.coordination-view-switch button.urgent.active {
+  color: #b91c1c;
+  background: #fff7f7;
+  box-shadow: 0 2px 7px rgba(220, 38, 38, 0.14);
+}
+
+.coordination-view-switch button.urgent.active > span {
+  color: white;
+  background: #dc2626;
+}
+
+.coordination-timeline.urgent-view {
+  background: #fffafa;
+}
+
+.coordination-conversation-empty.urgent-empty svg {
+  color: #16a34a;
+}
+
 .coordination-conversation.student-view {
   max-height: 600px;
   overflow-y: auto;
