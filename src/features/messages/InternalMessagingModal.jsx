@@ -148,8 +148,7 @@ export function InternalMessagingModal({
   }, [activeKey, activeConversation?.messages.length, sortedAnnouncements.length])
 
   function selectRecipient(email) {
-    setRecipientEmail(email)
-    setActiveKey(conversations.some((item) => item.email === email) ? email : NEW_MESSAGE_KEY)
+    setActiveKey(email)
     setStatus('')
   }
 
