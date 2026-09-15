@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   BellRing,
+  BookOpenCheck,
   Check,
   ChevronDown,
   Clock3,
   Inbox,
   MessageCircle,
+  Pencil,
   RefreshCw,
+  Save,
   Send,
   Trash2,
   UserRound,
   UsersRound,
+  X,
 } from 'lucide-react'
 import {
   getOpenTutoringReminders,
   groupTutoringCoordinationItemsByStudent,
+  isCoordinationItemInTutorialRecords,
   sortTutoringCoordinationItems,
 } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -42,11 +47,42 @@ function getMemberLabel(member, currentUser) {
   return member.name || member.displayName || member.emailLower || member.email || 'Cotutor'
 }
 
-function CoordinationMessage({ currentUser, item, memberStates, onDelete, onReminderStatus, student, spaceId }) {
+function CoordinationMessage({
+  currentUser,
+  isInTracking,
+  item,
+  memberStates,
+  onDelete,
+  onEdit,
+  onReminderStatus,
+  onSendToTracking,
+  student,
+  students,
+  spaceId,
+  trackingBusy,
+}) {
   const own = item.authorUid === currentUser?.uid
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(item.text)
+  const [editStudentId, setEditStudentId] = useState(item.studentId || '')
+  const [saving, setSaving] = useState(false)
   const seenByCotutor = own && memberStates.some(
     (state) => state.spaceId === spaceId && state.uid !== currentUser?.uid && state.lastReadAt >= item.createdAt,
   )
+
+  const startEditing = () => {
+    setEditText(item.text)
+    setEditStudentId(item.studentId || '')
+    setEditing(true)
+  }
+
+  const saveEdit = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    const saved = await onEdit(item, { studentId: editStudentId, text: editText })
+    setSaving(false)
+    if (saved) setEditing(false)
+  }
 
   return (
     <article className={`coordination-message ${own ? 'own' : ''} ${item.kind}`}>
@@ -55,13 +91,55 @@ function CoordinationMessage({ currentUser, item, memberStates, onDelete, onRemi
         <time>{formatDateTime(item.createdAt)}</time>
       </header>
       {item.kind === 'reminder' && <span className="coordination-kind"><BellRing size={13} /> Recordatori</span>}
-      <p>{item.text}</p>
-      {student && <span className="coordination-student">{student.name}</span>}
+      {editing ? (
+        <form className="coordination-edit-form" onSubmit={saveEdit}>
+          <textarea
+            autoFocus
+            maxLength={1600}
+            onChange={(event) => setEditText(event.target.value)}
+            rows={3}
+            value={editText}
+          />
+          <label>
+            Alumne relacionat
+            <select onChange={(event) => setEditStudentId(event.target.value)} value={editStudentId}>
+              <option value="">Cap alumne concret</option>
+              {students.map((studentOption) => (
+                <option key={studentOption.id} value={studentOption.id}>{studentOption.name}</option>
+              ))}
+            </select>
+          </label>
+          <div>
+            <button className="secondary-action compact" onClick={() => setEditing(false)} type="button">
+              <X size={14} /> Cancel·lar
+            </button>
+            <button className="primary-action compact" disabled={saving || !editText.trim()} type="submit">
+              <Save size={14} /> {saving ? 'Guardant…' : 'Desar canvis'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p>{item.text}</p>
+          {student && <span className="coordination-student">{student.name}</span>}
+        </>
+      )}
       <footer>
         {item.status === 'completed' && <span><Check size={13} /> Fet</span>}
         {item.syncStatus === 'pending' && <span>Enviant…</span>}
         {seenByCotutor && item.syncStatus !== 'pending' && <span>Vist pel cotutor</span>}
         <div className="coordination-message-actions">
+          {item.studentId && (
+            <button
+              className={`coordination-tracking ${isInTracking ? 'saved' : ''}`}
+              disabled={item.syncStatus === 'pending' || trackingBusy || isInTracking}
+              onClick={() => onSendToTracking(item)}
+              title={isInTracking ? 'Ja és al seguiment tutorial' : 'Desar aquest missatge al registre de seguiment tutorial'}
+              type="button"
+            >
+              <BookOpenCheck size={14} /> {isInTracking ? 'Al seguiment' : trackingBusy ? 'Desant…' : 'Enviar a seguiment'}
+            </button>
+          )}
           {item.kind === 'reminder' && item.status === 'completed' && (
             <button
               className="coordination-reopen"
@@ -73,16 +151,28 @@ function CoordinationMessage({ currentUser, item, memberStates, onDelete, onRemi
             </button>
           )}
           {own && (
-            <button
-              aria-label={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
-              className="coordination-delete"
-              disabled={item.syncStatus === 'pending'}
-              onClick={() => onDelete(item)}
-              title={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
-              type="button"
-            >
-              <Trash2 size={14} />
-            </button>
+            <>
+              <button
+                aria-label={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
+                className="coordination-edit"
+                disabled={item.syncStatus === 'pending' || editing}
+                onClick={startEditing}
+                title={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
+                type="button"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                aria-label={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
+                className="coordination-delete"
+                disabled={item.syncStatus === 'pending'}
+                onClick={() => onDelete(item)}
+                title={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
+                type="button"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
           )}
         </div>
       </footer>
@@ -97,6 +187,9 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
   const retrySync = useAvaluaproStore((state) => state.retryTutoringCoordinationSync)
   const setReminderCompleted = useAvaluaproStore((state) => state.setTutoringCoordinationReminderCompleted)
   const deleteItem = useAvaluaproStore((state) => state.deleteTutoringCoordinationItem)
+  const editItem = useAvaluaproStore((state) => state.editTutoringCoordinationItem)
+  const sendItemToTracking = useAvaluaproStore((state) => state.sendTutoringCoordinationItemToTracking)
+  const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const [view, setView] = useState('inbox')
   const [kind, setKind] = useState('message')
   const [text, setText] = useState('')
@@ -105,6 +198,8 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
   const [assigneeUid, setAssigneeUid] = useState('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [trackingBusyId, setTrackingBusyId] = useState('')
   const spaceId = activeClass?.sharedTutoringSpaceId || ''
   const activeSpace = cloud.sharedTutoringSpaces.find((space) => space.id === spaceId)
   const members = (activeSpace?.members || []).filter((member) => member.uid)
@@ -175,6 +270,34 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
     }
   }
 
+  const handleEdit = async (item, changes) => {
+    setError('')
+    setNotice('')
+    try {
+      await editItem(item.id, changes)
+      return true
+    } catch (editError) {
+      setError(editError.message || 'No s’ha pogut editar el missatge.')
+      return false
+    }
+  }
+
+  const handleSendToTracking = async (item) => {
+    setError('')
+    setNotice('')
+    setTrackingBusyId(item.id)
+    try {
+      const result = await sendItemToTracking(item.id, activeClass.id)
+      setNotice(result?.created
+        ? 'Missatge desat al registre de seguiment tutorial.'
+        : 'Aquest missatge ja era al registre de seguiment tutorial.')
+    } catch (trackingError) {
+      setError(trackingError.message || 'No s’ha pogut desar al seguiment tutorial.')
+    } finally {
+      setTrackingBusyId('')
+    }
+  }
+
   if (!spaceId) {
     return (
       <section className="tutoring-coordination-empty">
@@ -207,6 +330,7 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
           </button>
         </div>
       )}
+      {notice && <div className="coordination-notice" role="status"><Check size={16} /> {notice}</div>}
 
       <form className="coordination-composer" onSubmit={handleSubmit}>
         <div className="coordination-composer-heading">
@@ -324,13 +448,18 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
                 visibleItems.slice(-100).map((item) => (
                   <CoordinationMessage
                     currentUser={cloud.user}
+                    isInTracking={isCoordinationItemInTutorialRecords(item.id, tutorialRecords)}
                     item={item}
                     key={item.id}
                     memberStates={cloud.tutoringCoordinationMemberStates}
                     onDelete={handleDelete}
+                    onEdit={handleEdit}
                     onReminderStatus={handleReminderStatus}
+                    onSendToTracking={handleSendToTracking}
                     spaceId={spaceId}
                     student={studentById.get(item.studentId)}
+                    students={students}
+                    trackingBusy={trackingBusyId === item.id}
                   />
                 ))
               )}
@@ -357,13 +486,18 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
                     {group.items.map((item) => (
                       <CoordinationMessage
                         currentUser={cloud.user}
+                        isInTracking={isCoordinationItemInTutorialRecords(item.id, tutorialRecords)}
                         item={item}
                         key={item.id}
                         memberStates={cloud.tutoringCoordinationMemberStates}
                         onDelete={handleDelete}
+                        onEdit={handleEdit}
                         onReminderStatus={handleReminderStatus}
+                        onSendToTracking={handleSendToTracking}
                         spaceId={spaceId}
-                        student={null}
+                        student={studentById.get(item.studentId)}
+                        students={students}
+                        trackingBusy={trackingBusyId === item.id}
                       />
                     ))}
                   </div>

@@ -97,6 +97,8 @@ Poden compartir:
 - missatges i recordatoris de coordinacio, amb autoria, alumne opcional, responsable i termini;
 - estat de lectura individual de cada cotutor.
 
+Quan un docent envia un missatge vinculat a un alumne al seguiment tutorial, es crea una observacio al registre compartit. El registre conserva l'autor original, qui ha fet el traspas i l'identificador del missatge per evitar duplicats.
+
 Les eliminacions utilitzen tombstones per sincronitzar la baixa sense conservar el contingut pedagogic sensible. La revocacio talla la sincronitzacio futura, pero no pot retirar copies o exportacions ja obtingudes.
 
 Els avisos globals de coordinacio indiquen la classe i l'autor, pero no reprodueixen el text del missatge ni el nom de l'alumne fora de la pantalla de tutoria.

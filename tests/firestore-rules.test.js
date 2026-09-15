@@ -622,6 +622,18 @@ describe('cotutoria compartida', () => {
     )
   })
 
+  test('l autor pot editar el text i l alumne relacionat del seu missatge', async () => {
+    const itemRef = doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-edit')
+    await assertSucceeds(setDoc(itemRef, tutoringCoordinationItemData({ id: 'coord-edit' })))
+    await assertSucceeds(
+      updateDoc(itemRef, {
+        studentId: 'student-1',
+        text: 'Text revisat pel seu autor',
+        updatedAt: '2026-09-15T09:00:00.000Z',
+      }),
+    )
+  })
+
   test('l autor pot eliminar el contingut del seu missatge i no el pot fer reapareixer', async () => {
     const itemRef = doc(authDb(OWNER), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-delete')
     await assertSucceeds(setDoc(itemRef, tutoringCoordinationItemData({ id: 'coord-delete', studentId: 'student-1' })))

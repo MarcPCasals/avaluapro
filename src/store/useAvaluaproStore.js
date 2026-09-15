@@ -61,7 +61,11 @@ import {
   syncTutoringSpaceCollection,
   tombstoneTutoringSpaceRow,
 } from '../lib/firebase'
-import { mergeTutoringCoordinationItems } from '../lib/tutoringCoordination'
+import {
+  buildTutorialRecordFromCoordinationItem,
+  isCoordinationItemInTutorialRecords,
+  mergeTutoringCoordinationItems,
+} from '../lib/tutoringCoordination'
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
@@ -2822,6 +2826,81 @@ export const useAvaluaproStore = create((set, get) => ({
       },
     }))
     await flushTutoringCoordinationOutbox(set, get)
+  },
+
+  editTutoringCoordinationItem: async (itemId, { studentId = '', text = '' } = {}) => {
+    const state = get()
+    const user = state.cloud.user
+    const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
+    const cleanText = String(text || '').trim()
+    if (!user?.uid) throw new Error('Cal iniciar sessió per editar el missatge.')
+    if (!currentItem) return
+    if (currentItem.authorUid !== user.uid) throw new Error('Només pots editar els missatges que has escrit tu.')
+    if (currentItem.deletedAt) throw new Error('Aquest missatge ja està eliminat.')
+    if (currentItem.syncStatus === 'pending') throw new Error('Espera que el missatge s’hagi enviat.')
+    if (!cleanText) throw new Error('El missatge no pot quedar buit.')
+    if (cleanText.length > 1600) throw new Error('El missatge no pot superar els 1.600 caràcters.')
+    if (cleanText === currentItem.text && (studentId || '') === (currentItem.studentId || '')) return currentItem
+
+    const updatedAt = new Date().toISOString()
+    const item = {
+      ...currentItem,
+      studentId: studentId || '',
+      syncStatus: 'pending',
+      text: cleanText,
+      updatedAt,
+    }
+    const operation = {
+      createdAt: updatedAt,
+      id: `coord-item:${user.uid}:${item.spaceId}:${item.id}`,
+      item,
+      revision: updatedAt,
+      spaceId: item.spaceId,
+      type: 'item',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationItems: current.cloud.tutoringCoordinationItems.map((currentItem) =>
+          currentItem.id === item.id && currentItem.spaceId === item.spaceId ? item : currentItem,
+        ),
+        tutoringCoordinationStatus: 'pending',
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+    return item
+  },
+
+  sendTutoringCoordinationItemToTracking: async (itemId, classId = get().ui.activeClassId) => {
+    const state = get()
+    const user = state.cloud.user
+    const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
+    const classItem = state.classes.find((item) => item.id === classId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió per desar-ho al seguiment tutorial.')
+    if (!currentItem || currentItem.deletedAt) throw new Error('Aquest missatge ja no està disponible.')
+    if (!currentItem.studentId) throw new Error('Cal relacionar el missatge amb un alumne.')
+    if (!classItem || classItem.sharedTutoringSpaceId !== currentItem.spaceId) {
+      throw new Error('El missatge no correspon a aquesta tutoria.')
+    }
+    const studentBelongsToClass = state.students.some(
+      (student) => student.id === currentItem.studentId && student.classId === classId,
+    )
+    if (!studentBelongsToClass) throw new Error('L’alumne relacionat no pertany a aquesta tutoria.')
+    if (isCoordinationItemInTutorialRecords(currentItem.id, state.tutorialRecords)) {
+      return { created: false }
+    }
+
+    const record = buildTutorialRecordFromCoordinationItem({
+      classId,
+      importedByEmail: user.email,
+      importedByUid: user.uid,
+      item: currentItem,
+    })
+    if (!record) throw new Error('No s’ha pogut preparar el registre tutorial.')
+    set((current) => ({ tutorialRecords: [...current.tutorialRecords, record] }))
+    await persistCollections(set, get, ['tutorialRecords'])
+    return { created: true, record }
   },
 
   deleteTutoringCoordinationItem: async (itemId) => {

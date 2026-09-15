@@ -28600,7 +28600,8 @@ button.profile-followup-card:focus-visible {
   margin-left: auto;
 }
 
-.coordination-delete {
+.coordination-delete,
+.coordination-edit {
   width: 27px;
   height: 27px;
   display: inline-grid;
@@ -28612,13 +28613,76 @@ button.profile-followup-card:focus-visible {
   background: transparent;
 }
 
+.coordination-edit:hover {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
 .coordination-delete:hover {
   color: #b91c1c;
   background: #fee2e2;
 }
 
-.coordination-delete:disabled {
+.coordination-delete:disabled,
+.coordination-edit:disabled,
+.coordination-tracking:disabled {
   opacity: 0.45;
+}
+
+.coordination-tracking {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.coordination-tracking.saved {
+  color: #64748b;
+  background: #e2e8f0;
+}
+
+.coordination-edit-form {
+  display: grid;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.coordination-edit-form textarea,
+.coordination-edit-form select {
+  width: 100%;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  padding: 8px 9px;
+  color: #1f2937;
+  background: white;
+  font: inherit;
+}
+
+.coordination-edit-form textarea {
+  resize: vertical;
+}
+
+.coordination-edit-form label {
+  display: grid;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.coordination-edit-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
 }
 
 .coordination-message p {
@@ -28654,6 +28718,19 @@ button.profile-followup-card:focus-visible {
 .coordination-student {
   color: #1d4ed8;
   background: #dbeafe;
+}
+
+.coordination-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #86efac;
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: #166534;
+  background: #f0fdf4;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .coordination-composer {

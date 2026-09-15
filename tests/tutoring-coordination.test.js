@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import {
+  buildTutorialRecordFromCoordinationItem,
   getDueTutoringReminders,
   getOpenTutoringReminders,
   getUnreadTutoringCoordinationItems,
   groupTutoringCoordinationItemsByStudent,
+  isCoordinationItemInTutorialRecords,
   mergeTutoringCoordinationItems,
 } from '../src/lib/tutoringCoordination.js'
 
@@ -74,5 +76,30 @@ describe('coordinacio de cotutoria', () => {
 
     assert.deepEqual(grouped.map((group) => group.label), ['Alumna Un', 'Missatges generals'])
     assert.deepEqual(grouped[0].items.map((item) => item.id), ['message-1', 'reminder-1'])
+  })
+
+  test('crea un registre tutorial unic preservant autoria i alumne del missatge', () => {
+    const item = {
+      ...items[0],
+      authorEmail: 'tutor@educand.ad',
+      authorName: 'Tutor original',
+      studentId: 'student-1',
+      text: 'Observació compartida',
+    }
+    const record = buildTutorialRecordFromCoordinationItem({
+      classId: 'class-1',
+      importedByEmail: 'cotutor@educand.ad',
+      importedByUid: 'tutor-b',
+      item,
+      now: '2026-09-15T11:00:00.000Z',
+    })
+
+    assert.equal(record.id, 'trecord_coord_message-1')
+    assert.equal(record.type, 'tutorial-observation')
+    assert.equal(record.studentId, 'student-1')
+    assert.equal(record.note, 'Observació compartida')
+    assert.equal(record.authorName, 'Tutor original')
+    assert.equal(record.importedByUid, 'tutor-b')
+    assert.equal(isCoordinationItemInTutorialRecords(item.id, [record]), true)
   })
 })

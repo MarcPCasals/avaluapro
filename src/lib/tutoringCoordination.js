@@ -72,3 +72,46 @@ export function groupTutoringCoordinationItemsByStudent(items = [], students = [
     return a.label.localeCompare(b.label, 'ca')
   })
 }
+
+export function getTutorialRecordIdForCoordinationItem(itemId = '') {
+  const safeItemId = String(itemId).replaceAll('/', '_').trim()
+  return safeItemId ? `trecord_coord_${safeItemId}` : ''
+}
+
+export function isCoordinationItemInTutorialRecords(itemId, tutorialRecords = []) {
+  if (!itemId) return false
+  const recordId = getTutorialRecordIdForCoordinationItem(itemId)
+  return tutorialRecords.some(
+    (record) => record.id === recordId || record.sourceCoordinationItemId === itemId,
+  )
+}
+
+export function buildTutorialRecordFromCoordinationItem({
+  classId,
+  importedByEmail = '',
+  importedByUid = '',
+  item,
+  now = new Date().toISOString(),
+}) {
+  if (!classId || !item?.id || !item.studentId || !String(item.text || '').trim()) return null
+
+  return {
+    authorEmail: item.authorEmail || '',
+    authorName: item.authorName || item.authorEmail || '',
+    classId,
+    createdAt: now,
+    date: String(item.createdAt || now).slice(0, 10),
+    id: getTutorialRecordIdForCoordinationItem(item.id),
+    importedAt: now,
+    importedByEmail,
+    importedByUid,
+    note: String(item.text).trim(),
+    source: 'tutoring-coordination',
+    sourceCoordinationItemId: item.id,
+    sourceCoordinationSpaceId: item.spaceId || '',
+    sourceMessageCreatedAt: item.createdAt || '',
+    studentId: item.studentId,
+    type: 'tutorial-observation',
+    updatedAt: now,
+  }
+}
