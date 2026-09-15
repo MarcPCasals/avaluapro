@@ -28315,6 +28315,40 @@ button.profile-followup-card:focus-visible {
 .student-profile-response-sections article { display: grid; gap: 4px; padding: 10px 11px; border-radius: 10px; background: #f8fafc; }
 .student-profile-response-sections span { color: #64748b; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; }
 .student-profile-response-sections strong { overflow-wrap: anywhere; white-space: pre-wrap; }
+.student-profile-response-sections .student-profile-response-guardians { align-items: stretch; gap: 14px; }
+.student-profile-response-guardians > article {
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #cbdbe8;
+  border-radius: 13px;
+  background: white;
+}
+.student-profile-response-guardians > article:nth-child(2) { border-color: #d8d1ef; }
+.student-profile-response-guardians h4 {
+  margin: 0;
+  padding: 12px 14px;
+  color: #0f5f66;
+  background: #eaf7f6;
+  font-size: 0.94rem;
+}
+.student-profile-response-guardians > article:nth-child(2) h4 { color: #5b3f91; background: #f2effa; }
+.student-profile-response-guardians dl { display: grid; margin: 0; padding: 4px 14px 10px; }
+.student-profile-response-guardians dl > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.38fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e8eef3;
+}
+.student-profile-response-guardians dl > div:last-child { border-bottom: 0; }
+.student-profile-response-guardians dt {
+  color: #64748b;
+  font-size: 0.73rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.student-profile-response-guardians dd { margin: 0; color: #1e293b; font-weight: 800; overflow-wrap: anywhere; }
 .student-profile-response-actions { flex-wrap: wrap; }
 .student-profile-response-actions small { flex-basis: 100%; color: #64748b; }
 .student-profile-edit-modal .modal-body { padding: 0; }
@@ -28345,6 +28379,7 @@ button.profile-followup-card:focus-visible {
   .student-profile-guardian-grid,
   .student-profile-priority-grid,
   .student-profile-response-sections section > div { grid-template-columns: 1fr; }
+  .student-profile-response-guardians dl > div { grid-template-columns: minmax(100px, 0.34fr) minmax(0, 1fr); }
   .student-profile-survey-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .student-profile-portrait-grid { grid-template-columns: 1fr; }
   .student-profile-portrait-grid.extended { grid-template-columns: 1fr; }

@@ -133,6 +133,28 @@ test('mostra el text declarat dins dels avisos de salut i pauta mèdica', () => 
   assert.equal(flags.find((flag) => flag.id === 'medical').detail, 'Porta autoinjector a la motxilla')
 })
 
+test('els avisos que amaguen informació tutorial inclouen el detall consultable', () => {
+  const flags = getStudentProfilePriorityFlags({
+    ...createEmptyStudentProfileAnswers(),
+    currentSupports: ['Logopèdia', 'Un altre suport'],
+    currentSupportOther: 'Seguiment extern',
+    familySituation: 'explain',
+    familySituationDetails: 'Informació familiar rellevant',
+    previousSchoolSupport: 'yes',
+    repeatedCourse: 'yes',
+    repeatedCourseDetails: '5è de primària',
+    reinforcementActivities: [{ activity: 'Matemàtiques', hours: '2' }],
+    schoolSupportTypes: ['Adaptació metodològica'],
+  })
+
+  assert.match(flags.find((flag) => flag.id === 'support').detail, /Logopèdia.*Seguiment extern/)
+  assert.equal(flags.find((flag) => flag.id === 'family').detail, 'Informació familiar rellevant')
+  assert.equal(flags.find((flag) => flag.id === 'repeat').detail, '5è de primària')
+  assert.equal(flags.find((flag) => flag.id === 'school-support').detail, 'Adaptació metodològica')
+  assert.equal(flags.find((flag) => flag.id === 'reinforcement').detail, 'Matemàtiques · 2 h/setmana')
+  assert.equal(flags.find((flag) => flag.id === 'no-home-device'), undefined)
+})
+
 test('neteja camps antics o mal formats abans d’enviar una resposta', () => {
   const normalized = normalizeStudentProfileAnswers({
     birthPlace: 'Ordino',

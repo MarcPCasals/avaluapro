@@ -54,12 +54,23 @@ const ANSWER_GROUPS = [
   },
   {
     title: 'Responsables',
-    fields: [
-      ['guardian1Name', 'Primer responsable'], ['guardian1Relationship', 'Vincle'],
-      ['guardian1Phone', 'Primer telèfon'], ['guardian1Profession', 'Professió'],
-      ['guardian1Workplace', 'Lloc de treball'], ['guardian2Name', 'Segon responsable'],
-      ['guardian2Relationship', 'Vincle del segon responsable'], ['guardian2Phone', 'Segon telèfon'],
-      ['guardian2Profession', 'Professió del segon responsable'], ['guardian2Workplace', 'Segon lloc de treball'],
+    guardianGroups: [
+      {
+        title: 'Primer responsable',
+        fields: [
+          ['guardian1Name', 'Nom i cognoms'], ['guardian1Relationship', 'Vincle'],
+          ['guardian1Phone', 'Telèfon'], ['guardian1Profession', 'Professió'],
+          ['guardian1Workplace', 'Lloc de treball'],
+        ],
+      },
+      {
+        title: 'Segon responsable',
+        fields: [
+          ['guardian2Name', 'Nom i cognoms'], ['guardian2Relationship', 'Vincle'],
+          ['guardian2Phone', 'Telèfon'], ['guardian2Profession', 'Professió'],
+          ['guardian2Workplace', 'Lloc de treball'],
+        ],
+      },
     ],
   },
   {
@@ -400,6 +411,34 @@ function StudentProfileResponseModal({ onClose, onDelete, onReview, onSave, resp
 
       <div className="student-profile-response-sections">
         {ANSWER_GROUPS.map((group) => {
+          if (group.guardianGroups) {
+            const visibleGuardians = group.guardianGroups
+              .map((guardian) => ({
+                ...guardian,
+                visibleFields: guardian.fields
+                  .map(([key, label]) => ({ key, label, value: formatAnswer(answers[key], studentNamesById) }))
+                  .filter((field) => field.value),
+              }))
+              .filter((guardian) => guardian.visibleFields.length > 0)
+            if (visibleGuardians.length === 0) return null
+            return (
+              <section className="student-profile-response-guardian-section" key={group.title}>
+                <h3>{group.title}</h3>
+                <div className="student-profile-response-guardians">
+                  {visibleGuardians.map((guardian) => (
+                    <article key={guardian.title}>
+                      <h4>{guardian.title}</h4>
+                      <dl>
+                        {guardian.visibleFields.map((field) => (
+                          <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>
+                        ))}
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )
+          }
           const visibleFields = group.fields
             .map(([key, label]) => ({ key, label, value: formatAnswer(answers[key], studentNamesById) }))
             .filter((field) => field.value)

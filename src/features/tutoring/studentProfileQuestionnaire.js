@@ -508,6 +508,19 @@ export function getStudentProfilePersonalStepError(answers = {}) {
 }
 
 export function getStudentProfilePriorityFlags(answers = {}) {
+  const supportDetails = [
+    ...(Array.isArray(answers.currentSupports) ? answers.currentSupports : []),
+    answers.currentSupportOther?.trim(),
+  ].filter(Boolean).join(' · ')
+  const schoolSupportDetails = [
+    ...(Array.isArray(answers.schoolSupportTypes) ? answers.schoolSupportTypes : []),
+    answers.schoolSupportOther?.trim(),
+  ].filter(Boolean).join(' · ')
+  const reinforcementDetails = (Array.isArray(answers.reinforcementActivities) ? answers.reinforcementActivities : [])
+    .map((activity) => [activity?.activity?.trim(), activity?.hours ? `${activity.hours} h/setmana` : ''].filter(Boolean).join(' · '))
+    .filter(Boolean)
+    .join('\n')
+
   return [
     answers.healthSituation === 'yes' && {
       detail: answers.healthDetails?.trim() || 'Ha indicat que sí, però no ha afegit cap detall.',
@@ -534,6 +547,7 @@ export function getStudentProfilePriorityFlags(answers = {}) {
       tone: 'amber',
     },
     answers.currentSupports?.includes('Prefereixo no respondre') && {
+      detail: 'Ha triat «Prefereixo no respondre» a la pregunta sobre suports o seguiments actuals.',
       id: 'support-private',
       label: 'Prefereix parlar dels suports personalment',
       tone: 'amber',
@@ -541,23 +555,41 @@ export function getStudentProfilePriorityFlags(answers = {}) {
     answers.currentSupports?.length > 0 &&
       !answers.currentSupports.includes('Cap') &&
       !answers.currentSupports.includes('Prefereixo no respondre') && {
+        detail: supportDetails || 'Ha indicat que rep suport o seguiment, però no n’ha concretat el tipus.',
         id: 'support',
         label: 'Rep suport o seguiment',
         tone: 'amber',
       },
     answers.familySituation === 'explain' && {
+      detail: answers.familySituationDetails?.trim() || 'Ha indicat que hi ha una situació familiar rellevant, però no n’ha afegit cap explicació.',
       id: 'family',
       label: 'Situació familiar rellevant',
       tone: 'amber',
     },
     answers.familySituation === 'talk' && {
+      detail: 'Ha triat «Prefereixo parlar-ne personalment» a la pregunta sobre la situació familiar.',
       id: 'family-talk',
       label: 'Vol parlar personalment de la situació familiar',
       tone: 'amber',
     },
-    answers.repeatedCourse === 'yes' && { id: 'repeat', label: 'Ha repetit curs', tone: 'blue' },
-    answers.previousSchoolSupport === 'yes' && { id: 'school-support', label: 'Ha rebut suport escolar', tone: 'blue' },
-    answers.reinforcementActivities?.length > 0 && { id: 'reinforcement', label: 'Fa reforç escolar', tone: 'blue' },
+    answers.repeatedCourse === 'yes' && {
+      detail: answers.repeatedCourseDetails?.trim() || 'Ha indicat que ha repetit algun curs, però no ha concretat quin.',
+      id: 'repeat',
+      label: 'Ha repetit curs',
+      tone: 'blue',
+    },
+    answers.previousSchoolSupport === 'yes' && {
+      detail: schoolSupportDetails || 'Ha indicat que ha rebut suport escolar, però no n’ha concretat el tipus.',
+      id: 'school-support',
+      label: 'Ha rebut suport escolar',
+      tone: 'blue',
+    },
+    answers.reinforcementActivities?.length > 0 && {
+      detail: reinforcementDetails || 'Ha indicat que fa reforç escolar, però no n’ha concretat l’activitat.',
+      id: 'reinforcement',
+      label: 'Fa reforç escolar',
+      tone: 'blue',
+    },
     answers.homeDeviceAccess === 'no' && {
       id: 'no-home-device',
       label: 'No disposa de cap dispositiu per estudiar a casa',
