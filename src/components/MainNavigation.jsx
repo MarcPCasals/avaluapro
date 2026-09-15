@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
-import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
+import { getUnreadTutoringCoordinationItems, getUrgentTutoringMessages } from '../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 const modes = [
@@ -88,15 +88,57 @@ function UrgentModal({ profiles, onClose }) {
   )
 }
 
+function UrgentMessagesModal({ classes, items, onClose, onOpen, students }) {
+  return (
+    <Modal onClose={onClose} size="lg" title="Missatges urgents de cotutoria">
+      <div className="urgent-messages-modal">
+        <p>Aquest historial reuneix els missatges marcats com a urgents pels tutors.</p>
+        {items.length === 0 ? (
+          <div className="urgent-empty-state">
+            <CheckCircle2 size={22} />
+            <strong>No hi ha cap missatge urgent.</strong>
+          </div>
+        ) : (
+          <div className="urgent-message-list">
+            {items.map((item) => {
+              const classItem = classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
+              const student = students.find((candidate) => candidate.id === item.studentId)
+              return (
+                <article key={`${item.spaceId}_${item.id}`}>
+                  <div>
+                    <strong>{student?.name || 'Missatge general'}</strong>
+                    <span>{classItem?.name || 'Tutoria compartida'} · {item.authorName || item.authorEmail}</span>
+                  </div>
+                  <p>{item.text}</p>
+                  <button className="primary-action compact" onClick={() => onOpen(item)} type="button">
+                    Obrir coordinació
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 export function MainNavigation() {
   const [showUrgent, setShowUrgent] = useState(false)
+  const [showUrgentMessages, setShowUrgentMessages] = useState(false)
   const state = useAvaluaproStore()
   const { activeClassId, activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveInsight = useAvaluaproStore((state) => state.setActiveInsight)
+  const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
   const onboarding = useAvaluaproStore((state) => state.onboarding)
   const activeClass = useAvaluaproStore((state) => state.classes.find((classItem) => classItem.id === activeClassId))
   const urgentProfiles = useMemo(() => getUrgentProfiles(state), [state])
+  const urgentMessages = useMemo(
+    () => getUrgentTutoringMessages(state.cloud.tutoringCoordinationItems),
+    [state.cloud.tutoringCoordinationItems],
+  )
   const tutoringUnreadCount = useMemo(
     () =>
       getUnreadTutoringCoordinationItems(
@@ -116,6 +158,13 @@ export function MainNavigation() {
     if (!onboarding.tutoringGuideSeen) {
       useAvaluaproStore.getState().openGuide('tutoring')
     }
+  }
+  const handleOpenUrgentMessage = async (item) => {
+    const classItem = state.classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
+    if (classItem) await setActiveClass(classItem.id)
+    setActiveMode('tutoring')
+    setActiveTutoringPanel('coordination')
+    setShowUrgentMessages(false)
   }
 
   return (
@@ -169,6 +218,15 @@ export function MainNavigation() {
           </button>
         )}
         <button
+          className={`urgent-message-tab ${urgentMessages.length > 0 ? 'has-items' : ''}`}
+          onClick={() => setShowUrgentMessages(true)}
+          type="button"
+        >
+          <AlertOctagon size={18} />
+          Missatges urgents
+          <span>{urgentMessages.length}</span>
+        </button>
+        <button
           className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
           data-tour="urgent-button"
           onClick={() => setShowUrgent(true)}
@@ -180,6 +238,15 @@ export function MainNavigation() {
         </button>
       </div>
       {showUrgent && <UrgentModal profiles={urgentProfiles} onClose={() => setShowUrgent(false)} />}
+      {showUrgentMessages && (
+        <UrgentMessagesModal
+          classes={state.classes}
+          items={urgentMessages}
+          onClose={() => setShowUrgentMessages(false)}
+          onOpen={handleOpenUrgentMessage}
+          students={state.students}
+        />
+      )}
     </div>
   )
 }

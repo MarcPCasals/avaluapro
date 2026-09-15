@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   BellRing,
   BookOpenCheck,
   Check,
@@ -47,6 +48,37 @@ function getMemberLabel(member, currentUser) {
   return member.name || member.displayName || member.emailLower || member.email || 'Cotutor'
 }
 
+function StudentAutocomplete({ inputId, onChange, students, value }) {
+  const selectedStudent = students.find((student) => student.id === value)
+  const [query, setQuery] = useState(selectedStudent?.name || '')
+
+  const handleChange = (event) => {
+    const nextQuery = event.target.value
+    const normalizedQuery = nextQuery.trim().toLocaleLowerCase('ca')
+    const match = students.find(
+      (student) => student.name.trim().toLocaleLowerCase('ca') === normalizedQuery,
+    )
+    setQuery(nextQuery)
+    onChange(match?.id || '')
+  }
+
+  return (
+    <label>
+      Alumne relacionat
+      <input
+        autoComplete="off"
+        list={`${inputId}-students`}
+        onChange={handleChange}
+        placeholder="Escriu el nom de l’alumne…"
+        value={query}
+      />
+      <datalist id={`${inputId}-students`}>
+        {students.map((student) => <option key={student.id} value={student.name} />)}
+      </datalist>
+    </label>
+  )
+}
+
 function CoordinationMessage({
   currentUser,
   isInTracking,
@@ -87,10 +119,14 @@ function CoordinationMessage({
   return (
     <article className={`coordination-message ${own ? 'own' : ''} ${item.kind}`}>
       <header>
-        <strong>{own ? 'Tu' : item.authorName || item.authorEmail}</strong>
+        <span className="coordination-message-author">
+          <strong>{own ? 'Tu' : item.authorName || item.authorEmail}</strong>
+          {!editing && student && <span className="coordination-student">{student.name}</span>}
+        </span>
         <time>{formatDateTime(item.createdAt)}</time>
       </header>
       {item.kind === 'reminder' && <span className="coordination-kind"><BellRing size={13} /> Recordatori</span>}
+      {item.kind === 'urgent' && <span className="coordination-kind urgent"><AlertTriangle size={13} /> Urgent</span>}
       {editing ? (
         <form className="coordination-edit-form" onSubmit={saveEdit}>
           <textarea
@@ -100,15 +136,13 @@ function CoordinationMessage({
             rows={3}
             value={editText}
           />
-          <label>
-            Alumne relacionat
-            <select onChange={(event) => setEditStudentId(event.target.value)} value={editStudentId}>
-              <option value="">Cap alumne concret</option>
-              {students.map((studentOption) => (
-                <option key={studentOption.id} value={studentOption.id}>{studentOption.name}</option>
-              ))}
-            </select>
-          </label>
+          <StudentAutocomplete
+            inputId={`coordination-edit-${item.id}`}
+            key={editStudentId || 'empty'}
+            onChange={setEditStudentId}
+            students={students}
+            value={editStudentId}
+          />
           <div>
             <button className="secondary-action compact" onClick={() => setEditing(false)} type="button">
               <X size={14} /> Cancel·lar
@@ -121,7 +155,6 @@ function CoordinationMessage({
       ) : (
         <>
           <p>{item.text}</p>
-          {student && <span className="coordination-student">{student.name}</span>}
         </>
       )}
       <footer>
@@ -150,18 +183,17 @@ function CoordinationMessage({
               Reobrir
             </button>
           )}
+          <button
+            aria-label={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
+            className="coordination-edit"
+            disabled={item.syncStatus === 'pending' || editing}
+            onClick={startEditing}
+            title={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
+            type="button"
+          >
+            <Pencil size={14} />
+          </button>
           {own && (
-            <>
-              <button
-                aria-label={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
-                className="coordination-edit"
-                disabled={item.syncStatus === 'pending' || editing}
-                onClick={startEditing}
-                title={item.kind === 'reminder' ? 'Editar recordatori' : 'Editar missatge'}
-                type="button"
-              >
-                <Pencil size={14} />
-              </button>
               <button
                 aria-label={item.kind === 'reminder' ? 'Eliminar recordatori' : 'Eliminar missatge'}
                 className="coordination-delete"
@@ -172,7 +204,6 @@ function CoordinationMessage({
               >
                 <Trash2 size={14} />
               </button>
-            </>
           )}
         </div>
       </footer>
@@ -208,9 +239,10 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
     [cloud.tutoringCoordinationItems, spaceId],
   )
   const visibleItems = useMemo(() => items.filter((item) => !item.deletedAt), [items])
+  const messageItems = useMemo(() => visibleItems.filter((item) => item.kind !== 'reminder'), [visibleItems])
   const studentGroups = useMemo(
-    () => groupTutoringCoordinationItemsByStudent(visibleItems, students),
-    [students, visibleItems],
+    () => groupTutoringCoordinationItemsByStudent(messageItems, students),
+    [messageItems, students],
   )
   const openReminders = useMemo(
     () =>
@@ -228,10 +260,11 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const shouldRegister = event.nativeEvent.submitter?.value === 'send-and-register'
     setBusy(true)
     setError('')
     try {
-      await addItem({
+      const item = await addItem({
         assigneeUid,
         classId: activeClass.id,
         dueAt: toIsoDateTime(dueAt),
@@ -239,10 +272,12 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
         studentId,
         text,
       })
+      if (shouldRegister) await sendItemToTracking(item.id, activeClass.id)
       setText('')
       setStudentId('')
       setDueAt('')
       setAssigneeUid('all')
+      if (shouldRegister) setNotice('Missatge enviat i desat al registre de seguiment tutorial.')
     } catch (submitError) {
       setError(submitError.message || 'No s’ha pogut guardar aquesta informació.')
     } finally {
@@ -339,6 +374,9 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
             <button className={kind === 'message' ? 'active' : ''} onClick={() => setKind('message')} type="button">
               <MessageCircle size={15} /> Missatge
             </button>
+            <button className={kind === 'urgent' ? 'active urgent' : ''} onClick={() => setKind('urgent')} type="button">
+              <AlertTriangle size={15} /> Urgent
+            </button>
             <button className={kind === 'reminder' ? 'active reminder' : ''} onClick={() => setKind('reminder')} type="button">
               <BellRing size={15} /> Recordatori
             </button>
@@ -352,13 +390,13 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
           value={text}
         />
         <div className="coordination-composer-options">
-          <label>
-            Alumne relacionat
-            <select onChange={(event) => setStudentId(event.target.value)} value={studentId}>
-              <option value="">Cap alumne concret</option>
-              {students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}
-            </select>
-          </label>
+          <StudentAutocomplete
+            inputId="coordination-composer"
+            key={studentId || 'empty'}
+            onChange={setStudentId}
+            students={students}
+            value={studentId}
+          />
           {kind === 'reminder' && (
             <>
               <label>
@@ -376,15 +414,26 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
               </label>
             </>
           )}
-          <button className="primary-action coordination-send" disabled={busy || !text.trim()} type="submit">
+          <button className="primary-action coordination-send" disabled={busy || !text.trim()} type="submit" value="send">
             <Send size={16} /> {busy ? 'Guardant…' : kind === 'reminder' ? 'Afegir recordatori' : 'Enviar'}
           </button>
+          {kind !== 'reminder' && (
+            <button
+              className="secondary-action coordination-send-register"
+              disabled={busy || !text.trim() || !studentId}
+              title={!studentId ? 'Selecciona primer un alumne de les propostes' : 'Enviar i desar al seguiment tutorial'}
+              type="submit"
+              value="send-and-register"
+            >
+              <BookOpenCheck size={16} /> Enviar i registrar
+            </button>
+          )}
         </div>
       </form>
 
       <nav className="coordination-view-switch" aria-label="Organització dels missatges">
         <button className={view === 'inbox' ? 'active' : ''} onClick={() => setView('inbox')} type="button">
-          <Inbox size={16} /> Safata <span>{visibleItems.length}</span>
+          <Inbox size={16} /> Safata <span>{messageItems.length}</span>
         </button>
         <button className={view === 'students' ? 'active' : ''} onClick={() => setView('students')} type="button">
           <UserRound size={16} /> Per alumne <span>{studentGroups.filter((group) => group.studentId).length}</span>
@@ -438,14 +487,14 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
         <div className={`coordination-conversation ${view === 'students' ? 'student-view' : ''}`}>
           {view === 'inbox' ? (
             <div className="coordination-timeline" aria-live="polite">
-              {visibleItems.length === 0 ? (
+              {messageItems.length === 0 ? (
                 <div className="coordination-conversation-empty">
                   <UsersRound size={28} />
                   <strong>Encara no hi ha cap missatge.</strong>
                   <span>Comença deixant una informació o un acord per al cotutor.</span>
                 </div>
               ) : (
-                visibleItems.slice(-100).map((item) => (
+                [...messageItems].reverse().slice(0, 100).map((item) => (
                   <CoordinationMessage
                     currentUser={cloud.user}
                     isInTracking={isCoordinationItemInTutorialRecords(item.id, tutorialRecords)}

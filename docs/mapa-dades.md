@@ -94,7 +94,7 @@ Poden compartir:
 - layouts i disposicions;
 - rols;
 - antecedents.
-- missatges i recordatoris de coordinacio, amb autoria, alumne opcional, responsable i termini;
+- missatges normals, urgents i recordatoris de coordinacio, amb autoria, alumne opcional, responsable i termini;
 - estat de lectura individual de cada cotutor.
 
 Quan un docent envia un missatge vinculat a un alumne al seguiment tutorial, es crea una observacio al registre compartit. El registre conserva l'autor original, qui ha fet el traspas i l'identificador del missatge per evitar duplicats.

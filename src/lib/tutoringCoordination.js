@@ -34,8 +34,14 @@ export function getOpenTutoringReminders(items = [], uid = '') {
 }
 
 export function getDueTutoringReminders(items = [], uid = '', now = new Date()) {
-  const nowIso = now.toISOString()
-  return getOpenTutoringReminders(items, uid).filter((item) => item.dueAt && item.dueAt <= nowIso)
+  const warningLimit = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString()
+  return getOpenTutoringReminders(items, uid).filter((item) => item.dueAt && item.dueAt <= warningLimit)
+}
+
+export function getUrgentTutoringMessages(items = []) {
+  return sortTutoringCoordinationItems(items)
+    .filter((item) => item.kind === 'urgent' && !item.deletedAt)
+    .reverse()
 }
 
 export function getTutoringCoordinationCounts(items = [], memberStates = [], uid = '') {

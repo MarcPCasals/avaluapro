@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellRing, CheckCircle2, Clock3, Mail, MessageCircle, Skull } from 'lucide-react'
+import { AlertOctagon, Bell, BellRing, CheckCircle2, Clock3, Mail, MessageCircle, Skull } from 'lucide-react'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import {
   getDueTutoringReminders,
@@ -97,6 +97,9 @@ export function GlobalReminderLayer() {
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
   const markTutoringCoordinationRead = useAvaluaproStore((state) => state.markTutoringCoordinationRead)
+  const setTutoringCoordinationReminderCompleted = useAvaluaproStore(
+    (state) => state.setTutoringCoordinationReminderCompleted,
+  )
   const [tick, setTick] = useState(() => Date.now())
 
   useEffect(() => {
@@ -218,6 +221,10 @@ export function GlobalReminderLayer() {
     await markTutoringCoordinationRead(item.spaceId)
   }
 
+  const acceptCoordinationReminder = async (item) => {
+    await setTutoringCoordinationReminderCompleted(item.id, true)
+  }
+
   if (visibleAttentionCount === 0) return null
 
   return (
@@ -233,12 +240,18 @@ export function GlobalReminderLayer() {
         const classItem = classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
         const isDue = item.attention.includes('due')
         return (
-          <article className={`global-reminder-card coordination ${isDue ? 'due' : ''}`} key={`coord_${item.spaceId}_${item.id}`}>
-            {item.kind === 'reminder' ? <BellRing size={19} /> : <MessageCircle size={19} />}
+          <article className={`global-reminder-card coordination ${isDue ? 'due' : ''} ${item.kind === 'urgent' ? 'urgent' : ''}`} key={`coord_${item.spaceId}_${item.id}`}>
+            {item.kind === 'reminder'
+              ? <BellRing size={19} />
+              : item.kind === 'urgent'
+                ? <AlertOctagon size={19} />
+                : <MessageCircle size={19} />}
             <div>
               <strong>
                 {isDue
-                  ? 'Recordatori de cotutoria pendent'
+                  ? 'Recordatori de cotutoria: falten menys de 2 hores'
+                  : item.kind === 'urgent'
+                    ? 'Missatge urgent de cotutoria'
                   : item.kind === 'reminder'
                     ? 'Nou recordatori de cotutoria'
                     : 'Nou missatge de cotutoria'}
@@ -247,9 +260,14 @@ export function GlobalReminderLayer() {
               <small>{item.authorName || item.authorEmail}</small>
             </div>
             <div className="global-reminder-actions">
-              <button className="primary-action compact" onClick={() => openCoordinationItem(item)} type="button">
+              <button className="secondary-action compact" onClick={() => openCoordinationItem(item)} type="button">
                 Obrir coordinació
               </button>
+              {isDue && item.kind === 'reminder' && (
+                <button className="primary-action compact" onClick={() => acceptCoordinationReminder(item)} type="button">
+                  <CheckCircle2 size={15} /> Acceptar recordatori
+                </button>
+              )}
             </div>
           </article>
         )

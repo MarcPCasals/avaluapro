@@ -2756,7 +2756,7 @@ export const useAvaluaproStore = create((set, get) => ({
       deletedByUid: '',
       dueAt: kind === 'reminder' ? dueAt || '' : '',
       id: createId('coord').replaceAll('/', '_'),
-      kind: kind === 'reminder' ? 'reminder' : 'message',
+      kind: ['reminder', 'urgent'].includes(kind) ? kind : 'message',
       spaceId: classItem.sharedTutoringSpaceId,
       status: kind === 'reminder' ? 'open' : 'sent',
       studentId: studentId || '',
@@ -2835,7 +2835,6 @@ export const useAvaluaproStore = create((set, get) => ({
     const cleanText = String(text || '').trim()
     if (!user?.uid) throw new Error('Cal iniciar sessió per editar el missatge.')
     if (!currentItem) return
-    if (currentItem.authorUid !== user.uid) throw new Error('Només pots editar els missatges que has escrit tu.')
     if (currentItem.deletedAt) throw new Error('Aquest missatge ja està eliminat.')
     if (currentItem.syncStatus === 'pending') throw new Error('Espera que el missatge s’hagi enviat.')
     if (!cleanText) throw new Error('El missatge no pot quedar buit.')

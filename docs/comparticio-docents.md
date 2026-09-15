@@ -114,9 +114,12 @@ Els avisos que apareixen fora de la tutoria no mostren el text ni l'alumne: nome
 
 - nomes els membres actius de la cotutoria poden llegir o crear entrades;
 - l'autoria no es pot suplantar;
-- nomes l'autor pot modificar o marcar com a eliminat el seu missatge;
+- qualsevol dels cotutors pot corregir el text o l'alumne relacionat, sense alterar l'autoria original;
+- nomes l'autor pot marcar com a eliminat el seu missatge;
 - un missatge vinculat a un alumne es pot copiar una sola vegada al registre de seguiment tutorial, conservant l'autoria i la referencia d'origen;
+- els missatges urgents queden destacats en vermell i reunits en un acces global propi;
 - qualsevol cotutor pot completar o reobrir un recordatori;
+- els recordatoris reapareixen com a avis global dues hores abans i es mantenen fins que un tutor els accepta;
 - cada membre nomes pot actualitzar el seu propi estat de lectura;
 - l'eliminacio fisica directa queda bloquejada.
 
@@ -199,7 +202,7 @@ Des del 20 de juny de 2026, el formulari informa abans de respondre sobre finali
 | Restriccio explicita de subcol.leccions | Implementada localment; qualsevol col.leccio no prevista queda bloquejada. |
 | Missatgeria i recordatoris | Implementats, provats i desplegats; prova d'intercanvi real entre dos comptes pendent. |
 | Qüestionari sociometric public | Token individual, identitat fixada, un sol us, caducitat de 24 hores i eliminacio manual completa implementats localment. |
-| Proves automatitzades | 54 proves de rules, 6 de fusio compartida i 8 especifiques de coordinacio superades. |
+| Proves automatitzades | 55 proves de rules, 6 de fusio compartida i 9 especifiques de coordinacio superades. |
 
 ## 7. Eliminacio i tombstones
 

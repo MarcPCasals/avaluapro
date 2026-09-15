@@ -607,19 +607,44 @@ describe('cotutoria compartida', () => {
     )
   })
 
-  test('un cotutor no pot editar el text escrit per l altre', async () => {
+  test('un cotutor pot editar el text escrit per l altre sense alterar-ne l autoria', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
         doc(context.firestore(), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'),
         tutoringCoordinationItemData(),
       )
     })
-    await assertFails(
+    await assertSucceeds(
       updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'), {
         text: 'Text manipulat',
         updatedAt: '2026-09-15T09:00:00.000Z',
       }),
     )
+    await assertFails(
+      updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'), {
+        authorName: 'Autoria substituïda',
+        text: 'Text amb autoria manipulada',
+        updatedAt: '2026-09-15T09:05:00.000Z',
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-1'), {
+        text: 'Text d’una persona aliena',
+        updatedAt: '2026-09-15T09:10:00.000Z',
+      }),
+    )
+  })
+
+  test('un membre pot crear un missatge urgent i un tercer no el pot llegir', async () => {
+    const itemRef = doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'urgent-1')
+    await assertSucceeds(setDoc(itemRef, tutoringCoordinationItemData({
+      authorEmail: COTUTOR.email,
+      authorName: 'Cotutor',
+      authorUid: COTUTOR.uid,
+      id: 'urgent-1',
+      kind: 'urgent',
+    })))
+    await assertFails(getDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'urgent-1')))
   })
 
   test('l autor pot editar el text i l alumne relacionat del seu missatge', async () => {

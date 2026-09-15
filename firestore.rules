@@ -186,7 +186,7 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.id == itemId
-        && request.resource.data.kind in ['message', 'reminder']
+        && request.resource.data.kind in ['message', 'urgent', 'reminder']
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1600
@@ -204,7 +204,7 @@ service cloud.firestore {
           || request.resource.data.assigneeUid in get(/databases/$(database)/documents/tutoringSpaces/$(spaceId)).data.memberUids
         )
         && (
-          (request.resource.data.kind == 'message' && request.resource.data.status == 'sent')
+          (request.resource.data.kind in ['message', 'urgent'] && request.resource.data.status == 'sent')
           || (request.resource.data.kind == 'reminder' && request.resource.data.status == 'open')
         )
         && request.resource.data.completedAt == ''
@@ -287,6 +287,35 @@ service cloud.firestore {
             && request.resource.data.assigneeUid == ''
           )
         );
+    }
+
+    function validTutoringCoordinationMemberContentUpdate(spaceId) {
+      return canAccessTutoringSpace(spaceId)
+        && resource.data.deletedAt == ''
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.kind == resource.data.kind
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.authorEmail == resource.data.authorEmail
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.deletedAt == resource.data.deletedAt
+        && request.resource.data.deletedByUid == resource.data.deletedByUid
+        && request.resource.data.dueAt == resource.data.dueAt
+        && request.resource.data.assigneeUid == resource.data.assigneeUid
+        && request.resource.data.completedAt == resource.data.completedAt
+        && request.resource.data.completedByUid == resource.data.completedByUid
+        && request.resource.data.completedByEmail == resource.data.completedByEmail
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'studentId',
+          'text',
+          'updatedAt'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1600
+        && request.resource.data.studentId is string
+        && request.resource.data.updatedAt is string;
     }
 
     function validTutoringCoordinationMemberState(spaceId, memberUid) {
@@ -1159,6 +1188,7 @@ service cloud.firestore {
         allow read: if canAccessTutoringSpace(spaceId);
         allow create: if validTutoringCoordinationItemCreate(spaceId, itemId);
         allow update: if validTutoringCoordinationReminderStatusUpdate(spaceId)
+          || validTutoringCoordinationMemberContentUpdate(spaceId)
           || validTutoringCoordinationAuthorUpdate(spaceId);
         allow delete: if false;
       }

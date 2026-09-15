@@ -4,6 +4,7 @@ import {
   buildTutorialRecordFromCoordinationItem,
   getDueTutoringReminders,
   getOpenTutoringReminders,
+  getUrgentTutoringMessages,
   getUnreadTutoringCoordinationItems,
   groupTutoringCoordinationItemsByStudent,
   isCoordinationItemInTutorialRecords,
@@ -46,9 +47,18 @@ describe('coordinacio de cotutoria', () => {
     assert.deepEqual(open.map((item) => item.id), ['reminder-1'])
   })
 
-  test('un recordatori vençut es detecta independentment de si ja ha estat llegit', () => {
-    const due = getDueTutoringReminders(items, 'tutor-a', new Date('2026-09-15T10:01:00.000Z'))
+  test('un recordatori avisa dues hores abans independentment de si ja ha estat llegit', () => {
+    const due = getDueTutoringReminders(items, 'tutor-a', new Date('2026-09-15T08:01:00.000Z'))
     assert.deepEqual(due.map((item) => item.id), ['reminder-1'])
+  })
+
+  test('els missatges urgents es recuperen del mes recent al mes antic', () => {
+    const urgent = getUrgentTutoringMessages([
+      { ...items[0], id: 'urgent-old', kind: 'urgent' },
+      { ...items[0], createdAt: '2026-09-15T11:00:00.000Z', id: 'urgent-new', kind: 'urgent' },
+      items[1],
+    ])
+    assert.deepEqual(urgent.map((item) => item.id), ['urgent-new', 'urgent-old'])
   })
 
   test('la versio local pendent preval fins que el nuvol confirma la mateixa operacio', () => {
