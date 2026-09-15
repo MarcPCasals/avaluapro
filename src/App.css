@@ -24502,8 +24502,7 @@ button.profile-followup-card:focus-visible {
   font-size: 11px;
 }
 
-.internal-conversation-list > button em,
-.internal-message-button-badge {
+.internal-conversation-list > button em {
   display: inline-grid;
   min-width: 20px;
   height: 20px;
@@ -24752,15 +24751,25 @@ button.profile-followup-card:focus-visible {
   position: relative;
 }
 
-.internal-message-button-badge {
+.internal-message-button.has-unread {
+  color: #60a5fa;
+}
+
+.internal-message-icon-count {
   position: absolute;
-  top: 1px;
-  right: 1px;
-  min-width: 17px;
-  height: 17px;
-  padding-inline: 4px;
-  font-size: 9px;
-  box-shadow: 0 0 0 2px #111827;
+  top: 48%;
+  left: 50%;
+  min-width: 0;
+  height: auto;
+  transform: translate(-50%, -62%);
+  color: #f8fafc;
+  background: transparent;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: -0.6px;
+  pointer-events: none;
 }
 
 @media (max-width: 760px) {

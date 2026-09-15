@@ -391,16 +391,21 @@ export function TopBar() {
           <HelpCircle size={22} />
         </button>
         <button
-          className="icon-button internal-message-button"
+          aria-label={unreadInternalMessageCount > 0
+            ? `Missatgeria interna: ${unreadInternalMessageCount} missatge${unreadInternalMessageCount === 1 ? '' : 's'} nou${unreadInternalMessageCount === 1 ? '' : 's'}`
+            : 'Missatgeria interna'}
+          className={`icon-button internal-message-button ${unreadInternalMessageCount > 0 ? 'has-unread' : ''}`}
           onClick={() => setShowMessaging(true)}
-          title="Missatgeria interna"
+          title={unreadInternalMessageCount > 0
+            ? `Missatgeria interna: ${unreadInternalMessageCount} missatge${unreadInternalMessageCount === 1 ? '' : 's'} nou${unreadInternalMessageCount === 1 ? '' : 's'}`
+            : 'Missatgeria interna'}
           type="button"
         >
-          <MessageCircle size={22} />
+          <MessageCircle size={25} />
           {unreadInternalMessageCount > 0 && (
-            <em className="internal-message-button-badge">
-              {unreadInternalMessageCount > 99 ? '99+' : unreadInternalMessageCount}
-            </em>
+            <span className="internal-message-icon-count" aria-hidden="true">
+              {unreadInternalMessageCount > 9 ? '9+' : unreadInternalMessageCount}
+            </span>
           )}
         </button>
         <span className="top-divider" />
