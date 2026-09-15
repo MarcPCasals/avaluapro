@@ -57,7 +57,7 @@ Limit: un compte compromes, un dispositiu desbloquejat o una exportacio mal cust
 | Paquets de notes | Emissor i destinatari concret; el destinatari nomes pot registrar la importacio. | Implementat; prova real amb dos comptes pendent. |
 | Cotutoria | Acces per membres; nomes el propietari gestiona membres i espai. | Implementat, provat amb emulador i desplegat; prova real completa pendent. |
 | Subcol.leccions tutorials | Llista tancada de deu col.leccions; tercers exclosos. | Implementat, provat i desplegat. |
-| Missatgeria i recordatoris | Membres poden llegir i crear; autoria protegida; estat de lectura propi; qualsevol membre pot completar recordatoris. | Implementat i provat amb emulador; desplegament i prova real pendents. |
+| Missatgeria i recordatoris | Membres poden llegir i crear; autoria protegida; estat de lectura propi; qualsevol membre pot completar recordatoris. | Implementat, provat amb emulador, desplegat i obert en una cotutoria real; prova d'intercanvi entre dos comptes pendent. |
 | Eliminacio compartida | Es bloqueja el `delete` fisic i s'utilitzen tombstones minims. | Implementat i provat localment; prova real pendent. |
 | Revocacio o sortida | Propietari retira cotutor; cotutor nomes es pot retirar a si mateix. | Implementat i provat localment; prova real pendent. |
 | Qüestionari sociometric | Document general no public; token individual aleatori, no enumerable, d'un sol us i amb 24 hores de vigencia. | Implementat, desplegat i verificat en produccio amb dades ficticies. |
@@ -99,6 +99,14 @@ Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminaci
 No cobreixen encara tota la realitat operativa: cal provar comptes reals, dispositius, conflictes simultanis, restauracions i la configuracio efectivament desplegada.
 
 ## 6. Desplegament reforcat
+
+El 15 de setembre de 2026 es van publicar la missatgeria i els recordatoris de cotutoria:
+
+- commit `ed69800` a `main`;
+- ruleset `d70a12fe-316b-4ea3-ade4-4110dd195c71`;
+- hash de regles local i desplegat identics;
+- 52 proves de regles i la suite completa de 89 comprovacions superades;
+- pantalla de coordinacio oberta correctament en produccio amb una cotutoria real, sense enviar contingut al cotutor.
 
 El 22 de juny de 2026 es van publicar conjuntament hosting i regles:
 

@@ -1,7 +1,7 @@
 # Comparticio de dades entre docents
 
 Data d'actualitzacio: 15 de setembre de 2026
-Estat: descripcio del funcionament actual; auditoria de seguretat pendent
+Estat: descripcio del funcionament actual; regles provades, validacio institucional pendent
 
 Aquest document descriu els fluxos compartits actuals d'Avaluapro. No certifica que les rules siguin suficients per a un desplegament institucional. La revisio anterior del 4 de juny nomes cobria els paquets de notes i ha quedat superada per la incorporacio de cotutories compartides i qüestionaris sociometrics.
 
@@ -196,8 +196,9 @@ Des del 20 de juny de 2026, el formulari informa abans de respondre sobre finali
 | Eliminacio compartida | Implementada localment amb tombstones; l'eliminacio fisica directa queda bloquejada. |
 | Rols diferenciats | El model guarda un rol, pero les rules no estan validades com a control granular. |
 | Restriccio explicita de subcol.leccions | Implementada localment; qualsevol col.leccio no prevista queda bloquejada. |
+| Missatgeria i recordatoris | Implementats, provats i desplegats; prova d'intercanvi real entre dos comptes pendent. |
 | Qüestionari sociometric public | Token individual, identitat fixada, un sol us, caducitat de 24 hores i eliminacio manual completa implementats localment. |
-| Proves automatitzades | 26 proves de rules i 5 proves de fusio superades; cobertura addicional pendent. |
+| Proves automatitzades | 52 proves de rules, 6 de fusio compartida i 6 especifiques de coordinacio superades. |
 
 ## 7. Eliminacio i tombstones
 
