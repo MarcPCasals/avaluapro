@@ -84,15 +84,15 @@ coordinationItems
 coordinationMemberStates
 ```
 
-No s'hi permet l'eliminacio fisica. Un missatge nomes el pot modificar o marcar com a eliminat el seu autor; qualsevol membre de l'espai pot completar o reobrir un recordatori. Cada docent nomes pot escriure el seu propi estat de lectura.
+No s'hi permet l'eliminacio fisica. Un missatge nomes el pot modificar o marcar com a eliminat el seu autor; qualsevol membre de l'espai pot completar o reobrir un recordatori. Cada docent nomes pot escriure el seu propi estat de lectura i les acceptacions personals del preavís de 24 hores i de l’avís definitiu de 2 hores.
 
 ## 5. Proves automatitzades
 
 La versio local reforcada disposa de:
 
-- 55 proves de regles de Firestore, 27 de les quals cobreixen la cotutoria compartida;
+- 58 proves de regles de Firestore, 27 de les quals cobreixen la cotutoria compartida;
 - 6 proves de fusio i tombstones de cotutoria;
-- 9 proves especifiques de missatgeria, urgencia, edicio compartida, traspas al registre tutorial, agrupacio per alumne, lectura, preavis de recordatoris i cua local.
+- 10 proves especifiques de missatgeria, urgencia, edicio compartida, traspas al registre tutorial, agrupacio per alumne, lectura, doble preavís de recordatoris i cua local.
 
 Les proves cobreixen membres, invitacions, revocacio, subcol.leccions, eliminacions, autoria dels missatges, responsables dels recordatoris, estat de lectura, tokens sociometrics, caducitat, avís informatiu, resposta d'un sol us i eliminacio reservada al propietari.
 

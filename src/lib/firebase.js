@@ -1866,9 +1866,9 @@ export async function saveTutoringCoordinationItem({ item, spaceId }) {
 
 export async function saveTutoringCoordinationMemberState({ spaceId, state }) {
   if (!auth.currentUser?.uid || !auth.currentUser?.email) {
-    throw new Error('Cal iniciar sessió abans de marcar la conversa com a llegida.')
+    throw new Error('Cal iniciar sessió abans d’actualitzar els avisos de cotutoria.')
   }
-  if (!spaceId || !state?.uid) throw new Error('No s’ha pogut identificar l’estat de lectura.')
+  if (!spaceId || !state?.uid) throw new Error('No s’ha pogut identificar l’estat personal de cotutoria.')
   await setDoc(doc(getTutoringCoordinationMemberStateCollectionRef(spaceId), state.uid), cleanForFirestore(state))
   return state
 }

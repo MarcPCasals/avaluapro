@@ -687,6 +687,9 @@ describe('cotutoria compartida', () => {
     const ownState = {
       email: COTUTOR.email,
       lastReadAt: '2026-09-15T08:00:00.000Z',
+      reminderAcknowledgements: {
+        'reminder-1:pre:2026-09-16T08:00:00.000Z': '2026-09-15T08:01:00.000Z',
+      },
       spaceId: SPACE_ID,
       uid: COTUTOR.uid,
       updatedAt: '2026-09-15T08:01:00.000Z',

@@ -4,9 +4,11 @@ import {
   buildTutorialRecordFromCoordinationItem,
   getDueTutoringReminders,
   getOpenTutoringReminders,
+  getPendingTutoringReminderAlerts,
   getUrgentTutoringMessages,
   getUnreadTutoringCoordinationItems,
   groupTutoringCoordinationItemsByStudent,
+  hasTutoringReminderAcknowledgement,
   isCoordinationItemInTutorialRecords,
   mergeTutoringCoordinationItems,
 } from '../src/lib/tutoringCoordination.js'
@@ -50,6 +52,50 @@ describe('coordinacio de cotutoria', () => {
   test('un recordatori avisa dues hores abans independentment de si ja ha estat llegit', () => {
     const due = getDueTutoringReminders(items, 'tutor-a', new Date('2026-09-15T08:01:00.000Z'))
     assert.deepEqual(due.map((item) => item.id), ['reminder-1'])
+  })
+
+  test('el preavis acceptat reapareix com a recordatori definitiu dues hores abans', () => {
+    const reminder = items[1]
+    const preAlert = getPendingTutoringReminderAlerts(
+      items,
+      [],
+      'tutor-a',
+      new Date('2026-09-14T11:00:00.000Z'),
+    )
+    assert.deepEqual(preAlert.map((item) => [item.id, item.reminderStage]), [['reminder-1', 'pre']])
+
+    const memberStates = [{
+      lastReadAt: '',
+      reminderAcknowledgements: {
+        [`${reminder.id}:pre:${reminder.dueAt}`]: '2026-09-14T11:01:00.000Z',
+      },
+      spaceId: 'space-1',
+      uid: 'tutor-a',
+    }]
+    assert.equal(
+      getPendingTutoringReminderAlerts(items, memberStates, 'tutor-a', new Date('2026-09-14T12:00:00.000Z')).length,
+      0,
+    )
+    assert.equal(hasTutoringReminderAcknowledgement(reminder, memberStates, 'tutor-a'), true)
+    assert.equal(hasTutoringReminderAcknowledgement(reminder, memberStates, 'tutor-b'), false)
+    const dueAlert = getPendingTutoringReminderAlerts(
+      items,
+      memberStates,
+      'tutor-a',
+      new Date('2026-09-15T08:01:00.000Z'),
+    )
+    assert.deepEqual(dueAlert.map((item) => [item.id, item.reminderStage]), [['reminder-1', 'due']])
+    assert.equal(
+      getPendingTutoringReminderAlerts(items, memberStates, 'tutor-b', new Date('2026-09-14T12:00:00.000Z')).length,
+      1,
+    )
+
+    memberStates[0].reminderAcknowledgements[`${reminder.id}:due:${reminder.dueAt}`] =
+      '2026-09-15T08:02:00.000Z'
+    assert.equal(
+      getPendingTutoringReminderAlerts(items, memberStates, 'tutor-a', new Date('2026-09-15T08:03:00.000Z')).length,
+      0,
+    )
   })
 
   test('els missatges urgents es recuperen del mes recent al mes antic', () => {

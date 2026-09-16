@@ -119,8 +119,9 @@ Els avisos que apareixen fora de la tutoria no mostren el text ni l'alumne: nome
 - un missatge vinculat a un alumne es pot copiar una sola vegada al registre de seguiment tutorial, conservant l'autoria i la referencia d'origen;
 - els missatges urgents queden destacats en vermell i reunits en una vista pròpia al costat de «Safata» i «Per alumne»;
 - qualsevol cotutor pot completar o reobrir un recordatori;
-- els recordatoris reapareixen com a avis global dues hores abans i es mantenen fins que un tutor els accepta;
-- cada membre nomes pot actualitzar el seu propi estat de lectura;
+- els recordatoris mostren un preavís global 24 hores abans; acceptar-lo no completa el recordatori i l’avís definitiu torna a aparèixer dues hores abans;
+- cada tutor accepta independentment el preavís i l’avís definitiu, mentre que marcar-lo com a fet des de Coordinació sí que completa el recordatori compartit;
+- cada membre nomes pot actualitzar el seu propi estat de lectura i les seves acceptacions d’avisos;
 - l'eliminacio fisica directa queda bloquejada.
 
 ### Funcionament de sincronitzacio

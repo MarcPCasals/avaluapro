@@ -63,6 +63,7 @@ import {
 } from '../lib/firebase'
 import {
   buildTutorialRecordFromCoordinationItem,
+  getTutoringReminderAcknowledgementKey,
   isCoordinationItemInTutorialRecords,
   mergeTutoringCoordinationItems,
 } from '../lib/tutoringCoordination'
@@ -676,13 +677,19 @@ async function startTutoringCoordinationSubscriptions(set, get) {
     )
     const unsubscribeMemberStates = subscribeToTutoringCoordinationMemberStates(
       spaceId,
-      (memberStates) => {
+      async (memberStates) => {
+        const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+        const pendingStates = pendingOperations
+          .filter((operation) => operation.type === 'memberState' && operation.spaceId === spaceId)
+          .map((operation) => operation.state)
+        const memberStateByUid = new Map(memberStates.map((item) => [item.uid, item]))
+        pendingStates.forEach((item) => memberStateByUid.set(item.uid, item))
         set((current) => ({
           cloud: {
             ...current.cloud,
             tutoringCoordinationMemberStates: [
               ...current.cloud.tutoringCoordinationMemberStates.filter((item) => item.spaceId !== spaceId),
-              ...memberStates,
+              ...memberStateByUid.values(),
             ],
           },
         }))
@@ -2828,6 +2835,61 @@ export const useAvaluaproStore = create((set, get) => ({
     await flushTutoringCoordinationOutbox(set, get)
   },
 
+  acknowledgeTutoringCoordinationReminder: async (itemId, stage) => {
+    const state = get()
+    const user = state.cloud.user
+    const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
+    if (!user?.uid || !user?.email) throw new Error('Cal iniciar sessió per acceptar el recordatori.')
+    if (!currentItem || currentItem.kind !== 'reminder' || currentItem.status !== 'open') return
+    const acknowledgementKey = getTutoringReminderAcknowledgementKey(currentItem, stage)
+    if (!acknowledgementKey) throw new Error('No s’ha pogut identificar aquest avís.')
+
+    const currentMemberState = state.cloud.tutoringCoordinationMemberStates.find(
+      (item) => item.spaceId === currentItem.spaceId && item.uid === user.uid,
+    )
+    if (currentMemberState?.reminderAcknowledgements?.[acknowledgementKey]) return
+
+    const updatedAt = new Date().toISOString()
+    const recentAcknowledgements = Object.fromEntries(
+      Object.entries(currentMemberState?.reminderAcknowledgements || {})
+        .sort(([, first], [, second]) => String(second).localeCompare(String(first)))
+        .slice(0, 399),
+    )
+    const memberState = {
+      email: user.email,
+      lastReadAt: currentMemberState?.lastReadAt || '',
+      reminderAcknowledgements: {
+        ...recentAcknowledgements,
+        [acknowledgementKey]: updatedAt,
+      },
+      spaceId: currentItem.spaceId,
+      uid: user.uid,
+      updatedAt,
+    }
+    const operation = {
+      createdAt: updatedAt,
+      id: `coord-reminder-ack:${user.uid}:${currentItem.spaceId}:${acknowledgementKey}`,
+      revision: updatedAt,
+      spaceId: currentItem.spaceId,
+      state: memberState,
+      type: 'memberState',
+    }
+    await queueTutoringCoordinationOperation(user.uid, operation)
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationMemberStates: [
+          ...current.cloud.tutoringCoordinationMemberStates.filter(
+            (item) => item.spaceId !== memberState.spaceId || item.uid !== user.uid,
+          ),
+          memberState,
+        ],
+        tutoringCoordinationStatus: 'pending',
+      },
+    }))
+    await flushTutoringCoordinationOutbox(set, get)
+  },
+
   editTutoringCoordinationItem: async (itemId, { studentId = '', text = '' } = {}) => {
     const state = get()
     const user = state.cloud.user
@@ -2959,6 +3021,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const readState = {
       email: user.email,
       lastReadAt: latestCreatedAt,
+      reminderAcknowledgements: currentReadState?.reminderAcknowledgements || {},
       spaceId,
       uid: user.uid,
       updatedAt,

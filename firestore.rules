@@ -325,6 +325,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'email',
           'lastReadAt',
+          'reminderAcknowledgements',
           'spaceId',
           'uid',
           'updatedAt'
@@ -333,6 +334,13 @@ service cloud.firestore {
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.spaceId == spaceId
         && request.resource.data.lastReadAt is string
+        && (
+          !request.resource.data.keys().hasAny(['reminderAcknowledgements'])
+          || (
+            request.resource.data.reminderAcknowledgements is map
+            && request.resource.data.reminderAcknowledgements.size() <= 500
+          )
+        )
         && request.resource.data.updatedAt is string;
     }
 

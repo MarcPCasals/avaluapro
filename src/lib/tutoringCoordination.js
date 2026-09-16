@@ -38,6 +38,50 @@ export function getDueTutoringReminders(items = [], uid = '', now = new Date()) 
   return getOpenTutoringReminders(items, uid).filter((item) => item.dueAt && item.dueAt <= warningLimit)
 }
 
+export function getTutoringReminderAcknowledgementKey(item, stage) {
+  if (!item?.id || !item?.dueAt || !['pre', 'due'].includes(stage)) return ''
+  return `${item.id}:${stage}:${item.dueAt}`
+}
+
+export function hasTutoringReminderAcknowledgement(item, memberStates = [], uid = '') {
+  const memberState = getTutoringCoordinationReadState(memberStates, item?.spaceId, uid)
+  return ['pre', 'due'].some((stage) => {
+    const key = getTutoringReminderAcknowledgementKey(item, stage)
+    return key && memberState?.reminderAcknowledgements?.[key]
+  })
+}
+
+export function getPendingTutoringReminderAlerts(
+  items = [],
+  memberStates = [],
+  uid = '',
+  now = new Date(),
+) {
+  if (!uid) return []
+  const nowMs = now.getTime()
+  if (Number.isNaN(nowMs)) return []
+
+  return getOpenTutoringReminders(items, uid)
+    .map((item) => {
+      const dueMs = new Date(item.dueAt || '').getTime()
+      if (Number.isNaN(dueMs)) return null
+      const remainingMs = dueMs - nowMs
+      const reminderStage = remainingMs <= 2 * 60 * 60 * 1000
+        ? 'due'
+        : remainingMs <= 24 * 60 * 60 * 1000
+          ? 'pre'
+          : ''
+      if (!reminderStage) return null
+
+      const memberState = getTutoringCoordinationReadState(memberStates, item.spaceId, uid)
+      const acknowledgementKey = getTutoringReminderAcknowledgementKey(item, reminderStage)
+      if (memberState?.reminderAcknowledgements?.[acknowledgementKey]) return null
+      return { ...item, reminderStage }
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.dueAt || '').localeCompare(String(b.dueAt || '')))
+}
+
 export function getUrgentTutoringMessages(items = []) {
   return sortTutoringCoordinationItems(items)
     .filter((item) => item.kind === 'urgent' && !item.deletedAt)
@@ -46,7 +90,7 @@ export function getUrgentTutoringMessages(items = []) {
 
 export function getTutoringCoordinationCounts(items = [], memberStates = [], uid = '') {
   return {
-    due: getDueTutoringReminders(items, uid).length,
+    due: getPendingTutoringReminderAlerts(items, memberStates, uid).length,
     open: getOpenTutoringReminders(items, uid).length,
     unread: getUnreadTutoringCoordinationItems(items, memberStates, uid).length,
   }
