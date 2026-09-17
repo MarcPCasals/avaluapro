@@ -4468,6 +4468,8 @@ export function TutoringView() {
   const [shareTutoringEmail, setShareTutoringEmail] = useState('')
   const [shareTutoringMessage, setShareTutoringMessage] = useState('')
   const [shareTutoringBusy, setShareTutoringBusy] = useState('')
+  const [autoTutoringRefreshBusy, setAutoTutoringRefreshBusy] = useState(false)
+  const autoTutoringRefreshRef = useRef('')
   const [tutoringChangeSignals, setTutoringChangeSignals] = useState([])
   const [tutoringChangeSignalsSpaceId, setTutoringChangeSignalsSpaceId] = useState('')
   const [tutoringChangeSignalError, setTutoringChangeSignalError] = useState({ message: '', spaceId: '' })
@@ -4513,6 +4515,7 @@ export function TutoringView() {
   const updateTutorialSeatingPlan = useAvaluaproStore((state) => state.updateTutorialSeatingPlan)
   const deleteTutorialSeatingPlan = useAvaluaproStore((state) => state.deleteTutorialSeatingPlan)
   const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
+  const linkClassToSharedTutoringSpace = useAvaluaproStore((state) => state.linkClassToSharedTutoringSpace)
   const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
@@ -4579,14 +4582,60 @@ export function TutoringView() {
     TUTORING_CHANGE_COLLECTIONS.has(collectionName),
   )
   const hasRemoteTutoringChanges = pendingRemoteTutoringSignals.length > 0
+  const remoteTutoringChangeSignature = pendingRemoteTutoringSignals
+    .map((signal) => `${signal.changedByUid}:${signal.changeId}`)
+    .sort()
+    .join('|')
+  useEffect(() => {
+    if (
+      !activeClass?.sharedTutoringSpaceId ||
+      !cloud.user?.uid ||
+      !hasRemoteTutoringChanges ||
+      hasPendingLocalTutoringChanges ||
+      shareTutoringBusy ||
+      autoTutoringRefreshBusy ||
+      autoTutoringRefreshRef.current === remoteTutoringChangeSignature
+    ) {
+      return undefined
+    }
+
+    const classId = activeClass.id
+    const spaceId = activeClass.sharedTutoringSpaceId
+    const timer = window.setTimeout(async () => {
+      autoTutoringRefreshRef.current = remoteTutoringChangeSignature
+      setAutoTutoringRefreshBusy(true)
+      try {
+        await linkClassToSharedTutoringSpace({ classId, spaceId })
+        setShareTutoringMessage('Novetats del cotutor incorporades automàticament.')
+      } catch {
+        autoTutoringRefreshRef.current = ''
+      } finally {
+        setAutoTutoringRefreshBusy(false)
+      }
+    }, 450)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    activeClass?.id,
+    activeClass?.sharedTutoringSpaceId,
+    autoTutoringRefreshBusy,
+    cloud.user?.uid,
+    hasPendingLocalTutoringChanges,
+    hasRemoteTutoringChanges,
+    linkClassToSharedTutoringSpace,
+    remoteTutoringChangeSignature,
+    shareTutoringBusy,
+  ])
   const currentTutoringChangeSignalError =
     tutoringChangeSignalError.spaceId === activeClass?.sharedTutoringSpaceId
       ? tutoringChangeSignalError.message
       : ''
-  const tutoringSyncState = shareTutoringBusy === 'sync'
+  const tutoringSyncState = shareTutoringBusy === 'sync' || autoTutoringRefreshBusy
     ? {
-        detail: 'Estem comparant i incorporant les dues versions.',
-        label: 'Sincronitzant la cotutoria…',
+        detail: autoTutoringRefreshBusy
+          ? 'Incorporant automàticament els canvis de l’altre tutor.'
+          : 'Estem comparant i incorporant les dues versions.',
+        label: autoTutoringRefreshBusy ? 'Actualitzant la pantalla compartida…' : 'Sincronitzant la cotutoria…',
         tone: 'loading',
       }
     : cloud.sharedTutoringStatus === 'conflict' || cloud.sharedTutoringStatus === 'error' || currentTutoringChangeSignalError
@@ -7065,12 +7114,12 @@ export function TutoringView() {
             {activeClass?.sharedTutoringSpaceId && (
               <button
                 className="secondary-action compact tutoring-sync-button"
-                disabled={shareTutoringBusy === 'sync'}
+                disabled={shareTutoringBusy === 'sync' || autoTutoringRefreshBusy}
                 onClick={handleSyncTutoringFromHeader}
                 type="button"
               >
                 <RefreshCw size={15} />
-                {hasRemoteTutoringChanges ? 'Actualitzar' : 'Sincronitzar ara'}
+                {hasRemoteTutoringChanges ? 'Actualitzar manualment' : 'Sincronitzar ara'}
               </button>
             )}
           </div>
