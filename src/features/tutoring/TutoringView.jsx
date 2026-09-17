@@ -4664,11 +4664,11 @@ export function TutoringView() {
                 label: 'Canvis teus pendents',
                 tone: 'pending',
               }
-            : {
-                detail: 'No s’han detectat diferències amb l’espai compartit.',
-                label: 'Al dia amb la cotutoria',
-                tone: 'synced',
-              }
+          : {
+              detail: 'La informació es comparteix i s’actualitza sola entre els dos tutors.',
+              label: 'Cotutoria sincronitzada automàticament',
+              tone: 'synced',
+            }
   const classStudents = useMemo(
     () => students.filter((student) => student.classId === linkedClassId).sort((a, b) => a.name.localeCompare(b.name, 'ca')),
     [linkedClassId, students],
@@ -7056,16 +7056,17 @@ export function TutoringView() {
             Mode tutoria
           </span>
           <h1>{activeClass?.name || 'Tutoria'}</h1>
-          <p>
-            Espai per recollir la visió global del grup: dades acadèmiques de totes les assignatures,
-            seguiment tutorial i perfil individual de cada alumne.
-          </p>
+          <p>Visió global del grup: aprenentatge, seguiment i informació tutorial de cada alumne.</p>
         </div>
         <aside className="tutoring-hero-share-panel">
           <div className="tutoring-hero-linked-count">
-            <strong>{classStudents.length}</strong>
-            <span>alumnes vinculats</span>
-            <small>Dades compartides amb {linkedClass?.name || 'la classe activa'}</small>
+            <div className="tutoring-hero-count-summary">
+              <strong>{classStudents.length}</strong>
+              <div>
+                <span>alumnes vinculats</span>
+                <small>Dades compartides amb {linkedClass?.name || 'la classe activa'}</small>
+              </div>
+            </div>
             {activeClass?.sharedTutoringSpaceId && (
               <div className="tutoring-hero-shared-members">
                 <span>Cotutoria compartida amb</span>
@@ -7116,10 +7117,11 @@ export function TutoringView() {
                 className="secondary-action compact tutoring-sync-button"
                 disabled={shareTutoringBusy === 'sync' || autoTutoringRefreshBusy}
                 onClick={handleSyncTutoringFromHeader}
+                title="La sincronització és automàtica. Utilitza aquest botó només per forçar una comprovació immediata."
                 type="button"
               >
                 <RefreshCw size={15} />
-                {hasRemoteTutoringChanges ? 'Actualitzar manualment' : 'Sincronitzar ara'}
+                {hasRemoteTutoringChanges ? 'Incorporar ara' : 'Comprovar ara'}
               </button>
             )}
           </div>

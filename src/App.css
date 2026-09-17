@@ -1331,50 +1331,63 @@
 
 .tutoring-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
-  gap: 18px;
-  align-items: stretch;
+  grid-template-columns: minmax(250px, 0.55fr) minmax(640px, 1.45fr);
+  gap: 14px;
+  align-items: start;
   border: 1px solid #d1fae5;
   border-radius: 8px;
-  padding: 22px;
+  padding: 16px;
   background: linear-gradient(135deg, #ecfdf5, #ffffff 58%);
 }
 
 .tutoring-hero h1 {
-  margin: 8px 0 6px;
+  margin: 6px 0 5px;
   color: #0f172a;
-  font-size: 32px;
+  font-size: 28px;
   line-height: 1;
 }
 
 .tutoring-hero p {
-  max-width: 780px;
+  max-width: 470px;
   margin: 0;
   color: #475569;
+  font-size: 13px;
   font-weight: 750;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .tutoring-hero aside {
   display: grid;
   align-content: center;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid #bbf7d0;
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   background: white;
 }
 
 .tutoring-hero-linked-count {
   display: grid;
-  justify-items: center;
-  gap: 4px;
-  text-align: center;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(280px, 1.3fr);
+  gap: 10px;
+  align-items: stretch;
 }
 
-.tutoring-hero aside strong {
+.tutoring-hero-count-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.tutoring-hero-count-summary > div {
+  display: grid;
+  gap: 1px;
+}
+
+.tutoring-hero-count-summary > strong {
   color: #047857;
-  font-size: 40px;
+  font-size: 34px;
   line-height: 1;
 }
 
@@ -1384,6 +1397,7 @@
 }
 
 .tutoring-hero aside small {
+  display: block;
   color: #64748b;
   font-weight: 800;
 }
@@ -1398,7 +1412,7 @@
 
 .tutoring-hero-share-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 8px;
   align-items: end;
 }
@@ -1409,9 +1423,7 @@
 }
 
 .tutoring-hero-share-controls .tutoring-sync-button {
-  grid-column: 1 / -1;
   justify-content: center;
-  width: 100%;
 }
 
 .tutoring-sync-state {
@@ -1436,7 +1448,7 @@
 
 .tutoring-sync-state strong {
   color: inherit;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.25;
 }
 
@@ -1549,6 +1561,10 @@
 
   .tutoring-hero-share-controls {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tutoring-hero-linked-count {
+    grid-template-columns: 1fr;
   }
 
   .tracking-standby-panel {
