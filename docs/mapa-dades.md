@@ -101,7 +101,7 @@ Quan un docent envia un missatge vinculat a un alumne al seguiment tutorial, es 
 
 Les eliminacions utilitzen tombstones per sincronitzar la baixa sense conservar el contingut pedagogic sensible. La revocacio talla la sincronitzacio futura, pero no pot retirar copies o exportacions ja obtingudes.
 
-Els avisos globals de coordinacio indiquen la classe i l'autor, pero no reprodueixen el text del missatge ni el nom de l'alumne fora de la pantalla de tutoria.
+Els avisos globals de coordinacio indiquen la classe i l'autor, pero no reprodueixen el text dels missatges ni el nom de l'alumne fora de la pantalla de tutoria. Com a excepcio funcional, els preavisos i avisos definitius reprodueixen el títol del recordatori.
 
 ### Sociometria publica temporal
 

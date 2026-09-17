@@ -108,7 +108,7 @@ Aixo pot incloure:
 
 Per tant, la cotutoria compartida no es un simple enviament: dona acces persistent a un conjunt ampli de dades d'alta sensibilitat.
 
-Els avisos que apareixen fora de la tutoria no mostren el text ni l'alumne: nomes informen que hi ha novetats, la classe i l'autor. El contingut complet es consulta dins l'espai compartit.
+Els avisos que apareixen fora de la tutoria no mostren el text dels missatges ni el nom de l'alumne: nomes informen que hi ha novetats, la classe i l'autor. Els preavisos i avisos definitius de recordatoris sí que mostren el títol del recordatori perquè siguin útils sense haver d'obrir Coordinació.
 
 ### Permisos de la coordinacio
 

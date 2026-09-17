@@ -271,6 +271,9 @@ export function GlobalReminderLayer() {
                     ? 'Nou recordatori de cotutoria'
                     : 'Nou missatge de cotutoria'}
               </strong>
+              {(isDue || isPreReminder) && item.kind === 'reminder' && (
+                <p className="coordination-reminder-title">{item.text}</p>
+              )}
               <span>{classItem?.name || 'Tutoria compartida'}</span>
               <small>{item.authorName || item.authorEmail}</small>
             </div>

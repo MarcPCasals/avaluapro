@@ -13130,6 +13130,15 @@ button.tutorial-record-pill {
   line-height: 1.35;
 }
 
+.global-reminder-card .coordination-reminder-title {
+  margin: 5px 0 7px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .global-reminder-actions {
   grid-column: 1 / -1;
   display: flex;
