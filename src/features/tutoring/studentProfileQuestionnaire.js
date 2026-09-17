@@ -392,6 +392,26 @@ export const STUDENT_PROFILE_ANSWER_KEYS = [
   'studentMessage',
 ]
 
+export function getStudentProfileSurveyClassIds(activeClass, sharedTutoringSpaces = []) {
+  if (!activeClass?.id) return []
+  const sharedSpace = sharedTutoringSpaces.find(
+    (space) => space?.id && space.id === activeClass.sharedTutoringSpaceId,
+  )
+  return Array.from(new Set([
+    activeClass.id,
+    activeClass.tutorialLinkedClassId,
+    sharedSpace?.sourceClassId,
+  ].map((value) => String(value || '').trim()).filter(Boolean)))
+}
+
+export function getStudentProfileSurveyCanonicalClassId(activeClass, sharedTutoringSpaces = []) {
+  if (!activeClass?.id) return ''
+  const sharedSpace = sharedTutoringSpaces.find(
+    (space) => space?.id && space.id === activeClass.sharedTutoringSpaceId,
+  )
+  return String(sharedSpace?.sourceClassId || activeClass.tutorialLinkedClassId || activeClass.id).trim()
+}
+
 export function createEmptyStudentProfileAnswers() {
   return {
     birthDate: '',

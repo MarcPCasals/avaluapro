@@ -5,8 +5,31 @@ import {
   createEmptyStudentProfileAnswers,
   getStudentProfilePersonalStepError,
   getStudentProfilePriorityFlags,
+  getStudentProfileSurveyCanonicalClassId,
+  getStudentProfileSurveyClassIds,
   normalizeStudentProfileAnswers,
 } from '../src/features/tutoring/studentProfileQuestionnaire.js'
+
+test('troba el formulari creat pel cotutor a través de l’espai de tutoria compartit', () => {
+  assert.deepEqual(
+    getStudentProfileSurveyClassIds(
+      {
+        id: 'classe-local-cotutora',
+        sharedTutoringSpaceId: 'tutoria-1c',
+        tutorialLinkedClassId: 'classe-local-cotutora',
+      },
+      [{ id: 'tutoria-1c', sourceClassId: 'classe-original-tutor' }],
+    ),
+    ['classe-local-cotutora', 'classe-original-tutor'],
+  )
+  assert.equal(
+    getStudentProfileSurveyCanonicalClassId(
+      { id: 'classe-local-cotutora', sharedTutoringSpaceId: 'tutoria-1c' },
+      [{ id: 'tutoria-1c', sourceClassId: 'classe-original-tutor' }],
+    ),
+    'classe-original-tutor',
+  )
+})
 
 test('construeix el retrat inicial amb denominadors independents per pregunta', () => {
   const responses = [

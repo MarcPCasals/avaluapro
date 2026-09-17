@@ -39,6 +39,8 @@ import {
   STUDENT_PROFILE_PRIVACY_NOTICE_VERSION,
   buildStudentProfileClassPortrait,
   getStudentProfilePriorityFlags,
+  getStudentProfileSurveyCanonicalClassId,
+  getStudentProfileSurveyClassIds,
 } from './studentProfileQuestionnaire'
 
 const SURVEY_DURATION_MS = 7 * 24 * 60 * 60 * 1000
@@ -134,6 +136,14 @@ function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat('ca-AD', { dateStyle: 'medium' }).format(date)
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : new Intl.DateTimeFormat('ca-AD', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
 function formatAnswer(value, studentNamesById = {}) {
@@ -483,9 +493,13 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
   const [sociogramStatus, setSociogramStatus] = useState(null)
   const suppressFriendshipSyncRef = useRef('')
 
+  const surveyClassIds = useMemo(
+    () => getStudentProfileSurveyClassIds(activeClass, cloud.sharedTutoringSpaces || []),
+    [activeClass, cloud.sharedTutoringSpaces],
+  )
   const classSurveys = useMemo(
-    () => surveys.filter((survey) => survey.classId === activeClass?.id),
-    [activeClass?.id, surveys],
+    () => surveys.filter((survey) => surveyClassIds.includes(survey.classId)),
+    [surveyClassIds, surveys],
   )
   const selectedSurvey = classSurveys.find((survey) => survey.id === selectedSurveyId) || classSurveys[0] || null
   const surveyStudents = selectedSurvey?.studentOptions?.length ? selectedSurvey.studentOptions : classStudents
@@ -516,7 +530,7 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
     const nextSurveys = await listStudentProfileSurveysForUser(cloud.user.uid)
     setNowEpochMs(Date.now())
     setSurveys(nextSurveys)
-    const nextClassSurveys = nextSurveys.filter((survey) => survey.classId === activeClass?.id)
+    const nextClassSurveys = nextSurveys.filter((survey) => surveyClassIds.includes(survey.classId))
     setSelectedSurveyId((current) => nextClassSurveys.some((survey) => survey.id === current) ? current : nextClassSurveys[0]?.id || '')
   }
 
@@ -524,11 +538,12 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
     if (!surveyId) {
       setResponses([])
       setLoadedResponsesSurveyId('')
-      return
+      return []
     }
     const nextResponses = await listStudentProfileSurveyResponses(surveyId)
     setResponses(nextResponses)
     setLoadedResponsesSurveyId(surveyId)
+    return nextResponses
   }
 
   useEffect(() => {
@@ -539,7 +554,7 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
         if (cancelled) return
         setNowEpochMs(Date.now())
         setSurveys(nextSurveys)
-        const nextClassSurveys = nextSurveys.filter((survey) => survey.classId === activeClass?.id)
+        const nextClassSurveys = nextSurveys.filter((survey) => surveyClassIds.includes(survey.classId))
         setSelectedSurveyId((current) => nextClassSurveys.some((survey) => survey.id === current) ? current : nextClassSurveys[0]?.id || '')
       })
       .catch((error) => {
@@ -548,7 +563,7 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
     return () => {
       cancelled = true
     }
-  }, [activeClass?.id, cloud.user?.uid])
+  }, [cloud.user?.uid, surveyClassIds])
 
   useEffect(() => {
     if (!selectedSurvey?.id) return undefined
@@ -601,10 +616,14 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
       const sharedSpace = (cloud.sharedTutoringSpaces || []).find(
         (space) => space.id === activeClass.sharedTutoringSpaceId,
       )
+      const canonicalClassId = getStudentProfileSurveyCanonicalClassId(
+        activeClass,
+        cloud.sharedTutoringSpaces || [],
+      )
       const survey = await createStudentProfileSurveyDocument({
         survey: {
           academicYear: getAcademicYear(nowDate),
-          classId: activeClass.id,
+          classId: canonicalClassId,
           className: activeClass.name,
           createdAt: nowDate.toISOString(),
           expiresAt: new Date(expiresAtEpochMs).toISOString(),
@@ -664,6 +683,24 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
       setMessage('Enllaç compartit copiat.')
     } catch {
       setMessage('No s’ha pogut copiar automàticament. Pots seleccionar l’enllaç i copiar-lo.')
+    }
+  }
+
+  const handleRefreshResponses = async () => {
+    setBusy('responses')
+    setMessage('')
+    try {
+      const nextResponses = await refreshResponses()
+      const latestResponse = nextResponses.at(-1)
+      setMessage(
+        `Comprovació directa amb Firebase completada: ${formatResponseCount(nextResponses.length)} ${nextResponses.length === 1 ? 'registrada' : 'registrades'}${
+          latestResponse?.submittedAt ? `. L’última va arribar el ${formatDateTime(latestResponse.submittedAt)}` : ''
+        }.`,
+      )
+    } catch (error) {
+      setMessage(error.message || 'No s’han pogut comprovar les respostes directament a Firebase.')
+    } finally {
+      setBusy('')
     }
   }
 
@@ -784,7 +821,7 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
           <div className="student-profile-manager-actions">
             <button className="primary-action" disabled={!publicUrl || selectedSurvey.status !== 'active' || isExpired} onClick={handleCopy} type="button"><Clipboard size={17} />Copiar enllaç</button>
             <button className="secondary-action" disabled={!publicUrl} onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')} type="button"><ExternalLink size={17} />Obrir formulari</button>
-            <button className="secondary-action" disabled={busy === 'responses'} onClick={async () => { setBusy('responses'); try { await refreshResponses() } finally { setBusy('') } }} type="button">{busy === 'responses' ? <Loader2 className="spin-icon" size={17} /> : <RefreshCw size={17} />}Actualitzar</button>
+            <button className="secondary-action" disabled={busy === 'responses'} onClick={handleRefreshResponses} type="button">{busy === 'responses' ? <Loader2 className="spin-icon" size={17} /> : <RefreshCw size={17} />}Actualitzar</button>
             <button className="secondary-action" disabled={busy === 'status'} onClick={handleToggleStatus} type="button"><Lock size={17} />{selectedSurvey.status === 'active' && !isExpired ? 'Tancar' : 'Reobrir 7 dies'}</button>
             {selectedSurvey.ownerUid === cloud.user?.uid && <button className="danger-action" disabled={busy === 'delete-survey'} onClick={() => setConfirmDeleteSurvey(true)} type="button"><Trash2 size={17} />Eliminar formulari</button>}
           </div>

@@ -21,6 +21,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   getFirestore,
   limit,
   orderBy,
@@ -816,8 +817,8 @@ export async function listStudentProfileSurveysForUser(userUid) {
   if (!userUid) return []
   const surveysCollection = collection(db, STUDENT_PROFILE_SURVEYS_COLLECTION)
   const [ownedSnapshot, memberSnapshot] = await Promise.all([
-    getDocs(query(surveysCollection, where('ownerUid', '==', userUid))),
-    getDocs(query(surveysCollection, where(`memberUidMap.${userUid}`, '==', true))),
+    getDocsFromServer(query(surveysCollection, where('ownerUid', '==', userUid))),
+    getDocsFromServer(query(surveysCollection, where(`memberUidMap.${userUid}`, '==', true))),
   ])
   return Array.from(new Map(
     [...ownedSnapshot.docs, ...memberSnapshot.docs].map((snapshotDoc) => [
@@ -854,7 +855,7 @@ export async function submitStudentProfileSurveyResponse({ answers, privacyNotic
 
 export async function listStudentProfileSurveyResponses(surveyId) {
   if (!surveyId) return []
-  const snapshot = await getDocs(query(getStudentProfileSurveyResponsesCollectionRef(surveyId), orderBy('submittedAt', 'asc')))
+  const snapshot = await getDocsFromServer(query(getStudentProfileSurveyResponsesCollectionRef(surveyId), orderBy('submittedAt', 'asc')))
   return snapshot.docs.map((snapshotDoc) => {
     const value = snapshotDoc.data()
     return {
