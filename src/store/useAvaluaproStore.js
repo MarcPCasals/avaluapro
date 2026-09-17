@@ -37,7 +37,7 @@ import {
   listTutoringSpacesForUser,
   leaveTutoringSpace,
   loadCloudBackup,
-  loadCloudDataset,
+  loadCloudWorkspace,
   loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
@@ -72,6 +72,7 @@ import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/shared
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
 import { isFirestoreNetworkError, isFirestoreQuotaError } from '../lib/cloudSyncDiff'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
+import { getCloudStartupAction, getCloudWorkspacePreferences } from '../lib/cloudStartup'
 import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
@@ -109,6 +110,8 @@ let cloudSyncInFlight = false
 let cloudSyncBlockedUntil = 0
 let cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
 let cloudBackupInFlight = false
+let cloudStartupPromise = null
+let cloudStartupUid = ''
 const queuedCloudCollections = new Set()
 let tutoringCoordinationUnsubscribers = []
 let tutoringCoordinationOnlineListenerReady = false
@@ -875,6 +878,106 @@ async function resumePersistentCloudSync(set, get, uid) {
   }
 }
 
+async function applyCloudWorkspace(set, get, uid, workspace) {
+  if (!workspace?.exists || get().cloud.user?.uid !== uid) return false
+
+  const pendingOperations = await loadCloudSyncQueue(uid)
+  if (pendingOperations.length > 0 || get().cloud.user?.uid !== uid) return false
+
+  const dataset = normalizeDataset(workspace.dataset)
+  const preferences = getCloudWorkspacePreferences(
+    readPreferences(),
+    workspace.meta?.preferences || {},
+  )
+  const profile = {
+    ...getInitialProfile(),
+    ...(workspace.meta?.profile || {}),
+  }
+
+  await resetDatabase()
+  await saveDataset(dataset)
+  writePreferences({ ...preferences, ...profile })
+  const ui = getInitialUi(dataset)
+
+  set((current) => ({
+    ...dataset,
+    ui,
+    profile,
+    onboarding: getInitialOnboarding(dataset.classes.length > 0),
+    status: 'ready',
+    error: '',
+    cloud: {
+      ...current.cloud,
+      status: 'synced',
+      error: '',
+      errorKind: '',
+      lastSyncedAt: new Date().toISOString(),
+      pendingCollections: [],
+      pendingOperationCount: 0,
+      retryAvailableAt: '',
+    },
+  }))
+  return true
+}
+
+async function synchronizeAfterSignIn(set, get, uid) {
+  if (!uid || get().cloud.user?.uid !== uid) return
+  if (cloudStartupPromise && cloudStartupUid === uid) return cloudStartupPromise
+
+  cloudStartupUid = uid
+  cloudStartupPromise = (async () => {
+    try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        let pendingOperations = await loadCloudSyncQueue(uid)
+        if (getCloudStartupAction({ pendingOperationCount: pendingOperations.length }) === 'flush-local') {
+          await flushQueuedCloudSync(set, get)
+          pendingOperations = await loadCloudSyncQueue(uid)
+          if (pendingOperations.length > 0 || get().cloud.user?.uid !== uid) return
+        }
+
+        set((current) => ({
+          cloud: { ...current.cloud, status: 'syncing', error: '', errorKind: '' },
+        }))
+        const workspace = await loadCloudWorkspace(uid)
+        if (get().cloud.user?.uid !== uid) return
+
+        const action = getCloudStartupAction({
+          cloudWorkspaceExists: workspace.exists,
+          pendingOperationCount: (await loadCloudSyncQueue(uid)).length,
+        })
+        if (action === 'pull-cloud') {
+          await applyCloudWorkspace(set, get, uid, workspace)
+          return
+        }
+        if (action === 'keep-local') {
+          set((current) => ({
+            cloud: { ...current.cloud, status: 'signed-in', error: '', errorKind: '' },
+          }))
+          return
+        }
+      }
+      await resumePersistentCloudSync(set, get, uid)
+    } catch (error) {
+      if (get().cloud.user?.uid !== uid) return
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          status: 'error',
+          error: error.message || 'No s’ha pogut carregar l’última còpia de Firebase.',
+          errorKind: isFirestoreNetworkError(error) ? 'network' : 'sync',
+        },
+      }))
+    }
+  })().finally(() => {
+    if (cloudStartupUid === uid) {
+      cloudStartupPromise = null
+      cloudStartupUid = ''
+    }
+  })
+
+  return cloudStartupPromise
+}
+
 function getDatasetFromState(state) {
   return COLLECTIONS.reduce(
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] || [] }),
@@ -1490,7 +1593,7 @@ export const useAvaluaproStore = create((set, get) => ({
           })
           if (user) {
             setTimeout(() => {
-              resumePersistentCloudSync(set, get, user.uid)
+              synchronizeAfterSignIn(set, get, user.uid)
               get().loadCloudBackups()
               get().loadReceivedTeacherGradePackages()
               get().loadSentTeacherGradePackages()
@@ -1539,7 +1642,7 @@ export const useAvaluaproStore = create((set, get) => ({
           errorKind: '',
         },
       }))
-      if (user?.uid) await resumePersistentCloudSync(set, get, user.uid)
+      if (user?.uid) await synchronizeAfterSignIn(set, get, user.uid)
     } catch (error) {
       set((state) => ({
         cloud: {
@@ -1556,6 +1659,8 @@ export const useAvaluaproStore = create((set, get) => ({
       if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
       stopTutoringCoordinationSubscriptions()
       queuedCloudCollections.clear()
+      cloudStartupPromise = null
+      cloudStartupUid = ''
       cloudSyncBlockedUntil = 0
       cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
       await signOutFromGoogle()
@@ -1767,16 +1872,28 @@ export const useAvaluaproStore = create((set, get) => ({
 
     set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
     try {
-      const cloudDataset = await loadCloudDataset(state.cloud.user.uid)
-      const dataset = normalizeDataset(cloudDataset)
+      const workspace = await loadCloudWorkspace(state.cloud.user.uid)
+      if (!workspace.exists) throw new Error('Encara no hi ha cap còpia de dades desada a Firebase.')
+      const dataset = normalizeDataset(workspace.dataset)
       await clearCloudSyncQueue(state.cloud.user.uid)
       await resetDatabase()
       await saveDataset(dataset)
+      const preferences = getCloudWorkspacePreferences(
+        readPreferences(),
+        workspace.meta?.preferences || {},
+      )
+      const profile = {
+        ...getInitialProfile(),
+        ...(workspace.meta?.profile || {}),
+      }
+      writePreferences({ ...preferences, ...profile })
       const ui = getInitialUi(dataset)
       writePreferences({ ...readPreferences(), ...ui })
       set((current) => ({
         ...dataset,
         ui,
+        profile,
+        onboarding: getInitialOnboarding(dataset.classes.length > 0),
         status: 'ready',
         error: '',
         cloud: {

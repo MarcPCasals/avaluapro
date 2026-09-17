@@ -20,6 +20,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   getDocsFromServer,
   getFirestore,
@@ -1187,20 +1188,37 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
   }
 }
 
-export async function loadCloudDataset(uid) {
+export async function loadCloudWorkspace(uid) {
   if (!uid) throw new Error('Cal iniciar sessió amb Google abans de carregar dades del núvol.')
 
-  const entries = await Promise.all(
-    COLLECTIONS.map(async (collectionName) => {
-      const snapshot = await getDocs(getCollectionRef(uid, collectionName))
-      return [
-        collectionName,
-        snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })),
-      ]
-    }),
+  const [metaSnapshot, entries] = await Promise.all([
+    getDocFromServer(getMetaDocRef(uid)),
+    Promise.all(
+      COLLECTIONS.map(async (collectionName) => {
+        const snapshot = await getDocsFromServer(getCollectionRef(uid, collectionName))
+        return [
+          collectionName,
+          snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })),
+        ]
+      }),
+    ),
+  ])
+
+  const dataset = entries.reduce(
+    (nextDataset, [collectionName, rows]) => ({ ...nextDataset, [collectionName]: rows }),
+    {},
   )
 
-  return entries.reduce((dataset, [collectionName, rows]) => ({ ...dataset, [collectionName]: rows }), {})
+  return {
+    dataset,
+    exists: metaSnapshot.exists() || entries.some(([, rows]) => rows.length > 0),
+    meta: metaSnapshot.exists() ? metaSnapshot.data() : null,
+  }
+}
+
+export async function loadCloudDataset(uid) {
+  const workspace = await loadCloudWorkspace(uid)
+  return workspace.dataset
 }
 
 export async function saveCloudBackup(uid, backup, meta = {}) {
