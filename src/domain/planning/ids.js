@@ -21,4 +21,3 @@ export function ensurePlanningId(id, entityType, idFactory = createId) {
   const normalizedId = String(id || '').trim()
   return normalizedId || createPlanningId(entityType, idFactory)
 }
-

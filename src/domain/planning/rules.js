@@ -89,4 +89,3 @@ export function selectEffectiveTimetable(timetableVersions, date) {
     .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
   return candidates[0] || null
 }
-

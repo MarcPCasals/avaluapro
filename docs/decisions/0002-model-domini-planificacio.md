@@ -54,4 +54,3 @@ Les regles de Firestore aplicaran aquestes mateixes capacitats a la iteració 4.
 - Els horaris nous poden entrar en vigor en una data concreta sense reescriure sessions passades.
 - Les consultes de Firestore es podran limitar a una UP, un grup o un interval de dates.
 - Hi haurà més documents relacionats, però cadascun tindrà una responsabilitat clara i una mida controlada.
-

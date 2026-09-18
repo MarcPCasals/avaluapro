@@ -60,4 +60,3 @@ export const ACCESS_ROLES = Object.freeze([
   'planningEditor',
   'planningAgendaEditor',
 ])
-

@@ -154,4 +154,3 @@ Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a u
 | Col·laborador UP + Agenda | Sí | Sí | Amb accés al grup | Amb accés al grup | No per la invitació de Programació |
 
 Les regles de Firestore hauran de tornar a comprovar el propietari, el rol, la UP concreta i, quan correspongui, l'accés independent al grup.
-
