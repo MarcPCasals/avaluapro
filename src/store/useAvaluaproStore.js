@@ -70,7 +70,7 @@ import {
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
-import { isFirestoreNetworkError, isFirestoreQuotaError } from '../lib/cloudSyncDiff'
+import { areCloudDocumentsEqual, isFirestoreNetworkError, isFirestoreQuotaError } from '../lib/cloudSyncDiff'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
 import { getCloudStartupAction, getCloudWorkspacePreferences } from '../lib/cloudStartup'
 import {
@@ -920,6 +920,21 @@ async function applyCloudWorkspace(set, get, uid, workspace) {
   return true
 }
 
+function getComparableCloudWorkspace(dataset) {
+  return COLLECTIONS.reduce((result, collectionName) => ({
+    ...result,
+    [collectionName]: [...(dataset[collectionName] || [])]
+      .sort((first, second) => String(first.id || '').localeCompare(String(second.id || ''))),
+  }), {})
+}
+
+function cloudWorkspacesMatch(localDataset, remoteDataset) {
+  return areCloudDocumentsEqual(
+    getComparableCloudWorkspace(localDataset),
+    getComparableCloudWorkspace(remoteDataset),
+  )
+}
+
 async function synchronizeAfterSignIn(set, get, uid) {
   if (!uid || get().cloud.user?.uid !== uid) return
   if (cloudStartupPromise && cloudStartupUid === uid) return cloudStartupPromise
@@ -941,9 +956,13 @@ async function synchronizeAfterSignIn(set, get, uid) {
         const workspace = await loadCloudWorkspace(uid)
         if (get().cloud.user?.uid !== uid) return
 
+        const localDataset = getDatasetFromState(get())
         const action = getCloudStartupAction({
           cloudWorkspaceExists: workspace.exists,
+          localWorkspaceExists: localDataset.classes.length > 0,
+          localWorkspaceIsDemo: get().onboarding.demoMode,
           pendingOperationCount: (await loadCloudSyncQueue(uid)).length,
+          workspacesMatch: cloudWorkspacesMatch(localDataset, workspace.dataset),
         })
         if (action === 'pull-cloud') {
           await applyCloudWorkspace(set, get, uid, workspace)
@@ -952,6 +971,33 @@ async function synchronizeAfterSignIn(set, get, uid) {
         if (action === 'keep-local') {
           set((current) => ({
             cloud: { ...current.cloud, status: 'signed-in', error: '', errorKind: '' },
+          }))
+          return
+        }
+        if (action === 'already-synced') {
+          set((current) => ({
+            cloud: {
+              ...current.cloud,
+              status: 'synced',
+              error: '',
+              errorKind: '',
+              lastSyncedAt: new Date().toISOString(),
+              pendingCollections: [],
+              pendingOperationCount: 0,
+            },
+          }))
+          return
+        }
+        if (action === 'review-conflict') {
+          set((current) => ({
+            cloud: {
+              ...current.cloud,
+              status: 'review',
+              error: 'Les dades locals i Firebase són diferents. S’han conservat les dades d’aquest dispositiu sense substituir-les.',
+              errorKind: 'conflict',
+              pendingCollections: [],
+              pendingOperationCount: 0,
+            },
           }))
           return
         }

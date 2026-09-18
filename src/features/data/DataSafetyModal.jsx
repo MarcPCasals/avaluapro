@@ -52,6 +52,9 @@ function formatDateTime(value) {
 
 function getCloudStatusText(cloud) {
   if (!cloud.user) return 'No has iniciat sessió amb Google.'
+  if (cloud.status === 'review') {
+    return cloud.error || 'Les dades locals i Firebase són diferents. No s’ha substituït res automàticament.'
+  }
   if (cloud.status === 'pending') {
     const count = cloud.pendingOperationCount || cloud.pendingCollections?.length || 1
     return `Hi ha ${count} canvi${count === 1 ? '' : 's'} local${count === 1 ? '' : 's'} pendent${count === 1 ? '' : 's'} de pujar.`
@@ -70,6 +73,7 @@ function getCloudStatusText(cloud) {
 
 function CloudStatusIcon({ status }) {
   if (status === 'synced') return <CheckCircle2 size={20} />
+  if (status === 'review') return <AlertTriangle size={20} />
   if (status === 'pending') return <Clock3 size={20} />
   if (status === 'syncing') return <Loader2 size={20} className="spin-icon" />
   if (status === 'error') return <AlertTriangle size={20} />

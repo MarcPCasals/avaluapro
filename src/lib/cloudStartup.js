@@ -1,6 +1,14 @@
-export function getCloudStartupAction({ cloudWorkspaceExists = false, pendingOperationCount = 0 } = {}) {
+export function getCloudStartupAction({
+  cloudWorkspaceExists = false,
+  localWorkspaceExists = false,
+  localWorkspaceIsDemo = false,
+  pendingOperationCount = 0,
+  workspacesMatch = false,
+} = {}) {
   if (pendingOperationCount > 0) return 'flush-local'
-  return cloudWorkspaceExists ? 'pull-cloud' : 'keep-local'
+  if (!cloudWorkspaceExists) return 'keep-local'
+  if (!localWorkspaceExists || localWorkspaceIsDemo) return 'pull-cloud'
+  return workspacesMatch ? 'already-synced' : 'review-conflict'
 }
 
 export function getCloudWorkspacePreferences(localPreferences = {}, cloudPreferences = {}) {

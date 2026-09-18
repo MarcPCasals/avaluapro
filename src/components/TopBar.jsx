@@ -93,6 +93,9 @@ function timestampToMillis(value) {
 }
 
 function getSyncIndicator(cloud) {
+  if (cloud.status === 'review') {
+    return { className: 'review', icon: AlertCircle, label: 'Revisió necessària', detail: 'Dades locals preservades' }
+  }
   if (cloud.status === 'error') {
     if (cloud.errorKind === 'quota') {
       return { className: 'error', icon: AlertCircle, label: 'Quota esgotada', detail: 'Desat al dispositiu' }

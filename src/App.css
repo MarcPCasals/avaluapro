@@ -1094,10 +1094,12 @@
 
 .cloud-session.syncing,
 .cloud-session.pending,
+.cloud-session.review,
 .cloud-session.synced,
 .cloud-session.error,
 .top-sync-status.syncing,
 .top-sync-status.pending,
+.top-sync-status.review,
 .top-sync-status.synced,
 .top-sync-status.error {
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
@@ -1111,6 +1113,11 @@
 .cloud-session.pending,
 .top-sync-status.pending {
   border-color: #facc15;
+}
+
+.cloud-session.review,
+.top-sync-status.review {
+  border-color: #fb923c;
 }
 
 .cloud-session.synced,
@@ -1160,6 +1167,13 @@
 .top-sync-status.pending .sync-pill svg,
 .top-sync-status.pending .sync-pill {
   color: #fde68a;
+}
+
+.cloud-session.review .sync-pill svg,
+.cloud-session.review .sync-pill,
+.top-sync-status.review .sync-pill svg,
+.top-sync-status.review .sync-pill {
+  color: #fdba74;
 }
 
 .cloud-session.error .sync-pill svg,

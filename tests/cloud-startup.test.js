@@ -7,7 +7,22 @@ import {
 
 test('un navegador nou baixa les dades quan Firebase ja té un espai de treball', () => {
   assert.equal(
-    getCloudStartupAction({ cloudWorkspaceExists: true, pendingOperationCount: 0 }),
+    getCloudStartupAction({
+      cloudWorkspaceExists: true,
+      localWorkspaceExists: false,
+      pendingOperationCount: 0,
+    }),
+    'pull-cloud',
+  )
+})
+
+test('la demo inicial es pot substituir per les dades reals de Firebase', () => {
+  assert.equal(
+    getCloudStartupAction({
+      cloudWorkspaceExists: true,
+      localWorkspaceExists: true,
+      localWorkspaceIsDemo: true,
+    }),
     'pull-cloud',
   )
 })
@@ -23,6 +38,29 @@ test('un compte sense cap còpia remota conserva les dades locals', () => {
   assert.equal(
     getCloudStartupAction({ cloudWorkspaceExists: false, pendingOperationCount: 0 }),
     'keep-local',
+  )
+})
+
+test('mai se substitueixen automàticament dades locals reals diferents de Firebase', () => {
+  assert.equal(
+    getCloudStartupAction({
+      cloudWorkspaceExists: true,
+      localWorkspaceExists: true,
+      localWorkspaceIsDemo: false,
+      workspacesMatch: false,
+    }),
+    'review-conflict',
+  )
+})
+
+test('si local i Firebase coincideixen només es confirma la sincronització', () => {
+  assert.equal(
+    getCloudStartupAction({
+      cloudWorkspaceExists: true,
+      localWorkspaceExists: true,
+      workspacesMatch: true,
+    }),
+    'already-synced',
   )
 })
 
