@@ -13,8 +13,9 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
-import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
+import { DIAGNOSIS_OPTIONS, getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildStudentProfiles } from '../../lib/analytics'
+import { formatAbsenceDateTime, formatAbsenceHours, getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -32,6 +33,16 @@ const REGISTRY_TYPES = [
 ]
 
 const REGISTRY_TYPE_IDS = new Set(REGISTRY_TYPES.map((type) => type.id))
+
+const OTHER_TUTORING_TYPES = [
+  { id: 'agenda', label: 'Nota a l’agenda' },
+  { id: 'incident', label: 'Full d’incidents' },
+  { id: 'classroom-expulsion', label: 'Expulsió d’aula' },
+  { id: 'center-expulsion', label: 'Expulsió de centre' },
+  { id: 'doip', label: 'DOIP equip educatiu' },
+]
+
+const OTHER_TUTORING_TYPE_IDS = new Set(OTHER_TUTORING_TYPES.map((type) => type.id))
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -232,6 +243,37 @@ function RegistryModal({ onClose, student }) {
   )
 }
 
+function OtherTutoringRecordsModal({ onClose, records, student }) {
+  const sortedRecords = [...records].sort((a, b) =>
+    String(b.updatedAt || b.createdAt || b.date || '').localeCompare(
+      String(a.updatedAt || a.createdAt || a.date || ''),
+    ),
+  )
+
+  return (
+    <Modal onClose={onClose} size="md" title={`Agenda i incidències: ${student.name}`}>
+      <div className="student-overview-other-records">
+        {sortedRecords.length === 0 ? (
+          <p className="empty-list">No hi ha notes a l’agenda, incidents ni altres registres disciplinaris.</p>
+        ) : (
+          sortedRecords.map((record) => {
+            const type = OTHER_TUTORING_TYPES.find((item) => item.id === record.type)
+            return (
+              <article key={record.id}>
+                <div>
+                  <strong>{type?.label || 'Registre tutorial'}</strong>
+                  <small>{formatShortDate(record.date)}</small>
+                </div>
+                <p>{record.note || 'Sense comentari afegit.'}</p>
+              </article>
+            )
+          })
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 export function StudentOverviewView() {
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
@@ -241,9 +283,9 @@ export function StudentOverviewView() {
   const taskRecords = useAvaluaproStore((state) => state.taskRecords)
   const marks = useAvaluaproStore((state) => state.marks)
   const behaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
+  const absenceRecords = useAvaluaproStore((state) => state.absenceRecords)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
-  const studentAntecedents = useAvaluaproStore((state) => state.studentAntecedents)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const [search, setSearch] = useState('')
   const [onlyAttention, setOnlyAttention] = useState(false)
@@ -251,6 +293,8 @@ export function StudentOverviewView() {
   const [profileStudentId, setProfileStudentId] = useState(null)
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
   const [registryStudentId, setRegistryStudentId] = useState(null)
+  const [otherRecordsStudentId, setOtherRecordsStudentId] = useState(null)
+  const showTutoringColumns = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
 
   const profilesByStudentId = useMemo(
     () =>
@@ -272,16 +316,22 @@ export function StudentOverviewView() {
         const records = tutorialRecords.filter(
           (record) => record.studentId === student.id && REGISTRY_TYPE_IDS.has(record.type),
         )
+        const otherTutorialRecords = tutorialRecords.filter(
+          (record) => record.studentId === student.id && OTHER_TUTORING_TYPE_IDS.has(record.type),
+        )
+        const studentAbsenceRecords = getStudentAbsenceRecords(absenceRecords, student.id, activeClassId)
         const pendingRecords = records.filter(
           (record) => record.followUpDate && record.followUpStatus !== 'done',
         )
         const importantRecords = records.filter((record) => record.isImportant && record.followUpStatus !== 'done')
         return {
-          antecedent: studentAntecedents.find((item) => item.studentId === student.id),
+          absenceHours: getStudentAbsenceHours(absenceRecords, student.id, activeClassId),
+          absenceRecords: studentAbsenceRecords,
           importantRecords,
           latestTeamNote: latestByDate(notes.filter((note) => note.type === 'team')),
           latestTrackingNote: latestByDate(notes.filter((note) => note.type === 'tracking')),
           latestTutoringNote: latestByDate(notes.filter((note) => note.type === 'tutoring')),
+          otherTutorialRecords,
           pendingRecords,
           profile: profilesByStudentId.get(student.id),
           records,
@@ -289,13 +339,19 @@ export function StudentOverviewView() {
         }
       })
       .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca', { numeric: true }))
-  }, [activeClassId, agendaNotes, profilesByStudentId, studentAntecedents, students, tutorialRecords])
+  }, [absenceRecords, activeClassId, agendaNotes, profilesByStudentId, students, tutorialRecords])
 
   const rows = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('ca')
     return allRows
       .filter((row) => !normalizedSearch || row.student.name.toLocaleLowerCase('ca').includes(normalizedSearch))
-      .filter((row) => !onlyAttention || row.importantRecords.length > 0 || row.pendingRecords.length > 0)
+      .filter(
+        (row) =>
+          !showTutoringColumns ||
+          !onlyAttention ||
+          row.importantRecords.length > 0 ||
+          row.pendingRecords.length > 0,
+      )
       .sort((a, b) => {
         if (onlyAttention) {
           const priorityA = a.importantRecords.length + a.pendingRecords.length
@@ -304,20 +360,22 @@ export function StudentOverviewView() {
         }
         return 0
       })
-  }, [allRows, onlyAttention, search])
+  }, [allRows, onlyAttention, search, showTutoringColumns])
 
   const selectedProfileStudent = students.find((student) => student.id === profileStudentId)
   const selectedRegistryStudent = students.find((student) => student.id === registryStudentId)
-  const attentionCount = allRows.filter(
-    (row) => row.importantRecords.length > 0 || row.pendingRecords.length > 0,
-  ).length
+  const selectedOtherRecordsStudent = students.find((student) => student.id === otherRecordsStudentId)
+  const selectedOtherRecords = allRows.find((row) => row.student.id === otherRecordsStudentId)?.otherTutorialRecords || []
+  const attentionCount = showTutoringColumns
+    ? allRows.filter((row) => row.importantRecords.length > 0 || row.pendingRecords.length > 0).length
+    : 0
   const activeUt = useAvaluaproStore((state) => state.uts.find((item) => item.id === activeUtId))
 
   const handleDownloadExcel = async () => {
     if (allRows.length === 0 || exportingExcel) return
     setExportingExcel(true)
     try {
-      const blob = await buildStudentOverviewExcel({ activeClass, activeUt, rows: allRows })
+      const blob = await buildStudentOverviewExcel({ activeClass, activeUt, rows: allRows, showTutoringColumns })
       const classSlug = String(activeClass?.name || 'classe')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -367,11 +425,13 @@ export function StudentOverviewView() {
             <FileSpreadsheet size={17} />
             {exportingExcel ? 'Preparant Excel…' : 'Descarregar Excel'}
           </button>
-          <button className={onlyAttention ? 'active' : ''} onClick={() => setOnlyAttention((value) => !value)} type="button">
-            <Filter size={16} />
-            Només pendents o importants
-            {attentionCount > 0 && <span>{attentionCount}</span>}
-          </button>
+          {showTutoringColumns && (
+            <button className={onlyAttention ? 'active' : ''} onClick={() => setOnlyAttention((value) => !value)} type="button">
+              <Filter size={16} />
+              Només pendents o importants
+              {attentionCount > 0 && <span>{attentionCount}</span>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -382,25 +442,42 @@ export function StudentOverviewView() {
         </div>
       ) : (
         <div className="student-overview-table-wrap">
-          <table className="student-overview-table">
+          <table className={`student-overview-table ${showTutoringColumns ? 'has-tutoring-columns' : ''}`}>
+            <colgroup>
+              <col className="student" />
+              <col className="profile" />
+              <col className="general" />
+              <col className="learning" />
+              <col className="absences" />
+              <col className="annotations" />
+              {showTutoringColumns && <col className="tutoring-notes" />}
+              {showTutoringColumns && <col className="registry" />}
+              {showTutoringColumns && <col className="other-records" />}
+            </colgroup>
             <thead>
               <tr>
                 <th>Alumne</th>
                 <th><span>Perfil</span><small>Font: perfil de l’alumne</small></th>
                 <th><span>Informació general</span><small>Font: perfil de l’alumne</small></th>
                 <th><span>Avaluació i seguiment</span><small>Fonts: avaluació i seguiment</small></th>
-                <th><span>Anotacions</span><small>Font: equip educatiu i tutoria</small></th>
-                <th><span>Registre tutorial</span><small>Font: seguiment tutorial</small></th>
-                <th><span>Antecedents</span><small>Font: perfil de l’alumne</small></th>
+                <th><span>Absències</span><small>Font: control d’assistència</small></th>
+                <th><span>Anotacions de seguiment</span><small>Font: seguiment de tasques</small></th>
+                {showTutoringColumns && <th><span>Anotacions de tutoria</span><small>Fonts: equip educatiu i tutoria</small></th>}
+                {showTutoringColumns && <th><span>Registre tutorial</span><small>Font: registre tutorial</small></th>}
+                {showTutoringColumns && <th><span>Agenda i incidències</span><small>Font: altres registres tutorials</small></th>}
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ antecedent, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, pendingRecords, profile, records, student }) => {
+              {rows.map(({ absenceHours, absenceRecords: rowAbsences, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, otherTutorialRecords, pendingRecords, profile, records, student }) => {
                 const diagnoses = DIAGNOSIS_OPTIONS.filter((option) => (student.diagnoses || []).includes(option.id))
+                const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
                 const overdue = pendingRecords.some((record) => record.followUpDate < todayInputValue())
+                const otherRecordCounts = OTHER_TUTORING_TYPES
+                  .map((type) => ({ ...type, count: otherTutorialRecords.filter((record) => record.type === type.id).length }))
+                  .filter((type) => type.count > 0)
                 return (
                   <tr key={student.id}>
-                    <th scope="row">
+                    <th className={dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : ''} scope="row">
                       <button onClick={() => setProfileStudentId(student.id)} type="button">
                         <strong>{student.name}</strong>
                         <small>{student.halfGroup || 'Sense mig grup'}</small>
@@ -411,7 +488,7 @@ export function StudentOverviewView() {
                         <div className="student-overview-chip-list">
                           {student.isSkiStudyStudent && <span className="ee">EE</span>}
                           {diagnoses.length > 0
-                            ? diagnoses.map((diagnosis) => <span key={diagnosis.id}>{diagnosis.label}</span>)
+                            ? diagnoses.map((diagnosis) => <span className={diagnosis.color} key={diagnosis.id}>{diagnosis.label}</span>)
                             : <em>Sense diagnòstics marcats</em>}
                         </div>
                         {student.diagnosisNotes && <p>{student.diagnosisNotes}</p>}
@@ -451,12 +528,16 @@ export function StudentOverviewView() {
                       </button>
                     </td>
                     <td>
+                      <div className="student-overview-absence-summary">
+                        <strong>{formatAbsenceHours(absenceHours)}</strong>
+                        {rowAbsences[0] ? <small>Última: {formatAbsenceDateTime(rowAbsences[0])}</small> : <em>Sense absències</em>}
+                      </div>
+                    </td>
+                    <td>
                       <button className="student-overview-cell-button" onClick={() => setAnnotationsStudentId(student.id)} type="button">
-                        {latestTeamNote || latestTutoringNote || latestTrackingNote ? (
+                        {latestTrackingNote ? (
                           <>
-                            {latestTeamNote && <p><b>Equip:</b> {latestTeamNote.text}</p>}
-                            {latestTutoringNote && <p><b>Tutoria:</b> {latestTutoringNote.text}</p>}
-                            {latestTrackingNote && <p><b>Seguiment:</b> {latestTrackingNote.text}</p>}
+                            <p>{latestTrackingNote.text}</p>
                           </>
                         ) : (
                           <em>Sense anotacions</em>
@@ -464,7 +545,20 @@ export function StudentOverviewView() {
                         <small><MessageCircle size={13} /> Veure i afegir</small>
                       </button>
                     </td>
-                    <td>
+                    {showTutoringColumns && <td>
+                      <button className="student-overview-cell-button" onClick={() => setAnnotationsStudentId(student.id)} type="button">
+                        {latestTeamNote || latestTutoringNote ? (
+                          <>
+                            {latestTeamNote && <p><b>Equip:</b> {latestTeamNote.text}</p>}
+                            {latestTutoringNote && <p><b>Tutoria:</b> {latestTutoringNote.text}</p>}
+                          </>
+                        ) : (
+                          <em>Sense anotacions de tutoria</em>
+                        )}
+                        <small><MessageCircle size={13} /> Veure i afegir</small>
+                      </button>
+                    </td>}
+                    {showTutoringColumns && <td>
                       <button className="student-overview-cell-button" onClick={() => setRegistryStudentId(student.id)} type="button">
                         {importantRecords[0] ? <p><b>Important:</b> {importantRecords[0].note}</p> : null}
                         <div className="student-overview-statuses">
@@ -478,23 +572,19 @@ export function StudentOverviewView() {
                         </div>
                         <small><ClipboardList size={13} /> Veure i afegir</small>
                       </button>
-                    </td>
-                    <td>
-                      <button className="student-overview-cell-button" onClick={() => setProfileStudentId(student.id)} type="button">
-                        {antecedent ? (
-                          <>
-                            <div className="student-overview-antecedent-line">
-                              <strong>{antecedent.lastLookGrade || '—'}</strong>
-                              <span>{antecedent.courseLabel || 'Curs no indicat'}</span>
-                            </div>
-                            <p>{antecedent.qualitativeNotes || 'Sense observació qualitativa'}</p>
-                          </>
+                    </td>}
+                    {showTutoringColumns && <td>
+                      <button className="student-overview-cell-button" onClick={() => setOtherRecordsStudentId(student.id)} type="button">
+                        {otherRecordCounts.length > 0 ? (
+                          <div className="student-overview-record-counts">
+                            {otherRecordCounts.map((type) => <span key={type.id}>{type.label}: <b>{type.count}</b></span>)}
+                          </div>
                         ) : (
-                          <em>Sense antecedents</em>
+                          <em>Sense notes d’agenda ni incidències</em>
                         )}
-                        <small><PencilLine size={13} /> Editar a la font</small>
+                        <small><ClipboardList size={13} /> Veure el detall</small>
                       </button>
-                    </td>
+                    </td>}
                   </tr>
                 )
               })}
@@ -506,9 +596,10 @@ export function StudentOverviewView() {
       <details className="student-overview-source-note">
         <summary><ChevronDown size={15} /> Què s’actualitza a cada lloc?</summary>
         <p>
-          Perfil i informació general modifiquen la fitxa de l’alumne; les anotacions escriuen a equip educatiu o
-          tutoria; els acords, informacions importants i seguiments escriuen al registre tutorial; i els antecedents
-          continuen desats a l’apartat d’antecedents. Aquesta pantalla no en crea còpies.
+          Perfil i informació general modifiquen la fitxa de l’alumne. Les absències venen del control d’assistència
+          i les anotacions de seguiment, de les pantalles d’avaluació i tasques.
+          {showTutoringColumns && ' En aquest grup tutorial, les anotacions d’equip i tutoria, el registre qualitatiu i els registres d’agenda o incidències es mostren en columnes separades.'}
+          {' '}Aquesta pantalla no en crea còpies.
         </p>
       </details>
 
@@ -535,6 +626,13 @@ export function StudentOverviewView() {
       )}
       {selectedRegistryStudent && (
         <RegistryModal onClose={() => setRegistryStudentId(null)} student={selectedRegistryStudent} />
+      )}
+      {selectedOtherRecordsStudent && (
+        <OtherTutoringRecordsModal
+          onClose={() => setOtherRecordsStudentId(null)}
+          records={selectedOtherRecords}
+          student={selectedOtherRecordsStudent}
+        />
       )}
     </section>
   )

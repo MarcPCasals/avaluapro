@@ -30033,11 +30033,25 @@ button.profile-followup-card:focus-visible {
 
 .student-overview-table {
   width: 100%;
-  min-width: 1660px;
+  min-width: 1540px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
+
+.student-overview-table.has-tutoring-columns {
+  min-width: 2360px;
+}
+
+.student-overview-table col.student { width: 190px; }
+.student-overview-table col.profile { width: 240px; }
+.student-overview-table col.general { width: 250px; }
+.student-overview-table col.learning { width: 280px; }
+.student-overview-table col.absences { width: 220px; }
+.student-overview-table col.annotations { width: 270px; }
+.student-overview-table col.tutoring-notes,
+.student-overview-table col.registry,
+.student-overview-table col.other-records { width: 280px; }
 
 .student-overview-table th,
 .student-overview-table td {
@@ -30070,24 +30084,6 @@ button.profile-followup-card:focus-visible {
 .student-overview-table thead th:first-child {
   z-index: 4;
   background: #f8fafc;
-}
-
-.student-overview-table thead th:nth-child(2) {
-  width: 240px;
-}
-
-.student-overview-table thead th:nth-child(3) {
-  width: 250px;
-}
-
-.student-overview-table thead th:nth-child(4),
-.student-overview-table thead th:nth-child(5),
-.student-overview-table thead th:nth-child(6) {
-  width: 280px;
-}
-
-.student-overview-table thead th:nth-child(7) {
-  width: 210px;
 }
 
 .student-overview-table thead th span,
@@ -30129,6 +30125,19 @@ button.profile-followup-card:focus-visible {
   color: #0f172a;
   font-size: 13px;
 }
+
+.student-overview-table tbody th.student-diagnosis-blue { background: #dbeafe; }
+.student-overview-table tbody th.student-diagnosis-green { background: #dcfce7; }
+.student-overview-table tbody th.student-diagnosis-yellow { background: #fef3c7; }
+.student-overview-table tbody th.student-diagnosis-red { background: #fee2e2; }
+.student-overview-table tbody th.student-diagnosis-purple { background: #f3e8ff; }
+.student-overview-table tbody th.student-diagnosis-orange { background: #ffedd5; }
+.student-overview-table tbody th.student-diagnosis-blue button strong { color: #1e40af; }
+.student-overview-table tbody th.student-diagnosis-green button strong { color: #166534; }
+.student-overview-table tbody th.student-diagnosis-yellow button strong { color: #92400e; }
+.student-overview-table tbody th.student-diagnosis-red button strong { color: #991b1b; }
+.student-overview-table tbody th.student-diagnosis-purple button strong { color: #6b21a8; }
+.student-overview-table tbody th.student-diagnosis-orange button strong { color: #9a3412; }
 
 .student-overview-table tbody th > button small,
 .student-overview-cell-button > small {
@@ -30185,6 +30194,13 @@ button.profile-followup-card:focus-visible {
   background: #fce7f3;
 }
 
+.student-overview-chip-list span.blue { color: #1e40af; background: #dbeafe; }
+.student-overview-chip-list span.green { color: #166534; background: #dcfce7; }
+.student-overview-chip-list span.yellow { color: #92400e; background: #fef3c7; }
+.student-overview-chip-list span.red { color: #991b1b; background: #fee2e2; }
+.student-overview-chip-list span.purple { color: #6b21a8; background: #f3e8ff; }
+.student-overview-chip-list span.orange { color: #9a3412; background: #ffedd5; }
+
 .student-overview-statuses span.important {
   color: #92400e;
   background: #fef3c7;
@@ -30237,11 +30253,56 @@ button.profile-followup-card:focus-visible {
   cursor: pointer;
 }
 
-.student-overview-antecedent-line {
+.student-overview-absence-summary,
+.student-overview-record-counts {
+  display: grid;
+  gap: 5px;
+}
+
+.student-overview-absence-summary strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.student-overview-absence-summary small,
+.student-overview-absence-summary em,
+.student-overview-record-counts span {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.student-overview-record-counts span {
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: #f8fafc;
+  font-weight: 750;
+}
+
+.student-overview-other-records {
+  display: grid;
+  gap: 9px;
+}
+
+.student-overview-other-records article {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 11px;
+  background: white;
+}
+
+.student-overview-other-records article > div {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
 }
+
+.student-overview-other-records strong { color: #0f172a; font-size: 12px; }
+.student-overview-other-records small { color: #94a3b8; font-size: 10px; font-weight: 800; }
+.student-overview-other-records p { margin: 0; color: #475569; font-size: 12px; line-height: 1.4; }
 
 .student-overview-learning-summary {
   display: grid;
@@ -30266,22 +30327,6 @@ button.profile-followup-card:focus-visible {
 .student-overview-learning-summary strong {
   color: #0f172a;
   font-size: 13px;
-}
-
-.student-overview-antecedent-line strong {
-  min-width: 28px;
-  min-height: 28px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 7px;
-  color: white;
-  background: #334155;
-}
-
-.student-overview-antecedent-line span {
-  color: #334155;
-  font-size: 11px;
-  font-weight: 850;
 }
 
 .student-overview-source-note {

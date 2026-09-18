@@ -1,11 +1,11 @@
-import { DIAGNOSIS_OPTIONS } from '../data/studentAnnotations'
+import { DIAGNOSIS_OPTIONS, getDominantDiagnosis } from '../data/studentAnnotations'
 
 const HEADER_COLOR = '#1E3A5F'
 const HEADER_TEXT_COLOR = '#FFFFFF'
 const BORDER_COLOR = '#D9E2EC'
 const ALT_ROW_COLOR = '#F7FAFC'
 
-const COLUMNS = [
+const BASE_COLUMNS = [
   { title: 'Alumne', width: 28 },
   { title: 'Mig grup', width: 14 },
   { title: 'Diagnòstics', width: 28 },
@@ -16,17 +16,18 @@ const COLUMNS = [
   { title: 'Constància UT', width: 15 },
   { title: 'Tasques no fetes', width: 17 },
   { title: 'Incidències', width: 12 },
-  { title: 'Última anotació d’equip', width: 42 },
-  { title: 'Última anotació de tutoria', width: 42 },
+  { title: 'Absències (hores)', width: 18 },
+  { title: 'Última absència', width: 28 },
   { title: 'Última anotació de seguiment', width: 42 },
+]
+
+const TUTORING_COLUMNS = [
+  { title: 'Última anotació d’equip educatiu', width: 42 },
+  { title: 'Última anotació de tutoria', width: 42 },
   { title: 'Informacions importants', width: 48 },
   { title: 'Seguiments pendents', width: 48 },
   { title: 'Registre tutorial', width: 55 },
-  { title: 'Curs dels antecedents', width: 20 },
-  { title: 'Nota antecedent', width: 16 },
-  { title: 'Perfil antecedent', width: 24 },
-  { title: 'Competències antecedents', width: 36 },
-  { title: 'Observacions dels antecedents', width: 48 },
+  { title: 'Agenda i incidències', width: 55 },
 ]
 
 const RECORD_TYPE_LABELS = {
@@ -39,11 +40,21 @@ const RECORD_TYPE_LABELS = {
   'other-tutorial': 'Altres informacions tutorials',
 }
 
-const ANTECEDENT_PROFILE_LABELS = {
-  invisible: 'Alumne invisible',
-  priority: 'Intervenció prioritària',
-  ordinary: 'Seguiment ordinari',
-  stable: 'Hàbit estable',
+const OTHER_RECORD_TYPE_LABELS = {
+  agenda: 'Nota a l’agenda',
+  incident: 'Full d’incidents',
+  'classroom-expulsion': 'Expulsió d’aula',
+  'center-expulsion': 'Expulsió de centre',
+  doip: 'DOIP equip educatiu',
+}
+
+const DIAGNOSIS_COLORS = {
+  blue: { backgroundColor: '#DBEAFE', textColor: '#1E40AF' },
+  green: { backgroundColor: '#DCFCE7', textColor: '#166534' },
+  yellow: { backgroundColor: '#FEF3C7', textColor: '#92400E' },
+  red: { backgroundColor: '#FEE2E2', textColor: '#991B1B' },
+  purple: { backgroundColor: '#F3E8FF', textColor: '#6B21A8' },
+  orange: { backgroundColor: '#FFEDD5', textColor: '#9A3412' },
 }
 
 function cleanText(value) {
@@ -58,13 +69,6 @@ function formatDate(value) {
 
 function joinNotes(records, mapper) {
   return records.map(mapper).filter(Boolean).join('\n')
-}
-
-function formatCompetencyGrades(antecedent) {
-  return Object.entries(antecedent?.competencyGrades || {})
-    .filter(([, grade]) => grade)
-    .map(([competency, grade]) => `${competency}: ${grade}`)
-    .join(' · ')
 }
 
 function textCell(value, extra = {}) {
@@ -92,8 +96,8 @@ function numberCell(value, extra = {}) {
   }
 }
 
-function getDataRow(row, index) {
-  const { antecedent, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, pendingRecords, profile, records, student } = row
+function getDataRow(row, index, showTutoringColumns) {
+  const { absenceHours, absenceRecords, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, otherTutorialRecords, pendingRecords, profile, records, student } = row
   const diagnoses = DIAGNOSIS_OPTIONS.filter((option) => (student.diagnoses || []).includes(option.id))
     .map((option) => option.label)
     .join(', ')
@@ -116,9 +120,15 @@ function getDataRow(row, index) {
       return `${formatDate(record.date)} · ${RECORD_TYPE_LABELS[record.type] || 'Registre'} · ${record.note}${followUp}`
     },
   )
+  const otherRecordsText = joinNotes(
+    [...otherTutorialRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))),
+    (record) => `${formatDate(record.date)} · ${OTHER_RECORD_TYPE_LABELS[record.type] || 'Registre'} · ${record.note || 'Sense comentari'}`,
+  )
+  const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
+  const studentStyle = dominantDiagnosis ? DIAGNOSIS_COLORS[dominantDiagnosis.color] : {}
 
-  return [
-    textCell(student.name, { ...baseStyle, fontWeight: 'bold' }),
+  const baseCells = [
+    textCell(student.name, { ...baseStyle, ...studentStyle, fontWeight: 'bold' }),
     textCell(student.halfGroup, baseStyle),
     textCell(diagnoses, baseStyle),
     textCell(student.isSkiStudyStudent ? 'Sí' : '', { ...baseStyle, align: 'center' }),
@@ -130,23 +140,28 @@ function getDataRow(row, index) {
       : numberCell(null, baseStyle),
     numberCell(profile?.tracking.missing || 0, { ...baseStyle, format: '0' }),
     numberCell(profile?.incidents || 0, { ...baseStyle, format: '0' }),
+    numberCell(absenceHours || 0, { ...baseStyle, format: '0.##' }),
+    textCell(absenceRecords[0] ? `${formatDate(absenceRecords[0].date)}${absenceRecords[0].time ? ` · ${absenceRecords[0].time}` : ''}` : '', baseStyle),
+    textCell(latestTrackingNote?.text, baseStyle),
+  ]
+
+  if (!showTutoringColumns) return baseCells
+
+  return [
+    ...baseCells,
     textCell(latestTeamNote?.text, baseStyle),
     textCell(latestTutoringNote?.text, baseStyle),
-    textCell(latestTrackingNote?.text, baseStyle),
     textCell(importantText, baseStyle),
     textCell(pendingText, baseStyle),
     textCell(registryText, baseStyle),
-    textCell(antecedent?.courseLabel, baseStyle),
-    textCell(antecedent?.lastLookGrade, { ...baseStyle, align: 'center', fontWeight: 'bold' }),
-    textCell(ANTECEDENT_PROFILE_LABELS[antecedent?.profile] || antecedent?.profile, baseStyle),
-    textCell(formatCompetencyGrades(antecedent), baseStyle),
-    textCell(antecedent?.qualitativeNotes, baseStyle),
+    textCell(otherRecordsText, baseStyle),
   ]
 }
 
-export async function buildStudentOverviewExcel({ activeClass, activeUt, rows }) {
+export async function buildStudentOverviewExcel({ activeClass, activeUt, rows, showTutoringColumns = false }) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
-  const columnCount = COLUMNS.length
+  const columns = showTutoringColumns ? [...BASE_COLUMNS, ...TUTORING_COLUMNS] : BASE_COLUMNS
+  const columnCount = columns.length
   const titleRow = [
     {
       value: `AvaluaPro · ${activeClass?.name || 'Classe'}`,
@@ -174,7 +189,7 @@ export async function buildStudentOverviewExcel({ activeClass, activeUt, rows })
     },
     ...Array(columnCount - 1).fill(null),
   ]
-  const headerRow = COLUMNS.map((column) => ({
+  const headerRow = columns.map((column) => ({
     value: column.title,
     type: String,
     fontWeight: 'bold',
@@ -187,10 +202,16 @@ export async function buildStudentOverviewExcel({ activeClass, activeUt, rows })
     wrap: true,
     height: 34,
   }))
-  const data = [titleRow, contextRow, Array(columnCount).fill(null), headerRow, ...rows.map(getDataRow)]
+  const data = [
+    titleRow,
+    contextRow,
+    Array(columnCount).fill(null),
+    headerRow,
+    ...rows.map((row, index) => getDataRow(row, index, showTutoringColumns)),
+  ]
 
   return writeXlsxFile(data, {
-    columns: COLUMNS.map(({ width }) => ({ width })),
+    columns: columns.map(({ width }) => ({ width })),
     fontFamily: 'Arial',
     fontSize: 10,
     orientation: 'landscape',
