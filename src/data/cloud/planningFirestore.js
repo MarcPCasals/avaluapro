@@ -11,12 +11,15 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore'
 import { firebaseDb } from '../../lib/firebase.js'
+import { areCloudDocumentsEqual } from '../../lib/cloudSyncDiff.js'
+import { PLANNING_ENTITY_TYPES } from '../../domain/planning/constants.js'
 
 const OWNER_COLLECTIONS = Object.freeze({
   academicYear: 'planningAcademicYears',
@@ -344,4 +347,124 @@ export async function deletePlanningPrivateNote(noteId) {
 
 export async function touchPlanningUnit(planningUnitId, updatedAt = new Date().toISOString()) {
   await updateDoc(planningUnitRef(planningUnitId), { updatedAt })
+}
+
+function isPlanningAccessGrantPath(pathParts) {
+  return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'accessGrants'
+}
+
+function isExpectedPlanningOperationPath(operation, pathParts) {
+  const ownerCollection = OWNER_COLLECTIONS[operation.entityType]
+  if (ownerCollection) {
+    return pathParts.length === 4 && pathParts[0] === 'users' &&
+      pathParts[1] === operation.uid && pathParts[2] === ownerCollection
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.PLANNING_UNIT) {
+    return pathParts.length === 2 && pathParts[0] === 'planningUnits'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.PLANNING_PHASE) {
+    return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'phases'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.PLANNING_ACTIVITY) {
+    return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'activities'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.ACCESS_GRANT) return isPlanningAccessGrantPath(pathParts)
+  if (operation.entityType === PLANNING_ENTITY_TYPES.GROUP_APPLICATION) {
+    return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'applications'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.ACTIVITY_OVERRIDE) {
+    return pathParts.length === 6 && pathParts[0] === 'planningUnits' &&
+      pathParts[2] === 'applications' && pathParts[4] === 'activityOverrides'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.CALENDAR_SESSION) {
+    return pathParts.length === 6 && pathParts[0] === 'planningUnits' &&
+      pathParts[2] === 'applications' && pathParts[4] === 'sessions'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.SESSION_ITEM) {
+    return pathParts.length === 8 && pathParts[0] === 'planningUnits' &&
+      pathParts[2] === 'applications' && pathParts[4] === 'sessions' && pathParts[6] === 'items'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.ACTIVITY_RESULT) {
+    return pathParts.length === 8 && pathParts[0] === 'planningUnits' &&
+      pathParts[2] === 'applications' && pathParts[4] === 'sessions' && pathParts[6] === 'results'
+  }
+  if (operation.entityType === PLANNING_ENTITY_TYPES.PRIVATE_NOTE) {
+    return pathParts.length === 2 && pathParts[0] === 'planningPrivateNotes'
+  }
+  return false
+}
+
+/**
+ * Aplica una operació local només si el document remot encara és la versió
+ * sobre la qual es va editar. Aquesta comparació dins una transacció evita que
+ * l'ordinador substitueixi silenciosament una edició més nova feta a l'iPad.
+ */
+export async function applyPlanningCloudOperation(operation) {
+  if (!operation?.path || !operation.uid || !['upsert', 'delete'].includes(operation.operation)) {
+    throw new Error('Operació de planificació incompleta')
+  }
+  const pathParts = operation.path.split('/').filter(Boolean)
+  if (!isExpectedPlanningOperationPath(operation, pathParts)) {
+    throw new Error('La ruta no correspon al tipus d’entitat de planificació')
+  }
+  if (operation.operation === 'upsert' && (
+    operation.value?.entityType !== operation.entityType || operation.value?.ownerUid !== operation.uid
+  )) {
+    throw new Error('L’operació no correspon al docent o al tipus d’entitat')
+  }
+  const reference = doc(firebaseDb, operation.path)
+
+  return runTransaction(firebaseDb, async (transaction) => {
+    const snapshot = await transaction.get(reference)
+    const remoteValue = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
+    const remoteUpdatedAt = remoteValue?.updatedAt || ''
+    const operationAlreadyApplied = operation.operation === 'upsert' &&
+      remoteValue && areCloudDocumentsEqual(operation.value, remoteValue)
+    const remoteAlreadyDeleted = operation.operation === 'delete' && !remoteValue
+
+    if (operationAlreadyApplied || remoteAlreadyDeleted) {
+      return { applied: true, remoteUpdatedAt }
+    }
+    if (remoteUpdatedAt !== (operation.baseUpdatedAt || '')) {
+      return { conflict: true, remoteUpdatedAt, remoteValue }
+    }
+
+    if (isPlanningAccessGrantPath(pathParts)) {
+      const planningUnitId = pathParts[1]
+      const email = decodeURIComponent(pathParts[3]).toLowerCase()
+      const unitReference = planningUnitRef(planningUnitId)
+      await transaction.get(unitReference)
+      if (operation.operation === 'delete') {
+        transaction.delete(reference)
+        transaction.update(
+          unitReference,
+          new FieldPath('accessByEmail', email),
+          deleteField(),
+          'authorizedEmails',
+          arrayRemove(email),
+          'updatedAt',
+          new Date().toISOString(),
+        )
+      } else {
+        const value = cleanForPlanningFirestore(operation.value)
+        transaction.set(reference, value)
+        transaction.update(
+          unitReference,
+          new FieldPath('accessByEmail', email),
+          cleanForPlanningFirestore({ classIds: value.classIds || [], role: value.role, status: 'active' }),
+          'authorizedEmails',
+          arrayUnion(email),
+          'updatedAt',
+          new Date().toISOString(),
+        )
+      }
+      return { applied: true, remoteUpdatedAt: operation.value?.updatedAt || '' }
+    }
+
+    if (operation.operation === 'delete') transaction.delete(reference)
+    else transaction.set(reference, cleanForPlanningFirestore(operation.value), {
+      merge: pathParts.length === 2 && pathParts[0] === 'planningUnits',
+    })
+    return { applied: true, remoteUpdatedAt: operation.value?.updatedAt || '' }
+  })
 }

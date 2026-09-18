@@ -17,6 +17,7 @@ import {
   saveDataset,
 } from '../db/indexedDb'
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
+import { clearPlanningLocalData } from '../data/local/planningIndexedDb'
 import { getSubjectOption, getSubjectStructure } from '../data/subjects'
 import {
   buildTeacherGradePackage,
@@ -1742,6 +1743,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   signOutFromGoogle: async () => {
     try {
+      const signedInUid = get().cloud.user?.uid
       if (cloudSyncTimer) clearTimeout(cloudSyncTimer)
       stopTutoringCoordinationSubscriptions()
       queuedCloudCollections.clear()
@@ -1749,6 +1751,7 @@ export const useAvaluaproStore = create((set, get) => ({
       cloudStartupUid = ''
       cloudSyncBlockedUntil = 0
       cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
+      await clearPlanningLocalData(signedInUid)
       await signOutFromGoogle()
       set((state) => ({
         cloud: {
