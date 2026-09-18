@@ -206,8 +206,12 @@ function App() {
         </div>
       )}
       {cloud.error && (
-        <div className="storage-alert cloud-error">
-          <strong>No s’ha pogut sincronitzar amb Firebase.</strong>
+        <div className={`storage-alert ${cloud.status === 'review' ? 'cloud-review' : 'cloud-error'}`}>
+          <strong>
+            {cloud.status === 'review'
+              ? 'Les dades d’aquest dispositiu s’han protegit.'
+              : 'No s’ha pogut sincronitzar amb Firebase.'}
+          </strong>
           <span>{cloud.error}</span>
         </div>
       )}
