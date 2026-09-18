@@ -29975,7 +29975,13 @@ button.profile-followup-card:focus-visible {
   font-weight: 750;
 }
 
-.student-overview-toolbar > button {
+.student-overview-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.student-overview-toolbar-actions > button {
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -29989,13 +29995,13 @@ button.profile-followup-card:focus-visible {
   cursor: pointer;
 }
 
-.student-overview-toolbar > button.active {
+.student-overview-toolbar-actions > button.active {
   border-color: #f59e0b;
   color: #92400e;
   background: #fffbeb;
 }
 
-.student-overview-toolbar > button span {
+.student-overview-toolbar-actions > button span {
   min-width: 23px;
   min-height: 23px;
   display: inline-grid;
@@ -30004,6 +30010,17 @@ button.profile-followup-card:focus-visible {
   color: white;
   background: #f59e0b;
   font-size: 11px;
+}
+
+.student-overview-toolbar-actions > button.student-overview-excel-button {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.student-overview-toolbar-actions > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .student-overview-table-wrap {
@@ -30479,7 +30496,12 @@ button.profile-followup-card:focus-visible {
     min-width: 0;
   }
 
-  .student-overview-toolbar > button {
+  .student-overview-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .student-overview-toolbar-actions > button {
     justify-content: center;
   }
 

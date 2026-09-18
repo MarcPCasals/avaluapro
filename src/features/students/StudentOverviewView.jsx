@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  FileSpreadsheet,
   Filter,
   MessageCircle,
   PencilLine,
@@ -14,6 +15,8 @@ import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
 import { buildStudentProfiles } from '../../lib/analytics'
+import { downloadBlob, getTodaySlug } from '../../lib/downloads'
+import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { StudentAnnotationsModal } from './StudentAnnotationsModal'
 import { StudentProfileModal } from './StudentProfileModal'
@@ -244,6 +247,7 @@ export function StudentOverviewView() {
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const [search, setSearch] = useState('')
   const [onlyAttention, setOnlyAttention] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
   const [profileStudentId, setProfileStudentId] = useState(null)
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
   const [registryStudentId, setRegistryStudentId] = useState(null)
@@ -260,8 +264,7 @@ export function StudentOverviewView() {
     [activeClassId, activeUtId, behaviorEvents, marks, students, taskRecords, tasks],
   )
 
-  const rows = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase('ca')
+  const allRows = useMemo(() => {
     return students
       .filter((student) => student.classId === activeClassId)
       .map((student) => {
@@ -285,6 +288,12 @@ export function StudentOverviewView() {
           student,
         }
       })
+      .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca', { numeric: true }))
+  }, [activeClassId, agendaNotes, profilesByStudentId, studentAntecedents, students, tutorialRecords])
+
+  const rows = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase('ca')
+    return allRows
       .filter((row) => !normalizedSearch || row.student.name.toLocaleLowerCase('ca').includes(normalizedSearch))
       .filter((row) => !onlyAttention || row.importantRecords.length > 0 || row.pendingRecords.length > 0)
       .sort((a, b) => {
@@ -293,15 +302,33 @@ export function StudentOverviewView() {
           const priorityB = b.importantRecords.length + b.pendingRecords.length
           if (priorityA !== priorityB) return priorityB - priorityA
         }
-        return a.student.name.localeCompare(b.student.name, 'ca', { numeric: true })
+        return 0
       })
-  }, [activeClassId, agendaNotes, onlyAttention, profilesByStudentId, search, studentAntecedents, students, tutorialRecords])
+  }, [allRows, onlyAttention, search])
 
   const selectedProfileStudent = students.find((student) => student.id === profileStudentId)
   const selectedRegistryStudent = students.find((student) => student.id === registryStudentId)
-  const attentionCount = rows.filter(
+  const attentionCount = allRows.filter(
     (row) => row.importantRecords.length > 0 || row.pendingRecords.length > 0,
   ).length
+  const activeUt = useAvaluaproStore((state) => state.uts.find((item) => item.id === activeUtId))
+
+  const handleDownloadExcel = async () => {
+    if (allRows.length === 0 || exportingExcel) return
+    setExportingExcel(true)
+    try {
+      const blob = await buildStudentOverviewExcel({ activeClass, activeUt, rows: allRows })
+      const classSlug = String(activeClass?.name || 'classe')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase()
+      downloadBlob(blob, `avaluapro-alumnes-${classSlug || 'classe'}-${getTodaySlug()}.xlsx`)
+    } finally {
+      setExportingExcel(false)
+    }
+  }
 
   return (
     <section className="student-overview-view">
@@ -329,11 +356,23 @@ export function StudentOverviewView() {
             value={search}
           />
         </label>
-        <button className={onlyAttention ? 'active' : ''} onClick={() => setOnlyAttention((value) => !value)} type="button">
-          <Filter size={16} />
-          Només pendents o importants
-          {attentionCount > 0 && <span>{attentionCount}</span>}
-        </button>
+        <div className="student-overview-toolbar-actions">
+          <button
+            className="student-overview-excel-button"
+            disabled={allRows.length === 0 || exportingExcel}
+            onClick={handleDownloadExcel}
+            title="Descarrega tots els alumnes de la classe seleccionada"
+            type="button"
+          >
+            <FileSpreadsheet size={17} />
+            {exportingExcel ? 'Preparant Excel…' : 'Descarregar Excel'}
+          </button>
+          <button className={onlyAttention ? 'active' : ''} onClick={() => setOnlyAttention((value) => !value)} type="button">
+            <Filter size={16} />
+            Només pendents o importants
+            {attentionCount > 0 && <span>{attentionCount}</span>}
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
