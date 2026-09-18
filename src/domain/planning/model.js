@@ -405,3 +405,14 @@ export function createAccessGrant(input, options = {}) {
     status: enumValue(input.status || 'active', ['active', 'revoked'], "estat de l'accés"),
   }
 }
+
+export function createPlanningPrivateNote(input, options = {}) {
+  return {
+    ...entityBase(PLANNING_ENTITY_TYPES.PRIVATE_NOTE, input, options),
+    ownerUid: requiredText(input.ownerUid, 'propietari'),
+    planningUnitId: requiredText(input.planningUnitId, 'UP'),
+    applicationId: optionalText(input.applicationId),
+    sessionId: optionalText(input.sessionId),
+    text: requiredText(input.text, 'nota privada'),
+  }
+}

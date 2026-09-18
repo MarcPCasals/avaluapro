@@ -12,4 +12,4 @@ if ! java -version >/dev/null 2>&1; then
   fi
 fi
 
-npx firebase emulators:exec --only firestore "node --test tests/firestore-rules.test.js"
+npx firebase emulators:exec --only firestore "node --test tests/firestore-rules.test.js tests/planning-firestore-rules.test.js"

@@ -15,6 +15,7 @@ export const PLANNING_ENTITY_TYPES = Object.freeze({
   SESSION_ITEM: 'sessionItem',
   ACTIVITY_RESULT: 'activityResult',
   ACCESS_GRANT: 'accessGrant',
+  PRIVATE_NOTE: 'planningPrivateNote',
 })
 
 export const PLANNING_ID_PREFIXES = Object.freeze({
@@ -32,6 +33,7 @@ export const PLANNING_ID_PREFIXES = Object.freeze({
   [PLANNING_ENTITY_TYPES.SESSION_ITEM]: 'plan-session-item',
   [PLANNING_ENTITY_TYPES.ACTIVITY_RESULT]: 'plan-result',
   [PLANNING_ENTITY_TYPES.ACCESS_GRANT]: 'plan-grant',
+  [PLANNING_ENTITY_TYPES.PRIVATE_NOTE]: 'plan-private-note',
 })
 
 export const PLANNING_UNIT_STATUSES = Object.freeze(['draft', 'active', 'archived'])

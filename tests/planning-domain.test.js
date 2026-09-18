@@ -13,6 +13,7 @@ import {
   createGroupApplication,
   createPlanningActivity,
   createPlanningPhase,
+  createPlanningPrivateNote,
   createPlanningUnit,
   createSessionItem,
   createTemporalUnit,
@@ -340,6 +341,7 @@ test('totes les entitats principals declaren tipus i versió d’esquema', () =>
     createSessionItem({ ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: 'session-1', type: 'indication', title: 'Preparar la bata', order: 1 }, sharedOptions),
     createActivityResult({ ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: 'session-1', sessionItemId: 'item-1', status: 'continued', actualMinutes: 50 }, sharedOptions),
     createAccessGrant({ ownerUid: 'teacher-1', planningUnitId: 'up-1', granteeEmail: 'DIRECCIO@EXAMPLE.TEST', role: 'directionReader' }, sharedOptions),
+    createPlanningPrivateNote({ ownerUid: 'teacher-1', planningUnitId: 'up-1', sessionId: 'session-1', text: 'Recordatori només per al docent.' }, sharedOptions),
   ]
 
   assert.deepEqual(
@@ -348,6 +350,7 @@ test('totes les entitats principals declaren tipus i versió d’esquema', () =>
   )
   assert.ok(entities.every((entity) => entity.schemaVersion === PLANNING_SCHEMA_VERSION))
   assert.ok(entities.every((entity) => entity.id.startsWith('plan-')))
-  assert.equal(entities.at(-1).granteeEmail, 'direccio@example.test')
-  assert.equal('privateNote' in entities.at(-2), false)
+  assert.equal(entities.at(-2).granteeEmail, 'direccio@example.test')
+  assert.equal('privateNote' in entities.at(-3), false)
+  assert.equal(entities.at(-1).entityType, 'planningPrivateNote')
 })

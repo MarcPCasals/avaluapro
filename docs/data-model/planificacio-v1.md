@@ -20,6 +20,7 @@ erDiagram
     SESSION_ITEM ||--o| ACTIVITY_RESULT : produeix
     PLANNING_UNIT ||--o{ ACCESS_GRANT : comparteix
     ACADEMIC_YEAR ||--o{ CALENDAR_EVENT : excepciona
+    PLANNING_UNIT ||--o{ PLANNING_PRIVATE_NOTE : referencia_privada
 ```
 
 ## Contracte comú
@@ -55,6 +56,7 @@ Els noms, les dates i l'ordre són camps editables i no formen part de l'identif
 | `sessionItem` | Activitat, indicació o transició dins una sessió | Pot conservar el vincle amb l'activitat base |
 | `activityResult` | Resultat pedagògic real | Enllaça sessió i element; no conté dades individuals privades |
 | `accessGrant` | Lectura o coedició per correu exacte | Pertany a una UP i pot limitar-se a grups |
+| `planningPrivateNote` | Nota personal separada de l'aplicació compartible | Referencia UP, aplicació o sessió; només la llegeix el propietari |
 
 ## UP base i aplicació per grup
 
@@ -144,7 +146,7 @@ Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a u
 
 ## Privacitat i capacitats
 
-`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat i la reflexió pedagògica. Les notes privades, incidències, assistència i diagnòstics viuran en àmbits protegits separats.
+`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat i la reflexió pedagògica. `planningPrivateNote` viu en una col·lecció separada i només la pot llegir el propietari. Les incidències, l'assistència i els diagnòstics continuen en els àmbits protegits d'AvaluaPro.
 
 | Rol | UP | Editar UP | Aplicació real | Gestionar Agenda | Notes privades o incidències |
 |---|---:|---:|---:|---:|---:|

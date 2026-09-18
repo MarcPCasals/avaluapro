@@ -2132,3 +2132,7 @@ export async function markInternalAnnouncementsRead(user) {
     { merge: true },
   )
 }
+
+// Els mòduls de dades nous comparteixen aquesta instància per evitar crear una
+// segona connexió de Firestore o duplicar la configuració de Firebase.
+export { db as firebaseDb }

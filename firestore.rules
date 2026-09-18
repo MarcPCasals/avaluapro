@@ -1196,6 +1196,456 @@ service cloud.firestore {
         && validStudentProfileAnswers(request.resource.data.answers);
     }
 
+    function planningUnitExists(upId) {
+      return exists(/databases/$(database)/documents/planningUnits/$(upId));
+    }
+
+    function planningUnitData(upId) {
+      return get(/databases/$(database)/documents/planningUnits/$(upId)).data;
+    }
+
+    function isPlanningOwner(upId) {
+      return signedIn()
+        && planningUnitExists(upId)
+        && planningUnitData(upId).ownerUid == request.auth.uid;
+    }
+
+    function hasActivePlanningGrant(upId) {
+      return signedIn()
+        && request.auth.token.email is string
+        && planningUnitData(upId).accessByEmail is map
+        && request.auth.token.email in planningUnitData(upId).accessByEmail
+        && planningUnitData(upId).accessByEmail[request.auth.token.email].status == 'active';
+    }
+
+    function planningGrantRole(upId) {
+      return planningUnitData(upId).accessByEmail[request.auth.token.email].role;
+    }
+
+    function planningGrantClassIds(upId) {
+      return planningUnitData(upId).accessByEmail[request.auth.token.email].classIds;
+    }
+
+    function canReadPlanningUnit(upId) {
+      return isPlanningOwner(upId) || hasActivePlanningGrant(upId);
+    }
+
+    function canEditBasePlanning(upId) {
+      return isPlanningOwner(upId)
+        || (
+          hasActivePlanningGrant(upId)
+          && planningGrantRole(upId) in ['planningEditor', 'planningAgendaEditor']
+        );
+    }
+
+    function canReadPlanningApplication(upId, classId) {
+      return isPlanningOwner(upId)
+        || (
+          hasActivePlanningGrant(upId)
+          && (
+            planningGrantRole(upId) == 'directionReader'
+            || (
+              planningGrantClassIds(upId) is list
+              && classId in planningGrantClassIds(upId)
+            )
+          )
+        );
+    }
+
+    function canManagePlanningAgenda(upId, classId) {
+      return isPlanningOwner(upId)
+        || (
+          hasActivePlanningGrant(upId)
+          && planningGrantRole(upId) == 'planningAgendaEditor'
+          && planningGrantClassIds(upId) is list
+          && classId in planningGrantClassIds(upId)
+        );
+    }
+
+    function planningApplicationClassId(upId, applicationId) {
+      return get(/databases/$(database)/documents/planningUnits/$(upId)/applications/$(applicationId)).data.classId;
+    }
+
+    function validPlanningUnitShape(upId) {
+      return request.resource.data.keys().hasOnly([
+          'academicYearId',
+          'assessmentCriterionIds',
+          'attitudesAndValues',
+          'accessByEmail',
+          'authorizedEmails',
+          'code',
+          'competencyIds',
+          'complexSituation',
+          'copiedFrom',
+          'createdAt',
+          'entityType',
+          'expectedLearningIds',
+          'expectedProduct',
+          'factsAndConcepts',
+          'id',
+          'indicatorIds',
+          'level',
+          'ownerEmailLower',
+          'ownerUid',
+          'procedures',
+          'schemaVersion',
+          'specificResources',
+          'status',
+          'temporalUnitId',
+          'title',
+          'transversalResources',
+          'updatedAt',
+          'vehicularLanguage',
+          'versionNumber'
+        ])
+        && request.resource.data.id == upId
+        && request.resource.data.entityType == 'planningUnit'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid is string
+        && request.resource.data.ownerEmailLower is string
+        && request.resource.data.academicYearId is string
+        && request.resource.data.temporalUnitId is string
+        && request.resource.data.accessByEmail is map
+        && request.resource.data.authorizedEmails is list
+        && request.resource.data.authorizedEmails.size() == request.resource.data.accessByEmail.size()
+        && request.resource.data.authorizedEmails.hasAll(request.resource.data.accessByEmail.keys())
+        && request.resource.data.accessByEmail.keys().hasAll(request.resource.data.authorizedEmails)
+        && request.resource.data.status in ['draft', 'active', 'archived']
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningUnitOwnerUpdate(upId) {
+      return validPlanningUnitShape(upId)
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.ownerEmailLower == resource.data.ownerEmailLower
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.entityType == resource.data.entityType
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validPlanningUnitEditorUpdate(upId) {
+      return validPlanningUnitShape(upId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'assessmentCriterionIds',
+          'attitudesAndValues',
+          'code',
+          'competencyIds',
+          'complexSituation',
+          'expectedLearningIds',
+          'expectedProduct',
+          'factsAndConcepts',
+          'indicatorIds',
+          'level',
+          'procedures',
+          'specificResources',
+          'status',
+          'title',
+          'transversalResources',
+          'updatedAt',
+          'vehicularLanguage'
+        ]);
+    }
+
+    function validPlanningPhase(upId, phaseId) {
+      return request.resource.data.keys().hasOnly([
+          'createdAt', 'entityType', 'id', 'kind', 'order', 'ownerUid',
+          'parentPhaseId', 'planningUnitId', 'schemaVersion', 'title', 'updatedAt'
+        ])
+        && request.resource.data.id == phaseId
+        && request.resource.data.entityType == 'planningPhase'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.planningUnitId == upId
+        && request.resource.data.kind in ['preparation', 'resolution', 'closing', 'custom']
+        && request.resource.data.order is number
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningActivity(upId, activityId) {
+      return request.resource.data.keys().hasOnly([
+          'applicationComment', 'createdAt', 'description', 'diversityMeasureIds',
+          'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order',
+          'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
+          'space', 'studentMaterials', 'teacherMaterials', 'title', 'updatedAt'
+        ])
+        && request.resource.data.id == activityId
+        && request.resource.data.entityType == 'planningActivity'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.planningUnitId == upId
+        && request.resource.data.evidenceMode in ['none', 'final', 'perSession']
+        && request.resource.data.indicatorIds is list
+        && request.resource.data.diversityMeasureIds is list
+        && request.resource.data.teacherMaterials is list
+        && request.resource.data.studentMaterials is list
+        && request.resource.data.order is number
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function planningChildIdentityUnchanged() {
+      return request.resource.data.id == resource.data.id
+        && request.resource.data.entityType == resource.data.entityType
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validPlanningGrant(upId, grantEmail) {
+      return request.resource.data.keys().hasOnly([
+          'classIds', 'createdAt', 'entityType', 'granteeEmail', 'granteeUid',
+          'id', 'ownerUid', 'planningUnitId', 'role', 'schemaVersion', 'status', 'updatedAt'
+        ])
+        && request.resource.data.entityType == 'accessGrant'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.planningUnitId == upId
+        && request.resource.data.granteeEmail == grantEmail
+        && request.resource.data.classIds is list
+        && request.resource.data.role in ['directionReader', 'planningEditor', 'planningAgendaEditor']
+        && request.resource.data.status in ['active', 'revoked']
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function planningGrantMatchesAuthorizedEmailsAfterWrite(upId, grantEmail) {
+      return (
+          request.resource.data.status == 'active'
+          && grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.authorizedEmails
+          && grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail
+          && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].role == request.resource.data.role
+          && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].classIds == request.resource.data.classIds
+          && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].status == 'active'
+        ) || (
+          request.resource.data.status == 'revoked'
+          && !(grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.authorizedEmails)
+          && !(grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail)
+        );
+    }
+
+    function validPlanningApplication(upId, applicationId) {
+      return request.resource.data.keys().hasOnly([
+          'academicYearId', 'classId', 'createdAt', 'entityType', 'id', 'ownerUid',
+          'planningUnitId', 'planningUnitVersion', 'schemaVersion', 'status', 'updatedAt'
+        ])
+        && request.resource.data.id == applicationId
+        && request.resource.data.entityType == 'groupApplication'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.planningUnitId == upId
+        && request.resource.data.classId is string
+        && request.resource.data.status in ['draft', 'active', 'completed', 'archived']
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningOverride(upId, applicationId, overrideId) {
+      return request.resource.data.keys().hasOnly([
+          'activityId', 'applicationId', 'changeScope', 'changes', 'createdAt',
+          'entityType', 'id', 'ownerUid', 'proposalStatus', 'schemaVersion', 'updatedAt'
+        ])
+        && request.resource.data.id == overrideId
+        && request.resource.data.entityType == 'activityOverride'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.changeScope in ['groupOnly', 'groupAndProposal']
+        && request.resource.data.changes is map
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningSession(upId, applicationId, sessionId) {
+      return request.resource.data.keys().hasOnly([
+          'applicationId', 'classId', 'createdAt', 'durationMinutes', 'entityType',
+          'id', 'ownerUid', 'schemaVersion', 'startsAt', 'status', 'subgroupId',
+          'timetableSlotId', 'updatedAt'
+        ])
+        && request.resource.data.id == sessionId
+        && request.resource.data.entityType == 'calendarSession'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.classId == planningApplicationClassId(upId, applicationId)
+        && request.resource.data.durationMinutes is number
+        && request.resource.data.status in ['planned', 'held', 'cancelled', 'notHeld']
+        && request.resource.data.startsAt is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningSessionItem(upId, applicationId, sessionId, itemId) {
+      return request.resource.data.keys().hasOnly([
+          'applicationId', 'createdAt', 'entityType', 'id', 'order', 'ownerUid',
+          'plannedMinutes', 'schemaVersion', 'segmentCount', 'segmentIndex',
+          'sessionId', 'sourceActivityId', 'title', 'type', 'updatedAt'
+        ])
+        && request.resource.data.id == itemId
+        && request.resource.data.entityType == 'sessionItem'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.sessionId == sessionId
+        && request.resource.data.type in ['activity', 'indication', 'transition']
+        && request.resource.data.order is number
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningActivityResult(upId, applicationId, sessionId, resultId) {
+      return request.resource.data.keys().hasOnly([
+          'actualMinutes', 'applicationComment', 'applicationId', 'createdAt',
+          'entityType', 'id', 'ownerUid', 'pedagogicalReflection', 'reviewedAt',
+          'schemaVersion', 'sessionId', 'sessionItemId', 'sourceActivityId',
+          'status', 'updatedAt'
+        ])
+        && request.resource.data.id == resultId
+        && request.resource.data.entityType == 'activityResult'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
+        && request.resource.data.applicationId == applicationId
+        && request.resource.data.sessionId == sessionId
+        && request.resource.data.status in ['completed', 'continued', 'notHeld', 'skipped']
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validPlanningPrivateNote(noteId) {
+      return request.resource.data.keys().hasOnly([
+          'applicationId', 'createdAt', 'entityType', 'id', 'ownerUid',
+          'planningUnitId', 'schemaVersion', 'sessionId', 'text', 'updatedAt'
+        ])
+        && request.resource.data.id == noteId
+        && request.resource.data.entityType == 'planningPrivateNote'
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 5000
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    match /planningUnits/{upId} {
+      allow create: if signedIn()
+        && request.auth.token.email is string
+        && validPlanningUnitShape(upId)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmailLower == request.auth.token.email;
+      allow get: if canReadPlanningUnit(upId);
+      allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow list: if signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email in resource.data.authorizedEmails;
+      allow update: if (
+          isPlanningOwner(upId)
+          && validPlanningUnitOwnerUpdate(upId)
+        ) || (
+          canEditBasePlanning(upId)
+          && validPlanningUnitEditorUpdate(upId)
+        );
+      allow delete: if isPlanningOwner(upId);
+
+      match /accessGrants/{grantEmail} {
+        allow get: if isPlanningOwner(upId)
+          || (
+            signedIn()
+            && request.auth.token.email is string
+            && grantEmail == request.auth.token.email
+            && resource.data.granteeEmail == request.auth.token.email
+          );
+        allow list: if isPlanningOwner(upId);
+        allow create, update: if isPlanningOwner(upId)
+          && validPlanningGrant(upId, grantEmail)
+          && planningGrantMatchesAuthorizedEmailsAfterWrite(upId, grantEmail);
+        allow delete: if isPlanningOwner(upId)
+          && !(grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.authorizedEmails)
+          && !(grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail);
+      }
+
+      match /phases/{phaseId} {
+        allow read: if canReadPlanningUnit(upId);
+        allow create: if canEditBasePlanning(upId) && validPlanningPhase(upId, phaseId);
+        allow update: if canEditBasePlanning(upId)
+          && validPlanningPhase(upId, phaseId)
+          && planningChildIdentityUnchanged();
+        allow delete: if canEditBasePlanning(upId);
+      }
+
+      match /activities/{activityId} {
+        allow read: if canReadPlanningUnit(upId);
+        allow create: if canEditBasePlanning(upId) && validPlanningActivity(upId, activityId);
+        allow update: if canEditBasePlanning(upId)
+          && validPlanningActivity(upId, activityId)
+          && planningChildIdentityUnchanged();
+        allow delete: if canEditBasePlanning(upId);
+      }
+
+      match /applications/{applicationId} {
+        allow read: if canReadPlanningApplication(upId, resource.data.classId);
+        allow create: if validPlanningApplication(upId, applicationId)
+          && canManagePlanningAgenda(upId, request.resource.data.classId);
+        allow update: if validPlanningApplication(upId, applicationId)
+          && planningChildIdentityUnchanged()
+          && request.resource.data.classId == resource.data.classId
+          && canManagePlanningAgenda(upId, resource.data.classId);
+        allow delete: if canManagePlanningAgenda(upId, resource.data.classId);
+
+        match /activityOverrides/{overrideId} {
+          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+          allow create: if validPlanningOverride(upId, applicationId, overrideId)
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          allow update: if validPlanningOverride(upId, applicationId, overrideId)
+            && planningChildIdentityUnchanged()
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+        }
+
+        match /sessions/{sessionId} {
+          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+          allow create: if validPlanningSession(upId, applicationId, sessionId)
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          allow update: if validPlanningSession(upId, applicationId, sessionId)
+            && planningChildIdentityUnchanged()
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+
+          match /items/{itemId} {
+            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+            allow create: if validPlanningSessionItem(upId, applicationId, sessionId, itemId)
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            allow update: if validPlanningSessionItem(upId, applicationId, sessionId, itemId)
+              && planningChildIdentityUnchanged()
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          }
+
+          match /results/{resultId} {
+            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+            allow create: if validPlanningActivityResult(upId, applicationId, sessionId, resultId)
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            allow update: if validPlanningActivityResult(upId, applicationId, sessionId, resultId)
+              && planningChildIdentityUnchanged()
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+          }
+        }
+      }
+    }
+
+    match /planningPrivateNotes/{noteId} {
+      allow create: if signedIn() && validPlanningPrivateNote(noteId);
+      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && validPlanningPrivateNote(noteId)
+        && planningChildIdentityUnchanged();
+    }
+
     // Informal messages are independent from student records and teacher backups.
     match /internalMessages/{messageId} {
       function verifiedMessageUser() {
