@@ -18,6 +18,7 @@ import {
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -1398,6 +1399,7 @@ export function TrackingView() {
                         >
                           <MessageCircle size={17} />
                         </button>
+                        <AbsenceToggle classId={activeClassId} studentId={student.id} />
                         <button
                           className="tracking-student-name"
                           onClick={() => setProfileStudentId(student.id)}

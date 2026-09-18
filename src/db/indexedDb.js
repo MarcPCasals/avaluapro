@@ -6,7 +6,7 @@ import {
 } from '../lib/cloudSyncQueue.js'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 14
+const DB_VERSION = 15
 const TUTORING_COORDINATION_CACHE_STORE = 'tutoringCoordinationCache'
 const TUTORING_COORDINATION_OUTBOX_STORE = 'tutoringCoordinationOutbox'
 
@@ -18,6 +18,7 @@ const INDEXES = {
   marks: ['studentId', 'criterionId'],
   tasks: ['classId', 'utId'],
   taskRecords: ['classId', 'utId', 'studentId', 'taskId'],
+  absenceRecords: ['classId', 'studentId', 'date', 'slotKey'],
   behaviorEvents: ['classId', 'studentId'],
   agendaNotes: ['classId', 'studentId'],
   tutorialRecords: ['classId', 'studentId', 'type'],

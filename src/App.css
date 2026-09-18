@@ -12461,6 +12461,42 @@ button.tutorial-record-pill {
   border-color: #ef4444;
 }
 
+.absence-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 0;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 1000;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.absence-toggle:hover,
+.absence-toggle:focus-visible {
+  border-color: #ef4444;
+  color: #b91c1c;
+  outline: 3px solid rgba(248, 113, 113, 0.2);
+  outline-offset: 2px;
+}
+
+.absence-toggle.active {
+  border-color: #b91c1c;
+  color: white;
+  background: #dc2626;
+  box-shadow: 0 3px 8px rgba(185, 28, 28, 0.28);
+}
+
+.absence-toggle:active {
+  transform: scale(0.94);
+}
+
 .student-diagnosis-blue .student-cell,
 .student-diagnosis-blue .tracking-student-cell { background: #dbeafe; }
 .student-diagnosis-green .student-cell,
@@ -16720,6 +16756,11 @@ button.tutorial-record-pill {
   background: #e5e7eb;
 }
 
+.data-pill.absence.has-absence {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
 .data-pill.clickable {
   border: 0;
   cursor: pointer;
@@ -16729,6 +16770,82 @@ button.tutorial-record-pill {
 .data-pill.clickable:focus-visible {
   outline: 3px solid #fed7aa;
   outline-offset: 2px;
+}
+
+.absence-history-modal {
+  display: grid;
+  gap: 16px;
+}
+
+.absence-history-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #991b1b;
+  background: #fff1f2;
+}
+
+.absence-history-summary > div {
+  display: grid;
+  gap: 2px;
+}
+
+.absence-history-summary strong {
+  font-size: 22px;
+}
+
+.absence-history-summary span {
+  color: #7f1d1d;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.absence-history-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(52vh, 480px);
+  overflow: auto;
+}
+
+.absence-history-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: #fff;
+}
+
+.absence-history-list article > div {
+  display: grid;
+  gap: 3px;
+}
+
+.absence-history-list strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.absence-history-list small {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.absence-history-mark {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  color: white;
+  background: #dc2626;
+  font-size: 13px;
+  font-weight: 1000;
 }
 
 .evaluation-cell-actions {
@@ -26224,6 +26341,11 @@ button.profile-followup-card:focus-visible {
   .student-note-button {
     width: 29px;
     height: 29px;
+  }
+
+  .absence-toggle {
+    width: 26px;
+    height: 26px;
   }
 
   .tracking-student-row {

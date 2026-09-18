@@ -5,6 +5,7 @@ import { getSubjectStructure } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -409,6 +410,7 @@ export function EvaluationView() {
                   >
                     <MessageCircle size={17} />
                   </button>
+                  <AbsenceToggle classId={activeClassId} studentId={student.id} />
                   <button
                     className="student-name student-profile-trigger"
                     data-tour={index === 0 ? 'student-name-open' : undefined}

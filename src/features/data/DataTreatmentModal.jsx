@@ -179,7 +179,7 @@ export function DataTreatmentModal({ onClose }) {
                 <tbody>
                   <tr>
                     <td>Identificació i avaluació</td>
-                    <td>Nom, grup, qualificacions, competències i tasques</td>
+                    <td>Nom, grup, qualificacions, competències, tasques i absències</td>
                     <td>Alt</td>
                   </tr>
                   <tr>

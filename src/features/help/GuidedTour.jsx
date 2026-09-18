@@ -137,7 +137,7 @@ const tourSteps = [
   {
     target: 'stats-cross',
     title: '17. Anàlisi creuada',
-    text: 'Aquesta vista és la més potent per detectar patrons: alumnes constants amb dificultat, alumnes bons però poc constants o risc combinat.',
+    text: 'Aquesta vista és la més potent per detectar patrons: alumnes constants amb dificultat, alumnes bons però poc constants, hores d’absència o risc combinat. Clica les hores per veure les dates exactes.',
     dashboardScope: 'cross',
     mode: 'analytics',
     insight: 'dashboard',

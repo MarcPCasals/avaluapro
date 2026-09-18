@@ -37,12 +37,12 @@ const quickStart = [
   {
     icon: ClipboardCheck,
     title: '4. Seguiment',
-    text: 'Registra tasques fetes, incompletes, no fetes, exempts i incidències de comportament.',
+    text: 'Registra tasques fetes, incompletes, no fetes, exempts i incidències de comportament. El quadre A del nom registra una hora d’absència amb la data i l’hora exactes.',
   },
   {
     icon: BarChart3,
     title: '5. Estadístiques',
-    text: 'Consulta primer cada bloc per separat i després Estadístiques Globals per veure relacions entre rendiment, constància i comportament.',
+    text: 'Consulta primer cada bloc per separat i després Estadístiques Globals per veure relacions entre rendiment, constància, absències i comportament.',
   },
   {
     icon: ShieldCheck,
@@ -60,7 +60,7 @@ const helpSections = [
   {
     icon: Cloud,
     title: 'Què entra a la còpia de seguretat?',
-    text: 'La còpia completa inclou classes, alumnes, fotos comprimides, notes, tasques, registres, comentaris, diagnòstics, rúbriques i preferències.',
+    text: 'La còpia completa inclou classes, alumnes, fotos comprimides, notes, tasques, absències, registres, comentaris, diagnòstics, rúbriques i preferències.',
   },
   {
     icon: BookOpenCheck,

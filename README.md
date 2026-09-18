@@ -73,7 +73,8 @@ instructions and a translation key for the relevant controls.
 
 - **Competency assessment:** fast A/B/C/D assessment across competencies, criteria, units and semesters.
 - **Daily follow-up:** task completion, late or missing work, consistency and intervention signals.
-- **Classroom analytics:** achievement, habits and behavior are combined into actionable priorities.
+- **Attendance:** one-tap hourly absence records from assessment or follow-up, with exact date and time.
+- **Classroom analytics:** achievement, habits, attendance and behavior are combined into actionable priorities.
 - **Tutor mode:** a whole-class view across academic and tutorial information.
 - **Sociometry:** relationships, group dynamics and sociometric questionnaires.
 - **Cooperative groups:** configurable group proposals with teacher review.

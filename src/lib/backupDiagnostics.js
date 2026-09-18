@@ -9,6 +9,7 @@ const IMPORTANT_COLLECTIONS = [
   ['marks', 'notes'],
   ['tasks', 'tasques'],
   ['taskRecords', 'registres de tasques'],
+  ['absenceRecords', 'hores d’absència'],
   ['behaviorEvents', 'comportament'],
   ['agendaNotes', 'anotacions'],
   ['tutorialRecords', 'registres de tutoria'],

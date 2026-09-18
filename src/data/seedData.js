@@ -9,6 +9,7 @@ export const COLLECTIONS = [
   'marks',
   'tasks',
   'taskRecords',
+  'absenceRecords',
   'behaviorEvents',
   'agendaNotes',
   'tutorialRecords',

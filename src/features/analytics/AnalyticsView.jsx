@@ -26,6 +26,12 @@ import {
   getStudentTrackingStats,
 } from '../../lib/analytics'
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
+import {
+  formatAbsenceDateTime,
+  formatAbsenceHours,
+  getStudentAbsenceHours,
+  getStudentAbsenceRecords,
+} from '../../lib/attendance'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const insightCopy = {
@@ -104,7 +110,7 @@ const chartHelp = {
   habitStudents:
     'Detecta alumnes amb bon rendiment però poca constància. Ajuda a prevenir que els hàbits fràgils acabin afectant l’aprenentatge.',
   crossAnalysis:
-    'Creua rendiment, constància, tasques no fetes i comportament en una sola taula per decidir prioritats docents.',
+    'Creua rendiment, constància, hores d’absència, tasques no fetes i comportament en una sola taula per decidir prioritats docents.',
   pedagogicalAnalysis:
     'Converteix les dades en conclusions docents: millor competència, dificultat principal i recomanació de reforç.',
   scatter:
@@ -2094,6 +2100,43 @@ function TrackingEvidenceModal({ evidence, onClose }) {
   )
 }
 
+function AbsenceHistoryModal({ absence, onClose }) {
+  if (!absence) return null
+
+  const totalHours = absence.records.reduce((total, record) => total + (Number(record.hours) || 1), 0)
+
+  return (
+    <Modal onClose={onClose} size="md" title={`Absències: ${absence.profile.student.name}`}>
+      <div className="absence-history-modal">
+        <div className="absence-history-summary">
+          <FileClock size={24} />
+          <div>
+            <strong>{formatAbsenceHours(totalHours)}</strong>
+            <span>
+              {absence.records.length} {absence.records.length === 1 ? 'registre' : 'registres'} d’una hora
+            </span>
+          </div>
+        </div>
+        {absence.records.length === 0 ? (
+          <p className="empty-list">Aquest alumne encara no té cap absència registrada.</p>
+        ) : (
+          <div className="absence-history-list">
+            {absence.records.map((record) => (
+              <article key={record.id}>
+                <span className="absence-history-mark">A</span>
+                <div>
+                  <strong>{formatAbsenceDateTime(record)}</strong>
+                  <small>1 hora d’absència</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 function ProgressChangePanel({ declinedRows, improvedRows, onSelectStudent, setInfo }) {
   return (
     <section className="visual-card progress-change-panel">
@@ -2729,6 +2772,7 @@ export function AnalyticsView() {
   const [selectedScatterProfile, setSelectedScatterProfile] = useState(null)
   const [selectedEvolutionStudent, setSelectedEvolutionStudent] = useState(null)
   const [selectedTrackingEvidence, setSelectedTrackingEvidence] = useState(null)
+  const [selectedAbsence, setSelectedAbsence] = useState(null)
   const [selectedAntecedentInsight, setSelectedAntecedentInsight] = useState(null)
   const [profileSortMode, setProfileSortMode] = useState('intervention')
   const [dashboardScope, setDashboardScope] = useState(() =>
@@ -2827,6 +2871,7 @@ export function AnalyticsView() {
       />
       <InfoModal info={selectedInfo} onClose={() => setSelectedInfo(null)} />
       <TrackingEvidenceModal evidence={selectedTrackingEvidence} onClose={() => setSelectedTrackingEvidence(null)} />
+      <AbsenceHistoryModal absence={selectedAbsence} onClose={() => setSelectedAbsence(null)} />
       <ScatterStudentModal
         onClose={() => setSelectedScatterProfile(null)}
         profile={selectedScatterProfile}
@@ -3172,7 +3217,7 @@ export function AnalyticsView() {
             <LineChart size={20} />
             <div>
               <h3>Anàlisi creuada</h3>
-              <p>Rendiment acadèmic, hàbits de treball i comportament vistos conjuntament.</p>
+              <p>Rendiment acadèmic, hàbits de treball, absències i comportament vistos conjuntament.</p>
             </div>
             <div className="profile-sort-toggle" aria-label="Ordenar alumnes">
               <ListFilter size={16} />
@@ -3202,6 +3247,7 @@ export function AnalyticsView() {
                 <th>Alumne</th>
                 <th>Rendiment</th>
                 <th>Constància</th>
+                <th>Absències</th>
                 <th>Punts vermells</th>
                 <th>Punts negres</th>
                 <th>Perfil</th>
@@ -3212,6 +3258,16 @@ export function AnalyticsView() {
               {visibleProfiles.map((profile, index) => {
                 const decision = getGlobalDecision(profile)
                 const evidence = buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents)
+                const absenceRecords = getStudentAbsenceRecords(
+                  state.absenceRecords,
+                  profile.student.id,
+                  activeClassId,
+                )
+                const absenceHours = getStudentAbsenceHours(
+                  state.absenceRecords,
+                  profile.student.id,
+                  activeClassId,
+                )
                 return (
                   <tr
                     className={`profile-analysis-row ${
@@ -3252,6 +3308,16 @@ export function AnalyticsView() {
                       <b className={`consistency-badge ${profile.tracking.hasTrackingData ? '' : 'empty'}`}>
                         {getConsistencyLabel(profile.tracking)}
                       </b>
+                    </td>
+                    <td>
+                      <button
+                        className={`data-pill clickable absence ${absenceHours > 0 ? 'has-absence' : 'ok'}`}
+                        onClick={() => setSelectedAbsence({ profile, records: absenceRecords })}
+                        title={`Veure les dates exactes de les absències de ${profile.student.name}`}
+                        type="button"
+                      >
+                        {formatAbsenceHours(absenceHours)}
+                      </button>
                     </td>
                     <td>
                       <button

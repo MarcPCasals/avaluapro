@@ -87,6 +87,7 @@ import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
+import { findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
 import {
   STUDENT_PROFILE_MOMENT_SOURCE,
   buildStudentProfileFriendshipSnapshot,
@@ -1441,6 +1442,7 @@ function parseBackupDataset(backup) {
           collection === 'tutorialStudentRoles' ||
           collection === 'tutorialSeatingPlans' ||
           collection === 'studentAntecedents' ||
+          collection === 'absenceRecords' ||
           collection === 'sociometricSurveys') &&
         source[collection] === undefined
       ) {
@@ -2543,6 +2545,9 @@ export const useAvaluaproStore = create((set, get) => ({
       tasks: state.tasks.filter((task) => !taskIds.has(task.id)),
       taskRecords: state.taskRecords.filter(
         (record) => !studentIds.has(record.studentId) && !taskIds.has(record.taskId),
+      ),
+      absenceRecords: state.absenceRecords.filter(
+        (record) => record.classId !== classId && !studentIds.has(record.studentId),
       ),
       behaviorEvents: state.behaviorEvents.filter(
         (event) => event.classId !== classId && !studentIds.has(event.studentId),
@@ -4948,6 +4953,44 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['taskRecords'])
   },
 
+  toggleStudentAbsence: async (studentId, occurredAt = new Date()) => {
+    const state = get()
+    const student = state.students.find((item) => item.id === studentId)
+    const classId = student?.classId || state.ui.activeClassId
+    if (!student || !classId) return null
+
+    const timestamp = occurredAt instanceof Date ? occurredAt : new Date(occurredAt)
+    const timeParts = getAbsenceTimeParts(timestamp)
+    const existing = findAbsenceInSlot(
+      state.absenceRecords,
+      studentId,
+      classId,
+      timeParts.slotKey,
+    )
+
+    if (existing) {
+      set((current) => ({
+        absenceRecords: current.absenceRecords.filter((record) => record.id !== existing.id),
+      }))
+      await persistCollections(set, get, ['absenceRecords'])
+      return { registered: false, record: existing }
+    }
+
+    const record = {
+      id: createId('absence'),
+      classId,
+      studentId,
+      date: timeParts.date,
+      time: timeParts.time,
+      slotKey: timeParts.slotKey,
+      hours: 1,
+      recordedAt: timestamp.toISOString(),
+    }
+    set((current) => ({ absenceRecords: [...current.absenceRecords, record] }))
+    await persistCollections(set, get, ['absenceRecords'])
+    return { registered: true, record }
+  },
+
   updateTaskRecordMeta: async (studentId, taskId, patch) => {
     const task = get().tasks.find((item) => item.id === taskId)
     if (!task) return
@@ -5237,6 +5280,7 @@ export const useAvaluaproStore = create((set, get) => ({
       students: current.students.filter((item) => item.id !== studentId),
       marks: current.marks.filter((mark) => mark.studentId !== studentId),
       taskRecords: current.taskRecords.filter((record) => record.studentId !== studentId),
+      absenceRecords: current.absenceRecords.filter((record) => record.studentId !== studentId),
       behaviorEvents: current.behaviorEvents.filter((event) => event.studentId !== studentId),
       agendaNotes: current.agendaNotes.filter((note) => note.studentId !== studentId),
       studentAntecedents: current.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
@@ -5305,6 +5349,7 @@ export const useAvaluaproStore = create((set, get) => ({
       'students',
       'marks',
       'taskRecords',
+      'absenceRecords',
       'behaviorEvents',
       'agendaNotes',
       'studentAntecedents',
