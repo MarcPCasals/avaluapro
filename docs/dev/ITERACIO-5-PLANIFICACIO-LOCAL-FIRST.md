@@ -34,9 +34,10 @@ El servei de Firestore utilitza `baseUpdatedAt` dins una transacció. Una escrip
 - suite completa de seguretat correcta;
 - lint correcte;
 - construcció Firebase correcta;
-- `git diff --check` correcte.
+- `git diff --check` correcte;
+- Hosting publicat a `https://avaluapro.web.app`.
 
-No correspon una prova visual específica: aquesta iteració no afegeix cap control visible i els mòduls continuen desactivats per defecte. La iteració 6 connectarà el primer formulari real amb aquest repositori i comprovarà la persistència autenticada d'una UP buida.
+No correspon una prova visual específica del sistema local perquè aquesta iteració no afegeix cap control visible. Després del desplegament s'ha comprovat amb el compte autenticat que la versió normal continua carregant els cinc grups reals i manté Agenda i Programació amagades; la previsualització controlada mostra tots dos mòduls i conserva la sincronització. La iteració 6 connectarà el primer formulari real amb aquest repositori i comprovarà la persistència autenticada d'una UP buida.
 
 ## Pas següent
 
