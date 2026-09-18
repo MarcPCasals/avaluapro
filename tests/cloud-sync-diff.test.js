@@ -4,6 +4,7 @@ import { serverTimestamp } from 'firebase/firestore'
 import {
   areCloudDocumentsEqual,
   buildCloudDocumentDiff,
+  getCloudDocumentsFingerprint,
   isFirestoreQuotaError,
   isFirestoreNetworkError,
   isFirestoreSpecialValue,
@@ -11,6 +12,13 @@ import {
 
 test('compara documents sense dependre de l’ordre de les propietats', () => {
   assert.equal(areCloudDocumentsEqual({ b: 2, a: { d: 4, c: 3 } }, { a: { c: 3, d: 4 }, b: 2 }), true)
+})
+
+test('la petjada de la còpia és estable encara que canviï l’ordre de les propietats', async () => {
+  const first = await getCloudDocumentsFingerprint({ classes: [{ id: '1', name: '1rC' }], profile: { b: 2, a: 1 } })
+  const second = await getCloudDocumentsFingerprint({ profile: { a: 1, b: 2 }, classes: [{ name: '1rC', id: '1' }] })
+  assert.equal(first, second)
+  assert.equal(first.length, 64)
 })
 
 test('normalitza dates locals i timestamps retornats per Firestore', () => {

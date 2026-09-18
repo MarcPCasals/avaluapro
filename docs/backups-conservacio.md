@@ -52,11 +52,15 @@ Còpia automàtica diària · <data> · <classes> classes · <alumnes> alumnes
 
 ## 3. Còpia automàtica diària
 
-Avaluapro crea una còpia automàtica diària al núvol quan:
+Avaluapro crea com a màxim una còpia automàtica diària al núvol quan:
 
 - el docent ha iniciat sessió amb Google;
-- l'app ha carregat correctament;
-- encara no s'ha creat cap còpia automàtica aquell dia.
+- es fa el primer canvi del dia;
+- el canvi ja ha quedat confirmat a Firebase i no hi ha cap operació pendent;
+- encara no s'ha creat cap còpia automàtica aquell dia;
+- les dades són diferents de la darrera còpia identificada.
+
+Obrir l'app sense modificar res no crea cap còpia. Si passen diversos dies sense canvis, la còpia es crea després del primer canvi que es faci i que Firebase confirmi.
 
 La còpia automàtica no substitueix la còpia manual de final de curs. Serveix per recuperar errors recents o canvis accidentals.
 

@@ -1245,6 +1245,7 @@ export async function saveCloudBackup(uid, backup, meta = {}) {
       createdAt,
       label: meta.label || 'Còpia de seguretat al núvol',
       reason: meta.reason || 'manual',
+      fingerprint: meta.fingerprint || '',
       profile: backup?.profile || {},
       preferences: backup?.preferences || {},
       counts,
@@ -1255,7 +1256,14 @@ export async function saveCloudBackup(uid, backup, meta = {}) {
     await saveBackupRows(uid, backupId, collectionName, collections[collectionName] || [])
   }
 
-  return { id: backupId, createdAt, label: meta.label || 'Còpia de seguretat al núvol', reason: meta.reason || 'manual', counts }
+  return {
+    id: backupId,
+    createdAt,
+    label: meta.label || 'Còpia de seguretat al núvol',
+    reason: meta.reason || 'manual',
+    fingerprint: meta.fingerprint || '',
+    counts,
+  }
 }
 
 export async function listCloudBackups(uid, maxItems = 5) {

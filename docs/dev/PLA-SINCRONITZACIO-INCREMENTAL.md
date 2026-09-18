@@ -420,6 +420,8 @@ No s’utilitzarà una pujada completa automàtica com a mecanisme de reversió.
 - [ ] Validar una càrrega controlada de dades.
 - [x] Publicar la fase 1.
 - [ ] Observar les mètriques durant un o dos dies.
+
+> Actualització 2026-09-18: la còpia automàtica s'ha reactivat amb una condició més estricta. No s'executa en iniciar sessió: només després del primer canvi del dia confirmat per Firebase, sense cua pendent, amb bloqueig entre pestanyes i evitant duplicar una còpia ja feta aquell dia o un estat sense canvis.
 - [x] Dissenyar el magatzem persistent d’operacions de la fase 2.
 - [x] Implementar, provar i publicar la fase 2.
 

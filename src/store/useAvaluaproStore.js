@@ -70,9 +70,19 @@ import {
 import { mergeSharedRows } from '../lib/sharedTutoringRows'
 import { findSharedTutoringClassTarget, normalizeClassName } from '../lib/sharedTutoringClasses'
 import { removeExpiredSociometricSurveys } from '../lib/sociometricRetention'
-import { areCloudDocumentsEqual, isFirestoreNetworkError, isFirestoreQuotaError } from '../lib/cloudSyncDiff'
+import {
+  areCloudDocumentsEqual,
+  getCloudDocumentsFingerprint,
+  isFirestoreNetworkError,
+  isFirestoreQuotaError,
+} from '../lib/cloudSyncDiff'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
-import { getCloudStartupAction, getCloudWorkspacePreferences } from '../lib/cloudStartup'
+import {
+  getCloudStartupAction,
+  getCloudWorkspacePreferences,
+  getLocalDateKey,
+  shouldCreateDailyCloudBackup,
+} from '../lib/cloudStartup'
 import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
@@ -91,6 +101,7 @@ const CLOUD_SYNC_DELAY_MS = 2500
 const CLOUD_QUOTA_RETRY_DELAY_MS = 60 * 60 * 1000
 const CLOUD_NETWORK_RETRY_MIN_DELAY_MS = 5000
 const CLOUD_NETWORK_RETRY_MAX_DELAY_MS = 5 * 60 * 1000
+const DAILY_CLOUD_BACKUP_LEASE_MS = 15 * 60 * 1000
 const DEMO_SUBJECT = 'Ciències Físiques i de la Natura'
 const DEFAULT_CLASS_COLORS = ['green', 'blue', 'red', 'purple', 'yellow', 'orange']
 const DEFAULT_HALF_GROUPS = ['Grup A', 'Grup B']
@@ -133,6 +144,31 @@ function writePreferences(preferences) {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences))
   } catch (error) {
     console.warn('No s’han pogut guardar les preferències locals.', error)
+  }
+}
+
+function acquireDailyCloudBackupLease(uid, now = Date.now()) {
+  if (!uid) return null
+  const key = `avaluapro-daily-cloud-backup:${uid}:${getLocalDateKey(now)}`
+  const owner = createId('backup-lease')
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || 'null')
+    if (current?.expiresAt > now) return null
+    localStorage.setItem(key, JSON.stringify({ owner, expiresAt: now + DAILY_CLOUD_BACKUP_LEASE_MS }))
+    const confirmed = JSON.parse(localStorage.getItem(key) || 'null')
+    return confirmed?.owner === owner ? { key, owner } : null
+  } catch {
+    return { key: '', owner }
+  }
+}
+
+function releaseDailyCloudBackupLease(lease) {
+  if (!lease?.key) return
+  try {
+    const current = JSON.parse(localStorage.getItem(lease.key) || 'null')
+    if (current?.owner === lease.owner) localStorage.removeItem(lease.key)
+  } catch {
+    // La còpia ja s'ha resolt; una preferència local malmesa no l'ha de fer fallar.
   }
 }
 
@@ -812,6 +848,7 @@ async function flushQueuedCloudSync(set, get) {
         retryAvailableAt: '',
       },
     }))
+    await get().maybeCreateDailyCloudBackup({ triggeredByConfirmedChange: true })
   } catch (error) {
     const successfulIds = new Set(error.successfulOperationIds || [])
     const failedIds = new Set(error.failedOperationIds || [])
@@ -1783,6 +1820,8 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       if (remainingOperations.length > 0) {
         scheduleCloudSync(set, get, getPendingCollectionNames(remainingOperations), remainingOperations.length)
+      } else {
+        await get().maybeCreateDailyCloudBackup({ triggeredByConfirmedChange: true })
       }
       return syncStats
     } catch (error) {
@@ -1817,9 +1856,14 @@ export const useAvaluaproStore = create((set, get) => ({
     }))
     try {
       const backup = get().createBackup()
+      const fingerprint = await getCloudDocumentsFingerprint({
+        collections: backup.collections,
+        profile: backup.profile,
+      })
       const savedBackup = await saveCloudBackup(state.cloud.user.uid, backup, {
         reason,
         label: buildCloudBackupLabel(state, reason),
+        fingerprint,
       })
       const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
       set((current) => ({
@@ -1846,8 +1890,58 @@ export const useAvaluaproStore = create((set, get) => ({
     }
   },
 
-  maybeCreateDailyCloudBackup: async () => {
-    return null
+  maybeCreateDailyCloudBackup: async ({ triggeredByConfirmedChange = false } = {}) => {
+    const initialState = get()
+    const uid = initialState.cloud.user?.uid
+    if (!uid || cloudBackupInFlight) return null
+
+    try {
+      let recentBackups = await listCloudBackups(uid, 5)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          recentBackups,
+          lastCloudBackupAt: recentBackups[0]?.createdAt || current.cloud.lastCloudBackupAt,
+        },
+      }))
+      if (!shouldCreateDailyCloudBackup({
+        appStatus: get().status,
+        cloudStatus: get().cloud.status,
+        triggeredByConfirmedChange,
+        isDemo: get().onboarding.demoMode,
+        pendingOperationCount: get().cloud.pendingOperationCount,
+        recentBackups,
+      })) return null
+
+      const backup = get().createBackup()
+      const fingerprint = await getCloudDocumentsFingerprint({
+        collections: backup.collections,
+        profile: backup.profile,
+      })
+      if (recentBackups[0]?.fingerprint && recentBackups[0].fingerprint === fingerprint) return null
+
+      const lease = acquireDailyCloudBackupLease(uid)
+      if (!lease) return null
+      try {
+        recentBackups = await listCloudBackups(uid, 5)
+        const pendingOperations = await loadCloudSyncQueue(uid)
+        if (!shouldCreateDailyCloudBackup({
+          appStatus: get().status,
+          cloudStatus: get().cloud.status,
+          triggeredByConfirmedChange,
+          isDemo: get().onboarding.demoMode,
+          pendingOperationCount: pendingOperations.length,
+          recentBackups,
+        })) return null
+        if (recentBackups[0]?.fingerprint && recentBackups[0].fingerprint === fingerprint) return null
+        return await get().createCloudBackup('auto-daily')
+      } finally {
+        releaseDailyCloudBackupLease(lease)
+      }
+    } catch (error) {
+      console.warn('No s’ha pogut crear la còpia automàtica diària.', error)
+      return null
+    }
   },
 
   loadCloudBackups: async () => {

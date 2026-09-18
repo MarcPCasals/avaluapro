@@ -17,6 +17,16 @@ function normalizeComparableValue(value) {
     }, {})
 }
 
+export function serializeCloudDocuments(value) {
+  return JSON.stringify(normalizeComparableValue(value))
+}
+
+export async function getCloudDocumentsFingerprint(value) {
+  const bytes = new TextEncoder().encode(serializeCloudDocuments(value))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export function isFirestoreSpecialValue(value) {
   if (!value || typeof value !== 'object') return false
   if (value instanceof Date || typeof value.toDate === 'function') return true
@@ -24,7 +34,7 @@ export function isFirestoreSpecialValue(value) {
 }
 
 export function areCloudDocumentsEqual(first, second) {
-  return JSON.stringify(normalizeComparableValue(first)) === JSON.stringify(normalizeComparableValue(second))
+  return serializeCloudDocuments(first) === serializeCloudDocuments(second)
 }
 
 export function buildCloudDocumentDiff(localDocuments = [], remoteDocuments = []) {

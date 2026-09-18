@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   getCloudStartupAction,
   getCloudWorkspacePreferences,
+  shouldCreateDailyCloudBackup,
 } from '../src/lib/cloudStartup.js'
 
 test('un navegador nou baixa les dades quan Firebase ja té un espai de treball', () => {
@@ -77,5 +78,48 @@ test('les dades reals del núvol desactiven la demo i la guia inicial', () => {
       guideOpen: false,
       guideMode: 'own',
     },
+  )
+})
+
+test('la còpia diària només es crea amb dades reals plenament sincronitzades', () => {
+  const base = {
+    appStatus: 'ready',
+    cloudStatus: 'synced',
+    triggeredByConfirmedChange: true,
+    isDemo: false,
+    pendingOperationCount: 0,
+    recentBackups: [],
+    now: '2026-09-18T10:00:00+02:00',
+  }
+  assert.equal(shouldCreateDailyCloudBackup(base), true)
+  assert.equal(shouldCreateDailyCloudBackup({ ...base, cloudStatus: 'review' }), false)
+  assert.equal(shouldCreateDailyCloudBackup({ ...base, pendingOperationCount: 1 }), false)
+  assert.equal(shouldCreateDailyCloudBackup({ ...base, isDemo: true }), false)
+  assert.equal(shouldCreateDailyCloudBackup({ ...base, triggeredByConfirmedChange: false }), false)
+})
+
+test('una còpia automàtica feta avui evita una segona còpia completa', () => {
+  assert.equal(
+    shouldCreateDailyCloudBackup({
+      appStatus: 'ready',
+      cloudStatus: 'synced',
+      triggeredByConfirmedChange: true,
+      recentBackups: [{ createdAt: '2026-09-18T08:15:00.000Z', reason: 'auto-daily' }],
+      now: '2026-09-18T12:00:00+02:00',
+    }),
+    false,
+  )
+})
+
+test('una còpia manual anterior al primer canvi no anul·la la còpia automàtica del dia', () => {
+  assert.equal(
+    shouldCreateDailyCloudBackup({
+      appStatus: 'ready',
+      cloudStatus: 'synced',
+      triggeredByConfirmedChange: true,
+      recentBackups: [{ createdAt: '2026-09-18T08:15:00.000Z', reason: 'manual' }],
+      now: '2026-09-18T12:00:00+02:00',
+    }),
+    true,
   )
 })

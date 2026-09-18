@@ -587,7 +587,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               <h3>Còpies de seguretat al núvol</h3>
               <p>
                 Ruta protegida: <code>users/&lt;uid&gt;/cloudBackups</code>. Només l’usuari autenticat pot llegir o restaurar
-                les seves còpies. No se’n creen automàticament: una còpia manual duplica tots els registres.
+                les seves còpies. Amb el primer canvi de cada dia, Avaluapro espera que Firebase el confirmi i després crea
+                una còpia automàtica. Si no hi ha canvis, aquell dia no es crea cap còpia.
               </p>
             </div>
             <div className="cloud-backup-actions">
