@@ -9469,6 +9469,10 @@ button.tutorial-record-pill {
   gap: 10px;
 }
 
+.tutorial-relation-form-card {
+  height: max-content;
+}
+
 .tutorial-relation-form-header {
   display: flex;
   align-items: center;
