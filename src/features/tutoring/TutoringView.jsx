@@ -303,16 +303,6 @@ const SOCIOMETRIC_POSITIVE_LIMIT = 4
 const SOCIOMETRIC_AVOID_LIMIT = 3
 const TEACHER_OBSERVATION_RELATION_SOURCE = 'teacher-observation'
 const SOCIOMETRIC_PUBLIC_FORM_SOURCE = 'sociometric-public-form'
-const SOCIOMETRIC_TEMPLATE_HEADER = [
-  'Alumne',
-  'Elecció 1',
-  'Elecció 2',
-  'Elecció 3',
-  'Elecció 4',
-  'Rebuig 1',
-  'Rebuig 2',
-  'Rebuig 3',
-].join('\t')
 const SOCIOMETRIC_CATEGORY_META = {
   Líder: { id: 'leader', label: 'Líder', tone: 'green', description: 'Molta elecció positiva i poc rebuig.' },
   Promig: { id: 'average', label: 'Promig', tone: 'blue', description: 'Bona acceptació general i relació fluida amb el grup.' },
@@ -1290,238 +1280,6 @@ function summarizeTutorialRelations({ relations, students }) {
     socialPositiveCount: relations.filter((relation) => relation.type === 'friendship').length,
     studentRows,
     workPositiveCount: relations.filter((relation) => relation.type === 'positive').length,
-  }
-}
-
-function normalizeSociometricName(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['’`´]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
-
-function splitSociometricRow(line) {
-  const cleanLine = String(line || '').trim()
-  if (!cleanLine) return []
-  if (cleanLine.includes('\t')) return cleanLine.split('\t').map((cell) => cell.trim())
-  if (cleanLine.includes(';')) return cleanLine.split(';').map((cell) => cell.trim())
-  return [cleanLine]
-}
-
-function isSociometricHeader(cells) {
-  const normalized = cells.map((cell) => normalizeSociometricName(cell))
-  return normalized.some((cell) => ['alumne', 'alumna', 'nom', 'nom alumne', 'respondent'].includes(cell))
-}
-
-function getSociometricColumnIndexes(headerCells) {
-  const normalizedHeaders = headerCells.map((cell) => normalizeSociometricName(cell))
-  const respondentIndex = Math.max(
-    0,
-    normalizedHeaders.findIndex(
-      (header) =>
-        header === 'alumne' ||
-        header === 'alumna' ||
-        header === 'nom' ||
-        header.includes('nom alumne') ||
-        header.includes('responent') ||
-        header.includes('respondent'),
-    ),
-  )
-  const avoidIndexes = normalizedHeaders
-    .map((header, index) => ({ header, index }))
-    .filter(
-      ({ header, index }) =>
-        index !== respondentIndex &&
-        (header.includes('rebuig') ||
-          header.includes('rechaz') ||
-          header.includes('evitar') ||
-          header.includes('no anir') ||
-          header.includes('no t agrad')),
-    )
-    .map(({ index }) => index)
-  const positiveIndexes = normalizedHeaders
-    .map((header, index) => ({ header, index }))
-    .filter(
-      ({ header, index }) =>
-        index !== respondentIndex &&
-        !avoidIndexes.includes(index) &&
-        (header.includes('eleccio') ||
-          header.includes('elegir') ||
-          header.includes('tria') ||
-          header.includes('agrad') ||
-          header.includes('pati') ||
-          header.includes('posit')),
-    )
-    .map(({ index }) => index)
-
-  return {
-    avoidIndexes:
-      avoidIndexes.length > 0
-        ? avoidIndexes.slice(0, SOCIOMETRIC_AVOID_LIMIT)
-        : Array.from({ length: SOCIOMETRIC_AVOID_LIMIT }, (_, index) => respondentIndex + 1 + SOCIOMETRIC_POSITIVE_LIMIT + index),
-    positiveIndexes:
-      positiveIndexes.length > 0
-        ? positiveIndexes.slice(0, SOCIOMETRIC_POSITIVE_LIMIT)
-        : Array.from({ length: SOCIOMETRIC_POSITIVE_LIMIT }, (_, index) => respondentIndex + 1 + index),
-    respondentIndex,
-  }
-}
-
-function matchSociometricStudent(rawName, students) {
-  const normalizedName = normalizeSociometricName(rawName)
-  if (!normalizedName) return { issue: 'empty', student: null }
-
-  const exactMatch = students.find((student) => normalizeSociometricName(student.name) === normalizedName)
-  if (exactMatch) return { issue: '', student: exactMatch }
-
-  const candidates = students.filter((student) => {
-    const studentName = normalizeSociometricName(student.name)
-    if (!studentName) return false
-    return (
-      studentName.includes(normalizedName) ||
-      normalizedName.includes(studentName) ||
-      normalizedName
-        .split(' ')
-        .filter((part) => part.length >= 3)
-        .every((part) => studentName.includes(part))
-    )
-  })
-
-  if (candidates.length === 1) return { issue: 'approximate', student: candidates[0] }
-  if (candidates.length > 1) return { issue: 'ambiguous', student: null }
-
-  return { issue: 'missing', student: null }
-}
-
-function parseSociometricResponseText(rawText, students) {
-  const lines = String(rawText || '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-  if (lines.length === 0) {
-    return {
-      avoidCount: 0,
-      issues: [],
-      matchedResponses: 0,
-      positiveCount: 0,
-      relations: [],
-      responsesCount: 0,
-    }
-  }
-
-  const firstCells = splitSociometricRow(lines[0])
-  const hasHeader = isSociometricHeader(firstCells)
-  const indexes = hasHeader
-    ? getSociometricColumnIndexes(firstCells)
-    : {
-        avoidIndexes: Array.from({ length: SOCIOMETRIC_AVOID_LIMIT }, (_, index) => 1 + SOCIOMETRIC_POSITIVE_LIMIT + index),
-        positiveIndexes: Array.from({ length: SOCIOMETRIC_POSITIVE_LIMIT }, (_, index) => 1 + index),
-        respondentIndex: 0,
-      }
-  const dataLines = hasHeader ? lines.slice(1) : lines
-  const now = new Date().toISOString()
-  const importedLabel = `Qüestionari sociomètric · ${formatShortDate(getTodayDateInput())}`
-  const issues = []
-  const relationByKey = new Map()
-  let matchedResponses = 0
-
-  dataLines.forEach((line, lineIndex) => {
-    const rowNumber = lineIndex + (hasHeader ? 2 : 1)
-    const cells = splitSociometricRow(line)
-    const sourceName = cells[indexes.respondentIndex] || ''
-    const sourceMatch = matchSociometricStudent(sourceName, students)
-    if (!sourceMatch.student) {
-      issues.push({
-        detail: sourceName || 'Fila sense nom',
-        label:
-          sourceMatch.issue === 'ambiguous'
-            ? 'Nom ambigu'
-            : sourceMatch.issue === 'empty'
-              ? 'Fila sense alumne'
-              : 'Alumne no trobat',
-        rowNumber,
-      })
-      return
-    }
-
-    matchedResponses += 1
-    if (sourceMatch.issue === 'approximate') {
-      issues.push({
-        detail: `${sourceName} → ${sourceMatch.student.name}`,
-        label: 'Coincidència aproximada',
-        rowNumber,
-      })
-    }
-
-    const addChoice = (targetName, type) => {
-      const cleanTargetName = String(targetName || '').trim()
-      if (!cleanTargetName) return
-      const targetMatch = matchSociometricStudent(cleanTargetName, students)
-      if (!targetMatch.student) {
-        issues.push({
-          detail: cleanTargetName,
-          label: targetMatch.issue === 'ambiguous' ? 'Destinatari ambigu' : 'Destinatari no trobat',
-          rowNumber,
-        })
-        return
-      }
-      if (targetMatch.student.id === sourceMatch.student.id) {
-        issues.push({
-          detail: cleanTargetName,
-          label: 'Un alumne no es pot triar a si mateix',
-          rowNumber,
-        })
-        return
-      }
-
-      const pairKey = `${sourceMatch.student.id}__${targetMatch.student.id}`
-      const relationKey = `${pairKey}__${type}`
-      const oppositeKey = `${pairKey}__${type === 'avoid' ? 'friendship' : 'avoid'}`
-      if (relationByKey.has(oppositeKey)) {
-        if (type !== 'avoid') {
-          issues.push({
-            detail: `${sourceMatch.student.name} → ${targetMatch.student.name}`,
-            label: 'Ja constava com a rebuig; no s’importa l’elecció',
-            rowNumber,
-          })
-          return
-        }
-        relationByKey.delete(oppositeKey)
-        issues.push({
-          detail: `${sourceMatch.student.name} → ${targetMatch.student.name}`,
-          label: 'Triat en positiu i en rebuig; es conserva el rebuig',
-          rowNumber,
-        })
-      }
-      relationByKey.set(relationKey, {
-        classId: '',
-        createdAt: now,
-        importedAt: now,
-        note: importedLabel,
-        source: 'sociometric-questionnaire',
-        sourceLabel: importedLabel,
-        sourceStudentId: sourceMatch.student.id,
-        strength: 2,
-        targetStudentId: targetMatch.student.id,
-        type,
-      })
-    }
-
-    indexes.positiveIndexes.forEach((index) => addChoice(cells[index], 'friendship'))
-    indexes.avoidIndexes.forEach((index) => addChoice(cells[index], 'avoid'))
-  })
-
-  const relations = [...relationByKey.values()]
-  return {
-    avoidCount: relations.filter((relation) => relation.type === 'avoid').length,
-    issues,
-    matchedResponses,
-    positiveCount: relations.filter((relation) => relation.type === 'friendship').length,
-    relations,
-    responsesCount: dataLines.length,
   }
 }
 
@@ -4402,11 +4160,10 @@ export function TutoringView() {
     note: '',
   })
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
+  const [relationSaveState, setRelationSaveState] = useState({ status: '', message: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
   const [selectedSociometricStatKey, setSelectedSociometricStatKey] = useState('')
-  const [sociometricPasteText, setSociometricPasteText] = useState('')
-  const [sociometricImportMessage, setSociometricImportMessage] = useState('')
   const [sociometricSurveyMessage, setSociometricSurveyMessage] = useState('')
   const [sociometricSurveyBusy, setSociometricSurveyBusy] = useState('')
   const [sociometricResponseCounts, setSociometricResponseCounts] = useState({})
@@ -4503,7 +4260,6 @@ export function TutoringView() {
   const updateTutorialRecord = useAvaluaproStore((state) => state.updateTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
-  const importTutorialRelations = useAvaluaproStore((state) => state.importTutorialRelations)
   const createSociometricSurvey = useAvaluaproStore((state) => state.createSociometricSurvey)
   const deleteSociometricSurvey = useAvaluaproStore((state) => state.deleteSociometricSurvey)
   const setSociometricSurveyStatus = useAvaluaproStore((state) => state.setSociometricSurveyStatus)
@@ -4968,18 +4724,6 @@ export function TutoringView() {
   const tutorialRelationSummary = useMemo(
     () => summarizeTutorialRelations({ students: classStudents, relations: classTutorialRelations }),
     [classStudents, classTutorialRelations],
-  )
-  const sociometricPreview = useMemo(
-    () => parseSociometricResponseText(sociometricPasteText, classStudents),
-    [classStudents, sociometricPasteText],
-  )
-  const sociometricTemplateText = useMemo(
-    () =>
-      [
-        SOCIOMETRIC_TEMPLATE_HEADER,
-        ...classStudents.map((student) => [student.name, '', '', '', '', '', '', ''].join('\t')),
-      ].join('\n'),
-    [classStudents],
   )
   const sociometricMetrics = useMemo(
     () => summarizeSociometricMetrics({ students: classStudents, relations: classTutorialRelations }),
@@ -5851,39 +5595,35 @@ export function TutoringView() {
       relationForm.targetStudentId || classStudents.find((student) => student.id !== sourceStudentId)?.id
     if (!sourceStudentId || !targetStudentId || sourceStudentId === targetStudentId) return
 
-    await upsertTutorialRelation({
-      classId: activeClassId,
-      note: relationForm.note,
-      source: TEACHER_OBSERVATION_RELATION_SOURCE,
-      sourceLabel: 'Criteri docent',
-      sourceStudentId,
-      strength: relationForm.strength,
-      targetStudentId,
-      type: relationForm.type,
-    })
-    setSelectedRelationStudentId(sourceStudentId)
-    setRelationForm((current) => ({
-      ...current,
-      sourceStudentId,
-      targetStudentId: '',
-      note: '',
-    }))
-    setRelationSearch((current) => ({ ...current, target: '' }))
-  }
-
-  const handleCopySociometricTemplate = async () => {
+    setRelationSaveState({ status: 'saving', message: '' })
     try {
-      await navigator.clipboard.writeText(sociometricTemplateText)
-      setSociometricImportMessage('Plantilla copiada amb la llista d’alumnes. Enganxa-la al full de càlcul.')
-    } catch {
-      setSociometricImportMessage('No s’ha pogut copiar automàticament. Pots copiar la capçalera manualment.')
+      await upsertTutorialRelation({
+        classId: activeClassId,
+        note: relationForm.note,
+        source: TEACHER_OBSERVATION_RELATION_SOURCE,
+        sourceLabel: 'Criteri docent',
+        sourceStudentId,
+        strength: relationForm.strength,
+        targetStudentId,
+        type: relationForm.type,
+      })
+      const sourceName = classStudents.find((student) => student.id === sourceStudentId)?.name || 'Alumne origen'
+      const targetName = classStudents.find((student) => student.id === targetStudentId)?.name || 'alumne relacionat'
+      setSelectedRelationStudentId(sourceStudentId)
+      setRelationForm((current) => ({
+        ...current,
+        sourceStudentId,
+        targetStudentId: '',
+        note: '',
+      }))
+      setRelationSearch((current) => ({ ...current, target: '' }))
+      setRelationSaveState({ status: 'success', message: `Relació guardada: ${sourceName} → ${targetName}.` })
+    } catch (error) {
+      setRelationSaveState({
+        status: 'error',
+        message: error.message || 'No s’ha pogut guardar la relació. Torna-ho a provar.',
+      })
     }
-  }
-
-  const handleDownloadSociometricTemplate = () => {
-    const blob = new Blob([sociometricTemplateText], { type: 'text/tab-separated-values;charset=utf-8' })
-    downloadBlob(blob, `avaluapro-sociograma-${activeClass?.name || 'classe'}-${getTodaySlug()}.tsv`)
-    setSociometricImportMessage('Plantilla descarregada. Pots obrir-la amb Excel, Numbers o Google Sheets.')
   }
 
   const handleCreateSociometricSurvey = async () => {
@@ -6029,27 +5769,6 @@ export function TutoringView() {
     } finally {
       setSociometricSurveyBusy('')
     }
-  }
-
-  const handleImportSociometricResponses = async () => {
-    if (!activeClassId || sociometricPreview.relations.length === 0) return
-
-    await importTutorialRelations(
-      sociometricPreview.relations.map((relation) => ({
-        ...relation,
-        classId: activeClassId,
-      })),
-    )
-    await captureTutorialSociometricMoment({
-      classId: activeClassId,
-      label: `Importació manual · ${getTodayDateInput()}`,
-      source: 'manual-import',
-    })
-    setSociometricImportMessage(
-      `Importades ${sociometricPreview.positiveCount} eleccions i ${sociometricPreview.avoidCount} rebuigs. També s’ha guardat un moment sociomètric. Revisa el sociograma.`,
-    )
-    setSociometricPasteText('')
-    setActiveRelationshipTool('sociogram')
   }
 
   const handleCaptureSociometricMoment = async () => {
@@ -8311,11 +8030,22 @@ export function TutoringView() {
             </div>
 
             <article className="tutoring-card tutorial-relation-form-card" data-tour="tutoring-relation-form">
-              <div>
-                <Plus size={24} />
-                <h2>Registrar relació docent</h2>
-              </div>
-              <form className="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
+              <header className="tutorial-relation-form-header">
+                <div>
+                  <Plus size={24} />
+                  <h2>Registrar relació docent</h2>
+                </div>
+                <button
+                  className="primary-action tutorial-relation-save-button"
+                  disabled={classStudents.length < 2 || relationSaveState.status === 'saving'}
+                  form="tutorial-relation-form"
+                  type="submit"
+                >
+                  {relationSaveState.status === 'saving' ? <Loader2 size={17} /> : <Save size={17} />}
+                  {relationSaveState.status === 'saving' ? 'Guardant...' : 'Guardar relació'}
+                </button>
+              </header>
+              <form className="tutorial-relation-form" id="tutorial-relation-form" onSubmit={handleSubmitTutorialRelation}>
                 <label>
                   Alumne origen
                   <div className="tutorial-relation-picker">
@@ -8424,88 +8154,18 @@ export function TutoringView() {
                   />
                 </label>
 
-                <button className="primary-action" disabled={classStudents.length < 2} type="submit">
-                  Guardar relació
-                </button>
+                {relationSaveState.message && (
+                  <div
+                    aria-live="polite"
+                    className={`tutorial-relation-save-message ${relationSaveState.status}`}
+                    role="status"
+                  >
+                    {relationSaveState.status === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                    <span>{relationSaveState.message}</span>
+                  </div>
+                )}
               </form>
             </article>
-
-            <div className="sociometric-import-layout">
-              <article className="sociometric-import-help">
-                <FileSpreadsheet size={24} />
-                <h3>Pla B: importar des d’un full</h3>
-                <p>
-                  Una fila per alumne. La primera columna és qui respon. Després, 4 eleccions positives i 3 rebuigs.
-                </p>
-                <code>{SOCIOMETRIC_TEMPLATE_HEADER}</code>
-                <small>
-                  Pots copiar o descarregar una plantilla amb tots els alumnes. També funciona si el full ve de Google
-                  Forms i la columna “Alumne” no és la primera. Els noms poden tenir accents diferents o formes curtes:
-                  Avaluapro intentarà fer coincidència aproximada.
-                </small>
-                <div className="sociometric-import-actions compact-inline">
-                  <button className="secondary-action compact" onClick={handleCopySociometricTemplate} type="button">
-                    <Clipboard size={16} />
-                    Copiar plantilla
-                  </button>
-                  <button className="secondary-action compact" onClick={handleDownloadSociometricTemplate} type="button">
-                    <FileDown size={16} />
-                    Descarregar plantilla
-                  </button>
-                </div>
-              </article>
-
-              <label className="sociometric-import-textarea">
-                Enganxa aquí les respostes
-                <textarea
-                  onChange={(event) => {
-                    setSociometricPasteText(event.target.value)
-                    setSociometricImportMessage('')
-                  }}
-                  placeholder={`${SOCIOMETRIC_TEMPLATE_HEADER}\nALUMNE 1\tALUMNE 2\tALUMNE 3\tALUMNE 4\tALUMNE 5\tALUMNE 6\tALUMNE 7\tALUMNE 8`}
-                  value={sociometricPasteText}
-                />
-              </label>
-            </div>
-
-            <div className="sociometric-preview-grid">
-              <article>
-                <span>Respostes</span>
-                <strong>{sociometricPreview.responsesCount}</strong>
-              </article>
-              <article>
-                <span>Coincidències</span>
-                <strong>{sociometricPreview.matchedResponses}</strong>
-              </article>
-              <article className="positive">
-                <span>Eleccions</span>
-                <strong>{sociometricPreview.positiveCount}</strong>
-              </article>
-              <article className="danger">
-                <span>Rebuigs</span>
-                <strong>{sociometricPreview.avoidCount}</strong>
-              </article>
-              <article className={sociometricPreview.issues.length > 0 ? 'warning' : ''}>
-                <span>Revisions</span>
-                <strong>{sociometricPreview.issues.length}</strong>
-              </article>
-            </div>
-
-            {sociometricImportMessage && <div className="sociometric-import-message">{sociometricImportMessage}</div>}
-
-            {sociometricPreview.issues.length > 0 && (
-              <div className="sociometric-issue-list">
-                <strong>Files a revisar abans o després d’importar</strong>
-                {sociometricPreview.issues.slice(0, 12).map((issue, index) => (
-                  <p key={`${issue.rowNumber}_${issue.label}_${index}`}>
-                    Fila {issue.rowNumber}: {issue.label} · {issue.detail}
-                  </p>
-                ))}
-                {sociometricPreview.issues.length > 12 && (
-                  <small>Hi ha {sociometricPreview.issues.length - 12} avís/os més.</small>
-                )}
-              </div>
-            )}
 
             <div className="sociometric-results-preview">
               <header>
@@ -8533,20 +8193,6 @@ export function TutoringView() {
               </div>
             </div>
 
-            <footer className="sociometric-import-footer">
-              <p>
-                En importar, les respostes queden guardades com a relacions tutorials i alimenten el sociograma, els
-                grups cooperatius i la disposició d’aula.
-              </p>
-              <button
-                className="primary-action"
-                disabled={sociometricPreview.relations.length === 0}
-                onClick={handleImportSociometricResponses}
-                type="button"
-              >
-                Importar {sociometricPreview.relations.length} relacions
-              </button>
-            </footer>
           </section>
 
           <section
