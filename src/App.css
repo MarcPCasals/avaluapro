@@ -25004,16 +25004,16 @@ button.profile-followup-card:focus-visible {
 }
 
 .internal-message-button.has-unread {
-  color: #60a5fa;
+  color: #f87171;
 }
 
 .internal-message-icon-count {
   position: absolute;
-  top: 48%;
+  top: 50%;
   left: 50%;
   min-width: 0;
   height: auto;
-  transform: translate(-50%, -62%);
+  transform: translate(-50%, -50%);
   color: #f8fafc;
   background: transparent;
   font-size: 8px;
