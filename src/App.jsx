@@ -1,21 +1,50 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { CheckCircle2, Info, Loader2, PlayCircle, Share2, Trash2, XCircle } from 'lucide-react'
 import { GlobalReminderLayer } from './components/GlobalReminderLayer'
 import { MainNavigation } from './components/MainNavigation'
 import { Modal } from './components/Modal'
 import { SemesterUtTabs } from './components/SemesterUtTabs'
 import { TopBar } from './components/TopBar'
-import { AnalyticsView } from './features/analytics/AnalyticsView'
-import { EvaluationView } from './features/evaluation/EvaluationView'
 import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
-import { TrackingView } from './features/tracking/TrackingView'
-import { SociometricPublicForm } from './features/tutoring/SociometricPublicForm'
-import { StudentProfilePublicForm } from './features/tutoring/StudentProfilePublicForm'
-import { TutoringView } from './features/tutoring/TutoringView'
-import { StudentOverviewView } from './features/students/StudentOverviewView'
+import { isOptionalModeEnabled } from './config/featureFlags'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
+
+const AgendaModule = lazy(() => import('./features/agenda/AgendaModule'))
+const AnalyticsView = lazy(() =>
+  import('./features/analytics/AnalyticsView').then((module) => ({ default: module.AnalyticsView })),
+)
+const EvaluationView = lazy(() =>
+  import('./features/evaluation/EvaluationView').then((module) => ({ default: module.EvaluationView })),
+)
+const PlanningModule = lazy(() => import('./features/planning/PlanningModule'))
+const SociometricPublicForm = lazy(() =>
+  import('./features/tutoring/SociometricPublicForm').then((module) => ({ default: module.SociometricPublicForm })),
+)
+const StudentOverviewView = lazy(() =>
+  import('./features/students/StudentOverviewView').then((module) => ({ default: module.StudentOverviewView })),
+)
+const StudentProfilePublicForm = lazy(() =>
+  import('./features/tutoring/StudentProfilePublicForm').then((module) => ({ default: module.StudentProfilePublicForm })),
+)
+const TrackingView = lazy(() =>
+  import('./features/tracking/TrackingView').then((module) => ({ default: module.TrackingView })),
+)
+const TutoringView = lazy(() =>
+  import('./features/tutoring/TutoringView').then((module) => ({ default: module.TutoringView })),
+)
+
+const TIMELINE_MODES = new Set(['evaluation', 'tracking', 'analytics', 'tutoring'])
+
+function ModuleLoadingFallback({ label = 'Carregant espai...' }) {
+  return (
+    <div className="module-loading" role="status">
+      <Loader2 size={28} />
+      <span>{label}</span>
+    </div>
+  )
+}
 
 function DemoBanner() {
   const openGuide = useAvaluaproStore((state) => state.openGuide)
@@ -158,20 +187,34 @@ function App() {
   const error = useAvaluaproStore((state) => state.error)
   const cloud = useAvaluaproStore((state) => state.cloud)
   const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
+  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
   const onboarding = useAvaluaproStore((state) => state.onboarding)
+  const effectiveActiveMode = isOptionalModeEnabled(activeMode) ? activeMode : 'evaluation'
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId) return
     initialize()
   }, [initialize, sociometricSurveyId, studentProfileSurveyId])
 
+  useEffect(() => {
+    if (effectiveActiveMode !== activeMode) setActiveMode(effectiveActiveMode)
+  }, [activeMode, effectiveActiveMode, setActiveMode])
+
   if (sociometricSurveyId) {
-    return <SociometricPublicForm accessToken={sociometricAccessToken} surveyId={sociometricSurveyId} />
+    return (
+      <Suspense fallback={<ModuleLoadingFallback label="Carregant qüestionari..." />}>
+        <SociometricPublicForm accessToken={sociometricAccessToken} surveyId={sociometricSurveyId} />
+      </Suspense>
+    )
   }
 
   if (studentProfileSurveyId) {
-    return <StudentProfilePublicForm surveyId={studentProfileSurveyId} />
+    return (
+      <Suspense fallback={<ModuleLoadingFallback label="Carregant formulari..." />}>
+        <StudentProfilePublicForm surveyId={studentProfileSurveyId} />
+      </Suspense>
+    )
   }
 
   if (status === 'loading' || status === 'idle') {
@@ -217,13 +260,17 @@ function App() {
         </div>
       )}
       <MainNavigation />
-      {activeMode !== 'students' && <SemesterUtTabs />}
+      {TIMELINE_MODES.has(effectiveActiveMode) && <SemesterUtTabs />}
       <main className="content-area">
-        {activeMode === 'evaluation' && <EvaluationView />}
-        {activeMode === 'tracking' && <TrackingView />}
-        {activeMode === 'students' && <StudentOverviewView />}
-        {activeMode === 'analytics' && <AnalyticsView />}
-        {activeMode === 'tutoring' && <TutoringView />}
+        <Suspense fallback={<ModuleLoadingFallback />}>
+          {effectiveActiveMode === 'evaluation' && <EvaluationView />}
+          {effectiveActiveMode === 'tracking' && <TrackingView />}
+          {effectiveActiveMode === 'students' && <StudentOverviewView />}
+          {effectiveActiveMode === 'analytics' && <AnalyticsView />}
+          {effectiveActiveMode === 'tutoring' && <TutoringView />}
+          {effectiveActiveMode === 'planning' && <PlanningModule />}
+          {effectiveActiveMode === 'agenda' && <AgendaModule />}
+        </Suspense>
       </main>
       <GlobalReminderLayer />
       <TutoringInvitationCenter />

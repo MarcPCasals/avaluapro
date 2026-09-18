@@ -1453,6 +1453,38 @@
   border-color: #d1d5db;
 }
 
+.mode-tab.optional {
+  min-width: 132px;
+}
+
+.mode-tab.optional.agenda.active {
+  color: #c2410c;
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.mode-tab.optional.planning.active {
+  color: #6d28d9;
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.module-loading {
+  min-height: 280px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: #64748b;
+  background: #f8fafc;
+  font-weight: 900;
+}
+
+.module-loading svg {
+  color: #f97316;
+  animation: spin 1s linear infinite;
+}
+
 .insight-tab.active {
   color: #1d4ed8;
   border-color: #bfdbfe;
@@ -25445,6 +25477,25 @@ button.profile-followup-card:focus-visible {
 }
 
 @media (max-width: 1180px) {
+  .main-navigation.has-optional-modules {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .main-navigation.has-optional-modules .mode-tabs,
+  .main-navigation.has-optional-modules .insight-tabs {
+    max-width: 100%;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .main-navigation.has-optional-modules .mode-tabs {
+    margin-right: 0;
+  }
+
   .tutoring-hero,
   .tutoring-grid {
     grid-template-columns: 1fr;

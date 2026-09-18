@@ -1,11 +1,25 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties, UsersRound } from 'lucide-react'
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpenText,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  GraduationCap,
+  TableProperties,
+  UsersRound,
+} from 'lucide-react'
 import { Modal } from './Modal'
+import { featureFlags } from '../config/featureFlags'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
 import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 const modes = [
+  ...(featureFlags.agenda ? [{ id: 'agenda', label: 'Agenda', icon: CalendarDays, optional: true }] : []),
+  ...(featureFlags.planning ? [{ id: 'planning', label: 'Programació', icon: BookOpenText, optional: true }] : []),
   { id: 'evaluation', label: 'Avaluació', icon: TableProperties },
   { id: 'tracking', label: 'Seguiment', icon: ClipboardCheck },
   { id: 'students', label: 'Alumnes', icon: UsersRound },
@@ -112,6 +126,7 @@ export function MainNavigation() {
     ],
   )
   const hasTutoringMode = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
+  const hasOptionalModules = featureFlags.agenda || featureFlags.planning
   const handleOpenTutoring = () => {
     setActiveMode('tutoring')
     if (!onboarding.tutoringGuideSeen) {
@@ -119,13 +134,16 @@ export function MainNavigation() {
     }
   }
   return (
-    <div className="main-navigation" data-tour="main-navigation">
+    <div
+      className={`main-navigation ${hasOptionalModules ? 'has-optional-modules' : ''}`}
+      data-tour="main-navigation"
+    >
       <div className="mode-tabs">
         {modes.map((mode) => {
           const Icon = mode.icon
           return (
             <button
-              className={`mode-tab ${activeMode === mode.id ? 'active' : ''}`}
+              className={`mode-tab ${mode.optional ? `optional ${mode.id}` : ''} ${activeMode === mode.id ? 'active' : ''}`}
               key={mode.id}
               onClick={() => setActiveMode(mode.id)}
               type="button"
