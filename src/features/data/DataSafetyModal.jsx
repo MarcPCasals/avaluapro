@@ -124,6 +124,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const fileInputRef = useRef(null)
   const antecedentFileInputRef = useRef(null)
   const antecedentSectionRef = useRef(null)
+  const cloudConflictSectionRef = useRef(null)
   const state = useAvaluaproStore()
   const createBackup = useAvaluaproStore((store) => store.createBackup)
   const restoreBackup = useAvaluaproStore((store) => store.restoreBackup)
@@ -225,9 +226,14 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   }, [loadCloudBackups, state.cloud.user])
 
   useEffect(() => {
-    if (initialSection !== 'antecedents') return
+    const target = initialSection === 'antecedents'
+      ? antecedentSectionRef.current
+      : initialSection === 'cloud-conflict'
+        ? cloudConflictSectionRef.current
+        : null
+    if (!target) return
     window.setTimeout(() => {
-      antecedentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
   }, [initialSection])
 
@@ -503,6 +509,55 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             </div>
           )}
         </section>
+
+        {state.cloud.status === 'review' && (
+          <section className="cloud-conflict-guide" ref={cloudConflictSectionRef}>
+            <div className="cloud-conflict-guide-heading">
+              <AlertTriangle size={22} />
+              <div>
+                <h3>No cal esperar que millori la connexió</h3>
+                <p>
+                  Avaluapro ha trobat dues versions diferents de les dades i ha aturat la sincronització expressament
+                  per no sobreescriure’n cap. Aquest avís no desapareixerà tot sol: has d’indicar quina versió vols conservar.
+                </p>
+              </div>
+            </div>
+            <div className="cloud-conflict-options">
+              <article>
+                <Upload size={19} />
+                <div>
+                  <strong>Si aquest dispositiu té les dades més recents</strong>
+                  <span>Tria «Reconciliar tot el núvol» perquè Firebase quedi igual que aquest dispositiu.</span>
+                </div>
+              </article>
+              <article>
+                <Download size={19} />
+                <div>
+                  <strong>Si Firebase o un altre dispositiu té les dades més recents</strong>
+                  <span>Tria «Recuperar estat». Les dades locals actuals seran substituïdes per les de Firebase.</span>
+                </div>
+              </article>
+            </div>
+            <p className="cloud-conflict-safety-note">
+              <ShieldCheck size={17} />
+              Primer descarrega una còpia manual. Si no saps quina versió és la més recent, no triïs encara cap de les dues opcions.
+            </p>
+            <div className="cloud-conflict-actions">
+              <button className="primary-action compact" onClick={handleDownloadBackup} type="button">
+                <Download size={16} />
+                Descarregar còpia primer
+              </button>
+              <button className="secondary-action compact" onClick={handlePushToCloud} type="button">
+                <Upload size={16} />
+                Reconciliar tot el núvol
+              </button>
+              <button className="secondary-action compact" onClick={handlePullFromCloud} type="button">
+                <Download size={16} />
+                Recuperar estat
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="data-security-checklist">
           <div className="data-security-heading">

@@ -421,6 +421,20 @@ export function TopBar() {
                 <small>{syncIndicator.detail}</small>
               </span>
             </strong>
+            {cloud.status === 'review' && (
+              <button
+                className="sync-help-button"
+                onClick={() => {
+                  setDataSafetyInitialSection('cloud-conflict')
+                  setShowDataSafety(true)
+                }}
+                title="Com resoldre la diferència entre aquest dispositiu i Firebase"
+                type="button"
+              >
+                <HelpCircle size={15} />
+                Ajuda
+              </button>
+            )}
           </div>
         )}
         <div className="top-menu-wrapper" data-tour="data-menu" ref={dataMenuRef}>

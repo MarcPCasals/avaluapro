@@ -992,6 +992,26 @@
   background: transparent;
 }
 
+.sync-help-button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: #fed7aa;
+  background: rgba(124, 45, 18, 0.3);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.sync-help-button:hover {
+  border-color: #fb923c;
+  color: #fff7ed;
+  background: rgba(154, 52, 18, 0.48);
+}
+
 .top-menu-wrapper {
   position: relative;
 }
@@ -1249,6 +1269,98 @@
   color: #94a3b8;
   font-size: 10px;
   font-weight: 800;
+}
+
+.cloud-conflict-guide {
+  display: grid;
+  gap: 14px;
+  scroll-margin-top: 18px;
+  border: 1px solid #fdba74;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fff7ed;
+}
+
+.cloud-conflict-guide-heading,
+.cloud-conflict-options article,
+.cloud-conflict-safety-note,
+.cloud-conflict-actions {
+  display: flex;
+  align-items: flex-start;
+}
+
+.cloud-conflict-guide-heading {
+  gap: 11px;
+  color: #9a3412;
+}
+
+.cloud-conflict-guide-heading svg,
+.cloud-conflict-options article > svg,
+.cloud-conflict-safety-note svg {
+  flex: 0 0 auto;
+}
+
+.cloud-conflict-guide h3,
+.cloud-conflict-guide p {
+  margin: 0;
+}
+
+.cloud-conflict-guide-heading h3 {
+  margin-bottom: 4px;
+  font-size: 17px;
+}
+
+.cloud-conflict-guide-heading p {
+  color: #7c2d12;
+  line-height: 1.45;
+}
+
+.cloud-conflict-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cloud-conflict-options article {
+  gap: 9px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 12px;
+  color: #9a3412;
+  background: white;
+}
+
+.cloud-conflict-options article div {
+  display: grid;
+  gap: 4px;
+}
+
+.cloud-conflict-options article span {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cloud-conflict-safety-note {
+  gap: 8px;
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: #854d0e;
+  background: #fef3c7;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.cloud-conflict-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .cloud-conflict-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cloud-session.synced .sync-pill svg,
