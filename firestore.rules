@@ -1536,7 +1536,9 @@ service cloud.firestore {
         && validPlanningUnitShape(upId)
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerEmailLower == request.auth.token.email;
-      allow get: if canReadPlanningUnit(upId);
+      // Una transacció local-first ha de poder comprovar que una UP nova encara
+      // no existeix abans de crear-la. Una ruta buida no exposa cap document.
+      allow get: if signedIn() && (resource == null || canReadPlanningUnit(upId));
       allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
       allow list: if signedIn()
         && request.auth.token.email is string

@@ -32,7 +32,10 @@ import {
   createPlanningPrivateNote,
   createPlanningUnit,
   createSessionItem,
+  createTemporalUnit,
 } from '../src/domain/planning/index.js'
+import { applyPlanningCloudOperationToDatabase } from '../src/data/cloud/planningCloudSync.js'
+import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
 
 const PROJECT_ID = 'avaluapro-planning-rules-test'
 const NOW = '2026-09-18T12:00:00.000Z'
@@ -207,6 +210,18 @@ function appRef(db, applicationId = APP_ONE) {
 
 function sessionRef(db, sessionId = SESSION_ONE) {
   return doc(db, 'planningUnits', UP_ID, 'applications', APP_ONE, 'sessions', sessionId)
+}
+
+function queuedOperation(entity, context = {}, baseUpdatedAt = '') {
+  const location = getPlanningEntityLocation(entity, context)
+  return {
+    baseUpdatedAt,
+    entityType: entity.entityType,
+    operation: 'upsert',
+    path: location.path,
+    uid: entity.ownerUid,
+    value: entity,
+  }
 }
 
 before(async () => {
@@ -464,5 +479,81 @@ describe('Configuració privada del calendari', () => {
       doc(thirdDb, 'users', OWNER.uid, 'planningAcademicYears', 'forged'),
       { ...year, id: 'forged' },
     ))
+  })
+})
+
+describe('Recorregut local-first de la UP', () => {
+  test('crea curs i UT, recarrega una UP buida i l’arxiva sense acceptar una edició antiga', async () => {
+    const db = authDb(OWNER)
+    const year = createAcademicYear({
+      endsOn: '2027-06-30',
+      id: 'plan-year-flow',
+      label: '2026-2027',
+      ownerUid: OWNER.uid,
+      startsOn: '2026-09-01',
+    }, { now: NOW })
+    const temporalUnit = createTemporalUnit({
+      academicYearId: year.id,
+      endsOn: '2026-12-04',
+      id: 'plan-ut-flow',
+      label: 'UT1',
+      order: 0,
+      ownerUid: OWNER.uid,
+      startsOn: '2026-09-01',
+    }, { now: NOW })
+    const unit = {
+      ...createPlanningUnit({
+        academicYearId: year.id,
+        code: 'UP-PROVA',
+        id: 'plan-up-flow',
+        level: '1r ESO',
+        ownerUid: OWNER.uid,
+        temporalUnitId: temporalUnit.id,
+        title: 'UP buida de prova',
+      }, { now: NOW }),
+      accessByEmail: {},
+      authorizedEmails: [],
+      ownerEmailLower: OWNER.email,
+    }
+    const phases = ['preparation', 'resolution', 'closing'].map((kind, order) => createPlanningPhase({
+      id: `plan-phase-flow-${order}`,
+      kind,
+      order,
+      ownerUid: OWNER.uid,
+      planningUnitId: unit.id,
+      title: ['Preparació', 'Resolució', 'Tancament'][order],
+    }, { now: NOW }))
+
+    for (const entity of [year, temporalUnit, unit]) {
+      const result = await applyPlanningCloudOperationToDatabase(db, queuedOperation(entity))
+      assert.equal(result.applied, true)
+    }
+    for (const phase of phases) {
+      const result = await applyPlanningCloudOperationToDatabase(db, queuedOperation(phase))
+      assert.equal(result.applied, true)
+    }
+
+    const reloaded = await getDoc(doc(db, 'planningUnits', unit.id))
+    const reloadedPhases = await getDocs(collection(db, 'planningUnits', unit.id, 'phases'))
+    assert.equal(reloaded.data().title, 'UP buida de prova')
+    assert.equal(reloadedPhases.size, 3)
+    assert.equal((await getDocs(collection(db, 'planningUnits', unit.id, 'activities'))).size, 0)
+
+    const archivedAt = '2026-09-18T13:00:00.000Z'
+    const archived = { ...unit, status: 'archived', updatedAt: archivedAt }
+    const archiveResult = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(archived, {}, NOW),
+    )
+    assert.equal(archiveResult.applied, true)
+    assert.equal((await getDoc(doc(db, 'planningUnits', unit.id))).data().status, 'archived')
+
+    const staleResult = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation({ ...unit, title: 'Edició antiga', updatedAt: '2026-09-18T12:30:00.000Z' }, {}, NOW),
+    )
+    assert.equal(staleResult.conflict, true)
+    assert.equal(staleResult.remoteUpdatedAt, archivedAt)
+    assert.equal((await getDoc(doc(db, 'planningUnits', unit.id))).data().title, 'UP buida de prova')
   })
 })
