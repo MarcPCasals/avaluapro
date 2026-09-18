@@ -10,7 +10,6 @@ const CONFIRMATION = String(process.env.CONFIRM_PRODUCTION_SMOKE || '')
 const REQUIRED_CONFIRMATION = 'PROVA SOCIOMETRICA FICTICIA'
 const suffix = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`
 const surveyId = `smoke_survey_${suffix}`
-const tokenId = crypto.randomBytes(24).toString('hex')
 const classId = `smoke_class_${suffix}`
 const createdAt = new Date().toISOString()
 const expiresAtEpochMs = Date.now() + 60 * 60 * 1000
@@ -96,7 +95,7 @@ const survey = {
   studentOptions,
   updatedAt: createdAt,
 }
-const accessToken = {
+const publicForm = {
   avoidLimit: survey.avoidLimit,
   classId,
   className: survey.className,
@@ -105,20 +104,19 @@ const accessToken = {
   expiresAtEpochMs,
   positiveLimit: survey.positiveLimit,
   privacyNoticeVersion,
-  studentId: studentOptions[0].id,
-  studentName: studentOptions[0].name,
+  studentNamesById: Object.fromEntries(studentOptions.map((student) => [student.id, student.name])),
+  studentOptionIds: survey.studentOptionIds,
   studentOptions,
   surveyId,
-  tokenId,
 }
 const response = {
-  accessToken: tokenId,
+  accessToken: '',
   avoidStudentIds: [],
   classId,
   positiveStudentIds: [studentOptions[1].id],
   privacyNoticeAcknowledged: true,
   privacyNoticeVersion,
-  responseId: tokenId,
+  responseId: studentOptions[0].id,
   studentId: studentOptions[0].id,
   studentName: studentOptions[0].name,
   submittedAt: new Date().toISOString(),
@@ -152,8 +150,8 @@ if (!API_KEY) {
 
 const adminToken = await getAccessToken()
 const surveyPath = `sociometricSurveys/${surveyId}`
-const tokenPath = `${surveyPath}/accessTokens/${tokenId}`
-const responsePath = `${surveyPath}/responses/${tokenId}`
+const publicFormPath = `${surveyPath}/public/form`
+const responsePath = `${surveyPath}/responses/${studentOptions[0].id}`
 
 try {
   assertStatus(
@@ -166,26 +164,26 @@ try {
     'creació administrativa del qüestionari fictici',
   )
   assertStatus(
-    await request(apiUrl(tokenPath, '?currentDocument.exists=false'), {
-      body: encodeDocument(accessToken),
+    await request(apiUrl(publicFormPath, '?currentDocument.exists=false'), {
+      body: encodeDocument(publicForm),
       method: 'PATCH',
       token: adminToken,
     }),
     200,
-    'creació administrativa del token fictici',
+    'creació administrativa del formulari públic compartit',
   )
 
   assertStatus(await request(apiUrl(surveyPath)), 403, 'document general no públic')
-  assertStatus(await request(apiUrl(`${surveyPath}/accessTokens`, '?pageSize=10')), 403, 'tokens no enumerables')
-  assertStatus(await request(apiUrl(tokenPath)), 200, 'token individual consultable')
+  assertStatus(await request(apiUrl(`${surveyPath}/public`, '?pageSize=10')), 403, 'formulari públic no enumerable')
+  assertStatus(await request(apiUrl(publicFormPath)), 200, 'enllaç compartit consultable')
 
   assertStatus(
     await request(apiUrl(responsePath, '?currentDocument.exists=false'), {
-      body: encodeDocument({ ...response, studentId: studentOptions[1].id, studentName: studentOptions[1].name }),
+      body: encodeDocument({ ...response, studentName: studentOptions[1].name }),
       method: 'PATCH',
     }),
     403,
-    'el token no permet respondre per un altre alumne',
+    'l’enllaç compartit no permet falsejar el nom triat',
   )
   assertStatus(
     await request(apiUrl(responsePath, '?currentDocument.exists=false'), {
@@ -221,26 +219,11 @@ try {
     200,
     'caducitat administrativa del qüestionari fictici',
   )
-  assertStatus(
-    await request(
-      apiUrl(
-        tokenPath,
-        '?updateMask.fieldPaths=expiresAt&updateMask.fieldPaths=expiresAtEpochMs',
-      ),
-      {
-        body: encodeDocument({ expiresAt: expiredAt, expiresAtEpochMs: expiredAtEpochMs }),
-        method: 'PATCH',
-        token: adminToken,
-      },
-    ),
-    200,
-    'caducitat administrativa del token fictici',
-  )
-  assertStatus(await request(apiUrl(tokenPath)), 403, 'token caducat no consultable')
+  assertStatus(await request(apiUrl(publicFormPath)), 403, 'enllaç compartit caducat no consultable')
   console.log('\nProva sociomètrica fictícia completada correctament.')
 } finally {
   await request(apiUrl(responsePath), { method: 'DELETE', token: adminToken })
-  await request(apiUrl(tokenPath), { method: 'DELETE', token: adminToken })
+  await request(apiUrl(publicFormPath), { method: 'DELETE', token: adminToken })
   await request(apiUrl(surveyPath), { method: 'DELETE', token: adminToken })
   console.log('Neteja de la prova fictícia completada.')
 }

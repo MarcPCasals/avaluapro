@@ -118,6 +118,25 @@ function sociometricAccessTokenData(overrides = {}) {
   }
 }
 
+function sociometricPublicFormData(overrides = {}) {
+  const survey = sociometricSurveyData()
+  return {
+    avoidLimit: survey.avoidLimit,
+    classId: survey.classId,
+    className: survey.className,
+    createdAt: survey.createdAt,
+    expiresAt: survey.expiresAt,
+    expiresAtEpochMs: survey.expiresAtEpochMs,
+    positiveLimit: survey.positiveLimit,
+    privacyNoticeVersion: '2026-06-20-v1',
+    studentNamesById: Object.fromEntries(survey.studentOptions.map((student) => [student.id, student.name])),
+    studentOptionIds: survey.studentOptionIds,
+    studentOptions: survey.studentOptions,
+    surveyId: SURVEY_ID,
+    ...overrides,
+  }
+}
+
 function sociometricResponseData(overrides = {}) {
   return {
     accessToken: ACCESS_TOKEN,
@@ -133,6 +152,14 @@ function sociometricResponseData(overrides = {}) {
     surveyId: SURVEY_ID,
     ...overrides,
   }
+}
+
+function sharedSociometricResponseData(overrides = {}) {
+  return sociometricResponseData({
+    accessToken: '',
+    responseId: 'student-1',
+    ...overrides,
+  })
 }
 
 function studentProfileSurveyData(overrides = {}) {
@@ -214,6 +241,10 @@ beforeEach(async () => {
     await setDoc(
       doc(db, 'sociometricSurveys', SURVEY_ID, 'accessTokens', ACCESS_TOKEN),
       sociometricAccessTokenData(),
+    )
+    await setDoc(
+      doc(db, 'sociometricSurveys', SURVEY_ID, 'public', 'form'),
+      sociometricPublicFormData(),
     )
     await setDoc(doc(db, 'studentProfileSurveys', PROFILE_SURVEY_ID), studentProfileSurveyData())
     await setDoc(
@@ -710,6 +741,17 @@ describe('cotutoria compartida', () => {
 })
 
 describe('questionari sociometric public', () => {
+  test('el propietari pot crear atomicament el questionari i el formulari public compartit', async () => {
+    const db = authDb(OWNER)
+    const surveyId = 'survey-shared-new'
+    const survey = sociometricSurveyData({ id: surveyId })
+    const publicForm = sociometricPublicFormData({ surveyId })
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'sociometricSurveys', surveyId), survey)
+    batch.set(doc(db, 'sociometricSurveys', surveyId, 'public', 'form'), publicForm)
+    await assertSucceeds(batch.commit())
+  })
+
   test('el propietari pot crear atomicament el questionari i els tokens individuals', async () => {
     const db = authDb(OWNER)
     const surveyId = 'survey-new'
@@ -732,6 +774,12 @@ describe('questionari sociometric public', () => {
   test('el document general amb la llista d alumnes no es public', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
     await assertFails(getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID)))
+  })
+
+  test('el formulari compartit actiu es public i no es pot enumerar', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertSucceeds(getDoc(doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'public', 'form')))
+    await assertFails(getDocs(collection(publicDb, 'sociometricSurveys', SURVEY_ID, 'public')))
   })
 
   test('nomes el propietari pot reconciliar els membres del questionari', async () => {
@@ -764,6 +812,23 @@ describe('questionari sociometric public', () => {
       setDoc(
         doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', ACCESS_TOKEN),
         sociometricResponseData(),
+      ),
+    )
+  })
+
+  test('l enllac compartit permet respondre amb el nom triat una sola vegada', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    const responseRef = doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', 'student-1')
+    await assertSucceeds(setDoc(responseRef, sharedSociometricResponseData()))
+    await assertFails(setDoc(responseRef, sharedSociometricResponseData({ positiveStudentIds: [] })))
+  })
+
+  test('l enllac compartit no accepta un nom que no correspon a l alumne triat', async () => {
+    const publicDb = testEnv.unauthenticatedContext().firestore()
+    await assertFails(
+      setDoc(
+        doc(publicDb, 'sociometricSurveys', SURVEY_ID, 'responses', 'student-1'),
+        sharedSociometricResponseData({ studentName: 'Nom manipulat' }),
       ),
     )
   })

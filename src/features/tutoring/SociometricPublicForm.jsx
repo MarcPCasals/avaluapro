@@ -36,6 +36,7 @@ function getInitials(name = '') {
 export function SociometricPublicForm({ accessToken, surveyId }) {
   const [survey, setSurvey] = useState(null)
   const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [identityConfirmed, setIdentityConfirmed] = useState(false)
   const [positiveStudentIds, setPositiveStudentIds] = useState([])
   const [avoidStudentIds, setAvoidStudentIds] = useState([])
   const [privacyNoticeRead, setPrivacyNoticeRead] = useState(false)
@@ -52,7 +53,8 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
         const loadedSurvey = await loadPublicSociometricSurvey(surveyId, accessToken)
         if (cancelled) return
         setSurvey(loadedSurvey)
-        setSelectedStudentId(loadedSurvey.respondent.studentId)
+        setSelectedStudentId(loadedSurvey.respondent?.studentId || '')
+        setIdentityConfirmed(Boolean(loadedSurvey.respondent?.studentId))
         setPositiveStudentIds([])
         setAvoidStudentIds([])
         setPrivacyNoticeRead(false)
@@ -88,6 +90,7 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
   const canSubmit =
     status === 'ready' &&
     selectedStudentId &&
+    identityConfirmed &&
     hasAnyInteraction &&
     privacyNoticeRead
 
@@ -219,6 +222,49 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
           </p>
         </section>
 
+        {!accessToken && (
+          <section className="public-sociometric-identity" aria-labelledby="sociometric-identity-title">
+            <div className="public-sociometric-identity-heading">
+              <UsersRound size={24} />
+              <div>
+                <h2 id="sociometric-identity-title">Qui ets?</h2>
+                <p>Busca el teu nom i clica-hi. Revisa’l bé abans de continuar.</p>
+              </div>
+            </div>
+            <div className="public-sociometric-identity-grid">
+              {[...(survey?.studentOptions || [])]
+                .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
+                .map((student, index) => (
+                  <button
+                    className={selectedStudentId === student.id ? 'selected' : ''}
+                    key={student.id}
+                    onClick={() => {
+                      setSelectedStudentId(student.id)
+                      setIdentityConfirmed(false)
+                      setPositiveStudentIds([])
+                      setAvoidStudentIds([])
+                      setMessage('')
+                    }}
+                    type="button"
+                  >
+                    <span className={`tone-${index % 6}`}>{getInitials(student.name)}</span>
+                    <strong>{student.name}</strong>
+                  </button>
+                ))}
+            </div>
+            {selectedStudentName && (
+              <label className="public-sociometric-identity-confirmation">
+                <input
+                  checked={identityConfirmed}
+                  onChange={(event) => setIdentityConfirmed(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Confirmo que soc <strong>{selectedStudentName}</strong>.</span>
+              </label>
+            )}
+          </section>
+        )}
+
         <section aria-labelledby="privacy-notice-title" className="public-sociometric-privacy">
           <div className="public-sociometric-privacy-heading">
             <span>
@@ -262,8 +308,9 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
                 automàtiques ni per posar una nota.
               </p>
               <p>
-                L’enllaç és personal i només permet una resposta. No el comparteixis. Si t’has equivocat o vols
-                preguntar com s’utilitzarà la informació, parla amb el tutor/a que te l’ha facilitat.
+                L’enllaç és compartit amb el grup, però cada alumne només pot registrar una resposta amb el seu nom.
+                No responguis en nom d’una altra persona. Si t’has equivocat o vols preguntar com s’utilitzarà la
+                informació, parla amb el tutor/a que te l’ha facilitat.
               </p>
               <p>
                 El centre o l’administració educativa haurà d’identificar formalment el responsable del tractament,
@@ -282,12 +329,14 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
           </label>
         </section>
 
-        <div className="public-sociometric-student">
-          <span>Respon com</span>
-          <strong>{selectedStudentName}</strong>
-        </div>
+        {selectedStudentName && identityConfirmed && (
+          <div className="public-sociometric-student">
+            <span>Respon com</span>
+            <strong>{selectedStudentName}</strong>
+          </div>
+        )}
 
-        <section className="public-sociometric-question">
+        {selectedStudentName && identityConfirmed && <section className="public-sociometric-question">
           <div className="public-sociometric-question-header">
             <h2>
               Amb qui t’agrada jugar <em>sempre</em> al pati i amb qui no estàs o no t’agrada relacionar-te al pati?
@@ -337,7 +386,7 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
         {message && (
           <div className="public-sociometric-warning">
@@ -348,9 +397,11 @@ export function SociometricPublicForm({ accessToken, surveyId }) {
 
         <button className="public-sociometric-submit" disabled={!canSubmit} type="submit">
           {status === 'submitting' ? <Loader2 className="spin-icon" size={18} /> : <Send size={18} />}
-          {!privacyNoticeRead
-            ? 'Llegeix la informació abans d’enviar'
-            : selectedStudentId && !hasAnyInteraction
+          {!selectedStudentId || !identityConfirmed
+            ? 'Tria i confirma el teu nom'
+            : !privacyNoticeRead
+              ? 'Llegeix la informació abans d’enviar'
+              : !hasAnyInteraction
               ? 'Marca almenys una opció'
               : 'Enviar resposta'}
         </button>

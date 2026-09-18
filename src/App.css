@@ -125,6 +125,102 @@
   font-weight: 900;
 }
 
+.public-sociometric-identity {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.public-sociometric-identity-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #172033;
+}
+
+.public-sociometric-identity-heading h2,
+.public-sociometric-identity-heading p {
+  margin: 0;
+}
+
+.public-sociometric-identity-heading h2 {
+  font-size: 21px;
+}
+
+.public-sociometric-identity-heading p {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.public-sociometric-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+}
+
+.public-sociometric-identity-grid button {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 2px solid #dbe3ef;
+  border-radius: 8px;
+  color: #17324f;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.public-sociometric-identity-grid button.selected {
+  border-color: #4f46e5;
+  background: #eef2ff;
+  box-shadow: 0 0 0 2px rgb(79 70 229 / 10%);
+}
+
+.public-sociometric-identity-grid button > span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.public-sociometric-identity-grid button > span.tone-0 { color: #155e75; background: #cffafe; }
+.public-sociometric-identity-grid button > span.tone-1 { color: #5b21b6; background: #ede9fe; }
+.public-sociometric-identity-grid button > span.tone-2 { color: #9a3412; background: #ffedd5; }
+.public-sociometric-identity-grid button > span.tone-3 { color: #166534; background: #dcfce7; }
+.public-sociometric-identity-grid button > span.tone-4 { color: #9f1239; background: #ffe4e6; }
+.public-sociometric-identity-grid button > span.tone-5 { color: #3730a3; background: #e0e7ff; }
+
+.public-sociometric-identity-grid button strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.public-sociometric-identity-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 7px;
+  color: #312e81;
+  background: #e0e7ff;
+  font-weight: 800;
+}
+
+.public-sociometric-identity-confirmation input {
+  width: 20px;
+  height: 20px;
+}
+
 .public-sociometric-privacy {
   display: grid;
   gap: 14px;

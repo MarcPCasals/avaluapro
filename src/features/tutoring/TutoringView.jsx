@@ -52,7 +52,11 @@ import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
-import { listSociometricSurveyResponses, subscribeToTutoringSpaceChangeSignals } from '../../lib/firebase'
+import {
+  ensureSociometricSurveyPublicForm,
+  listSociometricSurveyResponses,
+  subscribeToTutoringSpaceChangeSignals,
+} from '../../lib/firebase'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { getUnreadTutoringCoordinationItems } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -4697,18 +4701,15 @@ export function TutoringView() {
   )
   const activeSociometricSurvey =
     classSociometricSurveys.find((survey) => survey.status === 'active') || classSociometricSurveys[0] || null
-  const activeSociometricSurveyLinks = useMemo(
-    () =>
-      (activeSociometricSurvey?.accessTokens || []).map((access) => ({
-        ...access,
-        url: `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${activeSociometricSurvey.id}&token=${access.token}`,
-      })),
-    [activeSociometricSurvey],
-  )
-  const activeSociometricSurveyUrl = activeSociometricSurveyLinks[0]?.url || ''
-  const activeSociometricSurveyLinksText = activeSociometricSurveyLinks
-    .map((access) => `${access.studentName}\t${access.url}`)
-    .join('\n')
+  const activeSociometricSurveyUrl = activeSociometricSurvey?.id
+    ? `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${activeSociometricSurvey.id}`
+    : ''
+  useEffect(() => {
+    if (!cloud.user || activeSociometricSurvey?.status !== 'active') return
+    ensureSociometricSurveyPublicForm(activeSociometricSurvey).catch(() => {
+      // Els botons de copiar i obrir tornaran a provar-ho i mostraran l'error al docent.
+    })
+  }, [activeSociometricSurvey, cloud.user])
   const activeSociometricResponseCount =
     activeSociometricSurvey?.id && Object.prototype.hasOwnProperty.call(sociometricResponseCounts, activeSociometricSurvey.id)
       ? sociometricResponseCounts[activeSociometricSurvey.id]
@@ -5890,19 +5891,14 @@ export function TutoringView() {
     setSociometricSurveyMessage('')
     try {
       const survey = await createSociometricSurvey({ classId: activeClassId })
-      const surveyLinks = (survey.accessTokens || [])
-        .map(
-          (access) =>
-            `${access.studentName}\t${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${survey.id}&token=${access.token}`,
-        )
-        .join('\n')
+      const surveyUrl = `${window.location.origin}${import.meta.env.BASE_URL}?sociometric=${survey.id}`
       try {
-        await navigator.clipboard.writeText(surveyLinks)
+        await navigator.clipboard.writeText(surveyUrl)
         setSociometricSurveyMessage(
-          'Qüestionari creat. S’han copiat els enllaços individuals, un per alumne; caduquen al cap de 24 hores.',
+          'Qüestionari creat. S’ha copiat l’enllaç compartit; l’alumnat hi triarà el seu nom. Caduca al cap de 24 hores.',
         )
       } catch {
-        setSociometricSurveyMessage('Qüestionari creat. Descarrega la llista d’enllaços individuals per repartir-los.')
+        setSociometricSurveyMessage('Qüestionari creat. Copia l’enllaç compartit per enviar-lo a tot el grup.')
       }
       setSociometricResponseCounts((current) => ({ ...current, [survey.id]: survey.responseCount || 0 }))
     } catch (error) {
@@ -5913,27 +5909,24 @@ export function TutoringView() {
   }
 
   const handleCopySociometricSurveyLink = async () => {
-    if (!activeSociometricSurveyLinksText) return
+    if (!activeSociometricSurveyUrl || !activeSociometricSurvey) return
     try {
-      await navigator.clipboard.writeText(activeSociometricSurveyLinksText)
-      setSociometricSurveyMessage('Enllaços individuals copiats. Cada alumne ha de rebre només el seu.')
+      await ensureSociometricSurveyPublicForm(activeSociometricSurvey)
+      await navigator.clipboard.writeText(activeSociometricSurveyUrl)
+      setSociometricSurveyMessage('Enllaç compartit copiat. Pots enviar el mateix a tot el grup.')
     } catch {
       setSociometricSurveyMessage('No s’ha pogut copiar automàticament. Pots seleccionar i copiar l’enllaç.')
     }
   }
 
-  const handleDownloadSociometricSurveyLinks = () => {
-    if (!activeSociometricSurveyLinksText) return
-    const blob = new Blob([`Alumne\tEnllaç individual\n${activeSociometricSurveyLinksText}`], {
-      type: 'text/tab-separated-values;charset=utf-8',
-    })
-    downloadBlob(blob, `avaluapro-enllacos-sociometria-${activeClass?.name || 'classe'}-${getTodaySlug()}.tsv`)
-    setSociometricSurveyMessage('Llista d’enllaços individuals descarregada.')
-  }
-
-  const handleOpenSociometricSurveyLink = () => {
-    if (!activeSociometricSurveyUrl) return
-    window.open(activeSociometricSurveyUrl, '_blank', 'noopener,noreferrer')
+  const handleOpenSociometricSurveyLink = async () => {
+    if (!activeSociometricSurveyUrl || !activeSociometricSurvey) return
+    try {
+      await ensureSociometricSurveyPublicForm(activeSociometricSurvey)
+      window.open(activeSociometricSurveyUrl, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      setSociometricSurveyMessage(error.message || 'No s’ha pogut preparar l’enllaç compartit.')
+    }
   }
 
   const handleRefreshSociometricResponses = async () => {
@@ -8213,11 +8206,12 @@ export function TutoringView() {
 
               {activeSociometricSurveyUrl ? (
                 <label className="sociometric-survey-link">
-                  Enllaços individuals
+                  Enllaç compartit
                   <input
                     readOnly
-                    value={`${activeSociometricSurveyLinks.length} enllaços · caducitat ${formatShortDate(activeSociometricSurvey.expiresAt)}`}
+                    value={activeSociometricSurveyUrl}
                   />
+                  <small>El mateix enllaç per a tot el grup · caducitat {formatShortDate(activeSociometricSurvey.expiresAt)}</small>
                 </label>
               ) : (
                 <div className="sociometric-survey-empty">
@@ -8245,16 +8239,7 @@ export function TutoringView() {
                   type="button"
                 >
                   <Clipboard size={17} />
-                  Copiar enllaços
-                </button>
-                <button
-                  className="secondary-action"
-                  disabled={!activeSociometricSurveyUrl}
-                  onClick={handleDownloadSociometricSurveyLinks}
-                  type="button"
-                >
-                  <FileDown size={17} />
-                  Descarregar llista
+                  Copiar enllaç
                 </button>
                 <button
                   className="secondary-action"

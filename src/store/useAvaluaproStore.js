@@ -32,6 +32,7 @@ import {
   listSentTutoringInvitationUpdates,
   createSociometricSurveyDocument,
   deleteSociometricSurveyDocument,
+  ensureSociometricSurveyPublicForm,
   listCloudBackups,
   listSociometricSurveyResponses,
   listTutoringSpacesForUser,
@@ -4071,11 +4072,6 @@ export const useAvaluaproStore = create((set, get) => ({
       id: student.id,
       name: student.name,
     }))
-    const accessTokens = studentOptions.map((student) => ({
-      studentId: student.id,
-      studentName: student.name,
-      token: Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
-    }))
     const memberUids = Array.from(
       new Set([
         user.uid,
@@ -4087,7 +4083,7 @@ export const useAvaluaproStore = create((set, get) => ({
       ]),
     ).filter(Boolean)
     const survey = normalizeSociometricSurvey({
-      accessTokens,
+      accessTokens: [],
       id: createId('survey'),
       avoidLimit,
       classId,
@@ -4137,6 +4133,7 @@ export const useAvaluaproStore = create((set, get) => ({
       }),
     }))
     if (updatedSurvey) {
+      await ensureSociometricSurveyPublicForm(updatedSurvey)
       await updateSociometricSurveyDocumentStatus({
         accessTokens: updatedSurvey.accessTokens,
         expiresAt: updatedSurvey.expiresAt,
