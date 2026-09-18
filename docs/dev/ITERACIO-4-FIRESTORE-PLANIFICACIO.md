@@ -47,11 +47,14 @@ S'han declarat 12 índexs compostos. Les funcions de lectura exigeixen un abast 
 - `npm run build:firebase`
 - `git diff --check`
 - auditoria de predesplegament de Firebase, que s'haurà de repetir quan es reiniciï la quota;
-- desplegament de regles i índexs al projecte `avaluapro`
+- desplegament de regles, índexs i Hosting al projecte `avaluapro`;
+- comprovació autenticada de la versió publicada amb dades reals.
 
 L'auditoria que consulta l'estat real ha retornat `429 RESOURCE_EXHAUSTED` abans de completar-se. No s'ha escrit cap dada de prova ni s'ha interpretat aquest resultat com una validació del núvol. Les regles s'han validat a l'emulador i el contrast real es repetirà després del reinici de quota.
 
-No s'ha fet una prova visual perquè la interfície encara no crida aquest servei. El primer flux real es provarà amb una sola UP i un sol grup quan l'editor comenci a desar dades.
+El desplegament posterior ha compilat i publicat correctament les regles i els 12 índexs. A `https://avaluapro.web.app` s'ha comprovat que el compte autenticat continua carregant els cinc grups reals i mostra la sincronització activa. Amb la previsualització controlada també apareixen Agenda i Programació, mentre que la versió normal els manté amagats. No s'ha creat cap dada real de Planificació perquè la interfície encara no desa en aquestes col·leccions.
+
+La prova visual cobreix la regressió de la carcassa i l'accés a les dades existents. El primer flux real de Planificació es provarà amb una sola UP i un sol grup quan l'editor comenci a desar dades.
 
 ## Pas següent
 
