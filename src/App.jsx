@@ -13,6 +13,7 @@ import { TrackingView } from './features/tracking/TrackingView'
 import { SociometricPublicForm } from './features/tutoring/SociometricPublicForm'
 import { StudentProfilePublicForm } from './features/tutoring/StudentProfilePublicForm'
 import { TutoringView } from './features/tutoring/TutoringView'
+import { StudentOverviewView } from './features/students/StudentOverviewView'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
 
@@ -216,10 +217,11 @@ function App() {
         </div>
       )}
       <MainNavigation />
-      <SemesterUtTabs />
+      {activeMode !== 'students' && <SemesterUtTabs />}
       <main className="content-area">
         {activeMode === 'evaluation' && <EvaluationView />}
         {activeMode === 'tracking' && <TrackingView />}
+        {activeMode === 'students' && <StudentOverviewView />}
         {activeMode === 'analytics' && <AnalyticsView />}
         {activeMode === 'tutoring' && <TutoringView />}
       </main>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties } from 'lucide-react'
+import { AlertTriangle, BarChart3, Brain, CheckCircle2, ClipboardCheck, GraduationCap, TableProperties, UsersRound } from 'lucide-react'
 import { Modal } from './Modal'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
 import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
@@ -8,6 +8,7 @@ import { useAvaluaproStore } from '../store/useAvaluaproStore'
 const modes = [
   { id: 'evaluation', label: 'Avaluació', icon: TableProperties },
   { id: 'tracking', label: 'Seguiment', icon: ClipboardCheck },
+  { id: 'students', label: 'Alumnes', icon: UsersRound },
 ]
 
 const insights = [
