@@ -52,3 +52,7 @@ El paquet inicial encara supera els 500 kB perquè la barra superior, l'estat gl
 - `npm run lint`.
 - `npm run build:firebase`.
 - Prova visual en ordinador i a 1024 × 1366.
+- Commit funcional publicat: `0dbb587`.
+- Firebase Hosting publicat a `https://avaluapro.web.app/`.
+- Verificació autenticada a producció: estat `Sincronitzat`, cinc espais existents i Mode tutoria carregats sense errors.
+- Verificació autenticada de `?preview=planning,agenda`: les dues carcasses es carreguen, mantenen les classes reals i no creen dades.
