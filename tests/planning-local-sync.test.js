@@ -242,6 +242,23 @@ test('el repositori carrega sota demanda i no consulta la xarxa quan està offli
   assert.equal(remoteLoads, 0)
 })
 
+test('si la consulta remota falla el repositori retorna la còpia local sense perdre-la', async () => {
+  await savePlanningEntityLocally('teacher-1', academicYear('teacher-1'))
+  const repository = createPlanningRepository({
+    applyRemoteOperation: async () => ({ applied: true }),
+    isOnline: () => true,
+    uid: 'teacher-1',
+  })
+
+  const result = await repository.loadScope('academicYears', async () => {
+    throw Object.assign(new Error('Sense resposta'), { code: 'firestore/unavailable' })
+  })
+
+  assert.equal(result.source, 'local')
+  assert.equal(result.entities.length, 1)
+  assert.equal(result.error.code, 'firestore/unavailable')
+})
+
 test('el tancament de sessió neteja la còpia local però protegeix canvis pendents', async () => {
   const operation = await savePlanningEntityLocally('teacher-1', academicYear('teacher-1'))
   await assert.rejects(clearPlanningLocalData('teacher-1'), { code: 'planning/pending-logout' })

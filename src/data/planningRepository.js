@@ -6,9 +6,8 @@ import {
 } from './local/planningIndexedDb.js'
 import { flushPlanningOutbox, getPlanningSyncSummary } from './sync/planningSync.js'
 
-async function applyPlanningOperationToFirebase(operation) {
-  const { applyPlanningCloudOperation } = await import('./cloud/planningFirestore.js')
-  return applyPlanningCloudOperation(operation)
+async function missingRemotePlanningService() {
+  throw new Error('Falta el servei remot de Planificació')
 }
 
 /**
@@ -17,7 +16,7 @@ async function applyPlanningOperationToFirebase(operation) {
  * canvi; la xarxa només buida la cua persistent quan està disponible.
  */
 export function createPlanningRepository({
-  applyRemoteOperation = applyPlanningOperationToFirebase,
+  applyRemoteOperation = missingRemotePlanningService,
   isOnline = () => globalThis.navigator?.onLine !== false,
   uid,
 } = {}) {
@@ -29,9 +28,13 @@ export function createPlanningRepository({
       if (!isOnline() || typeof loadRemote !== 'function') {
         return { entities: cached, source: 'local' }
       }
-      const remoteDescriptors = await loadRemote()
-      const entities = await mergePlanningRemoteScope(uid, scopeKey, remoteDescriptors, options)
-      return { entities, source: 'remote' }
+      try {
+        const remoteDescriptors = await loadRemote()
+        const entities = await mergePlanningRemoteScope(uid, scopeKey, remoteDescriptors, options)
+        return { entities, source: 'remote' }
+      } catch (error) {
+        return { entities: cached, error, source: 'local' }
+      }
     },
 
     remove(entity, context) {
