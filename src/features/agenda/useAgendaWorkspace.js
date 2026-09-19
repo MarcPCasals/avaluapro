@@ -2,19 +2,29 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   applyPlanningCloudOperation,
   loadPlanningAcademicYears,
+  loadOwnedPlanningUnits,
+  loadPlanningApplications,
   loadPlanningCalendarEvents,
+  loadPlanningSessionDetail,
+  loadPlanningSessions,
   loadPlanningTimetables,
   loadPlanningTimetableSlots,
+  loadPlanningUnitStructure,
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import {
   copyTimetableVersionStructure,
+  buildActivitySessionDistribution,
+  buildTimetableSessionCandidates,
   createCalendarEvent,
+  createGroupApplication,
   createTimetableSlot,
   createTimetableVersion,
   findTimetableSlotConflicts,
+  getSessionCandidateKey,
   moveTimetableSlot,
+  orderActivitiesForScheduling,
   selectEffectiveTimetable,
 } from '../../domain/planning'
 
@@ -66,6 +76,7 @@ export function useAgendaWorkspace(user) {
   const [timetables, setTimetables] = useState([])
   const [slots, setSlots] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
+  const [planningUnits, setPlanningUnits] = useState([])
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activeTimetableId, setActiveTimetableId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -102,7 +113,7 @@ export function useAgendaWorkspace(user) {
   const persist = useCallback(async (entries) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de desar l’Agenda.')
     for (const entry of Array.isArray(entries) ? entries : [entries]) {
-      await repository.save(entry)
+      await repository.save(entry.entity || entry, entry.context || {})
     }
     await refreshSync()
     return synchronize()
@@ -161,6 +172,7 @@ export function useAgendaWorkspace(user) {
         if (cancelled) return
         setTimetables([])
         setCalendarEvents([])
+        setPlanningUnits([])
         setActiveTimetableId('')
       })
       return undefined
@@ -182,15 +194,22 @@ export function useAgendaWorkspace(user) {
         ),
         { completeSnapshot: true },
       ),
-    ]).then(([timetableResult, eventResult]) => {
+      repository.loadScope(
+        `academicYear:${activeAcademicYear.id}:planningUnits`,
+        () => loadOwnedPlanningUnits(user.uid, { academicYearId: activeAcademicYear.id }),
+        { completeSnapshot: true },
+      ),
+    ]).then(([timetableResult, eventResult, unitResult]) => {
       if (cancelled) return
       const nextTimetables = sortTimetables(timetableResult.entities)
       setTimetables(nextTimetables)
       setCalendarEvents(sortEvents(eventResult.entities))
+      setPlanningUnits([...unitResult.entities].sort((left, right) =>
+        String(right.updatedAt).localeCompare(String(left.updatedAt))))
       setActiveTimetableId((current) => nextTimetables.some((item) => item.id === current)
         ? current
         : selectEffectiveTimetable(nextTimetables, today)?.id || nextTimetables[0]?.id || '')
-      if (timetableResult.error || eventResult.error) {
+      if (timetableResult.error || eventResult.error || unitResult.error) {
         setError('S’han carregat dades locals perquè Firebase no ha respost.')
       }
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir l’Agenda del curs.'))
@@ -316,6 +335,164 @@ export function useAgendaWorkspace(user) {
     setCalendarEvents((items) => items.filter((item) => item.id !== event.id))
   }, [remove])
 
+  /**
+   * Carrega sota demanda la UP, les franges de totes les versions d'horari i
+   * les sessions ja creades. La finestra de proposta pot així detectar què ja
+   * està assignat sense mantenir obertes totes aquestes dades a l'Agenda.
+   */
+  const loadSchedulingSetup = useCallback(async ({ classId, planningUnitId }) => {
+    if (!repository || !activeAcademicYear || !planningUnitId || !classId) {
+      throw new Error('Cal seleccionar una UP i un grup.')
+    }
+    const [structureResult, applicationResult, ...slotResults] = await Promise.all([
+      repository.loadScope(
+        `planningUnit:${planningUnitId}:structure`,
+        async () => {
+          const structure = await loadPlanningUnitStructure(planningUnitId)
+          return [structure.planningUnit, ...structure.phases, ...structure.activities]
+        },
+        { completeSnapshot: true },
+      ),
+      repository.loadScope(
+        `planningUnit:${planningUnitId}:applications`,
+        () => loadPlanningApplications(planningUnitId, classId),
+      ),
+      ...timetables.map((timetable) => repository.loadScope(
+        `timetable:${timetable.id}:slots`,
+        () => loadPlanningTimetableSlots(user.uid, timetable.id),
+        { completeSnapshot: true },
+      )),
+    ])
+    const planningUnit = structureResult.entities.find((item) => item.entityType === 'planningUnit')
+    if (!planningUnit) throw new Error('No s’ha pogut obrir aquesta UP.')
+    const phases = structureResult.entities.filter((item) => item.entityType === 'planningPhase')
+    const activities = orderActivitiesForScheduling(
+      phases,
+      structureResult.entities.filter((item) => item.entityType === 'planningActivity'),
+    )
+    const applications = applicationResult.entities
+      .filter((item) => item.classId === classId)
+      .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+    const application = applications[0] || createGroupApplication({
+      academicYearId: activeAcademicYear.id,
+      classId,
+      ownerUid: user.uid,
+      planningUnitId,
+      planningUnitVersion: planningUnit.versionNumber,
+      status: 'draft',
+    })
+    let existingSessions = []
+    let existingItems = []
+    let existingSessionBundles = []
+    if (applications[0]) {
+      const sessionResult = await repository.loadScope(
+        `application:${application.id}:sessions`,
+        () => loadPlanningSessions({
+          applicationId: application.id,
+          from: `${activeAcademicYear.startsOn}T00:00:00`,
+          maxItems: 500,
+          planningUnitId,
+          to: `${activeAcademicYear.endsOn}T23:59:59`,
+        }),
+        { completeSnapshot: true },
+      )
+      existingSessions = sessionResult.entities
+      const detailResults = await Promise.all(existingSessions.map((session) => repository.loadScope(
+        `session:${session.id}:detail`,
+        async () => {
+          const detail = await loadPlanningSessionDetail(planningUnitId, application.id, session.id)
+          return [detail.session, ...detail.items, ...detail.results]
+        },
+        { completeSnapshot: true },
+      )))
+      existingItems = detailResults.flatMap((result) =>
+        result.entities.filter((item) => item.entityType === 'sessionItem'))
+      existingSessionBundles = existingSessions.map((session, index) => ({
+        items: detailResults[index].entities.filter((item) => item.entityType === 'sessionItem'),
+        session,
+      }))
+    }
+    const slotsByTimetableId = Object.fromEntries(timetables.map((timetable, index) => [
+      timetable.id,
+      sortSlots(slotResults[index]?.entities || []),
+    ]))
+    const scheduledSourceActivityIds = [...new Set(existingItems.map((item) => item.sourceActivityId).filter(Boolean))]
+    return {
+      activities,
+      application,
+      calendarEvents,
+      existingSessions,
+      existingSessionBundles,
+      isNewApplication: !applications[0],
+      planningUnit,
+      scheduledSourceActivityIds,
+      slotsByTimetableId,
+      timetables,
+    }
+  }, [activeAcademicYear, calendarEvents, repository, timetables, user])
+
+  const buildSchedulingPreview = useCallback((setup, { selectedActivityIds, startDate }) => {
+    if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
+    const selected = new Set(selectedActivityIds || [])
+    const activities = setup.activities.filter((activity) => selected.has(activity.id))
+    if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt,
+      timetableSlotId: session.timetableSlotId,
+    }))
+    const temporalProposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents,
+      classId: setup.application.classId,
+      from: startDate,
+      occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId,
+      timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const distribution = buildActivitySessionDistribution({
+      activities,
+      application: setup.application,
+      candidates: temporalProposal.candidates,
+      existingSessionBundles: setup.existingSessionBundles.filter((bundle) =>
+        String(bundle.session.startsAt).slice(0, 10) >= startDate),
+      options: { now: new Date().toISOString() },
+      scheduledSourceActivityIds: setup.scheduledSourceActivityIds,
+    })
+    const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date || startDate
+    return {
+      ...distribution,
+      ...temporalProposal,
+      skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
+      setup,
+    }
+  }, [activeAcademicYear])
+
+  const confirmSchedulingPreview = useCallback(async (preview) => {
+    if (!preview?.setup?.planningUnit?.id || preview.unscheduled.length > 0) {
+      throw new Error('La proposta encara té activitats sense sessió.')
+    }
+    const now = new Date().toISOString()
+    const planningUnitId = preview.setup.planningUnit.id
+    const application = createGroupApplication({
+      ...preview.setup.application,
+      status: 'active',
+      updatedAt: now,
+    }, { now })
+    const entries = [{ entity: application }]
+    for (const bundle of preview.sessions) {
+      if (!bundle.isExisting) entries.push({ entity: bundle.session, context: { planningUnitId } })
+      for (const item of bundle.items) {
+        entries.push({
+          entity: item,
+          context: { applicationId: application.id, planningUnitId, sessionId: bundle.session.id },
+        })
+      }
+    }
+    await persist(entries)
+    return { application, sessionCount: preview.sessions.length }
+  }, [persist])
+
   return {
     academicYears,
     activeAcademicYear,
@@ -323,10 +500,13 @@ export function useAgendaWorkspace(user) {
     activeTimetable,
     activeTimetableId,
     calendarEvents,
+    buildSchedulingPreview,
+    confirmSchedulingPreview,
     createTimetable,
     error,
     isOnline,
     loading,
+    loadSchedulingSetup,
     moveSlot,
     removeCalendarEvent,
     removeSlot,
@@ -341,5 +521,6 @@ export function useAgendaWorkspace(user) {
     synchronize,
     timetables,
     today,
+    planningUnits,
   }
 }

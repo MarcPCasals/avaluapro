@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Bell, CalendarDays, CalendarPlus, Check, ChevronRight, Clock3, Cloud, CloudOff,
   Copy, Edit3, History, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus,
-  RotateCcw, Settings2, Trash2,
+  RotateCcw, Settings2, Sparkles, Trash2,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import {
@@ -11,6 +11,7 @@ import {
   TimetableSlotDialog,
 } from './AgendaDialogs'
 import { useAgendaWorkspace } from './useAgendaWorkspace'
+import { AgendaSchedulingDialog } from './AgendaSchedulingDialog'
 import './agenda.css'
 
 const WEEKDAYS = [
@@ -64,7 +65,7 @@ function SyncBadge({ isOnline, sync }) {
   )
 }
 
-function TodayView({ calendarEvents, onOpenCalendar, onOpenTimetable, timetable, today }) {
+function TodayView({ calendarEvents, onOpenCalendar, onOpenScheduling, onOpenTimetable, timetable, today }) {
   const upcoming = calendarEvents.filter((event) => event.endsOn >= today).slice(0, 3)
   return (
     <div className="agenda-today-layout">
@@ -75,9 +76,9 @@ function TodayView({ calendarEvents, onOpenCalendar, onOpenTimetable, timetable,
         </div>
         <div className="agenda-today-empty">
           <Clock3 size={30} />
-          <strong>Les sessions apareixeran aquí quan connectem les UP amb els grups</strong>
-          <p>L’horari i les excepcions que configuris ara són la base perquè la iteració següent pugui repartir les activitats sense perdre cap canvi.</p>
-          <button className="primary-action" onClick={onOpenTimetable} type="button"><LayoutGrid size={17} />Configurar l’horari</button>
+          <strong>Connecta una UP amb un grup i revisa les dates abans de crear-les</strong>
+          <p>Agenda pot repartir la seqüència progressivament o preparar tota la proposta, dividir activitats llargues i saltar festius.</p>
+          <div className="agenda-today-actions"><button className="primary-action" onClick={onOpenScheduling} type="button"><Sparkles size={17} />Calendaritzar una UP</button><button className="secondary-action" onClick={onOpenTimetable} type="button"><LayoutGrid size={17} />Configurar l’horari</button></div>
         </div>
       </section>
       <aside className="agenda-today-side">
@@ -257,6 +258,7 @@ export default function AgendaModule() {
   const [editingSlot, setEditingSlot] = useState(null)
   const [slotPosition, setSlotPosition] = useState(null)
   const [editingEvent, setEditingEvent] = useState(null)
+  const [scheduleNotice, setScheduleNotice] = useState('')
 
   if (!user) {
     return <section className="agenda-auth-required"><CalendarDays size={32} /><h1>Agenda</h1><p>Inicia sessió amb Google des de «Dades i Compte» per protegir l’horari i tenir-lo disponible als teus dispositius.</p></section>
@@ -295,6 +297,7 @@ export default function AgendaModule() {
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
+      {scheduleNotice && <div className="agenda-success"><span>{scheduleNotice}</span><button onClick={() => setScheduleNotice('')} type="button">Tancar</button></div>}
 
       {workspace.loading && workspace.academicYears.length === 0 ? (
         <div className="agenda-loading"><Loader2 className="spin" size={21} />Carregant l’Agenda…</div>
@@ -302,7 +305,7 @@ export default function AgendaModule() {
         <section className="agenda-large-empty"><span><CalendarDays size={29} /></span><h2>Primer crea el curs a Programació</h2><p>L’Agenda utilitza les mateixes dates del curs acadèmic per evitar informació duplicada.</p></section>
       ) : (
         <main className="agenda-main">
-          {view === 'today' && <TodayView calendarEvents={workspace.calendarEvents} onOpenCalendar={() => setView('calendar')} onOpenTimetable={() => setView('timetable')} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'today' && <TodayView calendarEvents={workspace.calendarEvents} onOpenCalendar={() => setView('calendar')} onOpenScheduling={() => setDialog('scheduling')} onOpenTimetable={() => setView('timetable')} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'timetable' && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut moure la classe.')} onMove={workspace.moveSlot} onSelectVersion={workspace.setActiveTimetableId} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
           {view === 'calendar' && <CalendarView classes={classes} events={workspace.calendarEvents} onAdd={() => { setEditingEvent(null); setDialog('event') }} onDelete={removeEvent} onEdit={(event) => { setEditingEvent(event); setDialog('event') }} />}
         </main>
@@ -311,6 +314,7 @@ export default function AgendaModule() {
       {dialog === 'timetable' && <TimetableDialog academicYear={workspace.activeAcademicYear} currentTimetable={workspace.activeTimetable} initialValue={editingTimetable} onClose={() => setDialog(null)} onSave={(values, current) => current ? workspace.saveTimetable(current, values) : workspace.createTimetable(values)} />}
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent} onClose={() => setDialog(null)} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
+      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => setDialog(null)} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => setScheduleNotice(`${result.sessionCount} ${result.sessionCount === 1 ? 'sessió creada' : 'sessions creades'} i vinculades amb la UP.`)} planningUnits={workspace.planningUnits} today={workspace.today} />}
     </section>
   )
 }

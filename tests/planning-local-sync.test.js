@@ -23,6 +23,9 @@ import {
 import {
   createAcademicYear,
   createCalendarEvent,
+  createCalendarSession,
+  createGroupApplication,
+  createSessionItem,
   createTimetableSlot,
   createTimetableVersion,
 } from '../src/domain/planning/model.js'
@@ -127,6 +130,33 @@ test('horari, franges i excepcions es recuperen per abast després d’una recà
   assert.equal((await loadPlanningScope(uid, 'academicYear:year-2026:planningTimetables'))[0].label, 'Horari inicial')
   assert.equal((await loadPlanningScope(uid, `timetable:${timetable.id}:slots`))[0].subgroupId, 'Grup A')
   assert.equal((await loadPlanningScope(uid, 'academicYear:year-2026:planningCalendarEvents'))[0].consumesPlannedSession, true)
+  assert.equal((await loadPlanningOutbox(uid)).length, 3)
+})
+
+test('una calendarització confirmada conserva aplicació, sessió i vincle amb l’activitat offline', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-09-19T10:00:00.000Z'
+  const application = createGroupApplication({
+    id: 'plan-application-offline', ownerUid: uid, academicYearId: 'year-2026',
+    planningUnitId: 'up-1', classId: 'class-1', status: 'active',
+  }, { now })
+  const session = createCalendarSession({
+    id: 'plan-session-offline', ownerUid: uid, applicationId: application.id,
+    classId: 'class-1', startsAt: '2026-09-21T09:30:00', durationMinutes: 60,
+  }, { now })
+  const item = createSessionItem({
+    id: 'plan-session-item-offline', ownerUid: uid, applicationId: application.id,
+    sessionId: session.id, sourceActivityId: 'activity-1', type: 'activity',
+    title: 'Taller', order: 0, plannedMinutes: 55,
+  }, { now })
+
+  await savePlanningEntityLocally(uid, application)
+  await savePlanningEntityLocally(uid, session, { planningUnitId: 'up-1' })
+  await savePlanningEntityLocally(uid, item, { planningUnitId: 'up-1' })
+
+  assert.equal((await loadPlanningScope(uid, 'planningUnit:up-1:applications'))[0].status, 'active')
+  assert.equal((await loadPlanningScope(uid, `application:${application.id}:sessions`))[0].startsAt, '2026-09-21T09:30:00')
+  assert.equal((await loadPlanningScope(uid, `session:${session.id}:detail`))[0].sourceActivityId, 'activity-1')
   assert.equal((await loadPlanningOutbox(uid)).length, 3)
 })
 

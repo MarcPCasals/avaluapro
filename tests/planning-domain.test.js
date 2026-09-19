@@ -5,6 +5,8 @@ import {
   PLANNING_SCHEMA_VERSION,
   applyImprovementProposals,
   buildActivityImprovementProposals,
+  buildActivitySessionDistribution,
+  buildTimetableSessionCandidates,
   copyPlanningActivityToPhase,
   copyTimetableVersionStructure,
   copyPlanningUnitStructureToAcademicYear,
@@ -32,6 +34,7 @@ import {
   getSessionLoad,
   movePlanningActivityInSequence,
   moveTimetableSlot,
+  orderActivitiesForScheduling,
   planActivityChange,
   selectEffectiveTimetable,
   updatePlanningActivity,
@@ -555,6 +558,138 @@ test('una activitat dividida conserva el mateix vincle pedagògic a totes les se
   assert.equal(first.sourceActivityId, second.sourceActivityId)
   assert.equal(first.segmentIndex, 1)
   assert.equal(second.segmentIndex, 2)
+})
+
+test('la seqüència de calendarització respecta fases, subfases i activitats sense temps', () => {
+  const phases = [
+    { id: 'closing', order: 2, parentPhaseId: null },
+    { id: 'resolution-child', order: 0, parentPhaseId: 'resolution' },
+    { id: 'preparation', order: 0, parentPhaseId: null },
+    { id: 'resolution', order: 1, parentPhaseId: null },
+  ]
+  const activities = [
+    { id: 'closing-activity', order: 0, phaseId: 'closing' },
+    { id: 'child-activity', order: 0, phaseId: 'resolution-child' },
+    { id: 'resolution-activity', order: 0, phaseId: 'resolution' },
+    { id: 'second-preparation', order: 1, phaseId: 'preparation' },
+    { id: 'first-preparation', order: 0, phaseId: 'preparation' },
+  ]
+
+  assert.deepEqual(
+    orderActivitiesForScheduling(phases, activities).map((activity) => activity.id),
+    ['first-preparation', 'second-preparation', 'resolution-activity', 'child-activity', 'closing-activity'],
+  )
+})
+
+test('la proposta usa la versió d’horari vigent i salta festius i anul·lacions del grup', () => {
+  const result = buildTimetableSessionCandidates({
+    calendarEvents: [
+      { id: 'holiday', type: 'holiday', title: 'Festa', startsOn: '2026-09-21', endsOn: '2026-09-21', classIds: [] },
+      { id: 'other-class', type: 'cancellation', title: 'Sortida 2B', startsOn: '2026-09-28', endsOn: '2026-09-28', classIds: ['class-2'] },
+      { id: 'our-class', type: 'cancellation', title: 'Sortida 1A', startsOn: '2026-10-05', endsOn: '2026-10-05', classIds: ['class-1'] },
+    ],
+    classId: 'class-1',
+    from: '2026-09-21',
+    slotsByTimetableId: {
+      first: [{ id: 'slot-first', classId: 'class-1', weekday: 1, startsAt: '09:30', durationMinutes: 60 }],
+      second: [{ id: 'slot-second', classId: 'class-1', weekday: 1, startsAt: '10:30', durationMinutes: 90 }],
+    },
+    timetables: [
+      { id: 'first', effectiveFrom: '2026-09-01', effectiveTo: '2026-09-30' },
+      { id: 'second', effectiveFrom: '2026-10-01', effectiveTo: null },
+    ],
+    to: '2026-10-12',
+  })
+
+  assert.deepEqual(result.candidates.map((candidate) => [candidate.date, candidate.startsAt, candidate.durationMinutes]), [
+    ['2026-09-28', '2026-09-28T09:30:00', 60],
+    ['2026-10-12', '2026-10-12T10:30:00', 90],
+  ])
+  assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05'])
+})
+
+test('una proposta divide una activitat llarga, manté indicacions i no duplica les ja assignades', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-2026',
+    planningUnitId: 'up-1',
+    planningUnitVersion: 1,
+    classId: 'class-1',
+  }, options(idFactory))
+  const result = buildActivitySessionDistribution({
+    activities: [
+      { id: 'already', title: 'Ja assignada', type: 'activity', plannedMinutes: 20 },
+      { id: 'coat', title: 'Agafar la bata', type: 'indication', plannedMinutes: null },
+      { id: 'long', title: 'Projecte llarg', type: 'activity', plannedMinutes: 120 },
+    ],
+    application,
+    candidates: [
+      { date: '2026-09-21', startsAt: '2026-09-21T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
+      { date: '2026-09-28', startsAt: '2026-09-28T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
+      { date: '2026-10-05', startsAt: '2026-10-05T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
+    ],
+    options: options(idFactory),
+    scheduledSourceActivityIds: ['already'],
+  })
+
+  assert.equal(result.sessions.length, 3)
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => item.plannedMinutes)), [
+    [null, 55],
+    [55],
+    [10],
+  ])
+  const longSegments = result.sessions.flatMap((bundle) => bundle.items).filter((item) => item.sourceActivityId === 'long')
+  assert.deepEqual(longSegments.map((item) => item.segmentIndex), [1, 2, 3])
+  assert.ok(longSegments.every((item) => item.segmentCount === 3))
+  assert.equal(longSegments.reduce((total, item) => total + item.plannedMinutes, 0), 120)
+  assert.deepEqual(result.skippedAlreadyScheduled, ['already'])
+  assert.deepEqual(result.unscheduled, [])
+})
+
+test('la previsualització avisa si el calendari no té prou sessions i no perd la resta', () => {
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-2026',
+    planningUnitId: 'up-1',
+    classId: 'class-1',
+  }, options())
+  const result = buildActivitySessionDistribution({
+    activities: [{ id: 'long', title: 'Projecte', type: 'activity', plannedMinutes: 80 }],
+    application,
+    candidates: [{ date: '2026-09-21', startsAt: '2026-09-21T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' }],
+    options: options(),
+  })
+
+  assert.equal(result.sessions[0].items[0].plannedMinutes, 55)
+  assert.deepEqual(result.unscheduled, [{ activityId: 'long', remainingMinutes: 25, title: 'Projecte' }])
+})
+
+test('la incorporació progressiva omple primer una sessió ja creada amb minuts lliures', () => {
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options())
+  const existingSession = createCalendarSession({
+    ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-21T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1',
+  }, options())
+  const existingIndication = createSessionItem({
+    ownerUid: 'teacher-1', applicationId: application.id, sessionId: existingSession.id,
+    type: 'indication', title: 'Agafar la bata', order: 0, sourceActivityId: 'coat',
+  }, options())
+  const result = buildActivitySessionDistribution({
+    activities: [{ id: 'practice', title: 'Pràctica', type: 'activity', plannedMinutes: 35 }],
+    application,
+    candidates: [{ date: '2026-09-28', startsAt: '2026-09-28T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' }],
+    existingSessionBundles: [{ session: existingSession, items: [existingIndication] }],
+    options: options(),
+  })
+
+  assert.equal(result.sessions.length, 1)
+  assert.equal(result.sessions[0].isExisting, true)
+  assert.equal(result.sessions[0].session.id, existingSession.id)
+  assert.equal(result.sessions[0].items[0].order, 1)
+  assert.equal(result.sessions[0].items[0].plannedMinutes, 35)
 })
 
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {
