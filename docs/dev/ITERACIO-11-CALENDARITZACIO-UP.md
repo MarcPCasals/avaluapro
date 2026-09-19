@@ -59,6 +59,16 @@ La vista **Avui** ofereix l'acció **Calendaritzar una UP**. La finestra conserv
 
 Commit funcional: `d419ac7`.
 
+## Publicació verificada
+
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- `?preview=agenda` mostra el botó d'Agenda;
+- obrir Agenda sense autenticació demana iniciar sessió abans de carregar dades;
+- la navegació publicada normal continua ocultant Agenda i Programació durant el pilot;
+- el paquet publicat d'Agenda conté **Calendaritzar una UP**, els dos modes, la confirmació i l'avís de manca de sessions;
+- la verificació publicada no ha creat ni modificat cap dada real.
+
 ## Pas següent
 
 La iteració 12 mostrarà les sessions ja calendaritzades a **Avui**, **Setmana** i la cronologia del grup. També incorporarà reajustaments, continuacions, cancel·lacions i classes extraordinàries que avancin la seqüència.
