@@ -55,6 +55,18 @@ Firestore només admet els tres nous moments de la sessió: obertura del Mode au
 
 Commit funcional: `60e3583`.
 
+## Publicació verificada
+
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- les regles desplegades i les regles locals tenen exactament la mateixa petjada;
+- la portada publicada respon correctament amb `no-cache, no-store, must-revalidate`;
+- `?preview=agenda` mostra Agenda i, sense autenticació, protegeix l'horari demanant iniciar sessió;
+- la navegació normal continua ocultant Agenda i Programació durant el pilot;
+- el paquet publicat conté **Obrir Mode aula**, **Temporitzador opcional**, **Confirmar la llista**, **Tancar la classe**, la correcció de final i **Continuarà**;
+- l'auditoria posterior al desplegament no detecta bloquejos ni respostes sense sincronitzar;
+- la verificació publicada no ha creat ni modificat cap dada real.
+
 ## Pas següent
 
 La iteració 14 connectarà aquesta mateixa pantalla amb les tasques i la constància existents d'AvaluaPro, els botons de comportament, la selecció múltiple d'alumnes, la reflexió pedagògica, la nota privada i la revisió posterior del temps real.
