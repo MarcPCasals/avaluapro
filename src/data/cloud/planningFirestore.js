@@ -233,6 +233,7 @@ export async function savePlanningAccessGrant(planningUnitId, grant) {
     now,
   )
   await batch.commit()
+  return { ...grant, granteeEmail: email }
 }
 
 export async function revokePlanningAccessGrant(planningUnitId, granteeEmail) {
@@ -249,6 +250,13 @@ export async function revokePlanningAccessGrant(planningUnitId, granteeEmail) {
     new Date().toISOString(),
   )
   await batch.commit()
+  return email
+}
+
+export async function loadPlanningAccessGrants(planningUnitId) {
+  const snapshot = await getDocs(collection(planningUnitRef(planningUnitId), 'accessGrants'))
+  return mapSnapshot(snapshot).sort((left, right) =>
+    String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')))
 }
 
 function planningUnitQueryConstraints({ academicYearId, temporalUnitId, maxItems, sharedEmail, ownerUid }) {

@@ -31,6 +31,12 @@ function isAccessGrantPath(pathParts) {
   return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'accessGrants'
 }
 
+function requiresCurrentUserOwnership(entityType) {
+  return Boolean(OWNER_COLLECTIONS[entityType])
+    || entityType === PLANNING_ENTITY_TYPES.ACCESS_GRANT
+    || entityType === PLANNING_ENTITY_TYPES.PRIVATE_NOTE
+}
+
 function isExpectedPath(operation, pathParts) {
   const ownerCollection = OWNER_COLLECTIONS[operation.entityType]
   if (ownerCollection) {
@@ -86,7 +92,8 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
     throw new Error('La ruta no correspon al tipus d’entitat de planificació')
   }
   if (operation.operation === 'upsert' && (
-    operation.value?.entityType !== operation.entityType || operation.value?.ownerUid !== operation.uid
+    operation.value?.entityType !== operation.entityType
+    || (requiresCurrentUserOwnership(operation.entityType) && operation.value?.ownerUid !== operation.uid)
   )) {
     throw new Error('L’operació no correspon al docent o al tipus d’entitat')
   }

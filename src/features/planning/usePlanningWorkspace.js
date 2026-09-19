@@ -2,14 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   applyPlanningCloudOperation,
   loadOwnedPlanningUnits,
+  loadPlanningAccessGrants,
   loadPlanningAcademicYears,
+  loadPlanningApplications,
+  loadPlanningSessionDetail,
+  loadPlanningSessions,
   loadPlanningTemporalUnits,
   loadPlanningUnitStructure,
+  loadSharedPlanningUnits,
+  revokePlanningAccessGrant,
+  savePlanningAccessGrant,
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import {
   copyPlanningActivityToPhase,
   copyPlanningUnitStructureToAcademicYear,
+  createAccessGrant,
   createAcademicYear,
   createPlanningActivity,
   createPlanningPhase,
@@ -53,11 +61,14 @@ export function usePlanningWorkspace(user) {
   const [academicYears, setAcademicYears] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
+  const [sharedPlanningUnits, setSharedPlanningUnits] = useState([])
+  const [accessGrants, setAccessGrants] = useState([])
   const [phases, setPhases] = useState([])
   const [activities, setActivities] = useState([])
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activePlanningUnitId, setActivePlanningUnitId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sharedLoading, setSharedLoading] = useState(true)
   const [error, setError] = useState('')
   const [sync, setSync] = useState(EMPTY_SYNC)
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
@@ -69,8 +80,20 @@ export function usePlanningWorkspace(user) {
       })
     : null, [user])
 
+  const allPlanningUnits = useMemo(() => Array.from(new Map(
+    [...planningUnits, ...sharedPlanningUnits].map((item) => [item.id, item]),
+  ).values()), [planningUnits, sharedPlanningUnits])
   const activeAcademicYear = academicYears.find((item) => item.id === activeAcademicYearId) || null
-  const activePlanningUnit = planningUnits.find((item) => item.id === activePlanningUnitId) || null
+  const activePlanningUnit = allPlanningUnits.find((item) => item.id === activePlanningUnitId) || null
+  const userEmail = String(user?.email || '').trim().toLowerCase()
+  const activeRole = activePlanningUnit?.ownerUid === user?.uid
+    ? 'owner'
+    : activePlanningUnit?.accessByEmail?.[userEmail]?.role || ''
+  const canEditActiveUnit = activeRole === 'owner' || activeRole === 'planningEditor'
+  const canManageActiveAgenda = activeRole === 'owner' || activeRole === 'planningAgendaEditor'
+  const canReadActiveApplications = activeRole === 'owner'
+    || activeRole === 'directionReader'
+    || activeRole === 'planningAgendaEditor'
 
   const refreshSync = useCallback(async (options = {}) => {
     if (!repository) return EMPTY_SYNC
@@ -164,6 +187,32 @@ export function usePlanningWorkspace(user) {
 
   useEffect(() => {
     let cancelled = false
+    if (!repository || !userEmail) {
+      queueMicrotask(() => !cancelled && setSharedLoading(false))
+      return () => { cancelled = true }
+    }
+    queueMicrotask(() => !cancelled && setSharedLoading(true))
+    repository.loadScope(
+      `sharedPlanningUnits:${userEmail}`,
+      () => loadSharedPlanningUnits(userEmail, { maxItems: 100 }),
+      { completeSnapshot: true },
+    ).then((result) => {
+      if (cancelled) return
+      const shared = result.entities
+        .filter((unit) => unit.ownerUid !== user?.uid)
+        .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+      setSharedPlanningUnits(shared)
+      setActivePlanningUnitId((current) => current || shared[0]?.id || '')
+      if (result.error && result.entities.length === 0) {
+        setError('No s’han pogut comprovar les programacions compartides amb tu.')
+      }
+    }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar les programacions compartides.'))
+      .finally(() => !cancelled && setSharedLoading(false))
+    return () => { cancelled = true }
+  }, [repository, user?.uid, userEmail])
+
+  useEffect(() => {
+    let cancelled = false
     if (!repository || !activePlanningUnitId) return undefined
     repository.loadScope(
       `planningUnit:${activePlanningUnitId}:structure`,
@@ -179,13 +228,28 @@ export function usePlanningWorkspace(user) {
     ).then((result) => {
       if (cancelled) return
       const unit = result.entities.find((item) => item.entityType === 'planningUnit')
-      if (unit) setPlanningUnits((items) => replaceById(items, unit))
+      if (unit) {
+        if (unit.ownerUid === user?.uid) setPlanningUnits((items) => replaceById(items, unit))
+        else setSharedPlanningUnits((items) => replaceById(items, unit))
+      }
       setPhases(sortByOrder(result.entities.filter((item) => item.entityType === 'planningPhase')))
       setActivities(sortByOrder(result.entities.filter((item) => item.entityType === 'planningActivity')))
       if (result.error) setError('La UP mostra la còpia local perquè Firebase no ha respost.')
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquesta UP.'))
     return () => { cancelled = true }
-  }, [activePlanningUnitId, repository])
+  }, [activePlanningUnitId, repository, user?.uid])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!activePlanningUnit || activePlanningUnit.ownerUid !== user?.uid) {
+      queueMicrotask(() => !cancelled && setAccessGrants([]))
+      return () => { cancelled = true }
+    }
+    loadPlanningAccessGrants(activePlanningUnit.id)
+      .then((grants) => !cancelled && setAccessGrants(grants))
+      .catch(() => !cancelled && setError('No s’han pogut carregar els accessos d’aquesta UP.'))
+    return () => { cancelled = true }
+  }, [activePlanningUnit, user?.uid])
 
   const createYear = useCallback(async (values) => {
     const year = createAcademicYear({ ...values, ownerUid: user.uid })
@@ -253,9 +317,10 @@ export function usePlanningWorkspace(user) {
       updatedAt: new Date().toISOString(),
     }))
     await persist(next)
-    setPlanningUnits((items) => replaceById(items, next))
+    if (next.ownerUid === user?.uid) setPlanningUnits((items) => replaceById(items, next))
+    else setSharedPlanningUnits((items) => replaceById(items, next))
     return next
-  }, [persist])
+  }, [persist, user?.uid])
 
   const archiveUnit = useCallback((unit) => saveUnit(unit, { status: 'archived' }), [saveUnit])
 
@@ -264,14 +329,14 @@ export function usePlanningWorkspace(user) {
       ...(current || {}),
       ...values,
       order: current?.order ?? phases.length,
-      ownerUid: user.uid,
+      ownerUid: activePlanningUnit?.ownerUid || user.uid,
       planningUnitId: activePlanningUnitId,
       updatedAt: new Date().toISOString(),
     })
     await persist(next)
     setPhases((items) => sortByOrder(replaceById(items, next)))
     return next
-  }, [activePlanningUnitId, persist, phases.length, user])
+  }, [activePlanningUnit, activePlanningUnitId, persist, phases.length, user])
 
   const saveActivity = useCallback(async (values, current = null) => {
     const now = new Date().toISOString()
@@ -299,14 +364,14 @@ export function usePlanningWorkspace(user) {
       ...values,
       order: current?.order
         ?? activities.filter((activity) => activity.phaseId === values.phaseId).length,
-      ownerUid: user.uid,
+      ownerUid: activePlanningUnit?.ownerUid || user.uid,
       planningUnitId: activePlanningUnitId,
       updatedAt: now,
     })
     await persist(next)
     setActivities((items) => sortByOrder(replaceById(items, next)))
     return next
-  }, [activePlanningUnitId, activities, persist, user])
+  }, [activePlanningUnit, activePlanningUnitId, activities, persist, user])
 
   const removeActivity = useCallback(async (activity) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar la programació.')
@@ -411,44 +476,183 @@ export function usePlanningWorkspace(user) {
       { now: new Date().toISOString() },
     )
     await persist([result.planningUnit, ...result.changedActivities])
-    setPlanningUnits((items) => replaceById(items, result.planningUnit))
+    if (result.planningUnit.ownerUid === user?.uid) {
+      setPlanningUnits((items) => replaceById(items, result.planningUnit))
+    } else {
+      setSharedPlanningUnits((items) => replaceById(items, result.planningUnit))
+    }
     setActivities(sortByOrder(result.activities))
     return result
-  }, [activePlanningUnit, activities, persist])
+  }, [activePlanningUnit, activities, persist, user?.uid])
+
+  const refreshActiveUnitFromCloud = useCallback(async () => {
+    if (!repository || !activePlanningUnitId) return null
+    const result = await repository.loadScope(
+      `planningUnit:${activePlanningUnitId}:structure`,
+      async () => {
+        const structure = await loadPlanningUnitStructure(activePlanningUnitId)
+        return [structure.planningUnit, ...structure.phases, ...structure.activities]
+      },
+      { completeSnapshot: true },
+    )
+    if (result.error) throw new Error('Firebase no ha confirmat el canvi d’accés.')
+    const unit = result.entities.find((item) => item.entityType === 'planningUnit') || null
+    if (unit) {
+      if (unit.ownerUid === user?.uid) setPlanningUnits((items) => replaceById(items, unit))
+      else setSharedPlanningUnits((items) => replaceById(items, unit))
+    }
+    setPhases(sortByOrder(result.entities.filter((item) => item.entityType === 'planningPhase')))
+    setActivities(sortByOrder(result.entities.filter((item) => item.entityType === 'planningActivity')))
+    return unit
+  }, [activePlanningUnitId, repository, user?.uid])
+
+  const saveAccessGrant = useCallback(async ({ classIds = [], email, role }) => {
+    if (!activePlanningUnit || activeRole !== 'owner') throw new Error('Només el propietari pot gestionar els accessos.')
+    if (!isOnline) throw new Error('Cal connexió per canviar qui pot accedir a la UP.')
+    const cleanEmail = String(email || '').trim().toLowerCase()
+    if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Escriu el correu complet de la persona convidada.')
+    if (cleanEmail === userEmail) throw new Error('El teu compte ja és el propietari de la UP.')
+    const allowedClassIds = role === 'planningAgendaEditor' ? [...new Set(classIds.filter(Boolean))] : []
+    if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) {
+      throw new Error('Selecciona almenys un grup per compartir l’Agenda.')
+    }
+    const syncSummary = await synchronize()
+    if (syncSummary.conflictCount || syncSummary.pendingCount) {
+      throw new Error('Acaba de sincronitzar els canvis de la UP abans de modificar els accessos.')
+    }
+    const current = accessGrants.find((grant) => grant.granteeEmail === cleanEmail)
+    const grant = createAccessGrant({
+      ...(current || {}),
+      classIds: allowedClassIds,
+      granteeEmail: cleanEmail,
+      ownerUid: activePlanningUnit.ownerUid,
+      planningUnitId: activePlanningUnit.id,
+      role,
+      status: 'active',
+      updatedAt: new Date().toISOString(),
+    })
+    await savePlanningAccessGrant(activePlanningUnit.id, grant)
+    await refreshActiveUnitFromCloud()
+    setAccessGrants(await loadPlanningAccessGrants(activePlanningUnit.id))
+    return grant
+  }, [accessGrants, activePlanningUnit, activeRole, isOnline, refreshActiveUnitFromCloud, synchronize, userEmail])
+
+  const revokeAccessGrant = useCallback(async (grant) => {
+    if (!activePlanningUnit || activeRole !== 'owner') throw new Error('Només el propietari pot retirar accessos.')
+    if (!isOnline) throw new Error('Cal connexió per retirar un accés.')
+    const syncSummary = await synchronize()
+    if (syncSummary.conflictCount || syncSummary.pendingCount) {
+      throw new Error('Acaba de sincronitzar els canvis de la UP abans de modificar els accessos.')
+    }
+    await revokePlanningAccessGrant(activePlanningUnit.id, grant.granteeEmail)
+    await refreshActiveUnitFromCloud()
+    setAccessGrants(await loadPlanningAccessGrants(activePlanningUnit.id))
+    return grant.granteeEmail
+  }, [activePlanningUnit, activeRole, isOnline, refreshActiveUnitFromCloud, synchronize])
+
+  const loadApplicationOverview = useCallback(async (planningUnit = activePlanningUnit) => {
+    if (!repository || !planningUnit) return []
+    const role = planningUnit.ownerUid === user?.uid
+      ? 'owner'
+      : planningUnit.accessByEmail?.[userEmail]?.role || ''
+    if (!['owner', 'directionReader', 'planningAgendaEditor'].includes(role)) return []
+    const allowedClassIds = role === 'planningAgendaEditor'
+      ? planningUnit.accessByEmail?.[userEmail]?.classIds || []
+      : []
+    if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
+    const applicationResults = allowedClassIds.length > 0
+      ? await Promise.all(allowedClassIds.map((classId) => repository.loadScope(
+          `planningUnit:${planningUnit.id}:applications:${classId}`,
+          () => loadPlanningApplications(planningUnit.id, classId, 100),
+          { completeSnapshot: true },
+        )))
+      : [await repository.loadScope(
+          `planningUnit:${planningUnit.id}:applications`,
+          () => loadPlanningApplications(planningUnit.id, undefined, 100),
+          { completeSnapshot: true },
+        )]
+    const applications = Array.from(new Map(applicationResults
+      .flatMap((result) => result.entities)
+      .map((application) => [application.id, application])).values())
+      .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+    return Promise.all(applications.map(async (application) => {
+      const sessionResult = await repository.loadScope(
+        `application:${application.id}:sessions`,
+        () => loadPlanningSessions({
+          applicationId: application.id,
+          from: '0000-01-01T00:00:00',
+          maxItems: 500,
+          planningUnitId: planningUnit.id,
+          to: '9999-12-31T23:59:59',
+        }),
+        { completeSnapshot: true },
+      )
+      const sessions = [...sessionResult.entities]
+        .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+      const detailResults = await Promise.all(sessions.map((session) => repository.loadScope(
+        `session:${session.id}:detail`,
+        async () => {
+          const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id)
+          return [detail.session, ...detail.items, ...detail.results]
+        },
+        { completeSnapshot: true },
+      )))
+      return {
+        application,
+        sessions: sessions.map((session, index) => ({
+          items: detailResults[index].entities
+            .filter((entity) => entity.entityType === 'sessionItem')
+            .sort((left, right) => Number(left.order) - Number(right.order)),
+          results: detailResults[index].entities.filter((entity) => entity.entityType === 'activityResult'),
+          session,
+        })),
+      }
+    }))
+  }, [activePlanningUnit, repository, user?.uid, userEmail])
 
   return {
+    accessGrants,
     academicYears,
     activities,
     activeAcademicYear,
     activeAcademicYearId,
     activePlanningUnit,
     activePlanningUnitId,
+    activeRole,
     archiveUnit,
     acceptImprovementSuggestions,
     copyHistoricalActivity,
+    canEditActiveUnit,
+    canManageActiveAgenda,
+    canReadActiveApplications,
     createTemporalUnit: createTemporalUnitForYear,
     createUnit,
     createYear,
     duplicateUnitToAcademicYear,
     error,
     isOnline,
-    loading,
+    loading: loading || sharedLoading,
     loadHistoricalUnits,
     loadHistoricalUnitStructure,
     loadTemporalUnitsForYear,
+    loadApplicationOverview,
     phases,
-    planningUnits,
+    ownedPlanningUnits: planningUnits,
+    planningUnits: allPlanningUnits,
     moveActivity,
     removeActivity,
     saveActivity,
+    saveAccessGrant,
     savePhase,
     saveTemporalUnit,
     saveUnit,
     setActiveAcademicYearId,
     setActivePlanningUnitId,
     setError,
+    sharedPlanningUnits,
     sync,
     synchronize,
     temporalUnits,
+    revokeAccessGrant,
   }
 }

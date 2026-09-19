@@ -461,6 +461,7 @@ export function createGroupApplication(input, options = {}) {
     planningUnitId: requiredText(input.planningUnitId, 'UP base'),
     planningUnitVersion: Math.max(1, Number(input.planningUnitVersion) || 1),
     classId: requiredText(input.classId, 'grup'),
+    classLabel: optionalText(input.classLabel),
     status: enumValue(input.status || 'draft', APPLICATION_STATUSES, "estat de l'aplicació"),
   }
 }

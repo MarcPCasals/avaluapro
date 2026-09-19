@@ -220,14 +220,14 @@ function sessionRef(db, sessionId = SESSION_ONE) {
   return doc(db, 'planningUnits', UP_ID, 'applications', APP_ONE, 'sessions', sessionId)
 }
 
-function queuedOperation(entity, context = {}, baseUpdatedAt = '') {
+function queuedOperation(entity, context = {}, baseUpdatedAt = '', actorUid = entity.ownerUid) {
   const location = getPlanningEntityLocation(entity, context)
   return {
     baseUpdatedAt,
     entityType: entity.entityType,
     operation: 'upsert',
     path: location.path,
-    uid: entity.ownerUid,
+    uid: actorUid,
     value: entity,
   }
 }
@@ -360,6 +360,20 @@ describe('Planificació compartida', () => {
     await assertFails(getDoc(appRef(db)))
   })
 
+  test('la cua local-first conserva el propietari quan un coeditor modifica una activitat', async () => {
+    const db = authDb(EDITOR)
+    const editedAt = '2026-09-18T12:05:00.000Z'
+    const edited = activityData({ description: 'Descripció revisada en coedició.', updatedAt: editedAt })
+    const result = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(edited, {}, NOW, EDITOR.uid),
+    )
+    assert.equal(result.applied, true)
+    const snapshot = await getDoc(doc(upRef(db), 'activities', edited.id))
+    assert.equal(snapshot.data().ownerUid, OWNER.uid)
+    assert.equal(snapshot.data().description, 'Descripció revisada en coedició.')
+  })
+
   test('el col·laborador d’Agenda només gestiona els grups concedits', async () => {
     const db = authDb(AGENDA_EDITOR)
     await assertSucceeds(getDoc(appRef(db, APP_ONE)))
@@ -381,6 +395,40 @@ describe('Planificació compartida', () => {
       resultData({ id: 'plan-result-two', sessionItemId: 'plan-session-item-two' }),
     ))
     await assertFails(updateDoc(appRef(db, APP_TWO), { status: 'completed', updatedAt: NOW }))
+    await assertFails(updateDoc(doc(upRef(db), 'activities', 'plan-activity-one'), {
+      plannedMinutes: 55,
+      updatedAt: NOW,
+    }))
+  })
+
+  test('la cua local-first permet al col·laborador desar la sessió del grup concedit', async () => {
+    const db = authDb(AGENDA_EDITOR)
+    const updated = sessionData({
+      attendanceConfirmedAt: NOW,
+      classroomClosedAt: NOW,
+      classroomOpenedAt: NOW,
+      status: 'held',
+      updatedAt: '2026-09-18T12:06:00.000Z',
+    })
+    const result = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(updated, { planningUnitId: UP_ID }, NOW, AGENDA_EDITOR.uid),
+    )
+    assert.equal(result.applied, true)
+    assert.equal((await getDoc(sessionRef(db))).data().status, 'held')
+  })
+
+  test('l’aplicació de grup conserva un nom llegible sense ampliar els permisos', async () => {
+    const ownerDb = authDb(OWNER)
+    await assertSucceeds(setDoc(
+      appRef(ownerDb, 'plan-application-labelled'),
+      applicationData('plan-application-labelled', CLASS_ONE, { classLabel: '1r C' }),
+    ))
+    const directionSnapshot = await assertSucceeds(getDoc(
+      appRef(authDb(DIRECTION), 'plan-application-labelled'),
+    ))
+    assert.equal(directionSnapshot.data().classLabel, '1r C')
+    await assertFails(getDoc(appRef(authDb(AGENDA_EDITOR), APP_TWO)))
   })
 
   test('només el propietari gestiona accessos i cada convidat només llegeix el seu', async () => {

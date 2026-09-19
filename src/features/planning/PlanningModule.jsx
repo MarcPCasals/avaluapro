@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Archive, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
-  Pencil, Plus, RotateCcw, Save,
+  Pencil, Plus, RotateCcw, Save, Share2, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import {
@@ -11,6 +11,8 @@ import {
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
+import { PlanningSharingDialog } from './PlanningSharingDialog'
+import { PlanningSharedView } from './PlanningSharedView'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
 import './planning.css'
 
@@ -49,7 +51,7 @@ function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt }) {
   )
 }
 
-function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
+function PhaseTree({ activities, editable = true, onAddChild, onAddRoot, onEdit, phases }) {
   const roots = phases.filter((phase) => !phase.parentPhaseId)
   const childrenByParent = useMemo(() => phases.reduce((result, phase) => {
     if (!phase.parentPhaseId) return result
@@ -62,12 +64,12 @@ function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
       <li key={phase.id}>
         <div className="planning-phase-row" style={{ '--phase-depth': depth }}>
           {childPhases.length > 0 ? <ChevronDown size={14} /> : <CircleDot size={11} />}
-          <button className="planning-phase-name" onClick={() => onEdit(phase)} type="button">
+          <button className="planning-phase-name" disabled={!editable} onClick={() => editable && onEdit(phase)} type="button">
             <strong>{phase.title}</strong>
             <span>{activityCount} activitats</span>
           </button>
-          <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChild(phase.id)} title="Afegir subfase" type="button"><Plus size={14} /></button>
-          <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEdit(phase)} title="Editar fase" type="button"><Pencil size={14} /></button>
+          {editable && <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChild(phase.id)} title="Afegir subfase" type="button"><Plus size={14} /></button>}
+          {editable && <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEdit(phase)} title="Editar fase" type="button"><Pencil size={14} /></button>}
         </div>
         {childPhases.length > 0 && <ul>{childPhases.map((child) => renderPhase(child, depth + 1))}</ul>}
       </li>
@@ -77,7 +79,7 @@ function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
     <div className="planning-outline-block">
       <div className="planning-outline-heading">
         <div><FolderTree size={17} /><strong>Fases</strong></div>
-        <button className="icon-action accent" onClick={onAddRoot} title="Afegir fase" type="button"><Plus size={15} /></button>
+        {editable && <button className="icon-action accent" onClick={onAddRoot} title="Afegir fase" type="button"><Plus size={15} /></button>}
       </div>
       <ul className="planning-phase-tree">{roots.map((phase) => renderPhase(phase))}</ul>
     </div>
@@ -126,7 +128,7 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenHistory, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
@@ -168,13 +170,15 @@ function UnitEditor({ activities, curriculumCatalog, onAcceptImprovements, onAdd
           <h2>{unit.title}</h2>
         </div>
         <div className="planning-editor-actions">
-          <button className="secondary-action compact" onClick={onOpenHistory} type="button"><History size={16} />Recuperar activitat</button>
-          <button className="secondary-action compact" onClick={onDuplicate} type="button"><Copy size={16} />Duplicar</button>
-          {unit.status === 'archived' ? (
+          {canManageUnit && <button className="secondary-action compact" onClick={onOpenPreview} type="button"><Eye size={16} />Vista direcció</button>}
+          {canManageUnit && <button className="secondary-action compact" onClick={onOpenSharing} type="button"><Share2 size={16} />Compartir</button>}
+          {canManageUnit && <button className="secondary-action compact" onClick={onOpenHistory} type="button"><History size={16} />Recuperar activitat</button>}
+          {canManageUnit && <button className="secondary-action compact" onClick={onDuplicate} type="button"><Copy size={16} />Duplicar</button>}
+          {canManageUnit && (unit.status === 'archived' ? (
             <button className="secondary-action compact" disabled={busy} onClick={() => handleStatusChange(onReactivate)} type="button"><RotateCcw size={16} />Reactivar</button>
           ) : (
             <button className="secondary-action compact" disabled={busy} onClick={() => handleStatusChange(onArchive)} type="button"><Archive size={16} />Arxivar</button>
-          )}
+          ))}
           <button className="primary-action compact" disabled={busy} type="submit">
             {busy ? <Loader2 className="spin" size={16} /> : <Save size={16} />}
             Desar
@@ -352,9 +356,9 @@ export default function PlanningModule() {
         </section>
       )}
 
-      {workspace.loading && workspace.academicYears.length === 0 ? (
+      {workspace.loading && workspace.academicYears.length === 0 && workspace.planningUnits.length === 0 ? (
         <div className="planning-loading"><Loader2 className="spin" size={26} />Carregant la programació…</div>
-      ) : workspace.academicYears.length === 0 ? (
+      ) : workspace.academicYears.length === 0 && workspace.planningUnits.length === 0 ? (
         <section className="planning-empty-state first-step">
           <span><CalendarRange size={30} /></span><div><h2>Configura el curs acadèmic</h2><p>Les dates es defineixen cada any i no afecten els cursos anteriors.</p></div>
           <button className="primary-action" onClick={() => setDialog('year')} type="button"><Plus size={17} />Crear el curs</button>
@@ -366,27 +370,28 @@ export default function PlanningModule() {
           <aside className="planning-outline-panel">
             <div className="planning-outline-heading units-heading">
               <div><BookOpenText size={17} /><strong>Unitats</strong></div>
-              <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
+              <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
             </div>
             <div className="planning-unit-list">
               {visibleUnits.map((unit) => (
                 <button className={unit.id === workspace.activePlanningUnitId ? 'active' : ''} key={unit.id} onClick={() => workspace.setActivePlanningUnitId(unit.id)} type="button">
-                  <span>{unit.code}</span><div><strong>{unit.title}</strong><small>{unit.level}</small></div><ChevronRight size={15} />
+                  <span>{unit.code}</span><div><strong>{unit.title}</strong><small>{unit.level}{unit.ownerUid !== user.uid ? ` · ${unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningEditor' ? 'Coedició' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningAgendaEditor' ? 'Agenda compartida' : 'Direcció'}` : ''}</small></div><ChevronRight size={15} />
                 </button>
               ))}
             </div>
             <button className="planning-archive-toggle" onClick={() => setShowArchived((value) => !value)} type="button">
               <Archive size={14} />{showArchived ? 'Amagar arxivades' : 'Mostrar arxivades'}
             </button>
-            {workspace.activePlanningUnit && <PhaseTree activities={workspace.activities} onAddChild={(parentId) => handleOpenPhase(null, parentId)} onAddRoot={() => handleOpenPhase()} onEdit={(phase) => handleOpenPhase(phase)} phases={workspace.phases} />}
+            {workspace.activePlanningUnit && <PhaseTree activities={workspace.activities} editable={workspace.canEditActiveUnit} onAddChild={(parentId) => handleOpenPhase(null, parentId)} onAddRoot={() => handleOpenPhase()} onEdit={(phase) => handleOpenPhase(phase)} phases={workspace.phases} />}
           </aside>
 
           <main className="planning-editor-panel">
-            {workspace.activePlanningUnit ? (
+            {workspace.activePlanningUnit && workspace.canEditActiveUnit ? (
               <UnitEditor
                 activities={workspace.activities}
                 curriculumCatalog={curriculumCatalog}
                 key={workspace.activePlanningUnit.id}
+                canManageUnit={workspace.activeRole === 'owner'}
                 onAcceptImprovements={workspace.acceptImprovementSuggestions}
                 onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
                 onArchive={workspace.archiveUnit}
@@ -396,11 +401,22 @@ export default function PlanningModule() {
                 onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
                 onMoveActivity={(move) => handleActivityAction(() => workspace.moveActivity(move))}
                 onOpenHistory={() => setDialog('history')}
+                onOpenPreview={() => setDialog('preview')}
+                onOpenSharing={() => setDialog('sharing')}
                 onReactivate={(unit) => workspace.saveUnit(unit, { status: 'draft' })}
                 onSave={workspace.saveUnit}
                 phases={workspace.phases}
                 sourceYearLabel={sourceYearLabel}
                 temporalUnit={activeTemporalUnit}
+                unit={workspace.activePlanningUnit}
+              />
+            ) : workspace.activePlanningUnit ? (
+              <PlanningSharedView
+                activities={workspace.activities}
+                classes={classes}
+                loadApplications={workspace.canReadActiveApplications ? workspace.loadApplicationOverview : null}
+                phases={workspace.phases}
+                role={workspace.activeRole}
                 unit={workspace.activePlanningUnit}
               />
             ) : (
@@ -422,6 +438,8 @@ export default function PlanningModule() {
       {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} students={students} />}
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={workspace.duplicateUnitToAcademicYear} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
+      {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
+      {dialog === 'preview' && workspace.activePlanningUnit && <div className="planning-dialog-backdrop"><section aria-modal="true" className="planning-preview-dialog" role="dialog"><button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={() => setDialog(null)} type="button"><X size={18} /></button><PlanningSharedView activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} phases={workspace.phases} role="owner" unit={workspace.activePlanningUnit} /></section></div>}
     </section>
   )
 }

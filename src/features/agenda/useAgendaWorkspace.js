@@ -12,6 +12,7 @@ import {
   loadPlanningTimetables,
   loadPlanningTimetableSlots,
   loadPlanningUnitStructure,
+  loadSharedPlanningUnits,
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
@@ -78,18 +79,21 @@ function sortEvents(items) {
  * excepcions passen pel mateix repositori local-first que Programació, però es
  * carreguen només per al curs i la versió que el docent ha obert.
  */
-export function useAgendaWorkspace(user) {
+export function useAgendaWorkspace(user, classes = []) {
   const [academicYears, setAcademicYears] = useState([])
   const [timetables, setTimetables] = useState([])
   const [slots, setSlots] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
+  const [sharedPlanningUnits, setSharedPlanningUnits] = useState([])
+  const [sharedClasses, setSharedClasses] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
   const [sessionBundles, setSessionBundles] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activeTimetableId, setActiveTimetableId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sharedLoading, setSharedLoading] = useState(true)
   const [error, setError] = useState('')
   const [sync, setSync] = useState(EMPTY_SYNC)
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
@@ -104,6 +108,10 @@ export function useAgendaWorkspace(user) {
 
   const activeAcademicYear = academicYears.find((item) => item.id === activeAcademicYearId) || null
   const activeTimetable = timetables.find((item) => item.id === activeTimetableId) || null
+  const userEmail = String(user?.email || '').trim().toLowerCase()
+  const allPlanningUnits = useMemo(() => Array.from(new Map(
+    [...planningUnits, ...sharedPlanningUnits].map((unit) => [unit.id, unit]),
+  ).values()), [planningUnits, sharedPlanningUnits])
 
   const refreshSync = useCallback(async (options = {}) => {
     if (!repository) return EMPTY_SYNC
@@ -237,6 +245,52 @@ export function useAgendaWorkspace(user) {
 
   useEffect(() => {
     let cancelled = false
+    if (!repository || !userEmail) {
+      queueMicrotask(() => {
+        if (cancelled) return
+        setSharedClasses([])
+        setSharedLoading(false)
+      })
+      return () => { cancelled = true }
+    }
+    queueMicrotask(() => !cancelled && setSharedLoading(true))
+    repository.loadScope(
+      `sharedAgendaPlanningUnits:${userEmail}`,
+      () => loadSharedPlanningUnits(userEmail, { maxItems: 100 }),
+      { completeSnapshot: true },
+    ).then(async (result) => {
+      if (cancelled) return
+      const sharedUnits = result.entities
+        .filter((unit) => unit.ownerUid !== user?.uid)
+        .filter((unit) => unit.accessByEmail?.[userEmail]?.role === 'planningAgendaEditor')
+        .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+      setSharedPlanningUnits(sharedUnits)
+      const classEntries = await Promise.all(sharedUnits.flatMap((unit) =>
+        (unit.accessByEmail?.[userEmail]?.classIds || []).map(async (classId) => {
+          const applicationResult = await repository.loadScope(
+            `planningUnit:${unit.id}:applications:${classId}`,
+            () => loadPlanningApplications(unit.id, classId, 20),
+            { completeSnapshot: true },
+          )
+          const application = applicationResult.entities.find((item) => item.classId === classId)
+          return {
+            id: classId,
+            name: application?.classLabel || classes.find((item) => item.id === classId)?.name || 'Grup compartit',
+          }
+        })))
+      if (!cancelled) {
+        setSharedClasses(Array.from(new Map(classEntries.map((item) => [item.id, item])).values()))
+      }
+      if (result.error && result.entities.length === 0) {
+        setError('No s’han pogut comprovar les Agendes compartides amb tu.')
+      }
+    }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar les Agendes compartides.'))
+      .finally(() => !cancelled && setSharedLoading(false))
+    return () => { cancelled = true }
+  }, [classes, repository, user?.uid, userEmail])
+
+  useEffect(() => {
+    let cancelled = false
     if (!repository || !user?.uid || !activeTimetableId) {
       queueMicrotask(() => !cancelled && setSlots([]))
       return undefined
@@ -359,19 +413,27 @@ export function useAgendaWorkspace(user) {
    * carreguen les sessions i els seus elements concrets.
    */
   const loadSessionRange = useCallback(async ({ classId = '', from, to }) => {
-    if (!repository || !activeAcademicYear || !from || !to) return []
+    if (!repository || !from || !to) return []
     setSessionsLoading(true)
     try {
-      const visibleUnits = planningUnits.filter((unit) => unit.status !== 'archived')
-      const applicationResults = await Promise.all(visibleUnits.map((unit) => repository.loadScope(
-        `planningUnit:${unit.id}:applications`,
-        () => loadPlanningApplications(unit.id, classId || undefined, 100),
-      )))
-      const applications = applicationResults.flatMap((result, index) => result.entities
-        .filter((application) => application.planningUnitId === visibleUnits[index].id)
-        .filter((application) => !classId || application.classId === classId)
-        .filter((application) => application.status !== 'archived')
-        .map((application) => ({ application, planningUnit: visibleUnits[index] })))
+      const visibleUnits = allPlanningUnits.filter((unit) => unit.status !== 'archived')
+      const applicationGroups = await Promise.all(visibleUnits.map(async (unit) => {
+        const isOwner = unit.ownerUid === user?.uid
+        const allowedClassIds = isOwner
+          ? (classId ? [classId] : [null])
+          : (unit.accessByEmail?.[userEmail]?.classIds || []).filter((allowedId) => !classId || allowedId === classId)
+        const results = await Promise.all(allowedClassIds.map((allowedClassId) => repository.loadScope(
+          `planningUnit:${unit.id}:applications${allowedClassId ? `:${allowedClassId}` : ''}`,
+          () => loadPlanningApplications(unit.id, allowedClassId || undefined, 100),
+          { completeSnapshot: true },
+        )))
+        return results.flatMap((result) => result.entities
+          .filter((application) => application.planningUnitId === unit.id)
+          .filter((application) => !classId || application.classId === classId)
+          .filter((application) => application.status !== 'archived')
+          .map((application) => ({ application, planningUnit: unit })))
+      }))
+      const applications = applicationGroups.flat()
       const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) =>
         repository.loadScope(
           `application:${application.id}:sessions`,
@@ -428,10 +490,10 @@ export function useAgendaWorkspace(user) {
     } finally {
       setSessionsLoading(false)
     }
-  }, [activeAcademicYear, planningUnits, repository])
+  }, [allPlanningUnits, repository, user?.uid, userEmail])
 
   useEffect(() => {
-    if (!activeAcademicYear || planningUnits.length === 0) {
+    if (allPlanningUnits.length === 0) {
       queueMicrotask(() => setSessionBundles([]))
       return
     }
@@ -449,7 +511,7 @@ export function useAgendaWorkspace(user) {
       })
     })
     return () => { cancelled = true }
-  }, [activeAcademicYear, loadSessionRange, planningUnits.length, today])
+  }, [allPlanningUnits.length, loadSessionRange, today])
 
   const saveSessionStatus = useCallback(async (bundle, status) => {
     const now = new Date().toISOString()
@@ -520,7 +582,7 @@ export function useAgendaWorkspace(user) {
    * sense connexió, aprofita les sessions que ja existeixen a la còpia local.
    */
   const findNextClassroomSession = useCallback(async (bundle) => {
-    if (!repository || !activeAcademicYear) return null
+    if (!repository) return null
     const isNextValidSession = (session) => session.entityType === 'calendarSession'
       && session.id !== bundle.session.id
       && session.classId === bundle.session.classId
@@ -535,9 +597,12 @@ export function useAgendaWorkspace(user) {
     // La pròxima classe pot pertànyer a una altra UP. Busquem totes les
     // aplicacions del grup, però només carreguem els encapçalaments de sessió:
     // no cal descarregar activitats ni resultats per programar el recordatori.
-    const visibleUnits = planningUnits.filter((unit) => unit.status !== 'archived')
+    const visibleUnits = allPlanningUnits
+      .filter((unit) => unit.status !== 'archived')
+      .filter((unit) => unit.ownerUid === user?.uid
+        || unit.accessByEmail?.[userEmail]?.classIds?.includes(bundle.session.classId))
     const applicationResults = await Promise.all(visibleUnits.map((unit) => repository.loadScope(
-      `planningUnit:${unit.id}:applications`,
+      `planningUnit:${unit.id}:applications:${bundle.session.classId}`,
       () => loadPlanningApplications(unit.id, bundle.session.classId, 100),
     )))
     const applications = applicationResults.flatMap((result, index) => result.entities
@@ -551,13 +616,13 @@ export function useAgendaWorkspace(user) {
         from: bundle.session.startsAt,
         maxItems: 500,
         planningUnitId: planningUnit.id,
-        to: `${activeAcademicYear.endsOn}T23:59:59`,
+        to: '9999-12-31T23:59:59',
       }),
     )))
     return sessionResults.flatMap((result) => result.entities)
       .filter(isNextValidSession)
       .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0] || null
-  }, [activeAcademicYear, planningUnits, repository, sessionBundles])
+  }, [allPlanningUnits, repository, sessionBundles, user?.uid, userEmail])
 
   const saveClassroomPrivateNote = useCallback(async (bundle, text) => {
     const cleanText = String(text || '').trim()
@@ -572,7 +637,9 @@ export function useAgendaWorkspace(user) {
     const now = new Date().toISOString()
     const note = createPlanningPrivateNote({
       ...(existing || {}),
-      ownerUid: bundle.session.ownerUid,
+      // Les notes personals pertanyen sempre al compte que les escriu. Així
+      // un col·laborador d'Agenda no pot veure les del propietari ni a l'inrevés.
+      ownerUid: user.uid,
       planningUnitId: bundle.planningUnit.id,
       sessionId: bundle.session.id,
       text: cleanText,
@@ -583,7 +650,7 @@ export function useAgendaWorkspace(user) {
       ? { ...current, privateNotes: [note] }
       : current))
     return note
-  }, [persist, remove])
+  }, [persist, remove, user])
 
   /**
    * Tancar Mode aula confirma com a fet tot element que no tingui una excepció.
@@ -647,7 +714,7 @@ export function useAgendaWorkspace(user) {
         { completeSnapshot: true },
       ),
       repository.loadScope(
-        `planningUnit:${planningUnitId}:applications`,
+        `planningUnit:${planningUnitId}:applications:${classId}`,
         () => loadPlanningApplications(planningUnitId, classId),
       ),
       ...timetables.map((timetable) => repository.loadScope(
@@ -669,6 +736,7 @@ export function useAgendaWorkspace(user) {
     const application = applications[0] || createGroupApplication({
       academicYearId: activeAcademicYear.id,
       classId,
+      classLabel: classes.find((item) => item.id === classId)?.name || '',
       ownerUid: user.uid,
       planningUnitId,
       planningUnitVersion: planningUnit.versionNumber,
@@ -740,7 +808,7 @@ export function useAgendaWorkspace(user) {
       slotsByTimetableId,
       timetables,
     }
-  }, [activeAcademicYear, calendarEvents, repository, timetables, user])
+  }, [activeAcademicYear, calendarEvents, classes, repository, timetables, user])
 
   const buildSchedulingPreview = useCallback((setup, { selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
@@ -1018,11 +1086,12 @@ export function useAgendaWorkspace(user) {
     error,
     findNextClassroomSession,
     isOnline,
-    loading,
+    loading: loading || sharedLoading,
     loadSchedulingSetup,
     loadClassroomPrivateNotes,
     loadSessionRange,
     moveSlot,
+    ownedPlanningUnits: planningUnits,
     removeCalendarEvent,
     removeSlot,
     saveCalendarEvent,
@@ -1044,6 +1113,8 @@ export function useAgendaWorkspace(user) {
     temporalUnits,
     timetables,
     today,
-    planningUnits,
+    planningUnits: allPlanningUnits,
+    sharedPlanningUnits,
+    sharedClasses,
   }
 }

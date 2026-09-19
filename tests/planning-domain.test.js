@@ -835,6 +835,18 @@ test('una invitació necessita un correu exacte vàlid', () => {
   )
 })
 
+test('l’aplicació de grup conserva el nom llegible per als espais compartits', () => {
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-1',
+    planningUnitId: 'up-1',
+    classId: 'class-1',
+    classLabel: '1r C',
+  })
+
+  assert.equal(application.classLabel, '1r C')
+})
+
 test('totes les entitats principals declaren tipus i versió d’esquema', () => {
   const idFactory = sequenceIdFactory()
   const sharedOptions = options(idFactory)

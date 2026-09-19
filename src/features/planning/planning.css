@@ -328,6 +328,118 @@
 .planning-material-reminder { display: grid; grid-template-columns: auto 48px auto; gap: 4px; align-items: center; color: #64748b; font-size: 9px; font-weight: 800; }
 .planning-material-reminder input { min-width: 0; padding-inline: 6px; }
 
+.planning-dialog-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 28px; background: rgba(15, 23, 42, .54); backdrop-filter: blur(7px); }
+.planning-sharing-dialog, .planning-preview-dialog { width: min(920px, 100%); max-height: calc(100vh - 56px); overflow-y: auto; border: 1px solid rgba(255, 255, 255, .7); border-radius: 22px; box-shadow: 0 28px 80px rgba(15, 23, 42, .22); background: white; }
+.planning-sharing-dialog { display: grid; gap: 17px; padding: 24px; }
+.planning-sharing-dialog > header { display: flex; align-items: center; gap: 12px; }
+.planning-sharing-dialog > header > span { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: #7c3aed; background: #f3e8ff; }
+.planning-sharing-dialog > header div { display: grid; gap: 2px; }
+.planning-sharing-dialog > header small { color: #8b5cf6; font-size: 9px; font-weight: 950; letter-spacing: .13em; text-transform: uppercase; }
+.planning-sharing-dialog h2 { margin: 0; color: #1e293b; font-size: 21px; }
+.planning-sharing-intro { margin: 0; border-left: 3px solid #a78bfa; padding: 8px 11px; color: #64748b; background: #faf5ff; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.planning-sharing-dialog > form { display: grid; gap: 15px; }
+.planning-sharing-dialog > form > label { display: grid; gap: 6px; color: #475569; font-size: 11px; font-weight: 900; }
+.planning-sharing-dialog > form > label input { border: 1px solid #d8dee9; border-radius: 9px; padding: 10px 11px; color: #1e293b; background: white; font: inherit; }
+.planning-sharing-dialog fieldset { display: grid; gap: 9px; margin: 0; border: 0; padding: 0; }
+.planning-sharing-dialog legend { margin-bottom: 8px; color: #475569; font-size: 11px; font-weight: 900; }
+.planning-sharing-roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.planning-sharing-roles > label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px; cursor: pointer; }
+.planning-sharing-roles > label.active { border-color: #a78bfa; box-shadow: 0 0 0 2px #ede9fe; background: #faf5ff; }
+.planning-sharing-roles input { position: absolute; opacity: 0; pointer-events: none; }
+.planning-sharing-roles span { display: grid; gap: 4px; }
+.planning-sharing-roles strong { color: #334155; font-size: 11px; }
+.planning-sharing-roles small { color: #64748b; font-size: 9px; font-weight: 700; line-height: 1.4; }
+.planning-sharing-roles svg { color: #7c3aed; }
+.planning-sharing-classes { display: flex; flex-wrap: wrap; gap: 7px; }
+.planning-sharing-classes label { display: flex; align-items: center; gap: 6px; border: 1px solid #e2e8f0; border-radius: 999px; padding: 7px 10px; color: #64748b; background: white; cursor: pointer; font-size: 10px; font-weight: 850; }
+.planning-sharing-classes label.active { border-color: #a78bfa; color: #6d28d9; background: #f5f3ff; }
+.planning-sharing-classes input { width: 14px; height: 14px; accent-color: #7c3aed; }
+.planning-sharing-error { margin: 0; border-radius: 9px; padding: 10px; color: #991b1b; background: #fff1f2; font-size: 11px; font-weight: 800; }
+.planning-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.planning-sharing-current { display: grid; gap: 7px; border-top: 1px solid #edf0f4; padding-top: 16px; }
+.planning-sharing-current > header > div { display: flex; align-items: center; gap: 7px; }
+.planning-sharing-current > header strong { color: #334155; font-size: 12px; }
+.planning-sharing-current > header span { min-width: 20px; border-radius: 999px; padding: 3px 6px; color: #6d28d9; background: #ede9fe; font-size: 9px; font-weight: 950; text-align: center; }
+.planning-sharing-current > p { margin: 0; border: 1px dashed #d8dee9; border-radius: 9px; padding: 13px; color: #64748b; font-size: 11px; font-weight: 750; text-align: center; }
+.planning-sharing-current article { display: grid; grid-template-columns: minmax(0, 1fr) 32px 32px; align-items: center; gap: 6px; border: 1px solid #e7eaf0; border-radius: 10px; padding: 9px 10px; }
+.planning-sharing-current article > div { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; }
+.planning-sharing-current article strong { overflow: hidden; color: #334155; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.planning-sharing-current article span { color: #7c3aed; font-size: 9px; font-weight: 900; }
+.planning-sharing-current article small { grid-column: 1 / 3; color: #64748b; font-size: 9px; font-weight: 750; }
+.planning-sharing-current article > button { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 8px; color: #64748b; background: white; }
+.planning-sharing-current article > button.danger { color: #b91c1c; }
+
+.planning-preview-dialog { position: relative; padding: 18px; }
+.planning-preview-close { position: sticky; top: 0; float: right; width: 34px; height: 34px; display: grid; place-items: center; z-index: 3; border: 1px solid #e2e8f0; border-radius: 10px; color: #475569; background: white; }
+.planning-shared-view { min-height: 100%; display: grid; align-content: start; gap: 0; background: #fbfbfe; }
+.planning-shared-view-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #e7eaf0; padding: 13px 18px; background: white; }
+.planning-shared-view-header > div { display: flex; align-items: center; gap: 9px; }
+.planning-shared-view-header > div > svg { color: #7c3aed; }
+.planning-shared-view-header > div > span { display: grid; gap: 2px; }
+.planning-shared-view-header small { color: #8b5cf6; font-size: 8px; font-weight: 950; letter-spacing: .12em; text-transform: uppercase; }
+.planning-shared-view-header strong { color: #1e293b; font-size: 13px; }
+.planning-shared-view-header nav { display: flex; gap: 5px; border-radius: 10px; padding: 4px; background: #f1f5f9; }
+.planning-shared-view-header nav button { border: 0; border-radius: 7px; padding: 7px 10px; color: #64748b; background: transparent; font-size: 10px; font-weight: 900; }
+.planning-shared-view-header nav button.active { color: #6d28d9; box-shadow: 0 1px 4px rgba(15, 23, 42, .1); background: white; }
+.planning-shared-program { display: grid; gap: 18px; padding: 22px; }
+.planning-shared-hero { display: grid; gap: 9px; border-radius: 15px; padding: 22px; color: white; background: linear-gradient(135deg, #312e81, #7c3aed 72%, #f59e0b 145%); }
+.planning-shared-hero > span { font-size: 9px; font-weight: 950; letter-spacing: .11em; text-transform: uppercase; opacity: .76; }
+.planning-shared-hero h2 { max-width: 760px; margin: 0; font-size: clamp(24px, 4vw, 38px); line-height: 1.04; }
+.planning-shared-hero > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 5px; }
+.planning-shared-hero p { display: grid; gap: 4px; margin: 0; border-top: 1px solid rgba(255,255,255,.22); padding-top: 9px; font-size: 11px; line-height: 1.45; }
+.planning-shared-hero p strong { font-size: 8px; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.planning-shared-section { display: grid; gap: 10px; }
+.planning-shared-section > header { display: flex; align-items: center; gap: 8px; color: #6d28d9; }
+.planning-shared-section > header > div { display: grid; gap: 1px; }
+.planning-shared-section > header strong { color: #334155; font-size: 13px; }
+.planning-shared-section > header span { color: #94a3b8; font-size: 9px; font-weight: 750; }
+.planning-shared-phases { display: grid; gap: 8px; }
+.planning-shared-phases > details, .planning-shared-applications > details { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: white; }
+.planning-shared-phases summary, .planning-shared-applications > details > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; cursor: pointer; list-style: none; }
+.planning-shared-phases summary span { flex: 1; color: #334155; font-size: 12px; font-weight: 900; }
+.planning-shared-phases summary small { color: #94a3b8; font-size: 9px; font-weight: 800; }
+.planning-shared-phases details > div { display: grid; gap: 0; border-top: 1px solid #edf0f4; }
+.planning-shared-phases article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; padding: 12px 14px; }
+.planning-shared-phases article + article { border-top: 1px solid #f1f5f9; }
+.planning-shared-phases article > div { display: grid; gap: 3px; }
+.planning-shared-phases article > div > span { color: #8b5cf6; font-size: 8px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.planning-shared-phases article strong { color: #334155; font-size: 11px; }
+.planning-shared-phases article p { margin: 0; color: #64748b; font-size: 10px; line-height: 1.45; }
+.planning-shared-phases article > aside { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.planning-shared-phases article > aside span { display: flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 7px; color: #64748b; background: #f1f5f9; font-size: 8px; font-weight: 850; }
+.planning-shared-phases article > section { grid-column: 1 / 3; display: flex; align-items: flex-start; gap: 7px; border-left: 2px solid #a78bfa; padding: 7px 9px; color: #7c3aed; background: #faf5ff; }
+.planning-shared-phases article > section > div { display: grid; gap: 4px; }
+.planning-shared-phases article > section p { display: grid; gap: 1px; }
+.planning-shared-phases article > section small { color: #7c3aed; font-size: 8px; font-weight: 750; }
+.planning-shared-curriculum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.planning-shared-curriculum section { border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px; background: white; }
+.planning-shared-curriculum strong { color: #6d28d9; font-size: 10px; }
+.planning-shared-curriculum ul { display: grid; gap: 5px; margin: 8px 0 0; padding-left: 16px; color: #475569; font-size: 10px; line-height: 1.4; }
+.planning-shared-empty { margin: 0; color: #64748b; font-size: 11px; font-weight: 750; }
+.planning-shared-empty.large, .planning-shared-loading { min-height: 330px; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 30px; color: #64748b; text-align: center; }
+.planning-shared-empty.large strong { color: #334155; }
+.planning-shared-empty.large p { max-width: 460px; margin: 0; font-size: 11px; line-height: 1.5; }
+.planning-shared-applications { display: grid; gap: 10px; padding: 22px; }
+.planning-shared-applications > details > summary > div { display: grid; gap: 2px; }
+.planning-shared-applications > details > summary span { color: #334155; font-size: 12px; font-weight: 900; }
+.planning-shared-applications > details > summary small { color: #64748b; font-size: 9px; font-weight: 750; }
+.planning-shared-sessions { display: grid; gap: 8px; border-top: 1px solid #edf0f4; padding: 10px; background: #f8fafc; }
+.planning-shared-sessions > article { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white; }
+.planning-shared-sessions > article > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; background: #fafafa; }
+.planning-shared-sessions > article > header div { display: grid; gap: 2px; }
+.planning-shared-sessions > article > header strong { color: #334155; font-size: 10px; }
+.planning-shared-sessions > article > header span { color: #64748b; font-size: 8px; font-weight: 750; }
+.planning-shared-sessions .status { border-radius: 999px; padding: 4px 7px; color: #6d28d9; background: #ede9fe; font-size: 8px; font-weight: 900; }
+.planning-shared-sessions > article > div { display: grid; }
+.planning-shared-sessions > article section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px; padding: 10px 11px; }
+.planning-shared-sessions > article section + section { border-top: 1px solid #f1f5f9; }
+.planning-shared-sessions section > div { display: grid; gap: 2px; }
+.planning-shared-sessions section strong { color: #334155; font-size: 10px; }
+.planning-shared-sessions section small { color: #94a3b8; font-size: 8px; font-weight: 750; }
+.planning-shared-sessions section aside { display: grid; gap: 6px; }
+.planning-shared-sessions section aside p { display: grid; gap: 2px; margin: 0; color: #64748b; font-size: 9px; line-height: 1.4; }
+.planning-shared-sessions section aside p strong { color: #7c3aed; font-size: 8px; text-transform: uppercase; }
+
 @media (max-width: 1180px) {
   .planning-workbench { grid-template-columns: 220px minmax(440px, 1fr) 235px; }
   .planning-course-controls { max-width: 650px; }
@@ -346,9 +458,20 @@
   .planning-activity-row { grid-template-columns: 30px 30px minmax(220px, 1fr) auto 60px; }
   .planning-material-row { grid-template-columns: 82px 100px 135px 1fr 1fr auto 30px; }
   .planning-content-grid { grid-template-columns: 1fr; }
+  .planning-sharing-roles { grid-template-columns: 1fr; }
+  .planning-shared-hero > div { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
+  .planning-dialog-backdrop { padding: 10px; }
+  .planning-sharing-dialog, .planning-preview-dialog { max-height: calc(100vh - 20px); border-radius: 15px; }
+  .planning-sharing-dialog { padding: 16px; }
+  .planning-shared-view-header { align-items: stretch; flex-direction: column; }
+  .planning-shared-view-header nav { align-self: flex-start; }
+  .planning-shared-program, .planning-shared-applications { padding: 14px; }
+  .planning-shared-curriculum { grid-template-columns: 1fr; }
+  .planning-shared-phases article, .planning-shared-sessions > article section { grid-template-columns: 1fr; }
+  .planning-shared-phases article > section { grid-column: 1; }
   .planning-sequence-section { padding: 16px; }
   .planning-budget-summary { align-items: stretch; flex-direction: column; }
   .planning-budget-summary > div { border-left: 0; border-top: 1px solid #ddd6fe; padding: 7px 0 0; text-align: left; }

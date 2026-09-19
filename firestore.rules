@@ -1234,7 +1234,7 @@ service cloud.firestore {
       return isPlanningOwner(upId)
         || (
           hasActivePlanningGrant(upId)
-          && planningGrantRole(upId) in ['planningEditor', 'planningAgendaEditor']
+          && planningGrantRole(upId) == 'planningEditor'
         );
     }
 
@@ -1460,7 +1460,7 @@ service cloud.firestore {
 
     function validPlanningApplication(upId, applicationId) {
       return request.resource.data.keys().hasOnly([
-          'academicYearId', 'classId', 'createdAt', 'entityType', 'id', 'ownerUid',
+          'academicYearId', 'classId', 'classLabel', 'createdAt', 'entityType', 'id', 'ownerUid',
           'planningUnitId', 'planningUnitVersion', 'schemaVersion', 'status', 'updatedAt'
         ])
         && request.resource.data.id == applicationId
@@ -1469,6 +1469,10 @@ service cloud.firestore {
         && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
         && request.resource.data.planningUnitId == upId
         && request.resource.data.classId is string
+        && (
+          request.resource.data.classLabel == null
+          || request.resource.data.classLabel is string
+        )
         && request.resource.data.status in ['draft', 'active', 'completed', 'archived']
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string;
