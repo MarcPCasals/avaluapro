@@ -152,13 +152,17 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
   const [values, setValues] = useState(() => ({
     classIds: initialValue?.classIds || [],
     consumesPlannedSession: initialValue?.consumesPlannedSession || false,
+    durationMinutes: initialValue?.durationMinutes || 60,
     endsOn: initialValue?.endsOn || initialValue?.startsOn || today,
     reason: initialValue?.reason || '',
     startsOn: initialValue?.startsOn || today,
+    startsAt: initialValue?.startsAt || '08:00',
+    subgroupId: initialValue?.subgroupId || '',
     title: initialValue?.title || '',
     type: initialValue?.type || 'holiday',
   }))
   const eventLabel = useMemo(() => EVENT_OPTIONS.find(([value]) => value === values.type)?.[1] || '', [values.type])
+  const selectedClass = classes.find((classItem) => classItem.id === values.classIds[0]) || null
   const setType = (type) => setValues((current) => ({
     ...current,
     type,
@@ -168,9 +172,12 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
     ...current,
     classIds: checked ? [...current.classIds, classId] : current.classIds.filter((id) => id !== classId),
   }))
+  const save = () => onSave(values.type === 'extraordinarySession'
+    ? values
+    : { ...values, durationMinutes: null, startsAt: null, subgroupId: null }, initialValue)
   return (
-    <AgendaDialog onClose={onClose} onSubmit={() => onSave(values, initialValue)} size="lg" submitLabel={initialValue ? 'Desar excepció' : 'Afegir al calendari'} title={initialValue ? 'Editar excepció del calendari' : 'Nova excepció del calendari'}>
-      <div className="agenda-event-intro"><CalendarPlus size={19} /><p>Aquesta informació ajustarà el calendari automàtic de les UP en la iteració següent.</p></div>
+    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={initialValue ? 'Desar excepció' : 'Afegir al calendari'} title={initialValue ? 'Editar excepció del calendari' : 'Nova excepció del calendari'}>
+      <div className="agenda-event-intro"><CalendarPlus size={19} /><p>Aquesta informació ajusta la calendarització de les UP. Abans de crear cap sessió, Agenda sempre en mostra la proposta.</p></div>
       <label>Tipus<select value={values.type} onChange={(event) => setType(event.target.value)}>{EVENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Títol<input autoFocus placeholder={eventLabel} required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
       <div className="agenda-form-row">
@@ -182,7 +189,14 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
         <small>Si no en marques cap, l’excepció s’aplica a tots els grups.</small>
         <div>{classes.map((classItem) => <label key={classItem.id}><input checked={values.classIds.includes(classItem.id)} onChange={(event) => toggleClass(classItem.id, event.target.checked)} type="checkbox" />{classItem.name}</label>)}</div>
       </fieldset>
-      {values.type === 'extraordinarySession' && <label className="agenda-check"><input checked={values.consumesPlannedSession} onChange={(event) => setValues({ ...values, consumesPlannedSession: event.target.checked })} type="checkbox" />Compta com una sessió lectiva extra i avança la seqüència del grup.</label>}
+      {values.type === 'extraordinarySession' && <>
+        <div className="agenda-form-row">
+          <label>Hora d’inici<input required step="900" type="time" value={values.startsAt} onChange={(event) => setValues({ ...values, startsAt: event.target.value })} /></label>
+          <label>Durada<select value={values.durationMinutes} onChange={(event) => setValues({ ...values, durationMinutes: Number(event.target.value) })}><option value="60">60 min · 55 programables</option><option value="90">90 min · 85 programables</option><option value="120">120 min · 115 programables</option></select></label>
+        </div>
+        {values.classIds.length === 1 && (selectedClass?.halfGroups || []).length > 0 && <label>Mig grup<select value={values.subgroupId} onChange={(event) => setValues({ ...values, subgroupId: event.target.value })}><option value="">Grup sencer</option>{selectedClass.halfGroups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label>}
+        <label className="agenda-check"><input checked={values.consumesPlannedSession} onChange={(event) => setValues({ ...values, consumesPlannedSession: event.target.checked })} type="checkbox" />Compta com una sessió lectiva extra i avança la seqüència del grup.</label>
+      </>}
       <label>Motiu o detall <span>(opcional)</span><textarea rows="3" value={values.reason} onChange={(event) => setValues({ ...values, reason: event.target.value })} /></label>
     </AgendaDialog>
   )

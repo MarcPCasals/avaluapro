@@ -356,6 +356,18 @@ test('les dates impossibles de curs, UT i horari es rebutgen abans de persistir'
     }),
     /data i hora vàlida/,
   )
+  assert.throws(
+    () => createCalendarEvent({
+      ownerUid: 'teacher-1',
+      academicYearId: 'year-1',
+      type: 'extraordinarySession',
+      title: 'Substitució',
+      startsOn: '2026-09-21',
+      startsAt: 'a primera hora',
+      durationMinutes: 60,
+    }),
+    /HH:mm/,
+  )
 })
 
 test('els canvis només de grup no modifiquen la UP base', () => {
@@ -587,6 +599,7 @@ test('la proposta usa la versió d’horari vigent i salta festius i anul·lacio
       { id: 'holiday', type: 'holiday', title: 'Festa', startsOn: '2026-09-21', endsOn: '2026-09-21', classIds: [] },
       { id: 'other-class', type: 'cancellation', title: 'Sortida 2B', startsOn: '2026-09-28', endsOn: '2026-09-28', classIds: ['class-2'] },
       { id: 'our-class', type: 'cancellation', title: 'Sortida 1A', startsOn: '2026-10-05', endsOn: '2026-10-05', classIds: ['class-1'] },
+      { id: 'extra-class', type: 'extraordinarySession', title: 'Substitució', startsOn: '2026-10-05', endsOn: '2026-10-05', startsAt: '12:00', durationMinutes: 60, consumesPlannedSession: true, classIds: ['class-1'] },
     ],
     classId: 'class-1',
     from: '2026-09-21',
@@ -603,8 +616,10 @@ test('la proposta usa la versió d’horari vigent i salta festius i anul·lacio
 
   assert.deepEqual(result.candidates.map((candidate) => [candidate.date, candidate.startsAt, candidate.durationMinutes]), [
     ['2026-09-28', '2026-09-28T09:30:00', 60],
+    ['2026-10-05', '2026-10-05T12:00:00', 60],
     ['2026-10-12', '2026-10-12T10:30:00', 90],
   ])
+  assert.equal(result.candidates[1].calendarEventId, 'extra-class')
   assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05'])
 })
 
@@ -625,7 +640,7 @@ test('una proposta divide una activitat llarga, manté indicacions i no duplica 
     ],
     application,
     candidates: [
-      { date: '2026-09-21', startsAt: '2026-09-21T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
+      { calendarEventId: 'extra-1', date: '2026-09-21', startsAt: '2026-09-21T09:30:00', durationMinutes: 60, timetableSlotId: null },
       { date: '2026-09-28', startsAt: '2026-09-28T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
       { date: '2026-10-05', startsAt: '2026-10-05T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' },
     ],
@@ -634,6 +649,7 @@ test('una proposta divide una activitat llarga, manté indicacions i no duplica 
   })
 
   assert.equal(result.sessions.length, 3)
+  assert.equal(result.sessions[0].session.calendarEventId, 'extra-1')
   assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => item.plannedMinutes)), [
     [null, 55],
     [55],

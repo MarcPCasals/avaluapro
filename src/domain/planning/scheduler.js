@@ -30,7 +30,7 @@ function eventCoversDate(event, dateKey) {
 }
 
 function candidateKey(candidate) {
-  return `${candidate.date}__${candidate.timetableSlotId || ''}__${candidate.startsAt}`
+  return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${candidate.startsAt}`
 }
 
 /**
@@ -123,10 +123,32 @@ export function buildTimetableSessionCandidates({
         if (!occupied.has(candidateKey(candidate))) candidates.push(candidate)
       }
     }
+    const extraordinaryEvents = calendarEvents.filter((event) =>
+      event.type === 'extraordinarySession' &&
+      event.consumesPlannedSession &&
+      event.startsAt &&
+      Number(event.durationMinutes) > 0 &&
+      eventCoversDate(event, dateKey) &&
+      eventAppliesToClass(event, classId))
+    for (const event of extraordinaryEvents) {
+      const candidate = {
+        calendarEventId: event.id,
+        date: dateKey,
+        durationMinutes: Number(event.durationMinutes),
+        startsAt: `${dateKey}T${event.startsAt}:00`,
+        subgroupId: event.subgroupId || null,
+        timetableSlotId: null,
+        timetableVersionId: timetable?.id || null,
+      }
+      if (!occupied.has(candidateKey(candidate))) candidates.push(candidate)
+    }
     dateKey = nextDate(dateKey)
   }
 
-  return { candidates, skippedDates }
+  return {
+    candidates: candidates.sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+    skippedDates,
+  }
 }
 
 /**
@@ -161,6 +183,7 @@ export function buildActivitySessionDistribution({
       .map((bundle) => ({
         candidate: {
           date: String(bundle.session.startsAt).slice(0, 10),
+          calendarEventId: bundle.session.calendarEventId,
           durationMinutes: bundle.session.durationMinutes,
           startsAt: bundle.session.startsAt,
           subgroupId: bundle.session.subgroupId,
@@ -238,6 +261,7 @@ export function buildActivitySessionDistribution({
     const session = draft.session || createCalendarSession(
       {
         applicationId: application.id,
+        calendarEventId: draft.candidate.calendarEventId,
         classId: application.classId,
         durationMinutes: draft.candidate.durationMinutes,
         ownerUid: application.ownerUid,

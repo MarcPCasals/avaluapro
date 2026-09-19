@@ -143,7 +143,13 @@ export function AgendaSchedulingDialog({
           {setup && (
             <div className="agenda-activity-picker">
               <header><div><strong>Activitats pendents</strong><span>{remainingActivities.length} per calendaritzar · {setup.scheduledSourceActivityIds.length} ja assignades</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
-              {remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{remainingActivities.map((activity) => <label key={activity.id}><input checked={selectedActivityIds.includes(activity.id)} disabled={values.mode === 'complete'} onChange={(event) => toggleActivity(activity.id, event.target.checked)} type="checkbox" /><span><strong>{activity.title}</strong><small>{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}{activity.type === 'indication' ? ' · indicació' : ''}</small></span></label>)}</div>}
+              {remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{remainingActivities.map((activity) => {
+                const remainingMinutes = setup.remainingMinutesByActivityId[activity.id]
+                const timeLabel = remainingMinutes && remainingMinutes !== activity.plannedMinutes
+                  ? `${remainingMinutes} de ${activity.plannedMinutes} min pendents`
+                  : activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'
+                return <label key={activity.id}><input checked={selectedActivityIds.includes(activity.id)} disabled={values.mode === 'complete'} onChange={(event) => toggleActivity(activity.id, event.target.checked)} type="checkbox" /><span><strong>{activity.title}</strong><small>{timeLabel}{activity.type === 'indication' ? ' · indicació' : ''}</small></span></label>
+              })}</div>}
             </div>
           )}
         </section>

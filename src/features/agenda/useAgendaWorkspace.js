@@ -18,13 +18,16 @@ import {
   buildActivitySessionDistribution,
   buildTimetableSessionCandidates,
   createCalendarEvent,
+  createCalendarSession,
   createGroupApplication,
+  createSessionItem,
   createTimetableSlot,
   createTimetableVersion,
   findTimetableSlotConflicts,
   getSessionCandidateKey,
   moveTimetableSlot,
   orderActivitiesForScheduling,
+  planActivityChange,
   selectEffectiveTimetable,
 } from '../../domain/planning'
 
@@ -77,6 +80,8 @@ export function useAgendaWorkspace(user) {
   const [slots, setSlots] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
+  const [sessionBundles, setSessionBundles] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activeTimetableId, setActiveTimetableId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -336,6 +341,112 @@ export function useAgendaWorkspace(user) {
   }, [remove])
 
   /**
+   * Obre només el tram temporal que la vista necessita. Les aplicacions viuen
+   * sota cada UP, per això primer es resolen aquestes relacions i després es
+   * carreguen les sessions i els seus elements concrets.
+   */
+  const loadSessionRange = useCallback(async ({ classId = '', from, to }) => {
+    if (!repository || !activeAcademicYear || !from || !to) return []
+    setSessionsLoading(true)
+    try {
+      const visibleUnits = planningUnits.filter((unit) => unit.status !== 'archived')
+      const applicationResults = await Promise.all(visibleUnits.map((unit) => repository.loadScope(
+        `planningUnit:${unit.id}:applications`,
+        () => loadPlanningApplications(unit.id, classId || undefined, 100),
+      )))
+      const applications = applicationResults.flatMap((result, index) => result.entities
+        .filter((application) => application.planningUnitId === visibleUnits[index].id)
+        .filter((application) => !classId || application.classId === classId)
+        .filter((application) => application.status !== 'archived')
+        .map((application) => ({ application, planningUnit: visibleUnits[index] })))
+      const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) =>
+        repository.loadScope(
+          `application:${application.id}:sessions`,
+          () => loadPlanningSessions({
+            applicationId: application.id,
+            from: `${from}T00:00:00`,
+            maxItems: 500,
+            planningUnitId: planningUnit.id,
+            to: `${to}T23:59:59`,
+          }),
+        )))
+      const sessionRecords = sessionResults.flatMap((result, index) => result.entities
+        .filter((session) => String(session.startsAt).slice(0, 10) >= from && String(session.startsAt).slice(0, 10) <= to)
+        .filter((session) => !classId || session.classId === classId)
+        .map((session) => ({ ...applications[index], session })))
+      const detailResults = await Promise.all(sessionRecords.map(({ application, planningUnit, session }) =>
+        repository.loadScope(
+          `session:${session.id}:detail`,
+          async () => {
+            const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id)
+            return [detail.session, ...detail.items, ...detail.results]
+          },
+          { completeSnapshot: true },
+        )))
+      const unitIds = [...new Set(sessionRecords.map((record) => record.planningUnit.id))]
+      const structureResults = await Promise.all(unitIds.map((planningUnitId) => repository.loadScope(
+        `planningUnit:${planningUnitId}:structure`,
+        async () => {
+          const structure = await loadPlanningUnitStructure(planningUnitId)
+          return [structure.planningUnit, ...structure.phases, ...structure.activities]
+        },
+        { completeSnapshot: true },
+      )))
+      const activitiesByUnitId = new Map(unitIds.map((planningUnitId, index) => [
+        planningUnitId,
+        new Map(structureResults[index].entities
+          .filter((entity) => entity.entityType === 'planningActivity')
+          .map((activity) => [activity.id, activity])),
+      ]))
+      const bundles = sessionRecords.map((record, index) => {
+        const entities = detailResults[index].entities
+        const activityById = activitiesByUnitId.get(record.planningUnit.id) || new Map()
+        return {
+          ...record,
+          items: entities
+            .filter((entity) => entity.entityType === 'sessionItem')
+            .sort((left, right) => Number(left.order) - Number(right.order))
+            .map((item) => ({ ...item, sourceActivity: activityById.get(item.sourceActivityId) || null })),
+          results: entities.filter((entity) => entity.entityType === 'activityResult'),
+        }
+      }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+      setSessionBundles(bundles)
+      return bundles
+    } finally {
+      setSessionsLoading(false)
+    }
+  }, [activeAcademicYear, planningUnits, repository])
+
+  useEffect(() => {
+    if (!activeAcademicYear || planningUnits.length === 0) {
+      queueMicrotask(() => setSessionBundles([]))
+      return
+    }
+    const date = new Date(`${today}T12:00:00Z`)
+    const weekday = date.getUTCDay() || 7
+    date.setUTCDate(date.getUTCDate() - weekday + 1)
+    const from = date.toISOString().slice(0, 10)
+    date.setUTCDate(date.getUTCDate() + 6)
+    const to = date.toISOString().slice(0, 10)
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      loadSessionRange({ from, to }).catch((loadError) => {
+        if (!cancelled) setError(loadError.message || 'No s’han pogut carregar les sessions de la setmana.')
+      })
+    })
+    return () => { cancelled = true }
+  }, [activeAcademicYear, loadSessionRange, planningUnits.length, today])
+
+  const saveSessionStatus = useCallback(async (bundle, status) => {
+    const now = new Date().toISOString()
+    const session = createCalendarSession({ ...bundle.session, status, updatedAt: now }, { now })
+    await persist({ entity: session, context: { planningUnitId: bundle.planningUnit.id } })
+    setSessionBundles((items) => items.map((item) => item.session.id === session.id ? { ...item, session } : item))
+    return session
+  }, [persist])
+
+  /**
    * Carrega sota demanda la UP, les franges de totes les versions d'horari i
    * les sessions ja creades. La finestra de proposta pot així detectar què ja
    * està assignat sense mantenir obertes totes aquestes dades a l'Agenda.
@@ -416,7 +527,24 @@ export function useAgendaWorkspace(user) {
       timetable.id,
       sortSlots(slotResults[index]?.entities || []),
     ]))
-    const scheduledSourceActivityIds = [...new Set(existingItems.map((item) => item.sourceActivityId).filter(Boolean))]
+    const activeSessionIds = new Set(existingSessions
+      .filter((session) => !['cancelled', 'notHeld'].includes(session.status))
+      .map((session) => session.id))
+    const activeItems = existingItems.filter((item) => activeSessionIds.has(item.sessionId))
+    const assignedMinutesByActivityId = activeItems.reduce((totals, item) => {
+      totals[item.sourceActivityId] = (totals[item.sourceActivityId] || 0) + (Number(item.plannedMinutes) || 0)
+      return totals
+    }, {})
+    const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
+      const plannedMinutes = Number(activity.plannedMinutes)
+      if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
+        return [activity.id, activeItems.some((item) => item.sourceActivityId === activity.id) ? 0 : null]
+      }
+      return [activity.id, Math.max(0, plannedMinutes - (assignedMinutesByActivityId[activity.id] || 0))]
+    }))
+    const scheduledSourceActivityIds = activities
+      .filter((activity) => remainingMinutesByActivityId[activity.id] === 0)
+      .map((activity) => activity.id)
     return {
       activities,
       application,
@@ -425,6 +553,7 @@ export function useAgendaWorkspace(user) {
       existingSessionBundles,
       isNewApplication: !applications[0],
       planningUnit,
+      remainingMinutesByActivityId,
       scheduledSourceActivityIds,
       slotsByTimetableId,
       timetables,
@@ -434,10 +563,16 @@ export function useAgendaWorkspace(user) {
   const buildSchedulingPreview = useCallback((setup, { selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
     const selected = new Set(selectedActivityIds || [])
-    const activities = setup.activities.filter((activity) => selected.has(activity.id))
+    const activities = setup.activities
+      .filter((activity) => selected.has(activity.id))
+      .map((activity) => ({
+        ...activity,
+        plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
+      }))
     if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
     const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
       date: String(session.startsAt).slice(0, 10),
+      calendarEventId: session.calendarEventId,
       startsAt: session.startsAt,
       timetableSlotId: session.timetableSlotId,
     }))
@@ -493,6 +628,175 @@ export function useAgendaWorkspace(user) {
     return { application, sessionCount: preview.sessions.length }
   }, [persist])
 
+  /**
+   * Aplica l'abast triat pel docent: només la còpia del grup, la UP base o
+   * una proposta pendent. L'element concret de la sessió sempre reflecteix
+   * el canvi que el docent acaba de confirmar.
+   */
+  const saveSessionItemChange = useCallback(async (bundle, item, changes, scope) => {
+    const now = new Date().toISOString()
+    const normalizedChanges = {
+      plannedMinutes: changes.plannedMinutes,
+      title: changes.title,
+    }
+    const itemChange = createSessionItem({ ...item, ...normalizedChanges, updatedAt: now }, { now })
+    const entries = [{
+      entity: itemChange,
+      context: {
+        applicationId: bundle.application.id,
+        planningUnitId: bundle.planningUnit.id,
+        sessionId: bundle.session.id,
+      },
+    }]
+    let sourceActivity = item.sourceActivity
+    if (sourceActivity) {
+      const plannedChange = planActivityChange({
+        activity: sourceActivity,
+        application: bundle.application,
+        changes: normalizedChanges,
+        now,
+        scope,
+      })
+      sourceActivity = plannedChange.baseActivity
+      if (plannedChange.baseActivity !== item.sourceActivity) entries.push({ entity: plannedChange.baseActivity })
+      if (plannedChange.groupOverride) {
+        entries.push({
+          entity: plannedChange.groupOverride,
+          context: { applicationId: bundle.application.id, planningUnitId: bundle.planningUnit.id },
+        })
+      }
+    }
+    await persist(entries)
+    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+      ? {
+          ...current,
+          items: current.items.map((currentItem) => currentItem.id === item.id
+            ? { ...itemChange, sourceActivity }
+            : currentItem),
+        }
+      : current))
+    return itemChange
+  }, [persist])
+
+  /**
+   * Una continuació no altera el temps ideal de la UP. Construeix fragments
+   * nous per al grup i actualitza els comptadors de parts, però espera una
+   * confirmació separada abans de desar-los.
+   */
+  const buildContinuationPreview = useCallback(async (bundle, item, minutes) => {
+    if (!item?.sourceActivityId || Number(minutes) <= 0) {
+      throw new Error('Cal seleccionar una activitat i indicar els minuts de continuació.')
+    }
+    const setup = await loadSchedulingSetup({
+      classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId,
+      date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt,
+      timetableSlotId: session.timetableSlotId,
+    }))
+    const temporalProposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents,
+      classId: bundle.session.classId,
+      from: String(bundle.session.startsAt).slice(0, 10),
+      occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId,
+      timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const futureBundles = setup.existingSessionBundles.filter((candidate) =>
+      candidate.session.status === 'planned' && candidate.session.startsAt > bundle.session.startsAt)
+    const distribution = buildActivitySessionDistribution({
+      activities: [{
+        id: item.sourceActivityId,
+        plannedMinutes: Number(minutes),
+        title: item.title,
+        type: item.type,
+      }],
+      application: setup.application,
+      candidates: temporalProposal.candidates.filter((candidate) => candidate.startsAt > bundle.session.startsAt),
+      existingSessionBundles: futureBundles,
+      options: { now: new Date().toISOString() },
+    })
+    if (distribution.unscheduled.length > 0) {
+      throw new Error('No hi ha prou temps disponible per afegir aquesta continuació.')
+    }
+    const activeSourceItems = setup.existingSessionBundles
+      .filter((candidate) => !['cancelled', 'notHeld'].includes(candidate.session.status))
+      .flatMap((candidate) => candidate.items)
+      .filter((candidate) => candidate.sourceActivityId === item.sourceActivityId)
+    const segmentOffset = Math.max(0, ...activeSourceItems.map((candidate) => Number(candidate.segmentIndex) || 0))
+    const newSegmentCount = segmentOffset + distribution.sessions.reduce((total, candidate) => total + candidate.items.length, 0)
+    const now = new Date().toISOString()
+    const changedExistingItems = activeSourceItems.map((candidate) => createSessionItem({
+      ...candidate,
+      segmentCount: newSegmentCount,
+      updatedAt: now,
+    }, { now }))
+    let addedIndex = 0
+    const sessions = distribution.sessions.map((candidate) => ({
+      ...candidate,
+      items: candidate.items.map((newItem) => {
+        addedIndex += 1
+        return createSessionItem({
+          ...newItem,
+          segmentCount: newSegmentCount,
+          segmentIndex: segmentOffset + addedIndex,
+          updatedAt: now,
+        }, { now })
+      }),
+    }))
+    return { bundle, changedExistingItems, item, minutes: Number(minutes), sessions, setup }
+  }, [activeAcademicYear, loadSchedulingSetup])
+
+  /** Desa en una sola cua la continuació confirmada i els comptadors revisats. */
+  const confirmContinuationPreview = useCallback(async (preview) => {
+    const planningUnitId = preview.setup.planningUnit.id
+    const entries = preview.changedExistingItems.map((item) => ({
+      entity: item,
+      context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
+    }))
+    for (const bundle of preview.sessions) {
+      if (!bundle.isExisting) entries.push({ entity: bundle.session, context: { planningUnitId } })
+      for (const item of bundle.items) {
+        entries.push({
+          entity: item,
+          context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
+        })
+      }
+    }
+    await persist(entries)
+    const changedById = new Map(preview.changedExistingItems.map((item) => [item.id, item]))
+    setSessionBundles((currentBundles) => {
+      const next = currentBundles.map((current) => {
+        const continuation = preview.sessions.find((candidate) => candidate.session.id === current.session.id)
+        return {
+          ...current,
+          items: [
+            ...current.items.map((currentItem) => changedById.has(currentItem.id)
+              ? { ...changedById.get(currentItem.id), sourceActivity: currentItem.sourceActivity }
+              : currentItem),
+            ...(continuation?.items || []).map((newItem) => ({ ...newItem, sourceActivity: preview.item.sourceActivity })),
+          ].sort((left, right) => Number(left.order) - Number(right.order)),
+        }
+      })
+      const knownIds = new Set(next.map((current) => current.session.id))
+      for (const continuation of preview.sessions.filter((candidate) => !knownIds.has(candidate.session.id))) {
+        next.push({
+          application: preview.setup.application,
+          items: continuation.items.map((newItem) => ({ ...newItem, sourceActivity: preview.item.sourceActivity })),
+          planningUnit: preview.setup.planningUnit,
+          results: [],
+          session: continuation.session,
+        })
+      }
+      return next.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+    })
+    return preview
+  }, [persist])
+
   return {
     academicYears,
     activeAcademicYear,
@@ -501,22 +805,29 @@ export function useAgendaWorkspace(user) {
     activeTimetableId,
     calendarEvents,
     buildSchedulingPreview,
+    buildContinuationPreview,
+    confirmContinuationPreview,
     confirmSchedulingPreview,
     createTimetable,
     error,
     isOnline,
     loading,
     loadSchedulingSetup,
+    loadSessionRange,
     moveSlot,
     removeCalendarEvent,
     removeSlot,
     saveCalendarEvent,
+    saveSessionItemChange,
+    saveSessionStatus,
     saveSlot,
     saveTimetable,
     setActiveAcademicYearId,
     setActiveTimetableId,
     setError,
     slots,
+    sessionBundles,
+    sessionsLoading,
     sync,
     synchronize,
     timetables,

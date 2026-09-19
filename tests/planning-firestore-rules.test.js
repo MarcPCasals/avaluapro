@@ -149,6 +149,7 @@ function sessionData(overrides = {}) {
       ownerUid: OWNER.uid,
       applicationId: APP_ONE,
       classId: CLASS_ONE,
+      calendarEventId: null,
       startsAt: '2026-09-22T09:30:00+02:00',
       durationMinutes: 60,
     }, { now: NOW }),

@@ -1492,7 +1492,7 @@ service cloud.firestore {
 
     function validPlanningSession(upId, applicationId, sessionId) {
       return request.resource.data.keys().hasOnly([
-          'applicationId', 'classId', 'createdAt', 'durationMinutes', 'entityType',
+          'applicationId', 'calendarEventId', 'classId', 'createdAt', 'durationMinutes', 'entityType',
           'id', 'ownerUid', 'schemaVersion', 'startsAt', 'status', 'subgroupId',
           'timetableSlotId', 'updatedAt'
         ])

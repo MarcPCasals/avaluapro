@@ -535,6 +535,10 @@ export function copyTimetableVersionStructure(
 export function createCalendarEvent(input, options = {}) {
   const startsOn = isoDate(input.startsOn, "inici de l'esdeveniment")
   const endsOn = optionalIsoDate(input.endsOn, "final de l'esdeveniment") || startsOn
+  const startsAt = optionalText(input.startsAt)
+  if (startsAt && !TIME_PATTERN.test(startsAt)) {
+    throw new Error("L'hora de la classe extraordinària ha de tenir el format HH:mm")
+  }
   assertDateRange(startsOn, endsOn, 'esdeveniment')
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.CALENDAR_EVENT, input, options),
@@ -547,6 +551,9 @@ export function createCalendarEvent(input, options = {}) {
     classIds: textList(input.classIds),
     reason: optionalText(input.reason),
     consumesPlannedSession: Boolean(input.consumesPlannedSession),
+    startsAt,
+    durationMinutes: optionalMinutes(input.durationMinutes, 'durada de la classe extraordinària'),
+    subgroupId: optionalText(input.subgroupId),
   }
 }
 
@@ -556,6 +563,7 @@ export function createCalendarSession(input, options = {}) {
     ownerUid: requiredText(input.ownerUid, 'propietari'),
     applicationId: requiredText(input.applicationId, 'aplicació de grup'),
     classId: requiredText(input.classId, 'grup'),
+    calendarEventId: optionalText(input.calendarEventId),
     timetableSlotId: optionalText(input.timetableSlotId),
     startsAt: isoDateTime(input.startsAt, "data i hora d'inici"),
     durationMinutes: positiveMinutes(input.durationMinutes, 'durada de la sessió'),
