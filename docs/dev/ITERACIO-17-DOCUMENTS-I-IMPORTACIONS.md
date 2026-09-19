@@ -86,7 +86,13 @@ Commit funcional: `96ab9f1`.
 
 ## Publicació
 
-Pendent de desplegar les regles de Firestore i Firebase Hosting.
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- Firebase Hosting serveix el paquet `PlanningModule-DUaGsYsv.js` amb **Document i imports**, **Importar una UP** i **Enganxar taula**;
+- la sessió autenticada conserva els cinc grups reals, mostra **Sincronitzat** i carrega Programació sense cap marcador d'error;
+- com que encara no hi ha cap curs de Programació creat al compte real, la verificació s'ha aturat a **Configura el curs acadèmic** i no ha creat dades;
+- l'auditoria posterior no detecta bloquejos ni respostes pendents de sincronitzar;
+- les regles locals i les desplegades tenen la mateixa signatura.
 
 ## Pas següent
 
