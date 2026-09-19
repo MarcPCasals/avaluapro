@@ -1278,6 +1278,7 @@ service cloud.firestore {
           'complexSituation',
           'copiedFrom',
           'createdAt',
+          'curriculum',
           'entityType',
           'expectedLearningIds',
           'expectedProduct',
@@ -1312,7 +1313,24 @@ service cloud.firestore {
         && request.resource.data.accessByEmail.keys().hasAll(request.resource.data.authorizedEmails)
         && request.resource.data.status in ['draft', 'active', 'archived']
         && request.resource.data.createdAt is string
-        && request.resource.data.updatedAt is string;
+        && request.resource.data.updatedAt is string
+        && (
+          !('curriculum' in request.resource.data)
+          || (
+            request.resource.data.curriculum is map
+            && request.resource.data.curriculum.keys().hasOnly([
+              'assessmentCriteria', 'competencies', 'expectedLearnings', 'indicators'
+            ])
+            && request.resource.data.curriculum.assessmentCriteria is list
+            && request.resource.data.curriculum.competencies is list
+            && request.resource.data.curriculum.expectedLearnings is list
+            && request.resource.data.curriculum.indicators is list
+            && request.resource.data.curriculum.assessmentCriteria.size() <= 100
+            && request.resource.data.curriculum.competencies.size() <= 100
+            && request.resource.data.curriculum.expectedLearnings.size() <= 100
+            && request.resource.data.curriculum.indicators.size() <= 200
+          )
+        );
     }
 
     function validPlanningUnitOwnerUpdate(upId) {
@@ -1334,6 +1352,7 @@ service cloud.firestore {
           'code',
           'competencyIds',
           'complexSituation',
+          'curriculum',
           'expectedLearningIds',
           'expectedProduct',
           'factsAndConcepts',
@@ -1367,7 +1386,7 @@ service cloud.firestore {
 
     function validPlanningActivity(upId, activityId) {
       return request.resource.data.keys().hasOnly([
-          'applicationComment', 'createdAt', 'description', 'diversityMeasureIds',
+          'applicationComment', 'createdAt', 'description', 'diversityMeasureIds', 'diversityMeasures',
           'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
           'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
@@ -1381,6 +1400,8 @@ service cloud.firestore {
         && request.resource.data.evidenceMode in ['none', 'final', 'perSession']
         && request.resource.data.indicatorIds is list
         && request.resource.data.diversityMeasureIds is list
+        && request.resource.data.diversityMeasures is list
+        && request.resource.data.diversityMeasures.size() <= 100
         && request.resource.data.teacherMaterials is list
         && request.resource.data.studentMaterials is list
         && request.resource.data.order is number

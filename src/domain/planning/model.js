@@ -13,6 +13,7 @@ import {
   SESSION_STATUSES,
 } from './constants.js'
 import { ensurePlanningId } from './ids.js'
+import { createId } from '../../lib/ids.js'
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -103,6 +104,46 @@ function textList(values) {
   return [...new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean))]
 }
 
+const CURRICULUM_KEYS = [
+  'competencies',
+  'expectedLearnings',
+  'assessmentCriteria',
+  'indicators',
+]
+
+function embeddedId(value, prefix, idFactory = createId) {
+  return optionalText(value) || idFactory(prefix)
+}
+
+/**
+ * Conserva una fotografia llegible del currículum dins la UP. Els sourceId
+ * només mantenen el vincle opcional amb AvaluaPro; direcció no depèn d'aquell
+ * espai privat per poder llegir el text oficial.
+ */
+function normalizeCurriculum(input = {}, options = {}) {
+  return Object.fromEntries(CURRICULUM_KEYS.map((key) => [key, (input?.[key] || []).map((item) => ({
+    id: embeddedId(item?.id, 'plan-curriculum', options.idFactory),
+    label: requiredText(item?.label, 'contingut curricular'),
+    sourceId: optionalText(item?.sourceId),
+  }))]))
+}
+
+/**
+ * Les mesures compartibles contenen únicament la decisió pedagògica i
+ * l'alumnat al qual s'aplica. Qualsevol diagnòstic o nota rebut a l'entrada es
+ * descarta expressament en normalitzar l'activitat.
+ */
+function normalizeDiversityMeasures(measures = [], options = {}) {
+  return measures.map((measure) => ({
+    id: embeddedId(measure?.id, 'plan-measure', options.idFactory),
+    label: requiredText(measure?.label, 'mesura d’atenció a la diversitat'),
+    classId: optionalText(measure?.classId),
+    className: optionalText(measure?.className),
+    studentIds: textList(measure?.studentIds),
+    studentNames: textList(measure?.studentNames),
+  }))
+}
+
 function entityBase(entityType, input, options = {}) {
   const timestamp = normalizedTimestamp(options.now)
   return {
@@ -157,6 +198,11 @@ export function createTemporalUnit(input, options = {}) {
 }
 
 export function createPlanningUnit(input, options = {}) {
+  const curriculum = normalizeCurriculum(input.curriculum, options)
+  const hasCurriculum = Object.prototype.hasOwnProperty.call(input, 'curriculum')
+  const curriculumSourceIds = (key, fallback) => hasCurriculum
+    ? curriculum[key].map((item) => item.sourceId).filter(Boolean)
+    : textList(fallback)
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.PLANNING_UNIT, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
@@ -170,10 +216,11 @@ export function createPlanningUnit(input, options = {}) {
     complexSituation: optionalText(input.complexSituation),
     expectedProduct: optionalText(input.expectedProduct),
     vehicularLanguage: optionalText(input.vehicularLanguage),
-    competencyIds: textList(input.competencyIds),
-    expectedLearningIds: textList(input.expectedLearningIds),
-    assessmentCriterionIds: textList(input.assessmentCriterionIds),
-    indicatorIds: textList(input.indicatorIds),
+    curriculum,
+    competencyIds: curriculumSourceIds('competencies', input.competencyIds),
+    expectedLearningIds: curriculumSourceIds('expectedLearnings', input.expectedLearningIds),
+    assessmentCriterionIds: curriculumSourceIds('assessmentCriteria', input.assessmentCriterionIds),
+    indicatorIds: curriculumSourceIds('indicators', input.indicatorIds),
     specificResources: textList(input.specificResources),
     transversalResources: textList(input.transversalResources),
     factsAndConcepts: textList(input.factsAndConcepts),
@@ -224,6 +271,7 @@ export function createPlanningPhase(input, options = {}) {
 }
 
 export function createPlanningActivity(input, options = {}) {
+  const diversityMeasures = normalizeDiversityMeasures(input.diversityMeasures, options)
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.PLANNING_ACTIVITY, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
@@ -239,7 +287,10 @@ export function createPlanningActivity(input, options = {}) {
     grouping: optionalText(input.grouping),
     space: optionalText(input.space),
     indicatorIds: textList(input.indicatorIds),
-    diversityMeasureIds: textList(input.diversityMeasureIds),
+    diversityMeasureIds: Object.prototype.hasOwnProperty.call(input, 'diversityMeasures')
+      ? diversityMeasures.map((measure) => measure.id)
+      : textList(input.diversityMeasureIds),
+    diversityMeasures,
     applicationComment: optionalText(input.applicationComment),
     evidenceMode: enumValue(input.evidenceMode || 'none', EVIDENCE_MODES, "mode d'evidència"),
   }

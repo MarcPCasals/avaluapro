@@ -77,6 +77,8 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
           {activity.grouping && <span>{activity.grouping}</span>}
           {activity.space && <span>{activity.space}</span>}
           {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
+          {activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador' : 'indicadors'}</span>}
+          {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
         </small>
       </button>
       <div className="planning-activity-meta">

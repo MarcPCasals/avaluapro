@@ -8,6 +8,7 @@ import {
   AcademicYearDialog, ActivityDialog, PhaseDialog, PlanningUnitDialog, TemporalUnitDialog,
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
+import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
 import './planning.css'
 
@@ -81,7 +82,7 @@ function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
   )
 }
 
-function UnitEditor({ activities, onAddActivity, onArchive, onDeleteActivity, onEditActivity, onError, onMoveActivity, onReactivate, onSave, phases, temporalUnit, unit }) {
+function UnitEditor({ activities, curriculumCatalog, onAddActivity, onArchive, onDeleteActivity, onEditActivity, onError, onMoveActivity, onReactivate, onSave, phases, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
@@ -154,15 +155,15 @@ function UnitEditor({ activities, onAddActivity, onArchive, onDeleteActivity, on
         onMove={onMoveActivity}
         phases={phases}
       />
-      <div className="planning-editor-section muted">
-        <div className="planning-section-title"><span>04</span><div><h3>Contingut pedagògic</h3><p>Competències, aprenentatges i criteris s’afegiran al pas següent.</p></div></div>
-      </div>
+      <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
     </form>
   )
 }
 
 function UnitSummary({ activities, phases, temporalUnit, unit }) {
   const rootPhases = phases.filter((phase) => !phase.parentPhaseId).length
+  const curriculumCount = Object.values(unit.curriculum || {}).reduce((total, items) => total + (items?.length || 0), 0)
+  const measureCount = activities.reduce((total, activity) => total + (activity.diversityMeasures?.length || 0), 0)
   return (
     <aside className="planning-summary-panel">
       <div className="planning-summary-status">
@@ -174,6 +175,8 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
         <div><dt>Fases</dt><dd>{rootPhases}</dd></div>
         <div><dt>Subfases</dt><dd>{Math.max(0, phases.length - rootPhases)}</dd></div>
         <div><dt>Activitats</dt><dd>{activities.length}</dd></div>
+        <div><dt>Currículum</dt><dd>{curriculumCount}</dd></div>
+        <div><dt>Mesures</dt><dd>{measureCount}</dd></div>
       </dl>
       <section>
         <h3>Estructura actual</h3>
@@ -194,6 +197,11 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
 
 export default function PlanningModule() {
   const user = useAvaluaproStore((state) => state.cloud.user)
+  const classes = useAvaluaproStore((state) => state.classes)
+  const students = useAvaluaproStore((state) => state.students)
+  const competencies = useAvaluaproStore((state) => state.competencies)
+  const criteria = useAvaluaproStore((state) => state.criteria)
+  const indicators = useAvaluaproStore((state) => state.indicators)
   const workspace = usePlanningWorkspace(user)
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
@@ -204,6 +212,18 @@ export default function PlanningModule() {
   const [editingActivity, setEditingActivity] = useState(null)
   const [activityPhaseId, setActivityPhaseId] = useState('')
   const [phaseParentId, setPhaseParentId] = useState('')
+  const curriculumCatalog = useMemo(() => {
+    const unique = (items) => Array.from(new Map(items
+      .filter((item) => item.label)
+      .map((item) => [item.label.toLocaleLowerCase('ca'), item])).values())
+      .sort((left, right) => left.label.localeCompare(right.label, 'ca'))
+    return {
+      competencies: unique(competencies.map((item) => ({ label: item.name, sourceId: item.id }))),
+      expectedLearnings: [],
+      assessmentCriteria: unique(criteria.map((item) => ({ label: item.name, sourceId: item.id }))),
+      indicators: unique(indicators.map((item) => ({ label: item.name || item.label || item.title, sourceId: item.id }))),
+    }
+  }, [competencies, criteria, indicators])
 
   if (!user) {
     return (
@@ -307,6 +327,7 @@ export default function PlanningModule() {
             {workspace.activePlanningUnit ? (
               <UnitEditor
                 activities={workspace.activities}
+                curriculumCatalog={curriculumCatalog}
                 key={workspace.activePlanningUnit.id}
                 onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
                 onArchive={workspace.archiveUnit}
@@ -336,7 +357,7 @@ export default function PlanningModule() {
       {dialog === 'ut' && <TemporalUnitDialog initialValue={editingUt} onClose={() => { setDialog(null); setEditingUt(null) }} onSave={(values) => editingUt ? workspace.saveTemporalUnit(editingUt, values) : workspace.createTemporalUnit(values)} />}
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={workspace.createUnit} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={workspace.savePhase} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} />}
+      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} students={students} />}
     </section>
   )
 }

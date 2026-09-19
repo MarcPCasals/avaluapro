@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
 function DialogActions({ busy, onClose, submitLabel }) {
   return (
@@ -118,7 +119,7 @@ function materialDrafts(initialValue) {
   return [...teacher, ...students]
 }
 
-export function ActivityDialog({ initialPhaseId = '', initialValue, onClose, onSave, phases }) {
+export function ActivityDialog({ availableIndicators = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, students = [] }) {
   const [values, setValues] = useState(() => ({
     description: initialValue?.description || '',
     evidenceMode: initialValue?.evidenceMode || 'none',
@@ -131,6 +132,8 @@ export function ActivityDialog({ initialPhaseId = '', initialValue, onClose, onS
     type: initialValue?.type || 'activity',
   }))
   const [materials, setMaterials] = useState(() => materialDrafts(initialValue))
+  const [indicatorIds, setIndicatorIds] = useState(() => initialValue?.indicatorIds || [])
+  const [diversityMeasures, setDiversityMeasures] = useState(() => initialValue?.diversityMeasures || [])
   const updateMaterial = (index, field, value) => setMaterials((items) => items.map((item, itemIndex) => (
     itemIndex === index ? { ...item, [field]: value } : item
   )))
@@ -152,6 +155,9 @@ export function ActivityDialog({ initialPhaseId = '', initialValue, onClose, onS
       ...values,
       evidenceMode: values.type === 'activity' ? values.evidenceMode : 'none',
       plannedMinutes: values.hasTiming ? Number(values.plannedMinutes) : null,
+      indicatorIds,
+      diversityMeasureIds: diversityMeasures.map((measure) => measure.id),
+      diversityMeasures,
       studentMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'students'),
       teacherMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'teacher'),
     }, initialValue)
@@ -184,6 +190,17 @@ export function ActivityDialog({ initialPhaseId = '', initialValue, onClose, onS
         <option value="final">Comprovar al final de l’activitat</option>
         <option value="perSession">Comprovar a cada sessió</option>
       </select></label>}
+      {values.type === 'activity' && availableIndicators.length > 0 && (
+        <fieldset className="planning-indicator-picker">
+          <legend>Indicadors associats</legend>
+          <div>{availableIndicators.map((indicator) => (
+            <label key={indicator.id}><input checked={indicatorIds.includes(indicator.id)} onChange={(event) => setIndicatorIds((current) => event.target.checked ? [...current, indicator.id] : current.filter((id) => id !== indicator.id))} type="checkbox" />{indicator.label}</label>
+          ))}</div>
+        </fieldset>
+      )}
+      {values.type === 'activity' && (
+        <PlanningDiversityEditor classes={classes} measures={diversityMeasures} onChange={setDiversityMeasures} students={students} />
+      )}
       <section className="planning-material-editor">
         <div><div><strong>Materials</strong><span>Enllaços externs o referències físiques.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
         {materials.map((material, index) => (

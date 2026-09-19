@@ -68,6 +68,20 @@ Els noms, les dates i l'ordre són camps editables i no formen part de l'identif
 
 Els tres tipus conserven un identificador estable quan es reordenen. Els materials es divideixen entre docent i alumnat i poden ser un enllaç extern o una referència física. No es desen fitxers dins de Firebase.
 
+## Currículum llegible i enllaçat
+
+`planningUnit.curriculum` conserva quatre llistes llegibles: competències, aprenentatges esperats, criteris d'avaluació i indicadors. Cada element té un identificador estable, el text que ha de veure direcció i un `sourceId` opcional quan s'ha incorporat des de l'avaluació d'AvaluaPro.
+
+El text es desa com una fotografia dins la UP. Això evita que una programació històrica canviï o perdi significat si més endavant es renombra o s'elimina l'element original d'AvaluaPro. Els camps antics acabats en `Ids` es mantenen sincronitzats amb els `sourceId` per conservar compatibilitat.
+
+Els indicadors de la UP es poden associar a una activitat mitjançant `planningActivity.indicatorIds`. Els recursos específics i transversals, els fets i conceptes, els procediments i les actituds i valors continuen com a llistes de text oficial dins de `planningUnit`.
+
+## Mesures d'atenció a la diversitat
+
+`planningActivity.diversityMeasures` només conserva la mesura pedagògica, la classe i l'alumnat seleccionat. La biblioteca d'AvaluaPro pot utilitzar els diagnòstics localment per suggerir i preseleccionar orientacions, però la normalització de domini descarta qualsevol diagnòstic o nota personal abans de persistir l'activitat.
+
+Direcció pot consultar les mesures que formen part de la programació. Els diagnòstics complets, les observacions individuals i les notes personals continuen fora de la UP compartible i sota els permisos propis d'AvaluaPro.
+
 ## UP base i aplicació per grup
 
 La UP base no es clona completament per a cada grup. L'aplicació guarda la relació i només registra excepcions.
@@ -156,7 +170,7 @@ Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a u
 
 ## Privacitat i capacitats
 
-`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat i la reflexió pedagògica. `planningPrivateNote` viu en una col·lecció separada i només la pot llegir el propietari. Les incidències, l'assistència i els diagnòstics continuen en els àmbits protegits d'AvaluaPro.
+`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat i la reflexió pedagògica. `planningPrivateNote` viu en una col·lecció separada i només la pot llegir el propietari. Les incidències, l'assistència, els diagnòstics i les notes personals continuen en els àmbits protegits d'AvaluaPro; una activitat només rep la mesura pedagògica i l'alumnat seleccionat explícitament.
 
 | Rol | UP | Editar UP | Aplicació real | Gestionar Agenda | Notes privades o incidències |
 |---|---:|---:|---:|---:|---:|

@@ -55,6 +55,8 @@ Els tres rols convidats són:
 
 Direcció no rep notes privades, incidències individuals ni diagnòstics complets.
 
+La UP incorpora una fotografia textual del currículum a `curriculum`, a més dels identificadors d'origen opcionals. Les activitats poden incorporar `diversityMeasures` amb la mesura pedagògica i els noms seleccionats. El model no hi copia diagnòstics ni notes personals, i les regles rebutgen camps superiors inesperats als documents d'UP i d'activitat.
+
 ## Consultes selectives
 
 El servei `planningFirestore.js` limita cada lectura:

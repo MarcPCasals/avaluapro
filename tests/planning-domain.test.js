@@ -96,6 +96,57 @@ test('una indicació queda dins la seqüència sense exigir temporització', () 
   assert.equal(indication.plannedMinutes, null)
 })
 
+test('la UP conserva una fotografia llegible del currículum i el vincle opcional amb AvaluaPro', () => {
+  const unit = createPlanningUnit({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-2026',
+    temporalUnitId: 'ut-1',
+    code: 'UP2',
+    level: '2n ESO',
+    title: 'Transformacions',
+    curriculum: {
+      competencies: [{ id: 'plan-curriculum-1', label: 'Competència científica', sourceId: 'comp-1' }],
+      expectedLearnings: [{ id: 'plan-curriculum-2', label: 'Explica els canvis observats' }],
+      assessmentCriteria: [{ id: 'plan-curriculum-3', label: 'Argumenta amb evidències' }],
+      indicators: [{ id: 'plan-curriculum-4', label: 'Relaciona causa i efecte', sourceId: 'indicator-1' }],
+    },
+  }, options())
+
+  assert.equal(unit.curriculum.competencies[0].label, 'Competència científica')
+  assert.equal(unit.curriculum.competencies[0].sourceId, 'comp-1')
+  assert.equal(unit.curriculum.expectedLearnings[0].sourceId, null)
+  assert.equal(unit.curriculum.indicators[0].id, 'plan-curriculum-4')
+  assert.deepEqual(unit.competencyIds, ['comp-1'])
+  assert.deepEqual(unit.indicatorIds, ['indicator-1'])
+})
+
+test('una mesura comparteix l’actuació i l’alumnat però descarta diagnòstics i notes personals', () => {
+  const activity = createPlanningActivity({
+    ownerUid: 'teacher-1',
+    planningUnitId: 'up-1',
+    phaseId: 'phase-1',
+    title: 'Lectura guiada',
+    order: 0,
+    diversityMeasures: [{
+      id: 'plan-measure-1',
+      label: 'Donar instruccions curtes i seqüenciades.',
+      classId: 'class-1',
+      className: '1r A',
+      studentIds: ['student-1'],
+      studentNames: ['ALBA SERRA, Joana'],
+      diagnosis: 'tdah',
+      personalNotes: 'No s’ha de copiar.',
+    }],
+  }, options())
+
+  assert.deepEqual(Object.keys(activity.diversityMeasures[0]).sort(), [
+    'classId', 'className', 'id', 'label', 'studentIds', 'studentNames',
+  ])
+  assert.equal(JSON.stringify(activity).includes('tdah'), false)
+  assert.equal(JSON.stringify(activity).includes('No s’ha de copiar'), false)
+  assert.deepEqual(activity.diversityMeasureIds, ['plan-measure-1'])
+})
+
 test('la nansa pot reordenar un element i moure’l a una altra fase sense canviar-ne la identitat', () => {
   const idFactory = sequenceIdFactory()
   const first = createPlanningActivity({

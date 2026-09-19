@@ -330,7 +330,16 @@ describe('Planificació compartida', () => {
 
   test('l’editor modifica la UP, fases i activitats sense obtenir accés implícit al grup', async () => {
     const db = authDb(EDITOR)
-    await assertSucceeds(updateDoc(upRef(db), { title: 'Títol revisat', updatedAt: NOW }))
+    await assertSucceeds(updateDoc(upRef(db), {
+      curriculum: {
+        competencies: [{ id: 'plan-curriculum-1', label: 'Competència científica', sourceId: null }],
+        expectedLearnings: [],
+        assessmentCriteria: [],
+        indicators: [],
+      },
+      title: 'Títol revisat',
+      updatedAt: NOW,
+    }))
     await assertSucceeds(updateDoc(
       doc(upRef(db), 'phases', 'plan-phase-one'),
       { title: 'Preparació revisada', updatedAt: NOW },
@@ -442,6 +451,32 @@ describe('Planificació compartida', () => {
       doc(upRef(db), 'activities', 'plan-invalid-kind'),
       activityData({ id: 'plan-invalid-kind', type: 'unknown' }),
     ))
+  })
+
+  test('les mesures compartibles admeten alumnat però no camps privats al document de l’activitat', async () => {
+    const db = authDb(OWNER)
+    const measure = {
+      classId: CLASS_ONE,
+      className: '1r A',
+      id: 'plan-measure-one',
+      label: 'Dividir la tasca en passos curts.',
+      studentIds: ['student-one'],
+      studentNames: ['ALBA SERRA, Joana'],
+    }
+    await assertSucceeds(setDoc(
+      doc(upRef(db), 'activities', 'plan-activity-diversity'),
+      activityData({ id: 'plan-activity-diversity', diversityMeasureIds: [measure.id], diversityMeasures: [measure] }),
+    ))
+    await assertFails(setDoc(
+      doc(upRef(db), 'activities', 'plan-activity-private-profile'),
+      activityData({ id: 'plan-activity-private-profile', diagnoses: ['tdah'] }),
+    ))
+
+    const directionSnapshot = await assertSucceeds(getDoc(
+      doc(upRef(authDb(DIRECTION)), 'activities', 'plan-activity-diversity'),
+    ))
+    assert.equal(directionSnapshot.data().diversityMeasures[0].label, measure.label)
+    assert.equal('diagnoses' in directionSnapshot.data(), false)
   })
 })
 
