@@ -99,11 +99,11 @@ La compilació continua separant Programació i Agenda del nucli principal. La i
 
 | Paquet | Mida minificada | Mida gzip |
 | --- | ---: | ---: |
-| Programació | 98,08 kB | 24,45 kB |
+| Programació | 98,08 kB | 24,44 kB |
 | Agenda | 122,84 kB | 31,71 kB |
-| Entrada principal | 571,82 kB | 162,95 kB |
+| Entrada principal | 571,80 kB | 162,94 kB |
 
-Respecte de la compilació anterior, l'augment gzip és de 0,43 kB a Programació, 0,42 kB a Agenda i 0,47 kB a l'entrada principal. Correspon al patró comú de diàlegs, pestanyes i etiquetes; no introdueix cap dependència nova ni cap consulta addicional.
+Respecte de la compilació anterior, l'augment gzip és de 0,42 kB a Programació, 0,42 kB a Agenda i 0,46 kB a l'entrada principal. Correspon al patró comú de diàlegs, pestanyes i etiquetes; no introdueix cap dependència nova ni cap consulta addicional.
 
 Vite manté un avís informatiu perquè l'entrada principal minificada supera 500 kB. No bloqueja el pilot, però el mòdul de Tutoria i el nucli principal continuen sent els candidats prioritaris per a una futura divisió de càrrega.
 
@@ -122,6 +122,17 @@ Vite manté un avís informatiu perquè l'entrada principal minificada supera 50
 
 Les captures locals usen dades sintètiques per no tocar alumnat real. La vista de 1024 × 768 px comprova el comportament responsive dins d'un navegador d'escriptori, però el pilot encara haurà de confirmar gestos, teclat virtual i Safari en un iPad físic. La publicació i la comprovació autenticada de la versió final es registraran al mateix document després del desplegament.
 
-## 9. Decisió de tancament
+## 9. Publicació i comprovació real
 
-Els recorreguts principals ja no presenten els bloquejos de teclat detectats, els controls essencials de Mode aula tenen una mida usable i els estats no depenen només del color. La iteració es pot tancar després de publicar i repetir la comprovació autenticada. El pas següent és el pilot d'una UP i un grup durant dues o tres setmanes.
+- Canvi funcional: `52c0d08`.
+- Auditoria i evidències: `3ebb230`.
+- Publicació: Firebase Hosting a `https://avaluapro.web.app`.
+- La versió autenticada carrega cinc grups, mostra `Sincronitzat` i obre Programació sense cap canvi pendent.
+- El diàleg publicat s'anuncia com «Nou curs acadèmic», posa el focus al primer camp, el manté dins del diàleg, es tanca amb `Esc` i el retorna a «Nou curs».
+- El paquet de Programació publicat conté la reordenació accessible per teclat.
+- L'auditoria posterior manté `readyToDeploy: true`, les regles locals i publicades tenen el mateix hash i no hi ha respostes sociomètriques pendents de sincronitzar.
+- Es conserva l'avís conegut d'un qüestionari sociomètric antic encara actiu; la còpia privada conté les 8 respostes declarades i aquesta publicació no ha modificat les regles.
+
+## 10. Decisió de tancament
+
+Els recorreguts principals ja no presenten els bloquejos de teclat detectats, els controls essencials de Mode aula tenen una mida usable i els estats no depenen només del color. La publicació i la comprovació autenticada confirmen el tancament de la iteració. El pas següent és el pilot d'una UP i un grup durant dues o tres setmanes.
