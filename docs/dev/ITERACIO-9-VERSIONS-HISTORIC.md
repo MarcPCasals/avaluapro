@@ -48,8 +48,13 @@ La pantalla inicial continua carregant només el curs actiu. Obrir l'històric a
 - comprovació visual a 1440 × 1000 i 1024 × 768;
 - diàlegs de duplicació i històric sencers, sense desbordament horitzontal;
 - cerca i selecció d'una activitat antiga comprovades amb dades representatives fora del compte real.
+- regles de Firestore i Hosting publicats a `avaluapro.web.app`;
+- el pilot publicat mostra Programació només amb `?preview=planning`, mentre que la navegació normal manté Agenda i Programació ocultes;
+- el paquet publicat conté «Duplicar la UP», «Recuperar una activitat» i «Millora per al curs següent».
 
 No s'ha creat cap UP, còpia ni activitat fictícia al compte real.
+
+L'auditoria d'inventari prèvia a la publicació no es va poder repetir perquè Firebase va respondre amb el límit temporal de consultes esgotat (`RESOURCE_EXHAUSTED`). No era una fallada de regles ni de construcció: la compilació, la suite de seguretat i la publicació van acabar correctament. Aquesta comprovació operativa es tornarà a executar quan la quota estigui disponible.
 
 ## Pas següent
 
