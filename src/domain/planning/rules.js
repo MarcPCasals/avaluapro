@@ -1,8 +1,10 @@
 import { CHANGE_SCOPES } from './constants.js'
 import {
+  createPlanningUnit,
   createGroupActivityOverride,
   updatePlanningActivity,
 } from './model.js'
+import { createId } from '../../lib/ids.js'
 
 export function getProgrammableMinutes(sessionDurationMinutes, marginMinutes = 5) {
   const duration = Math.max(0, Number(sessionDurationMinutes) || 0)
@@ -45,6 +47,129 @@ export function getPlanningTotals(phases, activities) {
     totalsByPhase[activity.phaseId] = (totalsByPhase[activity.phaseId] || 0) + minutes
   }
   return { totalMinutes, totalsByPhase }
+}
+
+/**
+ * Resumeix els resultats reals per activitat sense modificar la programació
+ * ideal. Agenda podrà alimentar aquesta funció quan hi hagi sessions fetes.
+ */
+export function getActivityActualComparisons(activities, results, options = {}) {
+  const groupNames = options.groupNamesByApplicationId || {}
+  return (activities || []).map((activity) => {
+    const activityResults = (results || []).filter((result) => result.sourceActivityId === activity.id)
+    const actualValues = activityResults
+      .map((result) => Number(result.actualMinutes))
+      .filter((minutes) => Number.isFinite(minutes) && minutes > 0)
+    const actualMinutesAverage = actualValues.length > 0
+      ? Math.round(actualValues.reduce((total, minutes) => total + minutes, 0) / actualValues.length)
+      : null
+    const plannedMinutes = Number(activity.plannedMinutes) > 0 ? Number(activity.plannedMinutes) : null
+    const sourceGroupNames = [...new Set(activityResults
+      .map((result) => groupNames[result.applicationId])
+      .filter(Boolean))]
+    return {
+      activityId: activity.id,
+      actualMinutesAverage,
+      plannedMinutes,
+      sampleCount: activityResults.length,
+      sourceGroupNames,
+      status: actualMinutesAverage === null || plannedMinutes === null
+        ? 'noData'
+        : actualMinutesAverage > plannedMinutes ? 'overrun' : 'withinPlan',
+    }
+  })
+}
+
+/**
+ * Converteix revisions d'Agenda en propostes pendents. La informació real
+ * explica la proposta, però cap canvi s'aplica fins que el docent l'accepta.
+ */
+export function buildActivityImprovementProposals(activities, results, options = {}) {
+  const comparisons = getActivityActualComparisons(activities, results, options)
+  const idFactory = options.idFactory || createId
+  return comparisons.flatMap((comparison) => {
+    const activity = (activities || []).find((candidate) => candidate.id === comparison.activityId)
+    const activityResults = (results || []).filter((result) => result.sourceActivityId === comparison.activityId)
+    const missingMaterials = [...new Set(activityResults.flatMap((result) => result.missingMaterials || []))]
+    const usefulAdaptationIds = [...new Set(activityResults.flatMap((result) => result.usefulAdaptationIds || []))]
+    const recommendations = activityResults.map((result) => result.improvementRecommendation).filter(Boolean)
+    const reflections = activityResults
+      .flatMap((result) => [result.pedagogicalReflection, result.applicationComment])
+      .filter(Boolean)
+    const recommendation = recommendations.includes('remove')
+      ? 'remove'
+      : recommendations.includes('modify') ? 'modify' : recommendations.includes('keep') ? 'keep' : null
+    const hasEvidence = comparison.status === 'overrun' || missingMaterials.length > 0 ||
+      usefulAdaptationIds.length > 0 || reflections.length > 0 || ['modify', 'remove'].includes(recommendation)
+    if (!hasEvidence) return []
+
+    const detailParts = []
+    if (comparison.status === 'overrun') {
+      detailParts.push(`Ha durat una mitjana de ${comparison.actualMinutesAverage} min en lloc de ${comparison.plannedMinutes} min.`)
+    }
+    if (missingMaterials.length > 0) detailParts.push(`Materials que han faltat: ${missingMaterials.join(', ')}.`)
+    if (usefulAdaptationIds.length > 0) detailParts.push(`${usefulAdaptationIds.length} adaptacions han resultat útils.`)
+    if (recommendation === 'modify') detailParts.push('S’ha recomanat modificar l’activitat.')
+    if (recommendation === 'remove') detailParts.push('S’ha recomanat retirar o substituir l’activitat.')
+    if (reflections.length > 0) detailParts.push(reflections.join(' · '))
+    const suggestedChanges = {}
+    if (comparison.status === 'overrun') suggestedChanges.plannedMinutes = comparison.actualMinutesAverage
+    if (recommendation === 'modify' || recommendation === 'remove' || missingMaterials.length > 0) {
+      suggestedChanges.applicationComment = detailParts.join(' ')
+    }
+    const kind = recommendation === 'remove'
+      ? 'sequence'
+      : missingMaterials.length > 0
+        ? 'materials'
+        : usefulAdaptationIds.length > 0
+          ? 'adaptation'
+          : comparison.status === 'overrun' ? 'time' : 'reflection'
+    return [{
+      id: idFactory('plan-improvement'),
+      activityId: activity.id,
+      kind,
+      title: `Revisar «${activity.title}»`,
+      detail: detailParts.join(' '),
+      status: 'pending',
+      suggestedChanges,
+      sourceGroupNames: comparison.sourceGroupNames,
+      plannedMinutes: comparison.plannedMinutes,
+      actualMinutesAverage: comparison.actualMinutesAverage,
+      sampleCount: comparison.sampleCount,
+    }]
+  })
+}
+
+/** Aplica només les propostes seleccionades i conserva la resta pendents. */
+export function applyImprovementProposals(planningUnit, activities, proposalIds, options = {}) {
+  const selected = new Set(proposalIds || [])
+  const changedActivitiesById = new Map()
+  const activitiesById = new Map((activities || []).map((activity) => [activity.id, activity]))
+  const proposals = (planningUnit.improvementProposals || []).map((proposal) => {
+    if (!selected.has(proposal.id) || proposal.status !== 'pending') return proposal
+    const activity = activitiesById.get(proposal.activityId)
+    if (activity && Object.keys(proposal.suggestedChanges || {}).length > 0) {
+      const updated = updatePlanningActivity(activity, proposal.suggestedChanges, { now: options.now })
+      activitiesById.set(updated.id, updated)
+      changedActivitiesById.set(updated.id, updated)
+    }
+    return { ...proposal, status: 'accepted' }
+  })
+  const normalizedUnit = createPlanningUnit({
+    ...planningUnit,
+    improvementProposals: proposals,
+    updatedAt: options.now || new Date().toISOString(),
+  }, options)
+  return {
+    planningUnit: {
+      ...normalizedUnit,
+      accessByEmail: planningUnit.accessByEmail || {},
+      authorizedEmails: planningUnit.authorizedEmails || [],
+      ownerEmailLower: planningUnit.ownerEmailLower || '',
+    },
+    activities: (activities || []).map((activity) => activitiesById.get(activity.id) || activity),
+    changedActivities: [...changedActivitiesById.values()],
+  }
 }
 
 /**

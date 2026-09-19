@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Clock3, Copy, History, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
@@ -217,6 +217,154 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
           </div>
         ))}
       </section>
+    </PlanningDialog>
+  )
+}
+
+export function AnnualCopyDialog({ academicYears, loadTemporalUnits, onClose, onSave, sourceYearId }) {
+  const targetYears = academicYears.filter((year) => year.id !== sourceYearId)
+  const [academicYearId, setAcademicYearId] = useState(targetYears[0]?.id || '')
+  const [temporalUnits, setTemporalUnits] = useState([])
+  const [temporalUnitId, setTemporalUnitId] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    if (!academicYearId) {
+      return undefined
+    }
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setLoadError('')
+    })
+    loadTemporalUnits(academicYearId)
+      .then((items) => {
+        if (cancelled) return
+        setTemporalUnits(items)
+        setTemporalUnitId(items[0]?.id || '')
+      })
+      .catch((error) => !cancelled && setLoadError(error.message || 'No s’han pogut carregar les UT.'))
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [academicYearId, loadTemporalUnits])
+
+  const save = () => {
+    if (!academicYearId) throw new Error('Primer crea el curs de destinació des de Programació.')
+    if (!temporalUnitId) throw new Error('El curs de destinació necessita almenys una UT.')
+    return onSave({ academicYearId, temporalUnitId })
+  }
+
+  return (
+    <PlanningDialog error={loadError} onClose={onClose} onSubmit={save} submitLabel="Crear la còpia" title="Duplicar la UP per a un altre curs">
+      <div className="planning-copy-intro"><Copy size={20} /><p>Es copiaran la UP, les fases i totes les activitats. La versió actual quedarà intacta i els permisos no es traslladaran.</p></div>
+      {targetYears.length === 0 ? (
+        <p className="planning-empty-inline">Encara no hi ha cap altre curs. Tanca aquest diàleg, crea’l amb «Nou curs» i defineix-hi almenys una UT.</p>
+      ) : (
+        <>
+          <label>Curs de destinació<select autoFocus value={academicYearId} onChange={(event) => setAcademicYearId(event.target.value)}>
+            {targetYears.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}
+          </select></label>
+          <label>Unitat temporal<select disabled={loading || temporalUnits.length === 0} value={temporalUnitId} onChange={(event) => setTemporalUnitId(event.target.value)}>
+            {loading && <option value="">Carregant…</option>}
+            {!loading && temporalUnits.length === 0 && <option value="">Aquest curs encara no té cap UT</option>}
+            {temporalUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.label}</option>)}
+          </select></label>
+        </>
+      )}
+    </PlanningDialog>
+  )
+}
+
+export function ActivityHistoryDialog({ loadStructure, loadUnits, onClose, onSave, phases }) {
+  const [units, setUnits] = useState([])
+  const [sourceUnitId, setSourceUnitId] = useState('')
+  const [structure, setStructure] = useState({ activities: [], phases: [], planningUnit: null })
+  const [selectedActivityId, setSelectedActivityId] = useState('')
+  const [phaseId, setPhaseId] = useState(phases[0]?.id || '')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => !cancelled && setLoading(true))
+    loadUnits()
+      .then((items) => {
+        if (cancelled) return
+        setUnits(items)
+        setSourceUnitId(items[0]?.id || '')
+      })
+      .catch((error) => !cancelled && setLoadError(error.message || 'No s’ha pogut carregar l’històric.'))
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [loadUnits])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!sourceUnitId) {
+      return undefined
+    }
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setSelectedActivityId('')
+    })
+    loadStructure(sourceUnitId)
+      .then((value) => !cancelled && setStructure(value))
+      .catch((error) => !cancelled && setLoadError(error.message || 'No s’ha pogut obrir aquesta UP.'))
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [loadStructure, sourceUnitId])
+
+  const numberedActivities = useMemo(() => {
+    const phaseOrder = new Map((structure.phases || []).map((phase, index) => [phase.id, index]))
+    return [...(structure.activities || [])]
+      .sort((left, right) => (phaseOrder.get(left.phaseId) ?? 999) - (phaseOrder.get(right.phaseId) ?? 999) || Number(left.order) - Number(right.order))
+      .map((activity, index) => ({ ...activity, sequenceNumber: index + 1 }))
+  }, [structure.activities, structure.phases])
+  const visibleActivities = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase('ca')
+    return numberedActivities.filter((activity) => !needle ||
+      `a${activity.sequenceNumber} ${activity.title} ${activity.description || ''}`.toLocaleLowerCase('ca').includes(needle))
+  }, [numberedActivities, search])
+  const selectedActivity = structure.activities.find((activity) => activity.id === selectedActivityId)
+  const save = () => {
+    if (!selectedActivity) throw new Error('Selecciona l’activitat que vols recuperar.')
+    if (!phaseId) throw new Error('Selecciona la fase de destinació.')
+    return onSave({
+      activity: selectedActivity,
+      phaseId,
+      sourceAcademicYearId: structure.planningUnit?.academicYearId,
+    })
+  }
+
+  return (
+    <PlanningDialog error={loadError} onClose={onClose} onSubmit={save} size="lg" submitLabel="Copiar l’activitat" title="Recuperar una activitat antiga">
+      <div className="planning-copy-intro"><History size={20} /><p>L’històric es carrega només en obrir aquest espai. La còpia conservarà contingut, temps, materials, indicadors i mesures.</p></div>
+      {units.length === 0 && !loading ? <p className="planning-empty-inline">No hi ha UP de cursos anteriors.</p> : (
+        <>
+          <div className="planning-form-row">
+            <label>Programació d’origen<select value={sourceUnitId} onChange={(event) => setSourceUnitId(event.target.value)}>
+              {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.academicYearLabel} · {unit.code} · {unit.title}</option>)}
+            </select></label>
+            <label>Fase de destinació<select value={phaseId} onChange={(event) => setPhaseId(event.target.value)}>
+              {phases.map((phase) => <option key={phase.id} value={phase.id}>{phase.title}</option>)}
+            </select></label>
+          </div>
+          <label className="planning-history-search"><Search size={15} /><input placeholder="Cerca pel títol o la descripció" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+          <div className="planning-history-results">
+            {loading ? <p><Loader2 className="spin" size={17} />Carregant activitats…</p> : visibleActivities.length === 0 ? <p>No s’ha trobat cap activitat.</p> : visibleActivities.map((activity) => (
+              <button className={selectedActivityId === activity.id ? 'selected' : ''} key={activity.id} onClick={() => setSelectedActivityId(activity.id)} type="button">
+                <span><b>A{activity.sequenceNumber}</b>{activity.title}</span>
+                <small>{activity.description || 'Sense descripció'}</small>
+                <em><Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}</em>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </PlanningDialog>
   )
 }

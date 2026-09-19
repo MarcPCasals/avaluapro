@@ -1284,6 +1284,7 @@ service cloud.firestore {
           'expectedProduct',
           'factsAndConcepts',
           'id',
+          'improvementProposals',
           'indicatorIds',
           'level',
           'ownerEmailLower',
@@ -1330,6 +1331,13 @@ service cloud.firestore {
             && request.resource.data.curriculum.expectedLearnings.size() <= 100
             && request.resource.data.curriculum.indicators.size() <= 200
           )
+        )
+        && (
+          !('improvementProposals' in request.resource.data)
+          || (
+            request.resource.data.improvementProposals is list
+            && request.resource.data.improvementProposals.size() <= 200
+          )
         );
     }
 
@@ -1357,6 +1365,7 @@ service cloud.firestore {
           'expectedProduct',
           'factsAndConcepts',
           'indicatorIds',
+          'improvementProposals',
           'level',
           'procedures',
           'specificResources',
@@ -1386,7 +1395,7 @@ service cloud.firestore {
 
     function validPlanningActivity(upId, activityId) {
       return request.resource.data.keys().hasOnly([
-          'applicationComment', 'createdAt', 'description', 'diversityMeasureIds', 'diversityMeasures',
+          'applicationComment', 'copiedFrom', 'createdAt', 'description', 'diversityMeasureIds', 'diversityMeasures',
           'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
           'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
@@ -1521,9 +1530,10 @@ service cloud.firestore {
     function validPlanningActivityResult(upId, applicationId, sessionId, resultId) {
       return request.resource.data.keys().hasOnly([
           'actualMinutes', 'applicationComment', 'applicationId', 'createdAt',
-          'entityType', 'id', 'ownerUid', 'pedagogicalReflection', 'reviewedAt',
+          'entityType', 'id', 'improvementRecommendation', 'missingMaterials', 'ownerUid',
+          'pedagogicalReflection', 'reviewedAt',
           'schemaVersion', 'sessionId', 'sessionItemId', 'sourceActivityId',
-          'status', 'updatedAt'
+          'status', 'updatedAt', 'usefulAdaptationIds'
         ])
         && request.resource.data.id == resultId
         && request.resource.data.entityType == 'activityResult'
@@ -1532,6 +1542,14 @@ service cloud.firestore {
         && request.resource.data.applicationId == applicationId
         && request.resource.data.sessionId == sessionId
         && request.resource.data.status in ['completed', 'continued', 'notHeld', 'skipped']
+        && request.resource.data.missingMaterials is list
+        && request.resource.data.usefulAdaptationIds is list
+        && request.resource.data.missingMaterials.size() <= 100
+        && request.resource.data.usefulAdaptationIds.size() <= 100
+        && (
+          request.resource.data.improvementRecommendation == null
+          || request.resource.data.improvementRecommendation in ['keep', 'modify', 'remove']
+        )
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string;
     }

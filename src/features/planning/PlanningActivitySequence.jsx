@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, BookOpenText, Clock3, ExternalLink, Layers3, Menu, Pencil,
+  ArrowRight, BookOpenText, Clock3, ExternalLink, History, Layers3, Menu, Pencil,
   Plus, Trash2,
 } from 'lucide-react'
 import {
@@ -35,7 +35,7 @@ function materialLinks(activity) {
     .filter((material) => material.kind === 'link')
 }
 
-function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onTouchDrop, programmableMinutes, sessionDuration }) {
+function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = materialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
@@ -71,7 +71,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
       ><Menu size={18} /></button>
       <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
       <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
-        <strong>{activity.title}</strong>
+        <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}</strong>
         {activity.description && <span>{activity.description}</span>}
         <small>
           {activity.grouping && <span>{activity.grouping}</span>}
@@ -79,6 +79,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
           {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
           {activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador' : 'indicadors'}</span>}
           {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
+          {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
         </small>
       </button>
       <div className="planning-activity-meta">
@@ -99,6 +100,11 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const flatPhases = useMemo(() => orderedPhases(phases), [phases])
+  const sequenceNumberById = useMemo(() => new Map(flatPhases
+    .flatMap((phase) => activities
+      .filter((activity) => activity.phaseId === phase.id)
+      .sort((left, right) => Number(left.order) - Number(right.order)))
+    .map((activity, index) => [activity.id, index + 1])), [activities, flatPhases])
   const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
@@ -165,6 +171,7 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
                     onEdit={onEdit}
                     onTouchDrop={touchDrop}
                     programmableMinutes={programmableMinutes}
+                    sequenceNumber={sequenceNumberById.get(activity.id)}
                     sessionDuration={sessionDuration}
                   />
                 ))}

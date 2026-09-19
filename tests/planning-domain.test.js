@@ -3,6 +3,10 @@ import test from 'node:test'
 import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
+  applyImprovementProposals,
+  buildActivityImprovementProposals,
+  copyPlanningActivityToPhase,
+  copyPlanningUnitStructureToAcademicYear,
   copyPlanningUnitToAcademicYear,
   createAcademicYear,
   createAccessGrant,
@@ -21,6 +25,7 @@ import {
   createTimetableVersion,
   getPlanningPermissions,
   getPlanningTotals,
+  getActivityActualComparisons,
   getProgrammableMinutes,
   getSessionLoad,
   movePlanningActivityInSequence,
@@ -193,6 +198,113 @@ test('una còpia anual crea una UP nova i conserva la procedència sense tocar l
   })
   assert.equal(original.copiedFrom, null)
   assert.equal(original.academicYearId, 'year-2026')
+})
+
+test('la còpia anual duplica fases, subfases i activitats sense conservar permisos ni identitats', () => {
+  const idFactory = sequenceIdFactory()
+  const unit = {
+    ...basePlanningUnit(idFactory),
+    accessByEmail: { 'direccio@example.test': { role: 'directionReader' } },
+    authorizedEmails: ['direccio@example.test'],
+    ownerEmailLower: 'teacher@example.test',
+  }
+  const root = createPlanningPhase({
+    id: 'phase-root', ownerUid: 'teacher-1', planningUnitId: unit.id, title: 'Preparació', kind: 'preparation', order: 0,
+  }, options(idFactory))
+  const child = createPlanningPhase({
+    id: 'phase-child', ownerUid: 'teacher-1', planningUnitId: unit.id, parentPhaseId: root.id, title: 'Exploració', order: 0,
+  }, options(idFactory))
+  const activity = createPlanningActivity({
+    id: 'activity-source', ownerUid: 'teacher-1', planningUnitId: unit.id, phaseId: child.id,
+    title: 'Escolta guiada', description: 'Identificar contrastos.', order: 0, plannedMinutes: 35,
+    indicatorIds: ['indicator-1'],
+    teacherMaterials: [{ id: 'material-1', kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
+    diversityMeasures: [{ id: 'measure-1', label: 'Fragmentar les instruccions', studentIds: ['student-1'], studentNames: ['Joana'] }],
+  }, options(idFactory))
+  const copied = copyPlanningUnitStructureToAcademicYear(
+    { planningUnit: unit, phases: [root, child], activities: [activity] },
+    { academicYearId: 'year-2027', temporalUnitId: 'ut-2027', ownerEmailLower: 'teacher@example.test' },
+    options(idFactory),
+  )
+
+  assert.notEqual(copied.planningUnit.id, unit.id)
+  assert.deepEqual(copied.planningUnit.accessByEmail, {})
+  assert.deepEqual(copied.planningUnit.authorizedEmails, [])
+  assert.notEqual(copied.phases[0].id, root.id)
+  assert.equal(copied.phases[1].parentPhaseId, copied.phases[0].id)
+  assert.notEqual(copied.activities[0].id, activity.id)
+  assert.equal(copied.activities[0].phaseId, copied.phases[1].id)
+  assert.equal(copied.activities[0].teacherMaterials[0].label, 'Àudio')
+  assert.deepEqual(copied.activities[0].indicatorIds, ['indicator-1'])
+  assert.equal(copied.activities[0].diversityMeasures[0].label, 'Fragmentar les instruccions')
+  assert.equal(copied.activities[0].copiedFrom.activityId, activity.id)
+  assert.equal(activity.copiedFrom, null)
+  assert.equal(child.parentPhaseId, root.id)
+})
+
+test('recuperar una activitat antiga conserva el contingut i deixa visible la procedència', () => {
+  const idFactory = sequenceIdFactory()
+  const original = baseActivity(idFactory)
+  const copy = copyPlanningActivityToPhase(original, {
+    planningUnitId: 'up-current', phaseId: 'phase-current', order: 4,
+    sourceAcademicYearId: 'year-2024', sourcePlanningUnitId: 'up-old',
+  }, options(idFactory))
+
+  assert.notEqual(copy.id, original.id)
+  assert.equal(copy.planningUnitId, 'up-current')
+  assert.equal(copy.phaseId, 'phase-current')
+  assert.equal(copy.plannedMinutes, original.plannedMinutes)
+  assert.deepEqual(copy.teacherMaterials, original.teacherMaterials)
+  assert.deepEqual(copy.copiedFrom, {
+    planningUnitId: 'up-old', activityId: original.id, academicYearId: 'year-2024', copiedAt: NOW,
+  })
+})
+
+test('la comparació prevista-real detecta excessos per activitat i per grup', () => {
+  const activity = baseActivity()
+  const results = [
+    createActivityResult({
+      ownerUid: 'teacher-1', applicationId: 'app-a', sessionId: 'session-a', sessionItemId: 'item-a',
+      sourceActivityId: activity.id, status: 'completed', actualMinutes: 50,
+    }, options()),
+    createActivityResult({
+      ownerUid: 'teacher-1', applicationId: 'app-b', sessionId: 'session-b', sessionItemId: 'item-b',
+      sourceActivityId: activity.id, status: 'continued', actualMinutes: 46,
+    }, options()),
+  ]
+  const [comparison] = getActivityActualComparisons([activity], results, {
+    groupNamesByApplicationId: { 'app-a': '1r A', 'app-b': '1r B' },
+  })
+
+  assert.equal(comparison.actualMinutesAverage, 48)
+  assert.equal(comparison.plannedMinutes, 40)
+  assert.equal(comparison.status, 'overrun')
+  assert.deepEqual(comparison.sourceGroupNames, ['1r A', '1r B'])
+})
+
+test('les revisions generen propostes i només s’apliquen les que el docent accepta', () => {
+  const idFactory = sequenceIdFactory()
+  const unit = basePlanningUnit(idFactory)
+  const activity = baseActivity(idFactory)
+  const result = createActivityResult({
+    ownerUid: 'teacher-1', applicationId: 'app-a', sessionId: 'session-a', sessionItemId: 'item-a',
+    sourceActivityId: activity.id, status: 'completed', actualMinutes: 55,
+    missingMaterials: ['Auriculars'], improvementRecommendation: 'modify',
+    pedagogicalReflection: 'Cal preparar un exemple més curt.',
+  }, options(idFactory))
+  const proposals = buildActivityImprovementProposals([activity], [result], { idFactory })
+  const unitWithProposals = createPlanningUnit({ ...unit, improvementProposals: proposals }, options(idFactory))
+
+  assert.equal(proposals.length, 1)
+  assert.equal(proposals[0].suggestedChanges.plannedMinutes, 55)
+  const untouched = applyImprovementProposals(unitWithProposals, [activity], [], { now: NOW })
+  assert.equal(untouched.activities[0].plannedMinutes, 40)
+  assert.equal(untouched.planningUnit.improvementProposals[0].status, 'pending')
+
+  const accepted = applyImprovementProposals(unitWithProposals, [activity], [proposals[0].id], { now: NOW })
+  assert.equal(accepted.activities[0].plannedMinutes, 55)
+  assert.equal(accepted.planningUnit.improvementProposals[0].status, 'accepted')
+  assert.equal(activity.plannedMinutes, 40)
 })
 
 test('les dates impossibles de curs, UT i horari es rebutgen abans de persistir', () => {

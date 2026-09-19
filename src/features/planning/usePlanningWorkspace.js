@@ -8,13 +8,15 @@ import {
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import {
+  copyPlanningActivityToPhase,
+  copyPlanningUnitStructureToAcademicYear,
   createAcademicYear,
   createPlanningActivity,
   createPlanningPhase,
   createPlanningUnit,
   createTemporalUnit,
 } from '../../domain/planning/model'
-import { movePlanningActivityInSequence } from '../../domain/planning/rules'
+import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 
 const EMPTY_SYNC = {
@@ -130,7 +132,7 @@ export function usePlanningWorkspace(user) {
       .catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar els cursos.'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [repository, user?.uid])
+  }, [repository, user])
 
   useEffect(() => {
     let cancelled = false
@@ -322,6 +324,98 @@ export function usePlanningWorkspace(user) {
     return result
   }, [activities, persist])
 
+  const loadTemporalUnitsForYear = useCallback(async (academicYearId) => {
+    if (!repository || !user?.uid || !academicYearId) return []
+    const result = await repository.loadScope(
+      `academicYear:${academicYearId}:planningTemporalUnits`,
+      () => loadPlanningTemporalUnits(user.uid, academicYearId),
+    )
+    if (result.error) throw new Error('No s’han pogut carregar les UT del curs seleccionat.')
+    return sortByOrder(result.entities)
+  }, [repository, user])
+
+  const loadHistoricalUnits = useCallback(async () => {
+    if (!repository || !user?.uid) return []
+    const historicalYears = academicYears.filter((year) => year.id !== activeAcademicYearId)
+    const results = await Promise.all(historicalYears.map(async (year) => {
+      const result = await repository.loadScope(
+        `academicYear:${year.id}:planningUnits`,
+        () => loadOwnedPlanningUnits(user.uid, { academicYearId: year.id }),
+      )
+      return result.entities.map((unit) => ({ ...unit, academicYearLabel: year.label }))
+    }))
+    return results.flat().sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+  }, [academicYears, activeAcademicYearId, repository, user])
+
+  const loadHistoricalUnitStructure = useCallback(async (planningUnitId) => {
+    if (!repository || !planningUnitId) return { activities: [], phases: [], planningUnit: null }
+    const result = await repository.loadScope(
+      `planningUnit:${planningUnitId}:structure`,
+      async () => {
+        const structure = await loadPlanningUnitStructure(planningUnitId)
+        return [structure.planningUnit, ...structure.phases, ...structure.activities]
+      },
+      { completeSnapshot: true },
+    )
+    if (result.error) throw new Error('No s’ha pogut obrir la programació antiga.')
+    return {
+      planningUnit: result.entities.find((item) => item.entityType === 'planningUnit') || null,
+      phases: sortByOrder(result.entities.filter((item) => item.entityType === 'planningPhase')),
+      activities: sortByOrder(result.entities.filter((item) => item.entityType === 'planningActivity')),
+    }
+  }, [repository])
+
+  const duplicateUnitToAcademicYear = useCallback(async ({ academicYearId, temporalUnitId }) => {
+    if (!activePlanningUnit) throw new Error('Cal seleccionar una UP per duplicar-la.')
+    const copied = copyPlanningUnitStructureToAcademicYear({
+      planningUnit: activePlanningUnit,
+      phases,
+      activities,
+    }, {
+      academicYearId,
+      temporalUnitId,
+      ownerEmailLower: String(user.email || '').trim().toLowerCase(),
+    }, { now: new Date().toISOString() })
+    await persist([copied.planningUnit, ...copied.phases, ...copied.activities])
+    setActivePlanningUnitId(copied.planningUnit.id)
+    setActiveAcademicYearId(academicYearId)
+    if (academicYearId === activeAcademicYearId) {
+      setPlanningUnits((items) => [copied.planningUnit, ...items])
+      setPhases(copied.phases)
+      setActivities(copied.activities)
+    }
+    return copied
+  }, [activeAcademicYearId, activePlanningUnit, activities, persist, phases, user])
+
+  const copyHistoricalActivity = useCallback(async ({ activity, phaseId, sourceAcademicYearId }) => {
+    if (!activePlanningUnitId) throw new Error('Cal seleccionar una UP de destinació.')
+    const order = activities.filter((item) => item.phaseId === phaseId).length
+    const copy = copyPlanningActivityToPhase(activity, {
+      planningUnitId: activePlanningUnitId,
+      phaseId,
+      order,
+      sourceAcademicYearId,
+      sourcePlanningUnitId: activity.planningUnitId,
+    }, { now: new Date().toISOString() })
+    await persist(copy)
+    setActivities((items) => sortByOrder([...items, copy]))
+    return copy
+  }, [activePlanningUnitId, activities, persist])
+
+  const acceptImprovementSuggestions = useCallback(async (proposalIds) => {
+    if (!activePlanningUnit) throw new Error('Cal seleccionar una UP.')
+    const result = applyImprovementProposals(
+      activePlanningUnit,
+      activities,
+      proposalIds,
+      { now: new Date().toISOString() },
+    )
+    await persist([result.planningUnit, ...result.changedActivities])
+    setPlanningUnits((items) => replaceById(items, result.planningUnit))
+    setActivities(sortByOrder(result.activities))
+    return result
+  }, [activePlanningUnit, activities, persist])
+
   return {
     academicYears,
     activities,
@@ -330,12 +424,18 @@ export function usePlanningWorkspace(user) {
     activePlanningUnit,
     activePlanningUnitId,
     archiveUnit,
+    acceptImprovementSuggestions,
+    copyHistoricalActivity,
     createTemporalUnit: createTemporalUnitForYear,
     createUnit,
     createYear,
+    duplicateUnitToAcademicYear,
     error,
     isOnline,
     loading,
+    loadHistoricalUnits,
+    loadHistoricalUnitStructure,
+    loadTemporalUnitsForYear,
     phases,
     planningUnits,
     moveActivity,

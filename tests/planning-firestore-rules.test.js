@@ -22,6 +22,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import {
+  copyPlanningUnitStructureToAcademicYear,
   createAccessGrant,
   createAcademicYear,
   createActivityResult,
@@ -181,6 +182,9 @@ function resultData(overrides = {}) {
       status: 'completed',
       actualMinutes: 45,
       pedagogicalReflection: 'Ha calgut un exemple addicional.',
+      missingMaterials: ['Auriculars'],
+      usefulAdaptationIds: ['plan-measure-one'],
+      improvementRecommendation: 'modify',
     }, { now: NOW }),
     ...overrides,
   }
@@ -517,6 +521,8 @@ describe('Notes privades de planificació', () => {
       doc(sessionRef(authDb(DIRECTION)), 'results', 'plan-result-one'),
     ))
     assert.equal(snapshot.data().pedagogicalReflection, 'Ha calgut un exemple addicional.')
+    assert.deepEqual(snapshot.data().missingMaterials, ['Auriculars'])
+    assert.equal(snapshot.data().improvementRecommendation, 'modify')
     assert.equal('privateNote' in snapshot.data(), false)
   })
 })
@@ -655,5 +661,52 @@ describe('Recorregut local-first de la UP', () => {
 
     assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedDelete(indication, {}, NOW))).applied, true)
     assert.equal((await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', indication.id))).exists(), false)
+  })
+
+  test('duplica tota la UP en documents nous i manté intacta la versió anterior', async () => {
+    const db = authDb(OWNER)
+    const sourceUnit = planningUnitData({
+      improvementProposals: [{
+        id: 'plan-improvement-one',
+        activityId: 'plan-activity-one',
+        kind: 'time',
+        title: 'Ajustar el temps',
+        detail: 'Ha durat més del previst.',
+        status: 'pending',
+        suggestedChanges: { plannedMinutes: 50 },
+        sourceGroupNames: ['1r A'],
+        plannedMinutes: 40,
+        actualMinutesAverage: 50,
+        sampleCount: 1,
+      }],
+    })
+    const copied = copyPlanningUnitStructureToAcademicYear({
+      planningUnit: sourceUnit,
+      phases: [phaseData()],
+      activities: [activityData({
+        indicatorIds: ['indicator-1'],
+        teacherMaterials: [{ id: 'material-one', kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
+      })],
+    }, {
+      academicYearId: 'plan-year-2027',
+      temporalUnitId: 'plan-ut-2027',
+      ownerEmailLower: OWNER.email,
+    }, { now: '2026-09-19T06:00:00.000Z' })
+
+    for (const entity of [copied.planningUnit, ...copied.phases, ...copied.activities]) {
+      assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedOperation(entity))).applied, true)
+    }
+
+    const oldUnit = await getDoc(upRef(db))
+    const oldActivity = await getDoc(doc(upRef(db), 'activities', 'plan-activity-one'))
+    const newUnit = await getDoc(doc(db, 'planningUnits', copied.planningUnit.id))
+    const newActivities = await getDocs(collection(db, 'planningUnits', copied.planningUnit.id, 'activities'))
+    assert.equal(oldUnit.data().academicYearId, 'plan-year-2026')
+    assert.equal(oldActivity.data().plannedMinutes, 40)
+    assert.equal(newUnit.data().academicYearId, 'plan-year-2027')
+    assert.deepEqual(newUnit.data().authorizedEmails, [])
+    assert.equal(newUnit.data().improvementProposals[0].activityId, copied.activities[0].id)
+    assert.equal(newActivities.docs[0].data().copiedFrom.activityId, 'plan-activity-one')
+    assert.equal(newActivities.docs[0].data().teacherMaterials[0].label, 'Àudio')
   })
 })

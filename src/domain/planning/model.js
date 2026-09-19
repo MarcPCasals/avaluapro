@@ -144,6 +144,45 @@ function normalizeDiversityMeasures(measures = [], options = {}) {
   }))
 }
 
+const IMPROVEMENT_KINDS = ['time', 'materials', 'adaptation', 'reflection', 'sequence']
+const IMPROVEMENT_STATUSES = ['pending', 'accepted', 'dismissed']
+const IMPROVEMENT_RECOMMENDATIONS = ['keep', 'modify', 'remove']
+
+function normalizeSuggestedChanges(changes = {}) {
+  const normalized = {}
+  if (Object.prototype.hasOwnProperty.call(changes, 'plannedMinutes')) {
+    normalized.plannedMinutes = optionalMinutes(changes.plannedMinutes, 'temps proposat')
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'description')) {
+    normalized.description = optionalText(changes.description)
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'applicationComment')) {
+    normalized.applicationComment = optionalText(changes.applicationComment)
+  }
+  return normalized
+}
+
+/**
+ * Les propostes són dades revisables, no canvis automàtics. Només guarden
+ * evidències pedagògiques i modificacions explícites que el docent podrà
+ * acceptar en una versió nova de la UP.
+ */
+function normalizeImprovementProposals(proposals = [], options = {}) {
+  return proposals.map((proposal) => ({
+    id: embeddedId(proposal?.id, 'plan-improvement', options.idFactory),
+    activityId: requiredText(proposal?.activityId, 'activitat de la proposta'),
+    kind: enumValue(proposal?.kind || 'reflection', IMPROVEMENT_KINDS, 'tipus de proposta'),
+    title: requiredText(proposal?.title, 'títol de la proposta'),
+    detail: optionalText(proposal?.detail),
+    status: enumValue(proposal?.status || 'pending', IMPROVEMENT_STATUSES, 'estat de la proposta'),
+    suggestedChanges: normalizeSuggestedChanges(proposal?.suggestedChanges),
+    sourceGroupNames: textList(proposal?.sourceGroupNames),
+    plannedMinutes: optionalMinutes(proposal?.plannedMinutes, 'temps previst de la proposta'),
+    actualMinutesAverage: optionalMinutes(proposal?.actualMinutesAverage, 'temps real mitjà'),
+    sampleCount: Math.max(0, Number(proposal?.sampleCount) || 0),
+  }))
+}
+
 function entityBase(entityType, input, options = {}) {
   const timestamp = normalizedTimestamp(options.now)
   return {
@@ -226,6 +265,7 @@ export function createPlanningUnit(input, options = {}) {
     factsAndConcepts: textList(input.factsAndConcepts),
     procedures: textList(input.procedures),
     attitudesAndValues: textList(input.attitudesAndValues),
+    improvementProposals: normalizeImprovementProposals(input.improvementProposals, options),
     copiedFrom: input.copiedFrom
       ? {
           planningUnitId: requiredText(input.copiedFrom.planningUnitId, 'UP original'),
@@ -248,6 +288,7 @@ export function copyPlanningUnitToAcademicYear(source, target, options = {}) {
       code: target.code || source.code,
       status: 'draft',
       versionNumber: Number(source.versionNumber || 1) + 1,
+      improvementProposals: target.improvementProposals || [],
       copiedFrom: {
         planningUnitId: source.id,
         academicYearId: source.academicYearId,
@@ -293,6 +334,91 @@ export function createPlanningActivity(input, options = {}) {
     diversityMeasures,
     applicationComment: optionalText(input.applicationComment),
     evidenceMode: enumValue(input.evidenceMode || 'none', EVIDENCE_MODES, "mode d'evidència"),
+    copiedFrom: input.copiedFrom
+      ? {
+          planningUnitId: requiredText(input.copiedFrom.planningUnitId, 'UP original de l’activitat'),
+          activityId: requiredText(input.copiedFrom.activityId, 'activitat original'),
+          academicYearId: requiredText(input.copiedFrom.academicYearId, 'curs original de l’activitat'),
+          copiedAt: normalizedTimestamp(input.copiedFrom.copiedAt || options.now),
+        }
+      : null,
+  }
+}
+
+/** Crea una activitat independent i en conserva una traça discreta d'origen. */
+export function copyPlanningActivityToPhase(source, target, options = {}) {
+  return createPlanningActivity({
+    ...cloneValue(source),
+    id: null,
+    createdAt: null,
+    updatedAt: null,
+    planningUnitId: requiredText(target.planningUnitId, 'UP de destinació'),
+    phaseId: requiredText(target.phaseId, 'fase de destinació'),
+    order: normalizedOrder(target.order),
+    copiedFrom: {
+      planningUnitId: target.sourcePlanningUnitId || source.planningUnitId,
+      activityId: source.id,
+      academicYearId: requiredText(target.sourceAcademicYearId, 'curs original de l’activitat'),
+      copiedAt: options.now,
+    },
+  }, options)
+}
+
+/**
+ * Duplica tota la jerarquia amb identificadors nous. El mapa previ de fases
+ * permet conservar subfases i moviments sense deixar cap vincle cap a l'UP
+ * antiga. Els permisos de compartició no s'hereten entre cursos.
+ */
+export function copyPlanningUnitStructureToAcademicYear(source, target, options = {}) {
+  const sourceUnit = source.planningUnit
+  const planningUnit = {
+    ...copyPlanningUnitToAcademicYear(sourceUnit, target, options),
+    accessByEmail: {},
+    authorizedEmails: [],
+    ownerEmailLower: optionalText(target.ownerEmailLower) || '',
+  }
+  const phaseIdMap = new Map((source.phases || []).map((phase) => [
+    phase.id,
+    ensurePlanningId(null, PLANNING_ENTITY_TYPES.PLANNING_PHASE, options.idFactory),
+  ]))
+  const phases = (source.phases || []).map((phase) => createPlanningPhase({
+    ...cloneValue(phase),
+    id: phaseIdMap.get(phase.id),
+    createdAt: null,
+    updatedAt: null,
+    planningUnitId: planningUnit.id,
+    parentPhaseId: phase.parentPhaseId ? phaseIdMap.get(phase.parentPhaseId) : null,
+  }, options))
+  const activityIdMap = new Map()
+  const activities = (source.activities || []).map((activity) => {
+    const copy = copyPlanningActivityToPhase(activity, {
+      planningUnitId: planningUnit.id,
+      phaseId: phaseIdMap.get(activity.phaseId),
+      order: activity.order,
+      sourceAcademicYearId: sourceUnit.academicYearId,
+      sourcePlanningUnitId: sourceUnit.id,
+    }, options)
+    activityIdMap.set(activity.id, copy.id)
+    return copy
+  })
+  const improvementProposals = (sourceUnit.improvementProposals || [])
+    .filter((proposal) => proposal.status !== 'dismissed' && activityIdMap.has(proposal.activityId))
+    .map((proposal) => ({
+      ...cloneValue(proposal),
+      id: null,
+      activityId: activityIdMap.get(proposal.activityId),
+      status: 'pending',
+    }))
+  const normalizedUnit = createPlanningUnit({ ...planningUnit, improvementProposals }, options)
+  return {
+    planningUnit: {
+      ...normalizedUnit,
+      accessByEmail: {},
+      authorizedEmails: [],
+      ownerEmailLower: planningUnit.ownerEmailLower,
+    },
+    phases,
+    activities,
   }
 }
 
@@ -439,6 +565,11 @@ export function createActivityResult(input, options = {}) {
     actualMinutes: optionalMinutes(input.actualMinutes, 'temps real'),
     pedagogicalReflection: optionalText(input.pedagogicalReflection),
     applicationComment: optionalText(input.applicationComment),
+    missingMaterials: textList(input.missingMaterials),
+    usefulAdaptationIds: textList(input.usefulAdaptationIds),
+    improvementRecommendation: input.improvementRecommendation
+      ? enumValue(input.improvementRecommendation, IMPROVEMENT_RECOMMENDATIONS, 'recomanació de millora')
+      : null,
     reviewedAt: input.reviewedAt || null,
   }
 }

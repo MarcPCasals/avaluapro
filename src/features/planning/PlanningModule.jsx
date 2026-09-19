@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
   Archive, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
-  Cloud, CloudOff, Eye, EyeOff, FolderTree, Loader2, Pencil, Plus, RotateCcw, Save,
+  Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
+  Pencil, Plus, RotateCcw, Save,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import {
-  AcademicYearDialog, ActivityDialog, PhaseDialog, PlanningUnitDialog, TemporalUnitDialog,
+  AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
+  PlanningUnitDialog, TemporalUnitDialog,
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
@@ -82,10 +84,61 @@ function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
   )
 }
 
-function UnitEditor({ activities, curriculumCatalog, onAddActivity, onArchive, onDeleteActivity, onEditActivity, onError, onMoveActivity, onReactivate, onSave, phases, temporalUnit, unit }) {
+function ImprovementPanel({ onAccept, onError, proposals = [] }) {
+  const pending = proposals.filter((proposal) => proposal.status === 'pending')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [busy, setBusy] = useState(false)
+  const accept = async () => {
+    if (selectedIds.length === 0) return
+    setBusy(true)
+    try {
+      await onAccept(selectedIds)
+      setSelectedIds([])
+    } catch (error) {
+      onError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="planning-improvement-section">
+      <div className="planning-section-title">
+        <span>05</span>
+        <div><h3>Millora per al curs següent</h3><p>Les dades reals de l’Agenda generaran propostes revisables; mai modificaran la UP soles.</p></div>
+      </div>
+      {pending.length === 0 ? (
+        <div className="planning-improvement-empty"><Lightbulb size={18} /><p>Encara no hi ha propostes pendents. Apareixeran quan es revisin activitats des de l’Agenda.</p></div>
+      ) : (
+        <>
+          <div className="planning-improvement-toolbar">
+            <label><input checked={selectedIds.length === pending.length} onChange={(event) => setSelectedIds(event.target.checked ? pending.map((proposal) => proposal.id) : [])} type="checkbox" />Seleccionar-les totes</label>
+            <button className="primary-action compact" disabled={busy || selectedIds.length === 0} onClick={accept} type="button">Acceptar {selectedIds.length || ''}</button>
+          </div>
+          <div className="planning-improvement-list">{pending.map((proposal) => (
+            <label className={proposal.actualMinutesAverage && proposal.plannedMinutes && proposal.actualMinutesAverage > proposal.plannedMinutes ? 'overrun' : ''} key={proposal.id}>
+              <input checked={selectedIds.includes(proposal.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, proposal.id] : current.filter((id) => id !== proposal.id))} type="checkbox" />
+              <span><strong>{proposal.title}</strong><small>{proposal.detail}</small>{proposal.actualMinutesAverage && <em>{proposal.plannedMinutes || '—'} min previstos · {proposal.actualMinutesAverage} min reals{proposal.sourceGroupNames?.length ? ` · ${proposal.sourceGroupNames.join(', ')}` : ''}</em>}</span>
+            </label>
+          ))}</div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function UnitEditor({ activities, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenHistory, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
+  const acceptImprovements = async (proposalIds) => {
+    const result = await onAcceptImprovements(proposalIds)
+    setValues((current) => ({
+      ...current,
+      improvementProposals: result.planningUnit.improvementProposals,
+      updatedAt: result.planningUnit.updatedAt,
+    }))
+    return result
+  }
   const handleSave = async (event) => {
     event.preventDefault()
     setBusy(true)
@@ -115,6 +168,8 @@ function UnitEditor({ activities, curriculumCatalog, onAddActivity, onArchive, o
           <h2>{unit.title}</h2>
         </div>
         <div className="planning-editor-actions">
+          <button className="secondary-action compact" onClick={onOpenHistory} type="button"><History size={16} />Recuperar activitat</button>
+          <button className="secondary-action compact" onClick={onDuplicate} type="button"><Copy size={16} />Duplicar</button>
           {unit.status === 'archived' ? (
             <button className="secondary-action compact" disabled={busy} onClick={() => handleStatusChange(onReactivate)} type="button"><RotateCcw size={16} />Reactivar</button>
           ) : (
@@ -126,6 +181,7 @@ function UnitEditor({ activities, curriculumCatalog, onAddActivity, onArchive, o
           </button>
         </div>
       </header>
+      {unit.copiedFrom && <div className="planning-version-origin"><Copy size={15} /><span>Versió creada a partir d’una UP de {sourceYearLabel || 'un curs anterior'}. L’original es conserva intacte.</span></div>}
       <div className="planning-editor-section">
         <div className="planning-section-title">
           <span>01</span>
@@ -156,6 +212,7 @@ function UnitEditor({ activities, curriculumCatalog, onAddActivity, onArchive, o
         phases={phases}
       />
       <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
+      <ImprovementPanel onAccept={acceptImprovements} onError={onError} proposals={values.improvementProposals} />
     </form>
   )
 }
@@ -237,6 +294,7 @@ export default function PlanningModule() {
 
   const visibleUnits = workspace.planningUnits.filter((unit) => showArchived || unit.status !== 'archived')
   const activeTemporalUnit = workspace.temporalUnits.find((item) => item.id === workspace.activePlanningUnit?.temporalUnitId)
+  const sourceYearLabel = workspace.academicYears.find((year) => year.id === workspace.activePlanningUnit?.copiedFrom?.academicYearId)?.label
   const handleOpenPhase = (phase = null, parentId = '') => {
     setEditingPhase(phase)
     setPhaseParentId(parentId)
@@ -329,15 +387,19 @@ export default function PlanningModule() {
                 activities={workspace.activities}
                 curriculumCatalog={curriculumCatalog}
                 key={workspace.activePlanningUnit.id}
+                onAcceptImprovements={workspace.acceptImprovementSuggestions}
                 onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
                 onArchive={workspace.archiveUnit}
                 onDeleteActivity={(activity) => handleActivityAction(() => workspace.removeActivity(activity))}
+                onDuplicate={() => setDialog('annualCopy')}
                 onEditActivity={(activity) => handleOpenActivity(activity)}
                 onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
                 onMoveActivity={(move) => handleActivityAction(() => workspace.moveActivity(move))}
+                onOpenHistory={() => setDialog('history')}
                 onReactivate={(unit) => workspace.saveUnit(unit, { status: 'draft' })}
                 onSave={workspace.saveUnit}
                 phases={workspace.phases}
+                sourceYearLabel={sourceYearLabel}
                 temporalUnit={activeTemporalUnit}
                 unit={workspace.activePlanningUnit}
               />
@@ -358,6 +420,8 @@ export default function PlanningModule() {
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={workspace.createUnit} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={workspace.savePhase} parentPhaseId={phaseParentId} />}
       {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} students={students} />}
+      {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={workspace.duplicateUnitToAcademicYear} sourceYearId={workspace.activeAcademicYearId} />}
+      {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
     </section>
   )
 }
