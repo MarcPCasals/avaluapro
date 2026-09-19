@@ -23,6 +23,7 @@ import {
   getPlanningTotals,
   getProgrammableMinutes,
   getSessionLoad,
+  movePlanningActivityInSequence,
   planActivityChange,
   selectEffectiveTimetable,
   updatePlanningActivity,
@@ -79,6 +80,46 @@ test('els identificadors es mantenen quan una activitat es revisa o es reordena'
   assert.equal(revised.createdAt, activity.createdAt)
   assert.equal(revised.order, 3)
   assert.equal(revised.title, 'Escolta en parelles')
+})
+
+test('una indicació queda dins la seqüència sense exigir temporització', () => {
+  const indication = createPlanningActivity({
+    ownerUid: 'teacher-1',
+    planningUnitId: 'up-1',
+    phaseId: 'phase-1',
+    type: 'indication',
+    title: 'Agafar la bata',
+    order: 0,
+  }, options())
+
+  assert.equal(indication.type, 'indication')
+  assert.equal(indication.plannedMinutes, null)
+})
+
+test('la nansa pot reordenar un element i moure’l a una altra fase sense canviar-ne la identitat', () => {
+  const idFactory = sequenceIdFactory()
+  const first = createPlanningActivity({
+    ownerUid: 'teacher-1', planningUnitId: 'up-1', phaseId: 'phase-1', title: 'A', order: 0,
+  }, options(idFactory))
+  const moved = createPlanningActivity({
+    ownerUid: 'teacher-1', planningUnitId: 'up-1', phaseId: 'phase-1', title: 'B', order: 1,
+  }, options(idFactory))
+  const target = createPlanningActivity({
+    ownerUid: 'teacher-1', planningUnitId: 'up-1', phaseId: 'phase-2', title: 'C', order: 0,
+  }, options(idFactory))
+
+  const result = movePlanningActivityInSequence(
+    [first, moved, target],
+    { activityId: moved.id, targetActivityId: target.id, targetPhaseId: 'phase-2' },
+    { now: '2026-09-18T13:00:00.000Z' },
+  )
+  const revised = result.activities.find((activity) => activity.id === moved.id)
+
+  assert.equal(revised.id, moved.id)
+  assert.equal(revised.phaseId, 'phase-2')
+  assert.equal(revised.order, 0)
+  assert.equal(result.activities.find((activity) => activity.id === target.id).order, 1)
+  assert.deepEqual(result.changedActivities.map((activity) => activity.id).sort(), [moved.id, target.id].sort())
 })
 
 test('una còpia anual crea una UP nova i conserva la procedència sense tocar l’original', () => {

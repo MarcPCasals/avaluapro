@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 
 function DialogActions({ busy, onClose, submitLabel }) {
@@ -14,7 +14,7 @@ function DialogActions({ busy, onClose, submitLabel }) {
   )
 }
 
-function PlanningDialog({ children, error, onClose, onSubmit, submitLabel, title }) {
+function PlanningDialog({ children, error, onClose, onSubmit, size = 'md', submitLabel, title }) {
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState('')
   const handleSubmit = async (event) => {
@@ -31,7 +31,7 @@ function PlanningDialog({ children, error, onClose, onSubmit, submitLabel, title
     }
   }
   return (
-    <Modal onClose={onClose} panelClassName="planning-dialog" title={title}>
+    <Modal onClose={onClose} panelClassName="planning-dialog" size={size} title={title}>
       <form className="planning-dialog-form" id="planning-dialog-form" onSubmit={handleSubmit}>
         {children}
         {(localError || error) && <p className="planning-inline-error">{localError || error}</p>}
@@ -108,6 +108,98 @@ export function PhaseDialog({ initialValue, onClose, onSave, parentPhaseId = '' 
         <option value="closing">Tancament</option>
         <option value="custom">Personalitzada</option>
       </select></label>
+    </PlanningDialog>
+  )
+}
+
+function materialDrafts(initialValue) {
+  const teacher = (initialValue?.teacherMaterials || []).map((material) => ({ ...material, audience: 'teacher' }))
+  const students = (initialValue?.studentMaterials || []).map((material) => ({ ...material, audience: 'students' }))
+  return [...teacher, ...students]
+}
+
+export function ActivityDialog({ initialPhaseId = '', initialValue, onClose, onSave, phases }) {
+  const [values, setValues] = useState(() => ({
+    description: initialValue?.description || '',
+    evidenceMode: initialValue?.evidenceMode || 'none',
+    grouping: initialValue?.grouping || '',
+    hasTiming: initialValue?.plannedMinutes !== null && initialValue?.plannedMinutes !== undefined,
+    phaseId: initialValue?.phaseId || initialPhaseId || phases[0]?.id || '',
+    plannedMinutes: initialValue?.plannedMinutes || '',
+    space: initialValue?.space || '',
+    title: initialValue?.title || '',
+    type: initialValue?.type || 'activity',
+  }))
+  const [materials, setMaterials] = useState(() => materialDrafts(initialValue))
+  const updateMaterial = (index, field, value) => setMaterials((items) => items.map((item, itemIndex) => (
+    itemIndex === index ? { ...item, [field]: value } : item
+  )))
+  const addMaterial = () => setMaterials((items) => [...items, {
+    audience: 'teacher',
+    id: globalThis.crypto?.randomUUID?.() || `material-${Date.now()}`,
+    kind: 'link',
+    label: '',
+    url: '',
+  }])
+  const save = () => {
+    const normalizedMaterials = materials.map((material) => ({
+      id: material.id,
+      kind: material.kind,
+      label: material.label,
+      url: material.kind === 'link' ? material.url : '',
+    }))
+    return onSave({
+      ...values,
+      evidenceMode: values.type === 'activity' ? values.evidenceMode : 'none',
+      plannedMinutes: values.hasTiming ? Number(values.plannedMinutes) : null,
+      studentMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'students'),
+      teacherMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'teacher'),
+    }, initialValue)
+  }
+
+  return (
+    <PlanningDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={initialValue ? 'Desar element' : 'Afegir a la seqüència'} title={initialValue ? 'Editar element' : 'Nou element de la seqüència'}>
+      <div className="planning-form-row">
+        <label>Tipus<select value={values.type} onChange={(event) => setValues({ ...values, type: event.target.value })}>
+          <option value="activity">Activitat</option>
+          <option value="indication">Indicació</option>
+          <option value="transition">Pausa o transició</option>
+        </select></label>
+        <label>Fase<select required value={values.phaseId} onChange={(event) => setValues({ ...values, phaseId: event.target.value })}>
+          {phases.map((phase) => <option key={phase.id} value={phase.id}>{phase.title}</option>)}
+        </select></label>
+      </div>
+      <label>Títol<input autoFocus required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
+      <label>Descripció<textarea rows="3" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></label>
+      <div className="planning-timing-fields">
+        <label className="planning-check-label"><input checked={values.hasTiming} onChange={(event) => setValues({ ...values, hasTiming: event.target.checked })} type="checkbox" />Té temporització</label>
+        {values.hasTiming && <label>Minuts previstos<input min="1" required type="number" value={values.plannedMinutes} onChange={(event) => setValues({ ...values, plannedMinutes: event.target.value })} /></label>}
+      </div>
+      <div className="planning-form-row">
+        <label>Agrupament<input placeholder="Individual, parelles, grups…" value={values.grouping} onChange={(event) => setValues({ ...values, grouping: event.target.value })} /></label>
+        <label>Espai<input placeholder="Aula, laboratori…" value={values.space} onChange={(event) => setValues({ ...values, space: event.target.value })} /></label>
+      </div>
+      {values.type === 'activity' && <label>Seguiment de la tasca<select value={values.evidenceMode} onChange={(event) => setValues({ ...values, evidenceMode: event.target.value })}>
+        <option value="none">No cal registrar entrega</option>
+        <option value="final">Comprovar al final de l’activitat</option>
+        <option value="perSession">Comprovar a cada sessió</option>
+      </select></label>}
+      <section className="planning-material-editor">
+        <div><div><strong>Materials</strong><span>Enllaços externs o referències físiques.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
+        {materials.map((material, index) => (
+          <div className="planning-material-row" key={material.id || index}>
+            <select aria-label="Destinatari del material" value={material.audience} onChange={(event) => updateMaterial(index, 'audience', event.target.value)}>
+              <option value="teacher">Docent</option><option value="students">Alumnat</option>
+            </select>
+            <select aria-label="Tipus de material" value={material.kind} onChange={(event) => updateMaterial(index, 'kind', event.target.value)}>
+              <option value="link">Enllaç</option><option value="physical">Material físic</option>
+            </select>
+            <input aria-label="Nom del material" placeholder="Nom" required value={material.label} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
+            {material.kind === 'link' && <input aria-label="Enllaç del material" placeholder="https://…" required type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} />}
+            <button aria-label="Eliminar material" className="icon-action" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 size={15} /></button>
+          </div>
+        ))}
+      </section>
     </PlanningDialog>
   )
 }

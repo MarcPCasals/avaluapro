@@ -224,6 +224,17 @@ function queuedOperation(entity, context = {}, baseUpdatedAt = '') {
   }
 }
 
+function queuedDelete(entity, context = {}, baseUpdatedAt = '') {
+  const location = getPlanningEntityLocation(entity, context)
+  return {
+    baseUpdatedAt,
+    entityType: entity.entityType,
+    operation: 'delete',
+    path: location.path,
+    uid: entity.ownerUid,
+  }
+}
+
 before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
@@ -415,6 +426,23 @@ describe('Planificació compartida', () => {
       { id: 'another-id', updatedAt: NOW },
     ))
   })
+
+  test('només s’accepten els tres tipus d’element previstos a la cronologia', async () => {
+    const db = authDb(OWNER)
+    await assertSucceeds(setDoc(
+      doc(upRef(db), 'activities', 'plan-indication-one'),
+      activityData({
+        id: 'plan-indication-one',
+        plannedMinutes: null,
+        title: 'Agafar la bata',
+        type: 'indication',
+      }),
+    ))
+    await assertFails(setDoc(
+      doc(upRef(db), 'activities', 'plan-invalid-kind'),
+      activityData({ id: 'plan-invalid-kind', type: 'unknown' }),
+    ))
+  })
 })
 
 describe('Notes privades de planificació', () => {
@@ -555,5 +583,42 @@ describe('Recorregut local-first de la UP', () => {
     assert.equal(staleResult.conflict, true)
     assert.equal(staleResult.remoteUpdatedAt, archivedAt)
     assert.equal((await getDoc(doc(db, 'planningUnits', unit.id))).data().title, 'UP buida de prova')
+  })
+
+  test('crea, reordena i elimina elements de la seqüència amb els materials intactes', async () => {
+    const db = authDb(OWNER)
+    const first = createPlanningActivity({
+      id: 'plan-activity-flow-first',
+      ownerUid: OWNER.uid,
+      planningUnitId: UP_ID,
+      phaseId: 'plan-phase-one',
+      type: 'activity',
+      title: 'Escolta guiada',
+      order: 0,
+      plannedMinutes: 20,
+      grouping: 'Parelles',
+      teacherMaterials: [{ id: 'material-1', kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
+    }, { now: NOW })
+    const indication = createPlanningActivity({
+      id: 'plan-activity-flow-indication',
+      ownerUid: OWNER.uid,
+      planningUnitId: UP_ID,
+      phaseId: 'plan-phase-one',
+      type: 'indication',
+      title: 'Agafar la bata',
+      order: 1,
+      plannedMinutes: null,
+    }, { now: NOW })
+
+    assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedOperation(first))).applied, true)
+    assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedOperation(indication))).applied, true)
+
+    const reorderedAt = '2026-09-18T14:00:00.000Z'
+    const reordered = { ...first, order: 1, updatedAt: reorderedAt }
+    assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedOperation(reordered, {}, NOW))).applied, true)
+    assert.equal((await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', first.id))).data().teacherMaterials[0].label, 'Àudio')
+
+    assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedDelete(indication, {}, NOW))).applied, true)
+    assert.equal((await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', indication.id))).exists(), false)
   })
 })

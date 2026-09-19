@@ -1370,13 +1370,14 @@ service cloud.firestore {
           'applicationComment', 'createdAt', 'description', 'diversityMeasureIds',
           'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
-          'space', 'studentMaterials', 'teacherMaterials', 'title', 'updatedAt'
+          'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
         ])
         && request.resource.data.id == activityId
         && request.resource.data.entityType == 'planningActivity'
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
         && request.resource.data.planningUnitId == upId
+        && request.resource.data.type in ['activity', 'indication', 'transition']
         && request.resource.data.evidenceMode in ['none', 'final', 'perSession']
         && request.resource.data.indicatorIds is list
         && request.resource.data.diversityMeasureIds is list

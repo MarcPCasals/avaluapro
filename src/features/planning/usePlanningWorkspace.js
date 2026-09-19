@@ -9,10 +9,12 @@ import {
 import { createPlanningRepository } from '../../data/planningRepository'
 import {
   createAcademicYear,
+  createPlanningActivity,
   createPlanningPhase,
   createPlanningUnit,
   createTemporalUnit,
 } from '../../domain/planning/model'
+import { movePlanningActivityInSequence } from '../../domain/planning/rules'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 
 const EMPTY_SYNC = {
@@ -269,6 +271,57 @@ export function usePlanningWorkspace(user) {
     return next
   }, [activePlanningUnitId, persist, phases.length, user])
 
+  const saveActivity = useCallback(async (values, current = null) => {
+    const now = new Date().toISOString()
+    if (current && values.phaseId !== current.phaseId) {
+      // Primer conservem l'element dins la fase d'origen amb el contingut nou;
+      // el moviment posterior renumera les dues fases sense recrear-lo.
+      const staged = createPlanningActivity({
+        ...current,
+        ...values,
+        phaseId: current.phaseId,
+        order: current.order,
+        updatedAt: now,
+      })
+      const result = movePlanningActivityInSequence(
+        replaceById(activities, staged),
+        { activityId: staged.id, targetPhaseId: values.phaseId },
+        { now },
+      )
+      await persist(result.changedActivities)
+      setActivities(result.activities)
+      return result.activities.find((activity) => activity.id === staged.id)
+    }
+    const next = createPlanningActivity({
+      ...(current || {}),
+      ...values,
+      order: current?.order
+        ?? activities.filter((activity) => activity.phaseId === values.phaseId).length,
+      ownerUid: user.uid,
+      planningUnitId: activePlanningUnitId,
+      updatedAt: now,
+    })
+    await persist(next)
+    setActivities((items) => sortByOrder(replaceById(items, next)))
+    return next
+  }, [activePlanningUnitId, activities, persist, user])
+
+  const removeActivity = useCallback(async (activity) => {
+    if (!repository) throw new Error('Cal iniciar sessió abans de modificar la programació.')
+    await repository.remove(activity)
+    setActivities((items) => items.filter((item) => item.id !== activity.id))
+    await refreshSync()
+    return synchronize()
+  }, [refreshSync, repository, synchronize])
+
+  const moveActivity = useCallback(async (move) => {
+    const result = movePlanningActivityInSequence(activities, move, { now: new Date().toISOString() })
+    if (result.changedActivities.length === 0) return result
+    await persist(result.changedActivities)
+    setActivities(result.activities)
+    return result
+  }, [activities, persist])
+
   return {
     academicYears,
     activities,
@@ -285,6 +338,9 @@ export function usePlanningWorkspace(user) {
     loading,
     phases,
     planningUnits,
+    moveActivity,
+    removeActivity,
+    saveActivity,
     savePhase,
     saveTemporalUnit,
     saveUnit,

@@ -1,0 +1,180 @@
+import { useMemo, useState } from 'react'
+import {
+  ArrowRight, BookOpenText, Clock3, ExternalLink, Layers3, Menu, Pencil,
+  Plus, Trash2,
+} from 'lucide-react'
+import {
+  getPlanningTotals,
+  getProgrammableMinutes,
+  getSessionLoad,
+} from '../../domain/planning/rules'
+
+const TYPE_DETAILS = {
+  activity: { icon: BookOpenText, label: 'Activitat' },
+  indication: { icon: Layers3, label: 'Indicació' },
+  transition: { icon: ArrowRight, label: 'Pausa o transició' },
+}
+
+function orderedPhases(phases) {
+  const byParent = (phases || []).reduce((result, phase) => {
+    const key = phase.parentPhaseId || 'root'
+    result[key] = [...(result[key] || []), phase].sort((left, right) => Number(left.order) - Number(right.order))
+    return result
+  }, {})
+  const flattened = []
+  const visit = (phase, depth) => {
+    flattened.push({ ...phase, depth })
+    ;(byParent[phase.id] || []).forEach((child) => visit(child, depth + 1))
+  }
+  ;(byParent.root || []).forEach((phase) => visit(phase, 0))
+  return flattened
+}
+
+function materialLinks(activity) {
+  return [...(activity.teacherMaterials || []), ...(activity.studentMaterials || [])]
+    .filter((material) => material.kind === 'link')
+}
+
+function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onTouchDrop, programmableMinutes, sessionDuration }) {
+  const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
+  const links = materialLinks(activity)
+  const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
+  const load = activity.plannedMinutes ? getSessionLoad([activity], sessionDuration) : null
+  return (
+    <article
+      className={`planning-activity-row ${dragId === activity.id ? 'dragging' : ''}`}
+      data-activity-id={activity.id}
+      data-phase-id={activity.phaseId}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => { event.preventDefault(); event.stopPropagation(); onDrop(activity.phaseId, activity.id) }}
+    >
+      <button
+        aria-label={`Arrossegar ${activity.title}`}
+        className="planning-drag-handle"
+        draggable
+        onDragEnd={onDragEnd}
+        onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; onDragStart(activity.id) }}
+        onPointerCancel={onDragEnd}
+        onPointerDown={(event) => {
+          if (event.pointerType === 'mouse') return
+          event.preventDefault()
+          event.currentTarget.setPointerCapture(event.pointerId)
+          onDragStart(activity.id)
+        }}
+        onPointerUp={(event) => {
+          if (event.pointerType === 'mouse') return
+          event.currentTarget.releasePointerCapture(event.pointerId)
+          onTouchDrop(event.clientX, event.clientY)
+        }}
+        title="Arrossega per canviar l’ordre"
+        type="button"
+      ><Menu size={18} /></button>
+      <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
+      <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
+        <strong>{activity.title}</strong>
+        {activity.description && <span>{activity.description}</span>}
+        <small>
+          {activity.grouping && <span>{activity.grouping}</span>}
+          {activity.space && <span>{activity.space}</span>}
+          {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
+        </small>
+      </button>
+      <div className="planning-activity-meta">
+        <span className={`planning-time-pill ${load?.status || 'untimed'}`} title={load?.status === 'red' ? `Supera els ${programmableMinutes} minuts programables` : ''}>
+          <Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}
+        </span>
+        {links.slice(0, 1).map((material) => <a aria-label={`Obrir ${material.label}`} href={material.url} key={material.id || material.url} rel="noreferrer" target="_blank"><ExternalLink size={14} /></a>)}
+      </div>
+      <div className="planning-activity-actions">
+        <button aria-label={`Editar ${activity.title}`} className="icon-action" onClick={() => onEdit(activity)} type="button"><Pencil size={15} /></button>
+        <button aria-label={`Eliminar ${activity.title}`} className="icon-action danger" onClick={() => onDelete(activity)} type="button"><Trash2 size={15} /></button>
+      </div>
+    </article>
+  )
+}
+
+export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, onMove, phases }) {
+  const [dragId, setDragId] = useState('')
+  const [sessionDuration, setSessionDuration] = useState(60)
+  const flatPhases = useMemo(() => orderedPhases(phases), [phases])
+  const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
+  const programmableMinutes = getProgrammableMinutes(sessionDuration)
+  const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
+  const drop = async (targetPhaseId, targetActivityId = null) => {
+    if (!dragId) return
+    const activityId = dragId
+    setDragId('')
+    await onMove({ activityId, targetActivityId, targetPhaseId })
+  }
+  const touchDrop = (clientX, clientY) => {
+    const target = globalThis.document?.elementFromPoint(clientX, clientY)?.closest?.('[data-phase-id]')
+    if (!target) {
+      setDragId('')
+      return
+    }
+    drop(target.dataset.phaseId, target.dataset.activityId || null)
+  }
+  const remove = async (activity) => {
+    if (!globalThis.confirm?.(`Vols eliminar «${activity.title}» de la seqüència?`)) return
+    await onDelete(activity)
+  }
+
+  return (
+    <section className="planning-sequence-section">
+      <div className="planning-sequence-heading">
+        <div className="planning-section-title">
+          <span>03</span>
+          <div><h3>Seqüència d’activitats</h3><p>Activitats, indicacions i transicions en l’ordre de treball.</p></div>
+        </div>
+        <div className="planning-budget-summary">
+          <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}>
+            <option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option>
+          </select></label>
+          <div><strong>{totals.totalMinutes} min</strong><span>{programmableMinutes} min programables · {approximateSessions || 0} {approximateSessions === 1 ? 'sessió orientativa' : 'sessions orientatives'}</span></div>
+        </div>
+      </div>
+
+      <div className="planning-sequence-list">
+        {flatPhases.map((phase) => {
+          const phaseActivities = activities
+            .filter((activity) => activity.phaseId === phase.id)
+            .sort((left, right) => Number(left.order) - Number(right.order))
+          return (
+            <section className={`planning-sequence-phase ${phase.kind}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
+              <header>
+                <div><span /><div><strong>{phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
+                <button className="secondary-action compact" onClick={() => onAdd(phase.id)} type="button"><Plus size={15} />Afegir element</button>
+              </header>
+              <div
+                className={`planning-activity-dropzone ${phaseActivities.length === 0 ? 'empty' : ''}`}
+                data-phase-id={phase.id}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => { event.preventDefault(); drop(phase.id) }}
+              >
+                {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
+                  <ActivityRow
+                    activity={activity}
+                    dragId={dragId}
+                    key={activity.id}
+                    onDelete={remove}
+                    onDragEnd={() => setDragId('')}
+                    onDragStart={setDragId}
+                    onDrop={drop}
+                    onEdit={onEdit}
+                    onTouchDrop={touchDrop}
+                    programmableMinutes={programmableMinutes}
+                    sessionDuration={sessionDuration}
+                  />
+                ))}
+                {phaseActivities.length > 0 && <div className="planning-drop-at-end" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); drop(phase.id) }}>Deixa anar aquí per posar-lo al final</div>}
+              </div>
+            </section>
+          )
+        })}
+      </div>
+      {activities.some((activity) => Number(activity.plannedMinutes) > programmableMinutes) && (
+        <p className="planning-overflow-note">Les activitats marcades en vermell superen la franja programable. En passar-les a Agenda es proposarà repartir-les o continuar-les a la sessió següent.</p>
+      )}
+    </section>
+  )
+}

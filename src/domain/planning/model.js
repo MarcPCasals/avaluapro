@@ -229,6 +229,7 @@ export function createPlanningActivity(input, options = {}) {
     ownerUid: requiredText(input.ownerUid, 'propietari'),
     planningUnitId: requiredText(input.planningUnitId, 'UP'),
     phaseId: requiredText(input.phaseId, 'fase'),
+    type: enumValue(input.type || 'activity', SESSION_ITEM_TYPES, "tipus d'element"),
     title: requiredText(input.title, "títol de l'activitat"),
     description: optionalText(input.description),
     order: normalizedOrder(input.order),

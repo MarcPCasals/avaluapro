@@ -48,6 +48,63 @@ export function getPlanningTotals(phases, activities) {
 }
 
 /**
+ * Mou un element de la seqüència per la seva nansa i renumera només les fases
+ * afectades. Això permet canviar-lo de fase sense recrear-lo ni perdre els
+ * vincles que en el futur utilitzaran Agenda i Mode aula.
+ */
+export function movePlanningActivityInSequence(
+  activities,
+  { activityId, targetActivityId = null, targetPhaseId },
+  options = {},
+) {
+  const source = (activities || []).find((activity) => activity.id === activityId)
+  if (!source) throw new Error("No s'ha trobat l'element que es vol moure")
+  if (!targetPhaseId) throw new Error('Cal indicar la fase de destinació')
+  if (targetActivityId === activityId) return { activities: [...activities], changedActivities: [] }
+
+  const remaining = activities.filter((activity) => activity.id !== activityId)
+  const destination = remaining
+    .filter((activity) => activity.phaseId === targetPhaseId)
+    .sort((left, right) => Number(left.order) - Number(right.order))
+  const targetIndex = targetActivityId
+    ? destination.findIndex((activity) => activity.id === targetActivityId)
+    : destination.length
+  if (targetActivityId && targetIndex < 0) throw new Error("La destinació no pertany a la fase indicada")
+
+  destination.splice(targetIndex, 0, { ...source, phaseId: targetPhaseId })
+  const affectedPhaseIds = new Set([source.phaseId, targetPhaseId])
+  const nextById = new Map()
+  const changedActivities = []
+
+  for (const phaseId of affectedPhaseIds) {
+    const phaseActivities = phaseId === targetPhaseId
+      ? destination
+      : remaining
+          .filter((activity) => activity.phaseId === phaseId)
+          .sort((left, right) => Number(left.order) - Number(right.order))
+    phaseActivities.forEach((activity, order) => {
+      const original = activities.find((candidate) => candidate.id === activity.id)
+      if (original.phaseId === phaseId && Number(original.order) === order) {
+        nextById.set(original.id, original)
+        return
+      }
+      const updated = updatePlanningActivity(
+        original,
+        { phaseId, order },
+        { now: options.now },
+      )
+      nextById.set(updated.id, updated)
+      changedActivities.push(updated)
+    })
+  }
+
+  return {
+    activities: activities.map((activity) => nextById.get(activity.id) || activity),
+    changedActivities,
+  }
+}
+
+/**
  * Planifica un canvi d'activitat sense barrejar la UP ideal amb el que només
  * ha passat en un grup. L'únic abast que modifica la base és baseAndGroup.
  */

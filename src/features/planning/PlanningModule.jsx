@@ -5,8 +5,9 @@ import {
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import {
-  AcademicYearDialog, PhaseDialog, PlanningUnitDialog, TemporalUnitDialog,
+  AcademicYearDialog, ActivityDialog, PhaseDialog, PlanningUnitDialog, TemporalUnitDialog,
 } from './PlanningDialogs'
+import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
 import './planning.css'
 
@@ -80,7 +81,7 @@ function PhaseTree({ activities, onAddChild, onAddRoot, onEdit, phases }) {
   )
 }
 
-function UnitEditor({ onArchive, onError, onReactivate, onSave, temporalUnit, unit }) {
+function UnitEditor({ activities, onAddActivity, onArchive, onDeleteActivity, onEditActivity, onError, onMoveActivity, onReactivate, onSave, phases, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
@@ -145,11 +146,16 @@ function UnitEditor({ onArchive, onError, onReactivate, onSave, temporalUnit, un
         <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
         <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
       </div>
+      <PlanningActivitySequence
+        activities={activities}
+        onAdd={onAddActivity}
+        onDelete={onDeleteActivity}
+        onEdit={onEditActivity}
+        onMove={onMoveActivity}
+        phases={phases}
+      />
       <div className="planning-editor-section muted">
-        <div className="planning-section-title">
-          <span>03</span>
-          <div><h3>Contingut pedagògic</h3><p>Competències, aprenentatges i criteris s’afegiran al següent pas.</p></div>
-        </div>
+        <div className="planning-section-title"><span>04</span><div><h3>Contingut pedagògic</h3><p>Competències, aprenentatges i criteris s’afegiran al pas següent.</p></div></div>
       </div>
     </form>
   )
@@ -195,6 +201,8 @@ export default function PlanningModule() {
   const [showSummary, setShowSummary] = useState(true)
   const [editingUt, setEditingUt] = useState(null)
   const [editingPhase, setEditingPhase] = useState(null)
+  const [editingActivity, setEditingActivity] = useState(null)
+  const [activityPhaseId, setActivityPhaseId] = useState('')
   const [phaseParentId, setPhaseParentId] = useState('')
 
   if (!user) {
@@ -213,6 +221,19 @@ export default function PlanningModule() {
     setEditingPhase(phase)
     setPhaseParentId(parentId)
     setDialog('phase')
+  }
+  const handleOpenActivity = (activity = null, phaseId = '') => {
+    setEditingActivity(activity)
+    setActivityPhaseId(phaseId || activity?.phaseId || '')
+    setDialog('activity')
+  }
+  const handleActivityAction = async (action) => {
+    try {
+      return await action()
+    } catch (actionError) {
+      workspace.setError(actionError.message || 'No s’ha pogut modificar la seqüència.')
+      return null
+    }
   }
 
   return (
@@ -285,11 +306,17 @@ export default function PlanningModule() {
           <main className="planning-editor-panel">
             {workspace.activePlanningUnit ? (
               <UnitEditor
+                activities={workspace.activities}
                 key={workspace.activePlanningUnit.id}
+                onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
                 onArchive={workspace.archiveUnit}
+                onDeleteActivity={(activity) => handleActivityAction(() => workspace.removeActivity(activity))}
+                onEditActivity={(activity) => handleOpenActivity(activity)}
                 onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
+                onMoveActivity={(move) => handleActivityAction(() => workspace.moveActivity(move))}
                 onReactivate={(unit) => workspace.saveUnit(unit, { status: 'draft' })}
                 onSave={workspace.saveUnit}
+                phases={workspace.phases}
                 temporalUnit={activeTemporalUnit}
                 unit={workspace.activePlanningUnit}
               />
@@ -309,6 +336,7 @@ export default function PlanningModule() {
       {dialog === 'ut' && <TemporalUnitDialog initialValue={editingUt} onClose={() => { setDialog(null); setEditingUt(null) }} onSave={(values) => editingUt ? workspace.saveTemporalUnit(editingUt, values) : workspace.createTemporalUnit(values)} />}
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={workspace.createUnit} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={workspace.savePhase} parentPhaseId={phaseParentId} />}
+      {dialog === 'activity' && <ActivityDialog initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} />}
     </section>
   )
 }

@@ -1,6 +1,6 @@
 # Model de dades de Planificació — versió 1
 
-Aquest document descriu el contracte de domini implementat a `src/domain/planning/`. Encara no crea col·leccions ni desa informació a Firebase; la persistència i les regles es definiran a la iteració 4.
+Aquest document descriu el contracte de domini implementat a `src/domain/planning/`, la seva persistència local-first i les formes acceptades per les regles de Firebase.
 
 ## Mapa d'entitats
 
@@ -46,7 +46,7 @@ Els noms, les dates i l'ordre són camps editables i no formen part de l'identif
 | `temporalUnit` | UT amb dates pròpies i ordre anual | Pertany a un curs |
 | `planningUnit` | UP base i ideal d'un curs concret | Pertany a una UT; té fases i activitats |
 | `planningPhase` | Fase o subfase reordenable | Pertany a una UP; `parentPhaseId` permet subfases |
-| `planningActivity` | Activitat pedagògica reutilitzable | Pertany a una fase i conserva materials, temps i indicadors |
+| `planningActivity` | Element reutilitzable de la seqüència | Pertany a una fase i conserva tipus, materials, temps i indicadors |
 | `groupApplication` | Aplicació d'una UP a un grup real | Enllaça UP, versió, curs i classe |
 | `activityOverride` | Diferència que només afecta un grup | Enllaça l'aplicació i l'activitat base |
 | `timetableVersion` | Horari vigent durant un període | Pertany al curs; té data d'entrada en vigor |
@@ -57,6 +57,16 @@ Els noms, les dates i l'ordre són camps editables i no formen part de l'identif
 | `activityResult` | Resultat pedagògic real | Enllaça sessió i element; no conté dades individuals privades |
 | `accessGrant` | Lectura o coedició per correu exacte | Pertany a una UP i pot limitar-se a grups |
 | `planningPrivateNote` | Nota personal separada de l'aplicació compartible | Referencia UP, aplicació o sessió; només la llegeix el propietari |
+
+## Elements de la seqüència de la UP
+
+`planningActivity.type` diferencia tres elements que es poden ordenar i moure entre fases:
+
+- `activity`: activitat pedagògica amb temps, materials, agrupament i seguiment opcional;
+- `indication`: recordatori dins la cronologia, habitualment sense temps;
+- `transition`: pausa o canvi d'espai, amb temporització opcional.
+
+Els tres tipus conserven un identificador estable quan es reordenen. Els materials es divideixen entre docent i alumnat i poden ser un enllaç extern o una referència física. No es desen fitxers dins de Firebase.
 
 ## UP base i aplicació per grup
 
