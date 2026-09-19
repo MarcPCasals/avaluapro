@@ -303,8 +303,14 @@ export async function loadPlanningUnitStructure(planningUnitId) {
 export async function loadPlanningApplications(planningUnitId, classId, maxItems = 50) {
   const unitReference = planningUnitRef(planningUnitId)
   const constraints = []
+  // El filtre de grup també forma part de la frontera de privacitat per a una
+  // Agenda compartida. Quan hi és, evitem combinar-lo amb un orderBy remot:
+  // aquesta combinació exigeix un índex compost i, si encara s'està creant,
+  // faria que l'aplicació acabés llegint una còpia local buida. Els consumidors
+  // ja ordenen les poques aplicacions retornades per updatedAt.
   if (classId) constraints.push(where('classId', '==', classId))
-  constraints.push(orderBy('updatedAt', 'desc'), limit(maxItems))
+  else constraints.push(orderBy('updatedAt', 'desc'))
+  constraints.push(limit(maxItems))
   return mapSnapshot(await getDocs(query(collection(unitReference, 'applications'), ...constraints)))
 }
 
