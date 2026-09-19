@@ -493,26 +493,37 @@ export function useAgendaWorkspace(user, classes = []) {
     }
   }, [allPlanningUnits, repository, user?.uid, userEmail])
 
+  /**
+   * La portada d'Agenda necessita les sessions d'avui i prou futur per poder
+   * mostrar la pròxima classe real. Sis setmanes cobreixen també els períodes
+   * habituals de vacances sense carregar els detalls de tot el curs.
+   */
+  const loadTodaySessions = useCallback(() => {
+    const fromDate = new Date(`${today}T12:00:00Z`)
+    const weekday = fromDate.getUTCDay() || 7
+    fromDate.setUTCDate(fromDate.getUTCDate() - weekday + 1)
+    const toDate = new Date(`${today}T12:00:00Z`)
+    toDate.setUTCDate(toDate.getUTCDate() + 42)
+    return loadSessionRange({
+      from: fromDate.toISOString().slice(0, 10),
+      to: toDate.toISOString().slice(0, 10),
+    })
+  }, [loadSessionRange, today])
+
   useEffect(() => {
     if (allPlanningUnits.length === 0) {
       queueMicrotask(() => setSessionBundles([]))
       return
     }
-    const date = new Date(`${today}T12:00:00Z`)
-    const weekday = date.getUTCDay() || 7
-    date.setUTCDate(date.getUTCDate() - weekday + 1)
-    const from = date.toISOString().slice(0, 10)
-    date.setUTCDate(date.getUTCDate() + 6)
-    const to = date.toISOString().slice(0, 10)
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
-      loadSessionRange({ from, to }).catch((loadError) => {
+      loadTodaySessions().catch((loadError) => {
         if (!cancelled) setError(loadError.message || 'No s’han pogut carregar les sessions de la setmana.')
       })
     })
     return () => { cancelled = true }
-  }, [allPlanningUnits.length, loadSessionRange, today])
+  }, [allPlanningUnits.length, loadTodaySessions])
 
   const saveSessionStatus = useCallback(async (bundle, status) => {
     const now = new Date().toISOString()
@@ -1082,6 +1093,7 @@ export function useAgendaWorkspace(user, classes = []) {
     loadSchedulingSetup,
     loadClassroomPrivateNotes,
     loadSessionRange,
+    loadTodaySessions,
     moveSlot,
     ownedPlanningUnits: planningUnits,
     removeCalendarEvent,

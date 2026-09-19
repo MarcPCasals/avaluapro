@@ -334,7 +334,9 @@ export default function AgendaModule() {
   const openToday = () => {
     setView('today')
     const currentStart = startOfWeek(workspace.today)
-    loadWeek(currentStart)
+    setWeekStart(currentStart)
+    workspace.loadTodaySessions()
+      .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar la pròxima sessió.'))
   }
   const moveWeek = (amount) => {
     const nextStart = amount === 0 ? startOfWeek(workspace.today) : addDateDays(weekStart, amount)
@@ -366,6 +368,11 @@ export default function AgendaModule() {
     setDialog('session-adjust')
   }
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, to: addDateDays(weekStart, 4) })
+  const reloadActiveView = () => {
+    if (view === 'timeline') return openTimeline(timelineClassId)
+    if (view === 'week') return reloadCurrentWeek()
+    return workspace.loadTodaySessions()
+  }
   const openClassroom = async (bundle) => {
     try {
       const bundleWithPrivateNotes = await workspace.loadClassroomPrivateNotes(bundle)
@@ -385,7 +392,7 @@ export default function AgendaModule() {
     setView('today')
     const currentStart = startOfWeek(workspace.today)
     setWeekStart(currentStart)
-    workspace.loadSessionRange({ from: currentStart, to: addDateDays(currentStart, 4) })
+    workspace.loadTodaySessions()
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut actualitzar la setmana.'))
   }
   const activateClassroomEvidence = async (bundle, item) => {
@@ -540,7 +547,7 @@ export default function AgendaModule() {
       {dialog === 'timetable' && <TimetableDialog academicYear={workspace.activeAcademicYear} currentTimetable={workspace.activeTimetable} initialValue={editingTimetable} onClose={() => setDialog(null)} onSave={(values, current) => current ? workspace.saveTimetable(current, values) : workspace.createTimetable(values)} />}
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent} onClose={() => setDialog(null)} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
-      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => setDialog(null)} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(`${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadCurrentWeek() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
+      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => setDialog(null)} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(`${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadActiveView() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>
