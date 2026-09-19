@@ -81,7 +81,15 @@ Commit funcional: `6a29571`.
 
 ## Publicació
 
-Pendent de desplegar les regles de Firestore i Firebase Hosting.
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- Firebase Hosting serveix els paquets nous de Programació i Agenda;
+- el paquet publicat conté **Direcció · lectura**, **Coedició de la UP**, **Agenda per grups**, **Vista direcció**, **Compartir** i **Aplicació real**;
+- l'Agenda de prova continua exigint iniciar sessió abans de carregar dades privades;
+- la navegació normal manté Agenda i Programació ocultes durant el pilot;
+- l'auditoria posterior no detecta bloquejos ni respostes pendents de sincronitzar;
+- les regles locals i les desplegades tenen la mateixa signatura;
+- la comprovació publicada només ha utilitzat dades demo i no ha creat concessions ni modificat dades reals.
 
 ## Pas següent
 
