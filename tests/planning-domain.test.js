@@ -6,6 +6,7 @@ import {
   applyImprovementProposals,
   buildActivityImprovementProposals,
   copyPlanningActivityToPhase,
+  copyTimetableVersionStructure,
   copyPlanningUnitStructureToAcademicYear,
   copyPlanningUnitToAcademicYear,
   createAcademicYear,
@@ -26,9 +27,11 @@ import {
   getPlanningPermissions,
   getPlanningTotals,
   getActivityActualComparisons,
+  findTimetableSlotConflicts,
   getProgrammableMinutes,
   getSessionLoad,
   movePlanningActivityInSequence,
+  moveTimetableSlot,
   planActivityChange,
   selectEffectiveTimetable,
   updatePlanningActivity,
@@ -410,6 +413,93 @@ test('el pressupost reserva cinc minuts i aplica els tres colors acordats', () =
   assert.equal(getSessionLoad([{ plannedMinutes: 46 }], 60).status, 'green')
   assert.equal(getSessionLoad([{ plannedMinutes: 47 }], 60).status, 'orange')
   assert.equal(getSessionLoad([{ plannedMinutes: 56 }], 60).status, 'red')
+})
+
+test('una versió nova de l’horari copia les franges amb identitats noves', () => {
+  const idFactory = sequenceIdFactory()
+  const sourceVersion = createTimetableVersion({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-1',
+    label: 'Horari de setembre',
+    effectiveFrom: '2026-09-01',
+  }, options(idFactory))
+  const sourceSlot = createTimetableSlot({
+    ownerUid: 'teacher-1',
+    timetableVersionId: sourceVersion.id,
+    classId: 'class-1',
+    weekday: 2,
+    startsAt: '09:30',
+    durationMinutes: 90,
+    subject: 'Música',
+    subgroupId: 'Grup A',
+  }, options(idFactory))
+
+  const copied = copyTimetableVersionStructure(
+    { timetableVersion: sourceVersion, slots: [sourceSlot] },
+    { label: 'Horari d’octubre', effectiveFrom: '2026-10-05' },
+    options(idFactory),
+  )
+
+  assert.notEqual(copied.timetableVersion.id, sourceVersion.id)
+  assert.equal(copied.timetableVersion.effectiveFrom, '2026-10-05')
+  assert.notEqual(copied.slots[0].id, sourceSlot.id)
+  assert.equal(copied.slots[0].timetableVersionId, copied.timetableVersion.id)
+  assert.equal(copied.slots[0].durationMinutes, 90)
+  assert.equal(sourceSlot.timetableVersionId, sourceVersion.id)
+})
+
+test('moure una franja conserva la identitat i no modifica una sessió ja creada', () => {
+  const slot = createTimetableSlot({
+    id: 'plan-slot-stable',
+    ownerUid: 'teacher-1',
+    timetableVersionId: 'plan-timetable-one',
+    classId: 'class-1',
+    weekday: 1,
+    startsAt: '08:30',
+    durationMinutes: 60,
+    subject: 'Física',
+  }, { now: NOW })
+  const historicalSession = createCalendarSession({
+    id: 'plan-session-historical',
+    ownerUid: 'teacher-1',
+    applicationId: 'application-1',
+    classId: 'class-1',
+    timetableSlotId: slot.id,
+    startsAt: '2026-09-21T08:30:00+02:00',
+    durationMinutes: 60,
+  }, { now: NOW })
+
+  const moved = moveTimetableSlot(slot, { weekday: 3, startsAt: '10:00' }, {
+    now: '2026-09-20T12:00:00.000Z',
+  })
+
+  assert.equal(moved.id, slot.id)
+  assert.equal(moved.weekday, 3)
+  assert.equal(moved.startsAt, '10:00')
+  assert.equal(historicalSession.startsAt, '2026-09-21T08:30:00+02:00')
+  assert.equal(historicalSession.timetableSlotId, slot.id)
+})
+
+test('cada data selecciona la versió horària que estava vigent', () => {
+  const versions = [
+    { id: 'setembre', effectiveFrom: '2026-09-01', effectiveTo: '2026-10-04' },
+    { id: 'octubre', effectiveFrom: '2026-10-05', effectiveTo: null },
+  ]
+  assert.equal(selectEffectiveTimetable(versions, '2026-09-30').id, 'setembre')
+  assert.equal(selectEffectiveTimetable(versions, '2026-10-05').id, 'octubre')
+})
+
+test('l’horari rebutja solapaments però permet franges consecutives', () => {
+  const existing = [{ id: 'one', weekday: 1, startsAt: '09:00', durationMinutes: 60 }]
+  assert.equal(findTimetableSlotConflicts(existing, {
+    id: 'two', weekday: 1, startsAt: '09:30', durationMinutes: 60,
+  }).length, 1)
+  assert.equal(findTimetableSlotConflicts(existing, {
+    id: 'three', weekday: 1, startsAt: '10:00', durationMinutes: 90,
+  }).length, 0)
+  assert.equal(findTimetableSlotConflicts(existing, {
+    id: 'four', weekday: 2, startsAt: '09:00', durationMinutes: 60,
+  }).length, 0)
 })
 
 test('les indicacions sense temps apareixen a la seqüència però no carreguen la sessió', () => {

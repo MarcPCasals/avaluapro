@@ -20,7 +20,12 @@ import {
   getPlanningSyncState,
   getPlanningSyncSummary,
 } from '../src/data/sync/planningSync.js'
-import { createAcademicYear } from '../src/domain/planning/model.js'
+import {
+  createAcademicYear,
+  createCalendarEvent,
+  createTimetableSlot,
+  createTimetableVersion,
+} from '../src/domain/planning/model.js'
 import { PLANNING_ENTITY_TYPES } from '../src/domain/planning/constants.js'
 
 function deleteTestDatabase() {
@@ -81,6 +86,48 @@ test('una entitat local i la cua sobreviuen el tancament de cada connexió Index
   assert.equal(reloaded[0].label, '2026-2027')
   assert.equal(pending.length, 1)
   assert.equal(pending[0].operation, 'upsert')
+})
+
+test('horari, franges i excepcions es recuperen per abast després d’una recàrrega offline', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-09-19T08:00:00.000Z'
+  const timetable = createTimetableVersion({
+    id: 'plan-timetable-offline',
+    ownerUid: uid,
+    academicYearId: 'year-2026',
+    label: 'Horari inicial',
+    effectiveFrom: '2026-09-01',
+  }, { now })
+  const slot = createTimetableSlot({
+    id: 'plan-slot-offline',
+    ownerUid: uid,
+    timetableVersionId: timetable.id,
+    classId: 'class-1',
+    weekday: 2,
+    startsAt: '09:30',
+    durationMinutes: 90,
+    subject: 'Música',
+    subgroupId: 'Grup A',
+  }, { now })
+  const calendarEvent = createCalendarEvent({
+    id: 'plan-event-offline',
+    ownerUid: uid,
+    academicYearId: 'year-2026',
+    type: 'extraordinarySession',
+    title: 'Substitució',
+    startsOn: '2026-09-22',
+    classIds: ['class-1'],
+    consumesPlannedSession: true,
+  }, { now })
+
+  await savePlanningEntityLocally(uid, timetable)
+  await savePlanningEntityLocally(uid, slot)
+  await savePlanningEntityLocally(uid, calendarEvent)
+
+  assert.equal((await loadPlanningScope(uid, 'academicYear:year-2026:planningTimetables'))[0].label, 'Horari inicial')
+  assert.equal((await loadPlanningScope(uid, `timetable:${timetable.id}:slots`))[0].subgroupId, 'Grup A')
+  assert.equal((await loadPlanningScope(uid, 'academicYear:year-2026:planningCalendarEvents'))[0].consumesPlannedSession, true)
+  assert.equal((await loadPlanningOutbox(uid)).length, 3)
 })
 
 test('una segona edició substitueix la pendent i una confirmació antiga no la retira', async () => {

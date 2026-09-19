@@ -26,6 +26,7 @@ import {
   createAccessGrant,
   createAcademicYear,
   createActivityResult,
+  createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
   createPlanningActivity,
@@ -34,6 +35,8 @@ import {
   createPlanningUnit,
   createSessionItem,
   createTemporalUnit,
+  createTimetableSlot,
+  createTimetableVersion,
 } from '../src/domain/planning/index.js'
 import { applyPlanningCloudOperationToDatabase } from '../src/data/cloud/planningCloudSync.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
@@ -542,8 +545,49 @@ describe('Configuració privada del calendari', () => {
     await assertSucceeds(getDoc(yearRef))
     await assertSucceeds(getDocs(collection(ownerDb, 'users', OWNER.uid, 'planningAcademicYears')))
 
+    const timetable = createTimetableVersion({
+      id: 'plan-timetable-private',
+      ownerUid: OWNER.uid,
+      academicYearId: year.id,
+      label: 'Horari inicial',
+      effectiveFrom: '2026-09-01',
+    }, { now: NOW })
+    const slot = createTimetableSlot({
+      id: 'plan-slot-private',
+      ownerUid: OWNER.uid,
+      timetableVersionId: timetable.id,
+      classId: CLASS_ONE,
+      weekday: 1,
+      startsAt: '09:00',
+      durationMinutes: 60,
+      subject: 'Música',
+      subgroupId: 'Grup A',
+    }, { now: NOW })
+    const calendarEvent = createCalendarEvent({
+      id: 'plan-event-private',
+      ownerUid: OWNER.uid,
+      academicYearId: year.id,
+      type: 'extraordinarySession',
+      title: 'Substitució',
+      startsOn: '2026-09-22',
+      classIds: [CLASS_ONE],
+      consumesPlannedSession: true,
+    }, { now: NOW })
+    const timetableRef = doc(ownerDb, 'users', OWNER.uid, 'planningTimetables', timetable.id)
+    const slotRef = doc(ownerDb, 'users', OWNER.uid, 'planningTimetableSlots', slot.id)
+    const eventRef = doc(ownerDb, 'users', OWNER.uid, 'planningCalendarEvents', calendarEvent.id)
+    await assertSucceeds(setDoc(timetableRef, timetable))
+    await assertSucceeds(setDoc(slotRef, slot))
+    await assertSucceeds(setDoc(eventRef, calendarEvent))
+    await assertSucceeds(getDoc(timetableRef))
+    await assertSucceeds(getDoc(slotRef))
+    await assertSucceeds(getDoc(eventRef))
+
     const thirdDb = authDb(THIRD)
     await assertFails(getDoc(doc(thirdDb, 'users', OWNER.uid, 'planningAcademicYears', year.id)))
+    await assertFails(getDoc(doc(thirdDb, 'users', OWNER.uid, 'planningTimetables', timetable.id)))
+    await assertFails(getDoc(doc(thirdDb, 'users', OWNER.uid, 'planningTimetableSlots', slot.id)))
+    await assertFails(getDoc(doc(thirdDb, 'users', OWNER.uid, 'planningCalendarEvents', calendarEvent.id)))
     await assertFails(setDoc(
       doc(thirdDb, 'users', OWNER.uid, 'planningAcademicYears', 'forged'),
       { ...year, id: 'forged' },

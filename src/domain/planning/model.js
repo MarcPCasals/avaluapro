@@ -503,6 +503,35 @@ export function createTimetableSlot(input, options = {}) {
   }
 }
 
+/**
+ * Crea una nova versió anual o de canvi d'horari sense reutilitzar cap
+ * identificador. Les franges es copien com a punt de partida i l'horari
+ * d'origen queda intacte, incloses les sessions que ja se n'hagin derivat.
+ */
+export function copyTimetableVersionStructure(
+  { timetableVersion, slots = [] },
+  { effectiveFrom, effectiveTo = null, label },
+  options = {},
+) {
+  const nextVersion = createTimetableVersion({
+    ...timetableVersion,
+    id: undefined,
+    createdAt: undefined,
+    updatedAt: undefined,
+    effectiveFrom,
+    effectiveTo,
+    label,
+  }, options)
+  const nextSlots = slots.map((slot) => createTimetableSlot({
+    ...slot,
+    id: undefined,
+    createdAt: undefined,
+    updatedAt: undefined,
+    timetableVersionId: nextVersion.id,
+  }, options))
+  return { timetableVersion: nextVersion, slots: nextSlots }
+}
+
 export function createCalendarEvent(input, options = {}) {
   const startsOn = isoDate(input.startsOn, "inici de l'esdeveniment")
   const endsOn = optionalIsoDate(input.endsOn, "final de l'esdeveniment") || startsOn

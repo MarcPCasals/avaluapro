@@ -182,7 +182,13 @@ Les evidències poden generar elements dins `planningUnit.improvementProposals`.
 
 ## Horaris versionats
 
-Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a una data concreta s'escull la versió vigent més recent. Les sessions ja creades conserven el seu `timetableSlotId` i no canvien si entra en vigor un horari nou.
+Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a una data concreta s'escull la versió vigent més recent. Crear una versió pot copiar les franges de l'anterior, però sempre genera identificadors nous. La versió d'origen i les sessions que ja se n'hagin derivat es conserven intactes.
+
+Cada `timetableSlot` vincula un dia i una hora amb un grup, l'assignatura i una durada de 60, 90 o 120 minuts. El mig grup i l'aula són opcionals. Arrossegar una franja en modifica el dia i l'hora sense canviar-ne la identitat. Les franges consecutives són vàlides i els solapaments dins la mateixa versió es rebutgen abans de desar.
+
+Els `calendarEvent` es guarden per curs i admeten festius, dies no lectius, jornades especials, cancel·lacions i classes extraordinàries. `classIds` buit significa tots els grups. El camp `consumesPlannedSession` només marca les classes extraordinàries que han de fer avançar una sessió la seqüència quan es generi el calendari de la UP.
+
+Horaris, franges i excepcions viuen dins `users/{uid}` perquè són configuració privada del docent. Agenda carrega només el curs actiu, les excepcions d'aquell curs i les franges de la versió seleccionada.
 
 ## Privacitat i capacitats
 

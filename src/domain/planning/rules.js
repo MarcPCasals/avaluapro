@@ -2,6 +2,7 @@ import { CHANGE_SCOPES } from './constants.js'
 import {
   createPlanningUnit,
   createGroupActivityOverride,
+  createTimetableSlot,
   updatePlanningActivity,
 } from './model.js'
 import { createId } from '../../lib/ids.js'
@@ -270,4 +271,34 @@ export function selectEffectiveTimetable(timetableVersions, date) {
     .filter((version) => version.effectiveFrom <= date && (!version.effectiveTo || version.effectiveTo >= date))
     .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
   return candidates[0] || null
+}
+
+/**
+ * Mou una franja sense recrear-la. Les sessions ja materialitzades conserven
+ * la data i l'hora pròpies; només les generacions futures veuran el canvi.
+ */
+export function moveTimetableSlot(slot, { startsAt, weekday }, options = {}) {
+  return createTimetableSlot({
+    ...slot,
+    startsAt,
+    weekday,
+    updatedAt: options.now || new Date().toISOString(),
+  }, options)
+}
+
+function timeInMinutes(value) {
+  const [hours, minutes] = String(value || '').split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+/** Retorna només els solapaments reals; dues franges consecutives no xoquen. */
+export function findTimetableSlotConflicts(slots, candidate) {
+  const candidateStart = timeInMinutes(candidate.startsAt)
+  const candidateEnd = candidateStart + Number(candidate.durationMinutes || 0)
+  return (slots || []).filter((slot) => {
+    if (slot.id === candidate.id || Number(slot.weekday) !== Number(candidate.weekday)) return false
+    const slotStart = timeInMinutes(slot.startsAt)
+    const slotEnd = slotStart + Number(slot.durationMinutes || 0)
+    return candidateStart < slotEnd && candidateEnd > slotStart
+  })
 }
