@@ -78,7 +78,14 @@ Commit funcional: `9c15b4d`.
 
 ## Publicació
 
-Pendent de publicar i verificar a producció.
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- `?preview=agenda` mostra el botó Agenda i continua exigint iniciar sessió abans de carregar l'horari;
+- la navegació normal manté Agenda i Programació ocultes durant el pilot;
+- el paquet publicat conté **Absència completa**, **Sortida a mitja sessió**, **Recuperació pendent justificada**, **Text de correu per copiar**, **Marcar preparat** i **Mesures previstes per a aquesta activitat**;
+- l'auditoria posterior continua preparada per desplegar i no detecta respostes pendents de sincronitzar;
+- les regles locals i desplegades continuen sent idèntiques;
+- la comprovació publicada només ha utilitzat les dades demo i no ha escrit cap dada real.
 
 ## Pas següent
 
