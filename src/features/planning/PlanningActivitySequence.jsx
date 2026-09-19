@@ -35,7 +35,7 @@ function materialLinks(activity) {
     .filter((material) => material.kind === 'link')
 }
 
-function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
+function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = materialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
@@ -49,11 +49,16 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
       onDrop={(event) => { event.preventDefault(); event.stopPropagation(); onDrop(activity.phaseId, activity.id) }}
     >
       <button
-        aria-label={`Arrossegar ${activity.title}`}
+        aria-label={`Reordenar ${activity.title}. Arrossega o prem Alt i fletxa amunt o avall`}
         className="planning-drag-handle"
         draggable
         onDragEnd={onDragEnd}
         onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; onDragStart(activity.id) }}
+        onKeyDown={(event) => {
+          if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return
+          event.preventDefault()
+          onKeyboardMove(activity, event.key === 'ArrowUp' ? -1 : 1)
+        }}
         onPointerCancel={onDragEnd}
         onPointerDown={(event) => {
           if (event.pointerType === 'mouse') return
@@ -66,7 +71,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
           event.currentTarget.releasePointerCapture(event.pointerId)
           onTouchDrop(event.clientX, event.clientY)
         }}
-        title="Arrossega per canviar l’ordre"
+        title="Arrossega o usa Alt + fletxa amunt/avall"
         type="button"
       ><Menu size={18} /></button>
       <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
@@ -105,6 +110,9 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
       .filter((activity) => activity.phaseId === phase.id)
       .sort((left, right) => Number(left.order) - Number(right.order)))
     .map((activity, index) => [activity.id, index + 1])), [activities, flatPhases])
+  const orderedActivities = useMemo(() => flatPhases.flatMap((phase) => activities
+    .filter((activity) => activity.phaseId === phase.id)
+    .sort((left, right) => Number(left.order) - Number(right.order))), [activities, flatPhases])
   const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
@@ -121,6 +129,21 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
       return
     }
     drop(target.dataset.phaseId, target.dataset.activityId || null)
+  }
+  const keyboardMove = async (activity, direction) => {
+    const index = orderedActivities.findIndex((item) => item.id === activity.id)
+    const neighbour = orderedActivities[index + direction]
+    if (!neighbour) return
+    if (direction < 0) {
+      await onMove({ activityId: activity.id, targetActivityId: neighbour.id, targetPhaseId: neighbour.phaseId })
+      return
+    }
+    const following = orderedActivities[index + 2]
+    await onMove({
+      activityId: activity.id,
+      targetActivityId: following?.phaseId === neighbour.phaseId ? following.id : null,
+      targetPhaseId: neighbour.phaseId,
+    })
   }
   const remove = async (activity) => {
     if (!globalThis.confirm?.(`Vols eliminar «${activity.title}» de la seqüència?`)) return
@@ -169,6 +192,7 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
                     onDragStart={setDragId}
                     onDrop={drop}
                     onEdit={onEdit}
+                    onKeyboardMove={keyboardMove}
                     onTouchDrop={touchDrop}
                     programmableMinutes={programmableMinutes}
                     sequenceNumber={sequenceNumberById.get(activity.id)}

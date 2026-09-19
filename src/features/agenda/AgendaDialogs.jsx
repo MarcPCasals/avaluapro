@@ -60,7 +60,7 @@ function AgendaDialog({ children, onClose, onSubmit, size = 'md', submitLabel, t
     <Modal onClose={onClose} panelClassName="agenda-dialog" size={size} title={title}>
       <form className="agenda-dialog-form" id="agenda-dialog-form" onSubmit={handleSubmit}>
         {children}
-        {error && <p className="agenda-inline-error">{error}</p>}
+        {error && <p className="agenda-inline-error" role="alert">{error}</p>}
       </form>
       <DialogActions busy={busy} onClose={onClose} submitLabel={submitLabel} />
     </Modal>

@@ -384,3 +384,16 @@
   .agenda-classroom-prompt button { grid-column: 2; justify-self: start; }
   .agenda-timeline-list { min-width: 670px; }
 }
+
+.agenda-screen :where(button, a, input, select, textarea):focus-visible,
+.agenda-dialog :where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(249, 115, 22, .3);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agenda-screen *, .agenda-dialog * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

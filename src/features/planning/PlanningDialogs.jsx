@@ -36,7 +36,7 @@ function PlanningDialog({ children, error, onClose, onSubmit, size = 'md', submi
     <Modal onClose={onClose} panelClassName="planning-dialog" size={size} title={title}>
       <form className="planning-dialog-form" id="planning-dialog-form" onSubmit={handleSubmit}>
         {children}
-        {(localError || error) && <p className="planning-inline-error">{localError || error}</p>}
+        {(localError || error) && <p className="planning-inline-error" role="alert">{localError || error}</p>}
       </form>
       <DialogActions busy={busy} onClose={onClose} submitLabel={submitLabel} />
     </Modal>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus, PackageCheck,
@@ -13,6 +13,7 @@ import {
   getCorrectedActualMinutes,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   buildRecoveryEmail,
   getMaterialPreparationKey,
@@ -57,6 +58,8 @@ function classroomEvidenceKey(bundle, item) {
 }
 
 function ActivityReviewDialog({ item, onClose, onSave, result }) {
+  const titleId = useId()
+  const dialogRef = useDialogAccessibility(onClose)
   const [values, setValues] = useState({
     actualMinutes: result?.actualMinutes || '',
     applicationComment: result?.applicationComment || '',
@@ -89,8 +92,8 @@ function ActivityReviewDialog({ item, onClose, onSave, result }) {
       setSaving(false)
     }
   }
-  return <div className="classroom-close-backdrop"><section aria-modal="true" className="classroom-review-dialog" role="dialog">
-    <header><span><PencilLine size={20} /></span><div><small>Revisió posterior</small><h2>{item.title}</h2></div></header>
+  return <div className="classroom-close-backdrop"><section aria-labelledby={titleId} aria-modal="true" className="classroom-review-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
+    <header><span><PencilLine size={20} /></span><div><small>Revisió posterior</small><h2 id={titleId}>{item.title}</h2></div></header>
     <div className="classroom-review-grid">
       <label>Temps real (min)<input min="0.1" step="0.1" type="number" value={values.actualMinutes} onChange={(event) => setValues({ ...values, actualMinutes: event.target.value })} /></label>
       <label>Recomanació<select value={values.improvementRecommendation} onChange={(event) => setValues({ ...values, improvementRecommendation: event.target.value })}><option value="">Sense recomanació</option><option value="keep">Conservar</option><option value="modify">Modificar</option><option value="remove">Retirar</option></select></label>
@@ -99,12 +102,14 @@ function ActivityReviewDialog({ item, onClose, onSave, result }) {
     <label>Reflexió pedagògica <span>visible per direcció</span><textarea rows="2" value={values.pedagogicalReflection} onChange={(event) => setValues({ ...values, pedagogicalReflection: event.target.value })} /></label>
     <label>Materials que han faltat <span>un per línia</span><textarea rows="2" value={values.missingMaterials} onChange={(event) => setValues({ ...values, missingMaterials: event.target.value })} /></label>
     {measures.length > 0 && <fieldset><legend>Adaptacions que han funcionat</legend>{measures.map((measure) => <label key={measure.id}><input checked={values.usefulAdaptationIds.includes(measure.id)} onChange={(event) => setValues((current) => ({ ...current, usefulAdaptationIds: event.target.checked ? [...current.usefulAdaptationIds, measure.id] : current.usefulAdaptationIds.filter((id) => id !== measure.id) }))} type="checkbox" />{measure.label}</label>)}</fieldset>}
-    {error && <p className="classroom-review-error">{error}</p>}
+    {error && <p className="classroom-review-error" role="alert">{error}</p>}
     <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onClose} type="button">Cancel·lar</button><button className="primary-action" disabled={saving} onClick={save} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}Desar revisió</button></div>
   </section></div>
 }
 
 function RecoveryDialog({ bundle, existing, kind, nextSession, onClose, onSave, student }) {
+  const titleId = useId()
+  const dialogRef = useDialogAccessibility(onClose)
   const recoverableItems = getRecoverableClassroomItems(bundle.items)
   const existingIds = new Set((existing?.recovery?.activities || []).map((activity) => activity.itemId))
   const [selectedIds, setSelectedIds] = useState(() => existing
@@ -160,14 +165,45 @@ function RecoveryDialog({ bundle, existing, kind, nextSession, onClose, onSave, 
       setError('No s’ha pogut copiar automàticament. Pots seleccionar el text manualment.')
     }
   }
-  return <div className="classroom-close-backdrop"><section aria-modal="true" className="classroom-recovery-dialog" role="dialog">
-    <header><span>{kind === 'absence' ? <UserX size={20} /> : <DoorOpen size={20} />}</span><div><small>{kind === 'absence' ? 'Absència completa' : 'Sortida a mitja sessió'}</small><h2>{student.name}</h2></div></header>
+  return <div className="classroom-close-backdrop"><section aria-labelledby={titleId} aria-modal="true" className="classroom-recovery-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
+    <header><span>{kind === 'absence' ? <UserX size={20} /> : <DoorOpen size={20} />}</span><div><small>{kind === 'absence' ? 'Absència completa' : 'Sortida a mitja sessió'}</small><h2 id={titleId}>{student.name}</h2></div></header>
     <p>{kind === 'absence' ? 'Totes les activitats apareixen seleccionades. Desmarca les que no cal recuperar.' : 'Selecciona només les activitats que s’ha perdut des que ha marxat.'}</p>
     <div className="classroom-recovery-activities">{recoverableItems.map((item) => <label key={item.id}><input checked={selectedIds.includes(item.id)} onChange={(event) => changeSelection(item.id, event.target.checked)} type="checkbox" /><span><strong>{item.title}</strong><small>{item.sourceActivity?.evidenceMode !== 'none' ? 'Genera una tasca pendent justificada' : 'Activitat per recuperar'}</small></span></label>)}</div>
     <div className="classroom-recovery-next"><Clock3 size={16} /><span>{nextSession?.startsAt ? `Recordatori programat per a la pròxima sessió: ${String(nextSession.startsAt).slice(0, 10)} · ${String(nextSession.startsAt).slice(11, 16)}` : 'No s’ha trobat una sessió posterior. El pendent quedarà visible des d’avui.'}</span></div>
     <label className="classroom-recovery-email"><span><Mail size={15} />Text de correu per copiar</span><textarea rows="11" value={emailText} onChange={(event) => { setEmailTouched(true); setEmailText(event.target.value) }} /></label>
-    {error && <p className="classroom-review-error">{error}</p>}
+    {error && <p className="classroom-review-error" role="alert">{error}</p>}
     <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onClose} type="button">Cancel·lar</button><button className="secondary-action" disabled={!emailText.trim()} onClick={copy} type="button"><Copy size={15} />{copied ? 'Copiat' : 'Copiar text'}</button><button className="primary-action" disabled={saving} onClick={save} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}Desar registre</button></div>
+  </section></div>
+}
+
+function ClassroomCloseReviewDialog({
+  attendanceConfirmed,
+  attendanceIssueDetail,
+  attendanceIssueCount,
+  busy,
+  className,
+  onClose,
+  onConfirm,
+  pendingTaskCount,
+  reminderCount,
+  sessionTime,
+  setSummaryPrivateNote,
+  setSummaryReflection,
+  summaryPrivateNote,
+  summaryReflection,
+}) {
+  const titleId = useId()
+  const dialogRef = useDialogAccessibility(onClose)
+  return <div className="classroom-close-backdrop" role="presentation"><section aria-labelledby={titleId} aria-modal="true" className="classroom-close-review" ref={dialogRef} role="dialog" tabIndex="-1">
+    <header><span><CheckCircle2 size={21} /></span><div><small>Resum abans de tancar</small><h2 id={titleId}>{className || 'Classe'} · {sessionTime}</h2></div></header>
+    <div className="classroom-close-summary">
+      <article><strong>{attendanceIssueCount}</strong><span>{attendanceIssueCount === 1 ? 'alumne absent o que ha marxat' : 'alumnes absents o que han marxat'}</span><small>{attendanceIssueDetail || 'Cap absència ni sortida registrada'}</small></article>
+      <article><strong>{pendingTaskCount}</strong><span>tasques pendents</span><small>{pendingTaskCount ? 'Inclou les recuperacions justificades de la sessió.' : 'Cap tasca pendent registrada.'}</small></article>
+      <article><strong>{reminderCount}</strong><span>recordatoris creats</span><small>{reminderCount ? 'Es conservaran a la capa global de recordatoris.' : 'Cap recordatori nou.'}</small></article>
+    </div>
+    <div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota privada <span>només per a tu</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>
+    {!attendanceConfirmed && <p className="classroom-close-warning">Encara no has confirmat la llista d’assistència.</p>}
+    <div className="classroom-close-actions"><button className="secondary-action" disabled={busy} onClick={onClose} type="button">Continuar la classe</button><button className="primary-action" disabled={busy} onClick={onConfirm} type="button">{busy ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}Confirmar i tancar</button></div>
   </section></div>
 }
 
@@ -572,7 +608,7 @@ export function ClassroomMode({
             const behaviorCount = behaviorEvents.filter((event) => event.studentId === student.id && event.sessionId === currentBundle.session.id).length
             return <div className={`${absence ? 'absent' : ''} ${selected ? 'selected' : ''}`} key={student.id}>
               <button aria-pressed={selected} className="classroom-student-select" onClick={() => toggleStudentSelection(student.id)} type="button"><span>{selected ? <Check size={15} /> : <Users size={15} />}</span><strong>{student.name}</strong>{behaviorCount > 0 && <small>{behaviorCount} registre{behaviorCount === 1 ? '' : 's'}</small>}</button>
-              <div className="classroom-presence-actions"><button aria-label={`${absence ? 'Marcar present' : 'Marcar absent'} ${student.name}`} aria-pressed={Boolean(absence)} className="classroom-absence-toggle" disabled={loading || busy === `recovery:${student.id}`} onClick={() => absence ? toggleAbsence(student.id) : openRecovery(student, 'absence')} type="button">{loading || busy === `recovery:${student.id}` ? <Loader2 className="spin" size={14} /> : absence ? <UserX size={16} /> : <UserCheck size={16} />}<small>{absence ? 'Absent' : 'Present'}</small></button><button aria-label={`Registrar sortida de ${student.name}`} aria-pressed={departed} className={`classroom-departure-toggle ${departed ? 'active' : ''}`} disabled={busy === `recovery:${student.id}`} onClick={() => openRecovery(student, 'earlyDeparture')} type="button"><DoorOpen size={15} /><small>Sortida</small></button></div>
+              <div className="classroom-presence-actions"><button aria-label={`${absence ? 'Marcar present' : 'Marcar absent'} ${student.name}`} aria-pressed={Boolean(absence)} className="classroom-absence-toggle" disabled={loading || busy === `recovery:${student.id}`} onClick={() => absence ? toggleAbsence(student.id) : openRecovery(student, 'absence')} type="button">{loading || busy === `recovery:${student.id}` ? <Loader2 className="spin" size={14} /> : absence ? <UserX size={16} /> : <UserCheck size={16} />}<small>{absence ? 'Absent' : 'Present'}</small></button><button aria-label={`Registrar sortida de ${student.name}`} aria-pressed={departed} className={`classroom-departure-toggle ${departed ? 'active' : ''}`} disabled={busy === `recovery:${student.id}`} onClick={() => openRecovery(student, 'earlyDeparture')} type="button"><DoorOpen size={15} /><small>Surt</small></button></div>
             </div>
           })}</div>
           {selectedStudentIds.length > 0 && <section className="classroom-behavior-controls"><header><MessageSquarePlus size={16} /><strong>{selectedStudentIds.length} seleccionat{selectedStudentIds.length === 1 ? '' : 's'}</strong></header><div className="classroom-behavior-kind"><button className={behaviorKind === 'incident' ? 'active incident' : ''} onClick={() => setBehaviorKind('incident')} type="button"><AlertTriangle size={14} />Incidència</button><button className={behaviorKind === 'positive' ? 'active positive' : ''} onClick={() => setBehaviorKind('positive')} type="button"><ThumbsUp size={14} />Positiu</button></div><div className="classroom-behavior-categories">{CLASSROOM_BEHAVIOR_CATEGORIES[behaviorKind].map(([id, label]) => <button disabled={busy === 'behavior'} key={id} onClick={() => saveBehavior(id, label)} type="button">{label}</button>)}<button className={showOtherBehavior ? 'active' : ''} onClick={() => setShowOtherBehavior((value) => !value)} type="button">Altres…</button></div>{showOtherBehavior && <div className="classroom-behavior-other"><input maxLength="500" placeholder="Escriu el registre" value={otherBehavior} onChange={(event) => setOtherBehavior(event.target.value)} /><button disabled={!otherBehavior.trim() || busy === 'behavior'} onClick={() => saveBehavior('other', otherBehavior)} type="button"><Save size={14} /></button></div>}</section>}
@@ -594,19 +630,19 @@ export function ClassroomMode({
         </aside>}
       </main>
 
-      {error && <div className="classroom-error">{error}<button onClick={() => setError('')} type="button">Tancar</button></div>}
+      {error && <div aria-live="assertive" className="classroom-error" role="alert">{error}<button onClick={() => setError('')} type="button">Tancar</button></div>}
 
       <footer className="classroom-footer">
         <div>
-          <button className={sidePanel === 'students' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'students' ? '' : 'students')} type="button"><Users size={17} />Alumnat{absentStudents.length > 0 && <span>{absentStudents.length}</span>}</button>
-          {evidenceItems.length > 0 && <button className={sidePanel === 'tasks' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'tasks' ? '' : 'tasks')} type="button"><ClipboardCheck size={17} />Tasques{pendingTaskRecords.length > 0 && <span>{pendingTaskRecords.length}</span>}</button>}
+          <button aria-pressed={sidePanel === 'students'} className={sidePanel === 'students' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'students' ? '' : 'students')} type="button"><Users size={17} />Alumnat{absentStudents.length > 0 && <span>{absentStudents.length}</span>}</button>
+          {evidenceItems.length > 0 && <button aria-pressed={sidePanel === 'tasks'} className={sidePanel === 'tasks' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'tasks' ? '' : 'tasks')} type="button"><ClipboardCheck size={17} />Tasques{pendingTaskRecords.length > 0 && <span>{pendingTaskRecords.length}</span>}</button>}
           <button disabled={currentIndex === 0 || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => selectItem(currentIndex - 1)} type="button"><ArrowLeft size={17} />Anterior</button>
           <button disabled={currentIndex >= currentBundle.items.length - 1 || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => selectItem(currentIndex + 1)} type="button">Següent<ArrowRight size={17} /></button>
         </div>
         <button className="classroom-close-button" disabled={Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => setCloseReview(true)} type="button"><CheckCircle2 size={17} />Tancar la classe</button>
       </footer>
 
-      {closeReview && <div className="classroom-close-backdrop" role="presentation"><section aria-modal="true" className="classroom-close-review" role="dialog"><header><span><CheckCircle2 size={21} /></span><div><small>Resum abans de tancar</small><h2>{classItem?.name || 'Classe'} · {String(currentBundle.session.startsAt).slice(11, 16)}</h2></div></header><div className="classroom-close-summary"><article><strong>{attendanceIssueIds.size}</strong><span>{attendanceIssueIds.size === 1 ? 'alumne absent o que ha marxat' : 'alumnes absents o que han marxat'}</span><small>{attendanceIssueDetail || 'Cap absència ni sortida registrada'}</small></article><article><strong>{pendingTaskRecords.length}</strong><span>tasques pendents</span><small>{pendingTaskRecords.length ? 'Inclou les recuperacions justificades de la sessió.' : 'Cap tasca pendent registrada.'}</small></article><article><strong>{reminderCount}</strong><span>recordatoris creats</span><small>{reminderCount ? 'Es conservaran a la capa global de recordatoris.' : 'Cap recordatori nou.'}</small></article></div><div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota privada <span>només per a tu</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>{!currentBundle.session.attendanceConfirmedAt && <p className="classroom-close-warning">Encara no has confirmat la llista d’assistència.</p>}<div className="classroom-close-actions"><button className="secondary-action" disabled={busy === 'close'} onClick={() => setCloseReview(false)} type="button">Continuar la classe</button><button className="primary-action" disabled={busy === 'close'} onClick={closeSession} type="button">{busy === 'close' ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}Confirmar i tancar</button></div></section></div>}
+      {closeReview && <ClassroomCloseReviewDialog attendanceConfirmed={Boolean(currentBundle.session.attendanceConfirmedAt)} attendanceIssueCount={attendanceIssueIds.size} attendanceIssueDetail={attendanceIssueDetail} busy={busy === 'close'} className={classItem?.name} onClose={() => setCloseReview(false)} onConfirm={closeSession} pendingTaskCount={pendingTaskRecords.length} reminderCount={reminderCount} sessionTime={String(currentBundle.session.startsAt).slice(11, 16)} setSummaryPrivateNote={setSummaryPrivateNote} setSummaryReflection={setSummaryReflection} summaryPrivateNote={summaryPrivateNote} summaryReflection={summaryReflection} />}
       {reviewItem && <ActivityReviewDialog item={reviewItem} onClose={() => setReviewItem(null)} onSave={(changes) => saveReview(reviewItem, changes)} result={currentBundle.results.find((result) => result.sessionItemId === reviewItem.id)} />}
       {recoveryDraft && <RecoveryDialog bundle={currentBundle} existing={recoveryDraft.existing} kind={recoveryDraft.kind} nextSession={recoveryDraft.nextSession} onClose={() => setRecoveryDraft(null)} onSave={saveRecovery} student={recoveryDraft.student} />}
     </section>

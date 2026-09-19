@@ -5,6 +5,7 @@ import {
   FileText, Pencil, Plus, RotateCcw, Save, Share2, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
   PlanningUnitDialog, TemporalUnitDialog,
@@ -27,10 +28,22 @@ const PHASE_LABELS = {
 function SyncBadge({ isOnline, sync }) {
   const Icon = !isOnline ? CloudOff : sync.state === 'saving' ? Loader2 : sync.state === 'saved' ? Check : Cloud
   return (
-    <span className={`planning-sync ${sync.state}`} title={`${sync.pendingCount || 0} canvis pendents`}>
+    <span aria-live="polite" className={`planning-sync ${sync.state}`} role="status" title={`${sync.pendingCount || 0} canvis pendents`}>
       <Icon className={sync.state === 'saving' ? 'spin' : ''} size={15} />
       {sync.label}
     </span>
+  )
+}
+
+function PlanningPreviewDialog({ activities, classes, loadApplications, onClose, phases, unit }) {
+  const dialogRef = useDialogAccessibility(onClose)
+  return (
+    <div className="planning-dialog-backdrop">
+      <section aria-label="Vista de direcció" aria-modal="true" className="planning-preview-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
+        <button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={onClose} type="button"><X size={18} /></button>
+        <PlanningSharedView activities={activities} classes={classes} loadApplications={loadApplications} phases={phases} role="owner" unit={unit} />
+      </section>
+    </div>
   )
 }
 
@@ -80,7 +93,7 @@ function PhaseTree({ activities, editable = true, onAddChild, onAddRoot, onEdit,
     <div className="planning-outline-block">
       <div className="planning-outline-heading">
         <div><FolderTree size={17} /><strong>Fases</strong></div>
-        {editable && <button className="icon-action accent" onClick={onAddRoot} title="Afegir fase" type="button"><Plus size={15} /></button>}
+          {editable && <button aria-label="Afegir fase" className="icon-action accent" onClick={onAddRoot} title="Afegir fase" type="button"><Plus size={15} /></button>}
       </div>
       <ul className="planning-phase-tree">{roots.map((phase) => renderPhase(phase))}</ul>
     </div>
@@ -428,7 +441,7 @@ export default function PlanningModule() {
           </main>
 
           {showSummary && workspace.activePlanningUnit && <UnitSummary activities={workspace.activities} phases={workspace.phases} temporalUnit={activeTemporalUnit} unit={workspace.activePlanningUnit} />}
-          <button className="planning-summary-toggle" onClick={() => setShowSummary((value) => !value)} title={showSummary ? 'Amagar resum' : 'Mostrar resum'} type="button">
+          <button aria-label={showSummary ? 'Amagar resum' : 'Mostrar resum'} className="planning-summary-toggle" onClick={() => setShowSummary((value) => !value)} title={showSummary ? 'Amagar resum' : 'Mostrar resum'} type="button">
             {showSummary ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
@@ -443,7 +456,7 @@ export default function PlanningModule() {
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && workspace.activePlanningUnit && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.importPlanningTable} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
-      {dialog === 'preview' && workspace.activePlanningUnit && <div className="planning-dialog-backdrop"><section aria-modal="true" className="planning-preview-dialog" role="dialog"><button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={() => setDialog(null)} type="button"><X size={18} /></button><PlanningSharedView activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} phases={workspace.phases} role="owner" unit={workspace.activePlanningUnit} /></section></div>}
+      {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
     </section>
   )
 }

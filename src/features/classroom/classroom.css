@@ -218,3 +218,47 @@
   .classroom-summary-notes, .classroom-review-grid { grid-template-columns: 1fr; }
   .classroom-recovery-activities { grid-template-columns: 1fr; }
 }
+
+/* Mode aula s'utilitza de pressa i sovint en pantalla tàctil: els controls
+   principals mantenen una àrea útil encara que el disseny continuï sent dens. */
+.classroom-mode :where(button, a, input, select, textarea):focus-visible,
+.classroom-close-backdrop :where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--classroom-accent, #8b5cf6) 35%, transparent);
+  outline-offset: 2px;
+}
+.classroom-exit { min-height: 34px; padding: 6px 4px; }
+.classroom-attendance > header button { width: 34px; height: 34px; }
+.classroom-student-select { min-height: 34px; }
+.classroom-student-select strong { font-size: 10px; }
+.classroom-header > div:nth-child(2) span,
+.classroom-session-meta span,
+.classroom-current-label strong,
+.classroom-current-label small,
+.classroom-timeline-item small,
+.classroom-timeline-item span:not(.classroom-timeline-dot),
+.classroom-current-details span,
+.classroom-adaptation-reminder strong,
+.classroom-adaptation-reminder small,
+.classroom-timer > span,
+.classroom-attendance > header small,
+.classroom-attendance > p { font-size: 10px; }
+.classroom-materials button,
+.classroom-finish-options button,
+.classroom-behavior-kind button,
+.classroom-behavior-categories button { min-height: 32px; font-size: 9px; }
+.classroom-absence-toggle, .classroom-departure-toggle { min-height: 34px; }
+.classroom-absence-toggle small, .classroom-departure-toggle small { font-size: 10px; }
+.classroom-student-select small,
+.classroom-behavior-controls > header,
+.classroom-task-tabs small,
+.classroom-task-students article > strong,
+.classroom-task-students article > strong small { font-size: 9px; }
+.classroom-task-students button { min-height: 32px; font-size: 9px; }
+.classroom-footer button { min-height: 40px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .classroom-mode *, .classroom-close-backdrop * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

@@ -591,3 +591,20 @@
   .planning-material-row .icon-action { grid-column: 3; grid-row: 1; }
   .planning-indicator-picker > div, .planning-student-picker > div { grid-template-columns: 1fr; }
 }
+
+/* El focus queda visible tant a l'editor com als diàlegs carregats fora seu. */
+.planning-screen :where(button, a, input, select, textarea):focus-visible,
+.planning-dialog :where(button, a, input, select, textarea):focus-visible,
+.planning-sharing-dialog :where(button, a, input, select, textarea):focus-visible,
+.planning-preview-dialog :where(button, a, input, select, textarea):focus-visible,
+.planning-document-dialog :where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(124, 58, 237, .3);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-screen *, .planning-dialog *, .planning-sharing-dialog *, .planning-preview-dialog * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

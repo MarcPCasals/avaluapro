@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 
 const ROLE_OPTIONS = [
   {
@@ -41,6 +42,7 @@ function roleLabel(role) {
  * i la llista autoritzada de la UP no puguin quedar desalineats.
  */
 export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSave, unit }) {
+  const dialogRef = useDialogAccessibility(onClose)
   const [draft, setDraft] = useState(emptyDraft)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -92,7 +94,9 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
         aria-labelledby="planning-sharing-title"
         aria-modal="true"
         className="planning-sharing-dialog"
+        ref={dialogRef}
         role="dialog"
+        tabIndex="-1"
       >
         <header>
           <span><ShieldCheck size={21} /></span>
@@ -156,7 +160,7 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
               </div>
             </fieldset>
           )}
-          {error && <p className="planning-sharing-error">{error}</p>}
+          {error && <p className="planning-sharing-error" role="alert">{error}</p>}
           <div className="planning-dialog-actions">
             <button className="secondary-action" disabled={Boolean(busy)} onClick={onClose} type="button">Tancar</button>
             <button className="primary-action" disabled={Boolean(busy) || !draft.email.trim()} type="submit">

@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
+import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
 const ROLE_LABELS = {
@@ -254,30 +255,30 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <Eye size={18} />
           <span><small>{ROLE_LABELS[role] || 'Programació compartida'}</small><strong>{unit.code} · {unit.title}</strong></span>
         </div>
-        <nav aria-label="Contingut compartit">
-          <button className={tab === 'program' ? 'active' : ''} onClick={() => setTab('program')} type="button">
+        <nav aria-label="Contingut compartit" role="tablist">
+          <button aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
             Programació
           </button>
-          <button className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} type="button">
+          <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button">
             <FileText size={13} />Document
           </button>
           {loadApplications && (
-            <button className={tab === 'applications' ? 'active' : ''} onClick={openApplications} type="button">
+            <button aria-selected={tab === 'applications'} className={tab === 'applications' ? 'active' : ''} onClick={openApplications} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'applications' ? 0 : -1} type="button">
               Aplicació real
             </button>
           )}
         </nav>
       </header>
       {tab === 'program' ? (
-        <BaseProgramView activities={activities} phases={phases} unit={unit} />
+        <div role="tabpanel"><BaseProgramView activities={activities} phases={phases} unit={unit} /></div>
       ) : tab === 'document' ? (
-        <PlanningDocumentView activities={activities} phases={phases} unit={unit} />
+        <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>
       ) : loading ? (
         <div className="planning-shared-loading"><Loader2 className="spin" size={22} />Carregant les sessions…</div>
       ) : error ? (
         <p className="planning-sharing-error">{error}</p>
       ) : (
-        <ApplicationView applications={applications || []} classes={classes} />
+        <div role="tabpanel"><ApplicationView applications={applications || []} classes={classes} /></div>
       )}
     </section>
   )

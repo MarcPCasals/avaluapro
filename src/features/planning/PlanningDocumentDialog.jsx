@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ClipboardPaste, FileJson, FileText, Import, Loader2, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { parsePlanningDocumentExport, parsePlanningTableText } from '../../domain/planning/documents'
+import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
 function ImportPreview({ bundle }) {
@@ -98,17 +99,16 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
       setBusy(false)
     }
   }
-
   return (
     <Modal onClose={onClose} panelClassName="planning-document-dialog" size="xl" title="Document i importacions">
-      <nav className="planning-document-tabs" aria-label="Eines documentals">
-        <button className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} type="button"><FileText size={16} />Vista documental</button>
-        <button className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')} type="button"><Import size={16} />Importar una UP</button>
-        <button className={tab === 'table' ? 'active' : ''} onClick={() => setTab('table')} type="button"><ClipboardPaste size={16} />Enganxar taula</button>
+      <nav aria-label="Eines documentals" className="planning-document-tabs" role="tablist">
+        <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button"><FileText size={16} />Vista documental</button>
+        <button aria-selected={tab === 'import'} className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'import' ? 0 : -1} type="button"><Import size={16} />Importar una UP</button>
+        <button aria-selected={tab === 'table'} className={tab === 'table' ? 'active' : ''} onClick={() => setTab('table')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'table' ? 0 : -1} type="button"><ClipboardPaste size={16} />Enganxar taula</button>
       </nav>
-      {tab === 'document' && <PlanningDocumentView activities={activities} phases={phases} unit={unit} />}
+      {tab === 'document' && <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>}
       {tab === 'import' && (
-        <section className="planning-import-panel">
+        <section className="planning-import-panel" role="tabpanel">
           <header><Upload size={20} /><div><strong>Crear una còpia nova des d’un fitxer</strong><p>El fitxer es llegeix dins del navegador. No se substitueix cap UP existent.</p></div></header>
           <div className="planning-import-source-actions">
             <button className="secondary-action" disabled={busy} onClick={() => wordInput.current?.click()} type="button"><FileText size={17} />Seleccionar Word</button>
@@ -122,15 +122,15 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
         </section>
       )}
       {tab === 'table' && (
-        <section className="planning-import-panel">
+        <section className="planning-import-panel" role="tabpanel">
           <header><ClipboardPaste size={20} /><div><strong>Enganxar des d’Excel o Numbers</strong><p>La primera fila ha de contenir capçaleres. Es reconeixen Activitat, Fase, Subfase, Minuts, Materials, Agrupament, Espai, IA, Diversitat i Comentaris.</p></div></header>
           <textarea onChange={(event) => { setTableText(event.target.value); setTablePreview(null) }} placeholder={'Fase\tSubfase\tActivitat\tMinuts\tMaterials\tAgrupament\tEspai\tIA'} rows="8" value={tableText} />
           <div className="planning-import-table-actions"><label>Fase si la taula no la reconeix<select value={targetPhaseId} onChange={(event) => setTargetPhaseId(event.target.value)}>{phases.map((phase) => <option key={phase.id} value={phase.id}>{phase.title}</option>)}</select></label><button className="secondary-action" disabled={!tableText.trim()} onClick={previewTable} type="button">Previsualitzar</button></div>
           {tablePreview && <section className="planning-table-preview"><strong>{tablePreview.activities.length} activitats detectades</strong>{tablePreview.activities.slice(0, 6).map((activity, index) => <div key={`${activity.title}-${index}`}><span>{index + 1}</span><b>{activity.title}</b><small>{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}{activity.phaseLabel ? ` · ${activity.phaseLabel}` : ''}</small></div>)}{tablePreview.activities.length > 6 && <p>i {tablePreview.activities.length - 6} activitats més</p>}<button className="primary-action" disabled={busy || !targetPhaseId} onClick={importTable} type="button">Afegir-les a la UP oberta</button></section>}
         </section>
       )}
-      {error && <p className="planning-inline-error">{error}</p>}
-      {success && <p className="planning-import-success">{success}</p>}
+      {error && <p className="planning-inline-error" role="alert">{error}</p>}
+      {success && <p aria-live="polite" className="planning-import-success" role="status">{success}</p>}
     </Modal>
   )
 }
