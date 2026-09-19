@@ -45,6 +45,10 @@ Les dades es guarden dins l'espai privat `users/{uid}`. Les proves de regles con
 - comprovació visual a 1440 × 1000 i 1024 × 768;
 - graella amb cinc franges representatives i sense desbordament horitzontal;
 - formularis de franja, versió i excepció complets dins la pantalla.
+- Hosting publicat a `avaluapro.web.app`;
+- el pilot publicat mostra Agenda només amb `?preview=agenda` i exigeix autenticació abans de carregar dades;
+- la navegació publicada normal manté Agenda i Programació ocultes;
+- el paquet publicat conté l'horari versionat, la nova versió i les classes extraordinàries amb avanç de sessió.
 
 Les dades representatives s'han creat només al navegador local de prova. No s'ha creat cap horari, franja ni excepció al compte real.
 
