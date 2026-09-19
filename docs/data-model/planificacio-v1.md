@@ -162,7 +162,23 @@ Copiar una UP crea un identificador nou i incrementa `versionNumber`. El camp `c
 - el curs d'origen;
 - el moment de la còpia.
 
-La versió antiga no es modifica. Les fases i activitats copiades també rebran identificadors nous quan s'implementi el flux complet de còpia a Programació.
+La versió antiga no es modifica. El flux complet de còpia crea identificadors nous per a la UP, totes les fases, les subfases i totes les activitats. Els `parentPhaseId` i `phaseId` es remapen dins la nova estructura, de manera que cap edició posterior pot arribar al document antic.
+
+Els permisos no s'hereten entre cursos. La còpia comença sense persones convidades i el propietari decideix després si la comparteix. Cada activitat copiada incorpora també un `copiedFrom` amb la UP, l'activitat, el curs i el moment d'origen.
+
+L'històric es consulta sota demanda. La càrrega inicial continua llegint únicament les UP del curs actiu; els cursos anteriors només es consulten quan el docent obre **Recuperar una activitat antiga**. La numeració `A1`, `A2`… es deriva de l'ordre visible de la seqüència i permet cercar una activitat pel número, el títol o la descripció.
+
+## Comparació real i millora anual
+
+`activityResult` ja pot registrar, a més del temps real, la reflexió i l'estat:
+
+- materials que han faltat;
+- adaptacions que han resultat útils;
+- recomanació de conservar, modificar o retirar l'activitat.
+
+`getActivityActualComparisons` agrupa aquests resultats per `sourceActivityId` i calcula la mitjana real per grup sense alterar la UP ideal. Quan la mitjana supera el temps previst, l'estat és `overrun` i la interfície el presenta en vermell.
+
+Les evidències poden generar elements dins `planningUnit.improvementProposals`. Cada proposta conserva activitat, explicació, grups d'origen, comparació temporal i canvis suggerits. L'estat inicial és `pending`; només passa a `accepted` quan el docent la selecciona individualment o dins d'una acceptació conjunta. Acceptar una proposta aplica únicament els camps suggerits a la versió nova. Les observacions buides no creen propostes.
 
 ## Horaris versionats
 
@@ -170,7 +186,7 @@ Cada `timetableVersion` té `effectiveFrom` i un `effectiveTo` opcional. Per a u
 
 ## Privacitat i capacitats
 
-`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat i la reflexió pedagògica. `planningPrivateNote` viu en una col·lecció separada i només la pot llegir el propietari. Les incidències, l'assistència, els diagnòstics i les notes personals continuen en els àmbits protegits d'AvaluaPro; una activitat només rep la mesura pedagògica i l'alumnat seleccionat explícitament.
+`activityResult` només conté dades pedagògiques compartibles, com el temps real, l'estat, la reflexió, els materials que han faltat i la valoració de les adaptacions. `planningPrivateNote` viu en una col·lecció separada i només la pot llegir el propietari. Les incidències, l'assistència, els diagnòstics i les notes personals continuen en els àmbits protegits d'AvaluaPro; una activitat només rep la mesura pedagògica i l'alumnat seleccionat explícitament.
 
 | Rol | UP | Editar UP | Aplicació real | Gestionar Agenda | Notes privades o incidències |
 |---|---:|---:|---:|---:|---:|
