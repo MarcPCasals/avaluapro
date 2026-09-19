@@ -58,6 +58,17 @@ Firestore admet aquest vincle només dins el document de sessió validat. La res
 
 Commit funcional: `cb11c36`.
 
+## Publicació verificada
+
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- les regles desplegades i les regles locals tenen exactament la mateixa petjada;
+- la portada publicada respon correctament i manté `no-cache`;
+- `?preview=agenda` mostra Agenda i, sense autenticació, protegeix les dades demanant iniciar sessió;
+- la navegació normal continua ocultant Agenda i Programació durant el pilot;
+- el paquet publicat conté Sessions d'avui, Cronologia del grup, la previsualització de continuació, els tres abasts i Classe extraordinària;
+- la verificació publicada no ha creat ni modificat cap dada real.
+
 ## Pas següent
 
 La iteració 13 convertirà una sessió prevista en una experiència de classe: avís cinc minuts abans, Mode aula, cronologia centrada en l'activitat actual, temporitzador silenciós, correcció retroactiva i assistència completa o de mig grup.
