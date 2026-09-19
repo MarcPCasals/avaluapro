@@ -47,7 +47,7 @@ function PlanningPreviewDialog({ activities, classes, loadApplications, onClose,
   )
 }
 
-function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt }) {
+function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt, onImportUnit }) {
   return (
     <section className="planning-empty-state">
       <span><BookOpenText size={30} /></span>
@@ -57,10 +57,13 @@ function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt }) {
           ? 'Crea una UP buida i organitza-la amb les fases que necessitis.'
           : 'Primer defineix les dates d’una UT. Després podràs crear-hi la primera UP.'}</p>
       </div>
-      <button className="primary-action" onClick={hasTemporalUnits ? onCreateUnit : onCreateUt} type="button">
-        <Plus size={17} />
-        {hasTemporalUnits ? 'Nova UP' : 'Crear la primera UT'}
-      </button>
+      <div className="planning-empty-actions">
+        <button className="primary-action" onClick={hasTemporalUnits ? onCreateUnit : onCreateUt} type="button">
+          <Plus size={17} />
+          {hasTemporalUnits ? 'Nova UP' : 'Crear la primera UT'}
+        </button>
+        {hasTemporalUnits && <button className="secondary-action" onClick={onImportUnit} type="button"><FileText size={17} />Importar la primera UP</button>}
+      </div>
     </section>
   )
 }
@@ -379,7 +382,7 @@ export default function PlanningModule() {
           <button className="primary-action" onClick={() => setDialog('year')} type="button"><Plus size={17} />Crear el curs</button>
         </section>
       ) : workspace.planningUnits.length === 0 ? (
-        <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
+        <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} onImportUnit={() => setDialog('documents')} />
       ) : (
         <div className={`planning-workbench ${showSummary ? '' : 'summary-hidden'}`}>
           <aside className="planning-outline-panel">
@@ -436,7 +439,7 @@ export default function PlanningModule() {
                 unit={workspace.activePlanningUnit}
               />
             ) : (
-              <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
+              <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} onImportUnit={() => setDialog('documents')} />
             )}
           </main>
 
@@ -455,7 +458,7 @@ export default function PlanningModule() {
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={workspace.duplicateUnitToAcademicYear} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
-      {dialog === 'documents' && workspace.activePlanningUnit && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.importPlanningTable} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
+      {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.activePlanningUnit ? workspace.importPlanningTable : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
     </section>
   )

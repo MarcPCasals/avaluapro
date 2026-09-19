@@ -21,11 +21,11 @@ function ImportPreview({ bundle }) {
 }
 
 export function PlanningDocumentDialog({ activities, onClose, onImportBundle, onImportTable, phases, temporalUnits, unit }) {
-  const [tab, setTab] = useState('document')
+  const [tab, setTab] = useState(unit ? 'document' : 'import')
   const [bundle, setBundle] = useState(null)
   const [tableText, setTableText] = useState('')
   const [tablePreview, setTablePreview] = useState(null)
-  const [temporalUnitId, setTemporalUnitId] = useState(unit.temporalUnitId || temporalUnits[0]?.id || '')
+  const [temporalUnitId, setTemporalUnitId] = useState(unit?.temporalUnitId || temporalUnits[0]?.id || '')
   const [targetPhaseId, setTargetPhaseId] = useState(phases[0]?.id || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -76,7 +76,7 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
     setError('')
     try {
       const imported = await onImportBundle(bundle, temporalUnitId)
-      setSuccess(`S’ha creat ${imported.code} amb ${bundle.activities.length} activitats. La UP oberta anterior no s’ha modificat.`)
+      setSuccess(`S’ha creat ${imported.code} amb ${bundle.activities.length} activitats.${unit ? ' La UP oberta anterior no s’ha modificat.' : ''}`)
       setBundle(null)
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut importar la UP.')
@@ -102,11 +102,11 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
   return (
     <Modal onClose={onClose} panelClassName="planning-document-dialog" size="xl" title="Document i importacions">
       <nav aria-label="Eines documentals" className="planning-document-tabs" role="tablist">
-        <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button"><FileText size={16} />Vista documental</button>
+        {unit && <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button"><FileText size={16} />Vista documental</button>}
         <button aria-selected={tab === 'import'} className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'import' ? 0 : -1} type="button"><Import size={16} />Importar una UP</button>
-        <button aria-selected={tab === 'table'} className={tab === 'table' ? 'active' : ''} onClick={() => setTab('table')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'table' ? 0 : -1} type="button"><ClipboardPaste size={16} />Enganxar taula</button>
+        {unit && <button aria-selected={tab === 'table'} className={tab === 'table' ? 'active' : ''} onClick={() => setTab('table')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'table' ? 0 : -1} type="button"><ClipboardPaste size={16} />Enganxar taula</button>}
       </nav>
-      {tab === 'document' && <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>}
+      {tab === 'document' && unit && <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>}
       {tab === 'import' && (
         <section className="planning-import-panel" role="tabpanel">
           <header><Upload size={20} /><div><strong>Crear una còpia nova des d’un fitxer</strong><p>El fitxer es llegeix dins del navegador. No se substitueix cap UP existent.</p></div></header>
@@ -121,7 +121,7 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
           {bundle && <div className="planning-import-confirm"><label>Unitat temporal<select value={temporalUnitId} onChange={(event) => setTemporalUnitId(event.target.value)}>{temporalUnits.map((temporalUnit) => <option key={temporalUnit.id} value={temporalUnit.id}>{temporalUnit.label}</option>)}</select></label><button className="primary-action" disabled={busy || !temporalUnitId} onClick={importBundle} type="button">Crear la còpia importada</button></div>}
         </section>
       )}
-      {tab === 'table' && (
+      {tab === 'table' && unit && onImportTable && (
         <section className="planning-import-panel" role="tabpanel">
           <header><ClipboardPaste size={20} /><div><strong>Enganxar des d’Excel o Numbers</strong><p>La primera fila ha de contenir capçaleres. Es reconeixen Activitat, Fase, Subfase, Minuts, Materials, Agrupament, Espai, IA, Diversitat i Comentaris.</p></div></header>
           <textarea onChange={(event) => { setTableText(event.target.value); setTablePreview(null) }} placeholder={'Fase\tSubfase\tActivitat\tMinuts\tMaterials\tAgrupament\tEspai\tIA'} rows="8" value={tableText} />

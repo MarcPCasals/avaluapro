@@ -298,6 +298,7 @@
 .planning-empty-state h2, .planning-empty-state p, .planning-auth-required h1, .planning-auth-required p { margin: 0; }
 .planning-empty-state p, .planning-auth-required p { max-width: 480px; margin-top: 5px; color: #64748b; font-weight: 700; line-height: 1.5; }
 .planning-empty-state.first-step { min-height: 470px; }
+.planning-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .planning-loading { min-height: 360px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #7c3aed; font-weight: 900; }
 
 .planning-dialog .modal-body { display: grid; gap: 14px; }
