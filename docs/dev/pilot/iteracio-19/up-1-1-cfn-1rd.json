@@ -1,0 +1,1085 @@
+{
+  "format": "avaluapro-planning-unit",
+  "version": 1,
+  "exportedAt": "2026-09-19T17:37:09.746Z",
+  "schemaVersion": 1,
+  "unit": {
+    "code": "UP 1.1",
+    "complexSituation": "Un 8 de maig de 1886 començava la història de Coca-Cola a Atlanta. El farmacèutic John S. Pemberton volia crear un xarop contra els problemes de digestió que a més aportés energia, i va acabar elaborant un producte amb la fórmula secreta més famosa del món. Podem desxifrar aquesta fórmula i trobar els components de la coca-cola?",
+    "curriculum": {
+      "assessmentCriteria": [],
+      "competencies": [],
+      "expectedLearnings": [
+        {
+          "label": "Representar models senzills d’estructures moleculars per explicar les diferències entre substàncies elementals i compostos químics i els canvis d’una reacció química."
+        },
+        {
+          "label": "Iniciar-se en l’ús del llenguatge científic bàsic."
+        },
+        {
+          "label": "Validar hipòtesis sobre les estructures moleculars seguint els passos d’una investigació científica."
+        },
+        {
+          "label": "Analitzar críticament el propi procés d’aprenentatge."
+        },
+        {
+          "label": "Aplicar tècniques d’estudi senzilles: subratllat, mots clau i mapa conceptual."
+        },
+        {
+          "label": "Comunicar amb precisió, amb el suport i el llenguatge adequats a la intencionalitat."
+        }
+      ],
+      "indicators": [
+        {
+          "label": "C2"
+        }
+      ]
+    },
+    "expectedProduct": "",
+    "level": "1r d’ESO",
+    "resourceSections": {
+      "specific": {
+        "attitudesAndValues": [
+          "Rigor en la formulació i la validació d’hipòtesis",
+          "Treball segur i responsable al laboratori"
+        ],
+        "factsAndConcepts": [
+          "Teoria corpuscular de la matèria",
+          "Àtoms, elements i compostos",
+          "Substàncies pures i mescles",
+          "Massa, volum i densitat"
+        ],
+        "procedures": [
+          "Aplicació del mètode científic",
+          "Mesura de massa i volum",
+          "Càlcul de la densitat",
+          "Elaboració d’informes de laboratori"
+        ]
+      },
+      "transversal": {
+        "attitudesAndValues": [
+          "Cooperació",
+          "Autonomia",
+          "Revisió crítica del propi aprenentatge"
+        ],
+        "factsAndConcepts": [
+          "Vocabulari científic bàsic"
+        ],
+        "procedures": [
+          "Lectura i subratllat d’idees principals",
+          "Elaboració de mapes conceptuals",
+          "Comunicació oral i escrita de conclusions"
+        ]
+      }
+    },
+    "title": "La fórmula secreta",
+    "vehicularLanguage": "Castellà / francès",
+    "versionNumber": 1
+  },
+  "phases": [
+    {
+      "key": "preparation",
+      "kind": "preparation",
+      "order": 0,
+      "parentKey": null,
+      "title": "Preparació"
+    },
+    {
+      "key": "prep-motivation",
+      "kind": "preparation",
+      "order": 0,
+      "parentKey": "preparation",
+      "title": "P1 · Motivació"
+    },
+    {
+      "key": "prep-prior",
+      "kind": "preparation",
+      "order": 1,
+      "parentKey": "preparation",
+      "title": "P2 · Coneixements previs"
+    },
+    {
+      "key": "prep-presentation",
+      "kind": "preparation",
+      "order": 2,
+      "parentKey": "preparation",
+      "title": "P1 · Presentació de la unitat"
+    },
+    {
+      "key": "prep-situation",
+      "kind": "preparation",
+      "order": 3,
+      "parentKey": "preparation",
+      "title": "P4 · Situació competencial"
+    },
+    {
+      "key": "prep-questions",
+      "kind": "preparation",
+      "order": 4,
+      "parentKey": "preparation",
+      "title": "P5 · Formulació de preguntes"
+    },
+    {
+      "key": "resolution",
+      "kind": "resolution",
+      "order": 1,
+      "parentKey": null,
+      "title": "Resolució"
+    },
+    {
+      "key": "res-question-1",
+      "kind": "resolution",
+      "order": 0,
+      "parentKey": "resolution",
+      "title": "R1 · Primera pregunta"
+    },
+    {
+      "key": "res-hypothesis-1",
+      "kind": "resolution",
+      "order": 1,
+      "parentKey": "resolution",
+      "title": "R2 · Hipòtesis sobre els components"
+    },
+    {
+      "key": "res-corpuscular",
+      "kind": "resolution",
+      "order": 2,
+      "parentKey": "resolution",
+      "title": "R3 · Teoria corpuscular"
+    },
+    {
+      "key": "res-mixtures-lab",
+      "kind": "resolution",
+      "order": 3,
+      "parentKey": "resolution",
+      "title": "R4 · Mescles al laboratori"
+    },
+    {
+      "key": "res-elements",
+      "kind": "resolution",
+      "order": 4,
+      "parentKey": "resolution",
+      "title": "R5 · Elements i compostos"
+    },
+    {
+      "key": "res-map-1",
+      "kind": "resolution",
+      "order": 5,
+      "parentKey": "resolution",
+      "title": "R6 · Mapa conceptual"
+    },
+    {
+      "key": "res-conclusion-1",
+      "kind": "resolution",
+      "order": 6,
+      "parentKey": "resolution",
+      "title": "R7 · Conclusions de la primera pregunta"
+    },
+    {
+      "key": "res-question-2",
+      "kind": "resolution",
+      "order": 7,
+      "parentKey": "resolution",
+      "title": "R1 · Segona pregunta"
+    },
+    {
+      "key": "res-hypothesis-2",
+      "kind": "resolution",
+      "order": 8,
+      "parentKey": "resolution",
+      "title": "R2 · Hipòtesis sobre la flotabilitat"
+    },
+    {
+      "key": "res-density-lab",
+      "kind": "resolution",
+      "order": 9,
+      "parentKey": "resolution",
+      "title": "R3 · Densitat al laboratori"
+    },
+    {
+      "key": "res-magnitudes",
+      "kind": "resolution",
+      "order": 10,
+      "parentKey": "resolution",
+      "title": "R4 · Massa, volum i densitat"
+    },
+    {
+      "key": "res-mixtures",
+      "kind": "resolution",
+      "order": 11,
+      "parentKey": "resolution",
+      "title": "Mescles"
+    },
+    {
+      "key": "closing",
+      "kind": "closing",
+      "order": 2,
+      "parentKey": null,
+      "title": "Tancament"
+    },
+    {
+      "key": "close-theorization",
+      "kind": "closing",
+      "order": 0,
+      "parentKey": "closing",
+      "title": "Teorització i síntesi"
+    },
+    {
+      "key": "close-test",
+      "kind": "closing",
+      "order": 1,
+      "parentKey": "closing",
+      "title": "Prova competencial"
+    },
+    {
+      "key": "close-metacognition",
+      "kind": "closing",
+      "order": 2,
+      "parentKey": "closing",
+      "title": "Metacognició"
+    }
+  ],
+  "activities": [
+    {
+      "applicationComment": "Quan es posa en comú la definició cal anotar a la pissarra els conceptes que vagin sorgint (substancia pura, mescla, dissolució, mescla homogènia, mescla heterogènia, líquid, gas, densitat, massa, etc…), encara que no surtin a la definició final.\nCal preveure comprar gots petits de plàstic, o que cada alumne es porti un got reciclable, i les diferents Coca Coles perquè els alumnes facin el tast.",
+      "description": "Es dóna als alumnes 6 gotets amb diferents tipus de Coca Cola (normal, zero, light, sense cafeïna, Cherry, Stevia), per què les tastin.\nIndividualment hauran de:\n1.- Identificar els ingredients de cada vas, a partir de les diferents olors i els diferents gustos, i deduir quina coca Cola hi ha a cada got.\n2.- Tenint en compte tots els ingredients que hagin sorgit, fer una definició general del què és la Coca Cola.\nCada alumne haurà d’escriure els ingredients que han detectat i la definició al seu quadern de treball.\nDesprés es posa en comú i s’escriu a la pissarra la definició general que sorgeixi de la posada en comú de tots els grups cooperatius.",
+      "diversityText": "",
+      "title": "Tast de Coca-Cola i definició inicial",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "motivation",
+      "phaseKey": "prep-motivation",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Gots petits de plàstic",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola normal",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola zero",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola light",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola sense cafeïna",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola Cherry",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca Cola Stevia",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Pissarra",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "En acabar es pot fer una posada en comú oral per poder observar el punt de partida dels alumnes.",
+      "description": "A partir de les etiquetes de diferents Coca Coles, els alumnes tenen els ingredients amb la seva fórmula química. A partir de les fórmules es demana als alumnes:\n- Quins àtoms hi ha?\n- Què és un àtom?\n- Què és un compost?\n- Què és la Coca Cola (mescla)?\n- Per què és necessari etiquetar els aliments?\n- A partir d’aquestes etiquetes raona si a tot arreu del món, donen la mateixa informació.",
+      "diversityText": "",
+      "title": "Què sabem sobre els ingredients?",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "priorKnowledge",
+      "phaseKey": "prep-prior",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN2",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "Presentació del que es treballarà durant la Unitat:\nAprenentatges específics\nC1. Representació de models senzills d’estructures moleculars senzilles per tal d'explicar les diferències entre substàncies elementals i compostos químics i els canvis que es produeixen durant una reacció química. Iniciar-se en l'ús del llenguatge científic bàsic.\nC2. Validació de les hipòtesis formulades sobre les estructures moleculars seguint els passos d’una investigació científica.\nAprenentatges transversals\nC2. - L’anàlisi del propi procés d’aprenentatge amb sentit crític.\n- Aplicació adequada d’algunes tècniques d’estudi senzilles com el subratllat, mots clau i mapa conceptual, del que es treballarà durant la Unitat.\nC5. -Comunicació adequada emprant el suport i el llenguatge adient, en funció de la intencionalitat comunicativa.\n- Comunicació precisa respectant les normes gramaticals, sintàctiques, lèxiques i ortogràfiques.\nPresentació de com es treballarà:\n- Mètode científic: explicació detallada del mètode de treball que se seguirà durant la Unitat.\nPresentació de com s’avaluarà:\n- Indicadors d’aprenentatge",
+      "diversityText": "",
+      "title": "Presentació dels aprenentatges i l’avaluació",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "explanation",
+      "phaseKey": "prep-presentation",
+      "plannedMinutes": 30,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Graella AE i IA",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "Presentació de la situació:\n“Un 8 de maig de 1886 començava la història de Coca-Cola a Atlanta. El farmacèutic John S. Pemberton volia crear un xarop contra els problemes de digestió que a més aportés energia, i va acabar elaborant el producte amb la fórmula secreta més famosa del món. Podem desxifrar aquesta fórmula i trobar els components de la coca-cola?”",
+      "diversityText": "",
+      "title": "La fórmula secreta: situació competencial",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "situation",
+      "phaseKey": "prep-situation",
+      "plannedMinutes": 30,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "Pluja d’idees, sobre les qüestions que se’ls planteja en saber la situació. Les preguntes que vagin sortint s’anoten a la pissarra.",
+      "diversityText": "",
+      "title": "Què necessitem investigar?",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "workPlan",
+      "phaseKey": "prep-questions",
+      "plannedMinutes": 30,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Pissarra",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Cal que el professor faci l’experiment abans de plantejar la pregunta, pot venir a l’aula ja amb un got amb la coca cola evaporada.\nHi ha un vídeo gravat amb l’experiment\nEls alumnes pensen individualment les seves hipòtesis i les anoten al seu quadern de treball.\nCal preveure comprar Coca cola normal.",
+      "description": "- Quins components hi ha en un vas de Coca Cola?\nPlantejament de la primera pregunta de la seqüència i elaboració de supòsits en relació a la seva resposta.\n• Quines són les propietats químiques que té la Coca cola?",
+      "diversityText": "",
+      "title": "Evaporació de la Coca-Cola i primera hipòtesi",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran Grup\nIndividual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "hypothesis",
+      "phaseKey": "res-question-1",
+      "plannedMinutes": 30,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Coca cola normal",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Vas de precipitats",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Vareta de vidre",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Placa calefactora",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.1 CFN 6 video1 evaporación cocacola",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Aquesta activitat es pot fer en gran grup a la\npissarra.",
+      "description": "",
+      "diversityText": "",
+      "title": "Posada en comú de les hipòtesis sobre els components",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "hypothesis",
+      "phaseKey": "res-hypothesis-1",
+      "plannedMinutes": 15,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Pissarra",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "El professor fa resums a la pissarra sobre la teoria apresa als vídeos i els alumnes prenen apunts a la seva llibreta de classe.",
+      "description": "1.-S’inicia l’activitat fent un petit repàs de conceptes (estats de la matèria i organització de la matèria) amb un joc.\nEls alumnes s’agrupen en 3 grups (A, B, C), un d’aquests farà de molècules, un altre de font de calor i l’últim de material fred.\nEl docent delimita l’espai per on es poden moure les molècules, els altres dos grups es posaran en costats oposats, fora de l’espai ocupat pel primer grup.\nEl docent dóna les indicacions següents:\n- El grup de molècules ha de caminar fent línies rectes i si xoquen amb un company o amb la paret -del que representa és el recipient on hi ha la matèria- han d’augmentar una mica la velocitat.\n- La font de calor donarà un cop a la mà de les molècules que s’acostin i això provocarà en aquestes un augment de la velocitat.\n- El material fred agafarà de la mà durant 1 segon a les molècules que s’acostin i això provocarà que aquestes redueixin la velocitat i el material fred es mogui una mica.\nAquesta activitat es farà tres vegades, permetent així que quan acabin l’activitat tots els alumnes hauran representat els tres papers (molècules, calor, fred).\n1a vegada: Molècules gas(A), Calor (B), Fred (C)\n2a vegada: Molècules líquid(B), Calor (C),Fred (A)\n3a vegada: Molècules sòlid(C), Calor (A), Fred (B)\nComportament de l’estat, que el docent ha d’explicar al grup que representi les molècules en cada cas:\nGas: Les molècules es mouen lliurement per tot l’espai, fent línies rectes.\nLíquid: alumnes agafats de la mà, això els permet moure’s, però no tant com en el primer cas.\nSòlid: Han d’estar tots els alumnes enganxats, farà que no es puguin moure gaire.\nEl docent no explica quin estat representa cada grup, només les indicacions. Una vegada acabades les representacions, el docent dinamitza una posada en comú on l’alumnat haurà d’explicar què ha vist diferent en cada cas i deduir que es tracta de tres estats de la matèria i com afecta la calor en cada un dels estats.\n2.- Observació de 5 vídeos curts i lectura d’un text en el que s’explica:\n- Teoria corpuscular de la matèria\n- Què és la matèria?\n3.- Els alumnes hauran de subratllar les idees principals del text i resoldre 6 exercicis relacionats amb la temàtica.\n4.-Resolució i correcció posterior dels exercicis.\n5.- Introducció sobre els àtoms i les seves parts (electrons, protons, neutrons, número massic, número atòmic)\n6.- Realització d’una fitxa amb diversos exercicis en els que es treballaran:\n- Què és l’àtom?\n- Organització atòmica (protons, neutrons i electrons)\n7.-Resolució i correcció posterior dels exercicis.\n8.- Elaboració d’un glossari de termes. Els alumnes aniran creant un glossari de paraules noves amb el seu significat",
+      "diversityText": "",
+      "title": "Teoria corpuscular de la matèria",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup\nIndividual/Parelles\nIndividual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-corpuscular",
+      "plannedMinutes": 240,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN8.1",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN8.2 iPad",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Llibreta de classe",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN8.3- iPad",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN8.4 - iPad",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "És important que abans d’anar al laboratori facin les hipòtesis de les preguntes plantejades (hipòtesis)::\nQuè passarà quan es mescli aigua i etanol?\nQuè passarà quan es mescli terra i virutes de ferro?\nQuè passarà quan es mescli agua i oli?",
+      "description": "Els alumnes realitzaran la preparació de diferents mescles, per tal d’observar in situ quines són mescles homogènies i heterogènies. També hauran de deduir quins són els dissolvents i els soluts en les dissolucions.\nPer parelles, els alumnes hauran de pesar les substàncies abans de fer la mescla. Hauran d’analitzar el resultat i elaborar conclusions indicant si el resultat és el que s’esperava.\nEls alumnes elaboraran un informe de la pràctica al dossier del laboratori.",
+      "diversityText": "",
+      "title": "Mescles homogènies i heterogènies al laboratori",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Parelles\nIndividual",
+      "indicatorLabels": [
+        "C2"
+      ],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-mixtures-lab",
+      "plannedMinutes": 60,
+      "space": "Laboratori 2",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Material laboratori",
+          "preparationKind": "reserve",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN9.1",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Dossier de laboratori",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Es projecta i es penja al classroom un document amb la pauta per realitzar l’informe de laboratori per tal que els alumnes ho consultin per escrit",
+      "description": "Els alumnes realitzen l’informe de pràctiques de laboratori amb ajuda del professor. El professor dóna les indicacions i els alumnes executen l’informe per tal d’aprendre a fer-ho correctrament de cara als propers informes.",
+      "diversityText": "",
+      "title": "Informe de la pràctica de mescles",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 1,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-mixtures-lab",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Dossier de laboratori",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Es recomana comentar què són la Temperatura de fusió i d’ebullició dels compostos.\nEl document hauria d’estar imprès en paper.\nEs fa una lectura compartida, el rol de cada alumne el dona el professor, està a la diapositiva de la presentació.",
+      "description": "Es veu un vídeo on explica sobre l’agrupació dels àtoms formant elements o compostos, i de les substàncies pures. Prendre apunts a la llibreta sobre la teoria donada.\nFan un mapa conceptual en la llibreta.",
+      "diversityText": "",
+      "title": "Elements, compostos i substàncies pures",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Grup cooperatiu",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-elements",
+      "plannedMinutes": 120,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN9",
+          "preparationKind": "print",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "La intenció és anar ampliant el mapa conceptual a mida que es van treballant conceptes nous, fins que al final de la Unitat cada alumne tingui un mapa conceptual general, format enganxant els diferents mapes conceptuals fets després de treballar cada part de la Unitat.",
+      "description": "Els alumnes hauran d’ampliar el mapa conceptual de l’activitat 11, afegint tots els conceptes treballats fins ara, que fan referència a la pregunta 1.",
+      "diversityText": "",
+      "title": "Mapa conceptual de la primera pregunta",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "mobilization",
+      "phaseKey": "res-map-1",
+      "plannedMinutes": 45,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Mapa conceptual",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "Amb tots els recursos treballats, i tenint el mapa conceptual davant, es reprèn la pregunta 1:\n- Quins components hi ha en un vas de Coca Cola?\nCada alumne ha de contestar de nou aquesta pregunta, comparant amb les hipòtesis que havia fet a l’inici de la unitat, per elaborar una conclusió.\nElaboració de l’enciclopèdia amb tots els recursos treballats.",
+      "diversityText": "",
+      "title": "Resposta a la primera pregunta i enciclopèdia",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "response",
+      "phaseKey": "res-conclusion-1",
+      "plannedMinutes": 15,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Mapa conceptual",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Enciclopèdia",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Cal que el professor faci l’experiment abans de plantejar la pregunta.\nSi pot ser un bol gran transparent en lloc d’una galleda els alumnes ho veuran millor.\nEls alumnes pensen individualment les seves hipòtesis i les anoten al seu quadern de treball.\nCal preveure comprar una llauna de Coca cola normal i una de Coca cola light.",
+      "description": "El professor realitza un petit experiment: “En una galleda amb aigua es submergeixen dues llaunes de Coca cola (una normal i una light) i s’observa que la llauna de Coca cola normal s’enfonsa mentre que la llauna de Coca cola light flota.” Hi ha un video sobre aquest experiment. Es pot reproduir directament.\n- Per què una llauna de coca-cola flota i l’altra no?\nPlantejament de la segona pregunta de la seqüència i elaboració de supòsits en relació a la seva resposta.\n• Quines són les propietats físiques de la Coca cola?",
+      "diversityText": "",
+      "title": "Flotabilitat de les llaunes i segona hipòtesi",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup\nIndividual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "hypothesis",
+      "phaseKey": "res-question-2",
+      "plannedMinutes": 15,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "1 llauna de Coca cola normal",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "1 llauna de Coca cola light",
+          "preparationKind": "buy",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "1 galleda transparent amb aigua",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Quadern de treball",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Aquesta activitat es pot fer en gran grup a la\npissarra.",
+      "description": "Posada en comú i selecció de les hipòtesis més rellevants.",
+      "diversityText": "",
+      "title": "Posada en comú de la segona hipòtesi",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "hypothesis",
+      "phaseKey": "res-hypothesis-2",
+      "plannedMinutes": 10,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Pissarra",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "És important que abans d’anar al laboratori facin les hipòtesis de les preguntes plantejades:\nQuè és més densa l’aigua o l’oli?\nQuè és més densa l’aigua o l’etanol?",
+      "description": "Els alumnes realitzaran la mesures de massa i volum de sòlids i líquids..\nPer parelles, els alumnes hauran de familiaritzar-se amb l’ús de la balança per pesar les substàncies i amb l’ús de la proveta per calcular el volum. Hauran de calcular el resultat de la densitat aplicant la formula, analitzar els resultats i elaborar conclusions indicant si el resultat és el que s’esperava.\nEls alumnes elaboraran un informe de la pràctica al dossier del laboratori.",
+      "diversityText": "",
+      "title": "Massa, volum i densitat al laboratori",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Parelles\nIndividual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-density-lab",
+      "plannedMinutes": 60,
+      "space": "Laboratori 2",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Material laboratori",
+          "preparationKind": "reserve",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.1 CFN 15.2 la densidad lab",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Dossier de laboratori",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Es projecta i es penja al classroom un document amb la pauta per realitzar l’informe de laboratori per tal que els alumnes ho consultin per escrit",
+      "description": "Els alumnes realitzen l’informe de pràctiques de laboratori amb ajuda del professor. El professor dóna les indicacions i els alumnes executen l’informe per tal d’aprendre a fer-ho correctrament de cara als propers informes.",
+      "diversityText": "",
+      "title": "Informe de la pràctica de densitat",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 1,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-density-lab",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Dossier de laboratori",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "Atenció a la diversitat:\nComentaris per a l’aplicació, si s’escau:\nCom a activitat d’ampliació es pot fer una cerca sobre les propietats de la matèria (la massa, el volum i la densitat) que es pot completar amb la visualització d’un vídeo. L’activitat es pot fer per parelles, o individualment i després posar-la en comú.",
+      "description": "A partir d’un experiment que fa el professor a l’aula, en el que es veu una proveta amb una quantitat d’aigua a la que se li afegeix unes llimadures de ferro, i es pot observar com augmenta el volum, es demana als alumnes que calculin la massa del ferro.\nPer això es reparteix als alumnes una fitxa on consta la fórmula de la densitat i la densitat del ferro.",
+      "diversityText": "",
+      "title": "Magnituds: massa, volum i densitat",
+      "diversityMeasures": [],
+      "evidenceMode": "none",
+      "grouping": "Gran grup\nParelles\nIndividualment",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-magnitudes",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN14.1(vídeo)",
+          "preparationKind": "teacher",
+          "reminderDaysBefore": 1,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN14.2",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN14.3",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "El document cal donar-lo en paper per tal que els alumnes el puguin subratllar.",
+      "description": "Reprenent l’experiment de la pregunta 2, el professor introdueix les mescles.\nEs reparteix un document a cada alumne en el que s’explica què són les mescles i els diferents tipus de mescles (homogènies i heterogènies). Cada alumne haurà de llegir-lo i subratllar-ne les idees principals.\nTambé es pot donar teoria a la pissarra sobre les idees de mescles (homogènies i heterogènies) i mètodes de separació.\nEn acabar els alumnes realitzaran uns exercicis de classificació de mescles.",
+      "diversityText": "",
+      "title": "Mescles i mètodes de separació",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individualment\nParelles",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "acquisition",
+      "phaseKey": "res-mixtures",
+      "plannedMinutes": 120,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "UT1.4CFN14.3",
+          "preparationKind": "print",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "També fan un mapa mental de tots els coneixements adquirits durant la UT. També es pot fer un repàs - resum grupal de tots els conceptes donats",
+      "diversityText": "",
+      "title": "Kahoot i mapa mental de síntesi",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "theorization",
+      "phaseKey": "close-theorization",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Kahoot",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        },
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Mapa conceptual i repàs",
+          "preparationKind": "student",
+          "reminderDaysBefore": 1,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "",
+      "diversityText": "",
+      "title": "Prova competencial",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "competencyTest",
+      "phaseKey": "close-test",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Prova competencial",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    },
+    {
+      "applicationComment": "",
+      "description": "Correcció de la prova competencial i entrega de la prova amb la correcció feta.",
+      "diversityText": "",
+      "title": "Metacognició i correcció de la prova",
+      "diversityMeasures": [],
+      "evidenceMode": "final",
+      "grouping": "Individual\nGrup gran",
+      "indicatorLabels": [],
+      "order": 0,
+      "pedagogicalType": "metacognition",
+      "phaseKey": "close-metacognition",
+      "plannedMinutes": 60,
+      "space": "",
+      "studentMaterials": [],
+      "teacherMaterials": [
+        {
+          "id": null,
+          "kind": "physical",
+          "label": "Activitat metacognició",
+          "preparationKind": "reference",
+          "reminderDaysBefore": 0,
+          "url": null
+        }
+      ],
+      "type": "activity"
+    }
+  ],
+  "importSummary": {
+    "activityCount": 22,
+    "phaseCount": 3,
+    "warning": "Adaptació revisada del Taller 1.1 CFN. El Word indica 1.330 minuts, però les 22 files sumen 1.300 minuts."
+  }
+}
