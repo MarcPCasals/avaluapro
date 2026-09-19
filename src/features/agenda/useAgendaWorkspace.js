@@ -5,8 +5,10 @@ import {
   loadOwnedPlanningUnits,
   loadPlanningApplications,
   loadPlanningCalendarEvents,
+  loadPlanningPrivateNotes,
   loadPlanningSessionDetail,
   loadPlanningSessions,
+  loadPlanningTemporalUnits,
   loadPlanningTimetables,
   loadPlanningTimetableSlots,
   loadPlanningUnitStructure,
@@ -21,6 +23,7 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createPlanningPrivateNote,
   createSessionItem,
   createTimetableSlot,
   createTimetableVersion,
@@ -81,6 +84,7 @@ export function useAgendaWorkspace(user) {
   const [slots, setSlots] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
+  const [temporalUnits, setTemporalUnits] = useState([])
   const [sessionBundles, setSessionBundles] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
@@ -179,6 +183,7 @@ export function useAgendaWorkspace(user) {
         setTimetables([])
         setCalendarEvents([])
         setPlanningUnits([])
+        setTemporalUnits([])
         setActiveTimetableId('')
       })
       return undefined
@@ -205,17 +210,24 @@ export function useAgendaWorkspace(user) {
         () => loadOwnedPlanningUnits(user.uid, { academicYearId: activeAcademicYear.id }),
         { completeSnapshot: true },
       ),
-    ]).then(([timetableResult, eventResult, unitResult]) => {
+      repository.loadScope(
+        `academicYear:${activeAcademicYear.id}:planningTemporalUnits`,
+        () => loadPlanningTemporalUnits(user.uid, activeAcademicYear.id),
+        { completeSnapshot: true },
+      ),
+    ]).then(([timetableResult, eventResult, unitResult, temporalUnitResult]) => {
       if (cancelled) return
       const nextTimetables = sortTimetables(timetableResult.entities)
       setTimetables(nextTimetables)
       setCalendarEvents(sortEvents(eventResult.entities))
       setPlanningUnits([...unitResult.entities].sort((left, right) =>
         String(right.updatedAt).localeCompare(String(left.updatedAt))))
+      setTemporalUnits([...temporalUnitResult.entities].sort((left, right) =>
+        String(left.startsOn).localeCompare(String(right.startsOn))))
       setActiveTimetableId((current) => nextTimetables.some((item) => item.id === current)
         ? current
         : selectEffectiveTimetable(nextTimetables, today)?.id || nextTimetables[0]?.id || '')
-      if (timetableResult.error || eventResult.error || unitResult.error) {
+      if (timetableResult.error || eventResult.error || unitResult.error || temporalUnitResult.error) {
         setError('S’han carregat dades locals perquè Firebase no ha respost.')
       }
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir l’Agenda del curs.'))
@@ -485,6 +497,48 @@ export function useAgendaWorkspace(user) {
       : current))
     return result
   }, [persist])
+
+  const loadClassroomPrivateNotes = useCallback(async (bundle) => {
+    if (!repository || !user?.uid) return { ...bundle, privateNotes: [] }
+    const result = await repository.loadScope(
+      `session:${bundle.session.id}:privateNotes`,
+      () => loadPlanningPrivateNotes(user.uid, {
+        planningUnitId: bundle.planningUnit.id,
+        sessionId: bundle.session.id,
+      }),
+      { completeSnapshot: true },
+    )
+    const nextBundle = { ...bundle, privateNotes: result.entities }
+    setSessionBundles((bundles) => bundles.map((current) =>
+      current.session.id === bundle.session.id ? nextBundle : current))
+    return nextBundle
+  }, [repository, user])
+
+  const saveClassroomPrivateNote = useCallback(async (bundle, text) => {
+    const cleanText = String(text || '').trim()
+    const existing = (bundle.privateNotes || [])[0]
+    if (!cleanText) {
+      if (existing) await remove(existing)
+      setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+        ? { ...current, privateNotes: [] }
+        : current))
+      return null
+    }
+    const now = new Date().toISOString()
+    const note = createPlanningPrivateNote({
+      ...(existing || {}),
+      ownerUid: bundle.session.ownerUid,
+      planningUnitId: bundle.planningUnit.id,
+      sessionId: bundle.session.id,
+      text: cleanText,
+      updatedAt: now,
+    }, { now })
+    await persist(note)
+    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+      ? { ...current, privateNotes: [note] }
+      : current))
+    return note
+  }, [persist, remove])
 
   /**
    * Tancar Mode aula confirma com a fet tot element que no tingui una excepció.
@@ -920,12 +974,14 @@ export function useAgendaWorkspace(user) {
     isOnline,
     loading,
     loadSchedulingSetup,
+    loadClassroomPrivateNotes,
     loadSessionRange,
     moveSlot,
     removeCalendarEvent,
     removeSlot,
     saveCalendarEvent,
     saveActivityResult,
+    saveClassroomPrivateNote,
     saveSessionClassroomState,
     saveSessionItemChange,
     saveSessionStatus,
@@ -939,6 +995,7 @@ export function useAgendaWorkspace(user) {
     sessionsLoading,
     sync,
     synchronize,
+    temporalUnits,
     timetables,
     today,
     planningUnits,

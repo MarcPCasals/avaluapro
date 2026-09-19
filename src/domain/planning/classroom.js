@@ -3,7 +3,9 @@
  * depengui de la freqüència amb què la pantalla es torna a dibuixar.
  */
 export function getClassroomTimerState({ endedAtMs = null, nowMs = Date.now(), plannedMinutes, startedAtMs }) {
-  const start = Number(startedAtMs)
+  // Number(null) és 0; sense aquest control un temporitzador encara no iniciat
+  // semblaria actiu des de 1970 i entraria directament en temps excedit.
+  const start = startedAtMs === null || startedAtMs === undefined ? Number.NaN : Number(startedAtMs)
   const end = endedAtMs === null ? Number(nowMs) : Number(endedAtMs)
   const plannedSeconds = Math.max(0, Math.round((Number(plannedMinutes) || 0) * 60))
   const elapsedSeconds = Number.isFinite(start) && Number.isFinite(end)
@@ -45,4 +47,73 @@ export function getClassroomPromptState(session, now = new Date()) {
     kind: differenceMs > 0 ? 'upcoming' : 'active',
     minutesUntil: differenceMs > 0 ? Math.max(1, Math.ceil(differenceMs / 60000)) : 0,
   }
+}
+
+export const CLASSROOM_BEHAVIOR_CATEGORIES = Object.freeze({
+  incident: Object.freeze([
+    ['interrupts', 'Interromp'],
+    ['talks', 'Parla fora de torn'],
+    ['instructions', 'No segueix indicacions'],
+    ['disturbs', 'Molesta el grup'],
+    ['materials', 'No porta material'],
+    ['conflict', 'Conflicte'],
+  ]),
+  positive: Object.freeze([
+    ['participates', 'Participa'],
+    ['helps', 'Ajuda el grup'],
+    ['consistent', 'Treballa amb constància'],
+    ['attitude', 'Bona actitud'],
+    ['improves', 'Mostra millora'],
+    ['autonomous', 'Treballa amb autonomia'],
+  ]),
+})
+
+/** Decideix si aquest fragment ha de generar seguiment en aquesta sessió. */
+export function isClassroomEvidenceDue(item = {}) {
+  const mode = item.sourceActivity?.evidenceMode || 'none'
+  if (mode === 'perSession') return true
+  if (mode !== 'final') return false
+  const segmentCount = Math.max(1, Number(item.segmentCount) || 1)
+  const segmentIndex = Math.max(1, Number(item.segmentIndex) || 1)
+  return segmentIndex >= segmentCount
+}
+
+export function getClassroomEvidenceItems(items = []) {
+  return items.filter(isClassroomEvidenceDue)
+}
+
+/**
+ * Relaciona la UT temporal de Programació amb la UT de seguiment del grup.
+ * Primer respecta un nom coincident i, si no existeix, conserva el mateix ordre.
+ */
+export function getClassroomTrackingUtId({
+  activeClassId,
+  activeUtId,
+  classId,
+  planningUnit,
+  semesters = [],
+  temporalUnits = [],
+  uts = [],
+}) {
+  const classSemesters = semesters
+    .filter((semester) => semester.classId === classId)
+    .sort((left, right) => Number(left.order) - Number(right.order))
+  const semesterOrder = new Map(classSemesters.map((semester, index) => [semester.id, index]))
+  const classUts = uts
+    .filter((ut) => ut.classId === classId)
+    .sort((left, right) => (semesterOrder.get(left.semesterId) ?? 999) - (semesterOrder.get(right.semesterId) ?? 999)
+      || Number(left.order) - Number(right.order))
+  if (classUts.length === 0) return ''
+
+  const planningTemporalUnit = temporalUnits.find((unit) => unit.id === planningUnit?.temporalUnitId)
+  const normalizedLabel = String(planningTemporalUnit?.label || '').trim().toLocaleLowerCase('ca')
+  const exact = normalizedLabel && classUts.find((ut) => String(ut.name || '').trim().toLocaleLowerCase('ca') === normalizedLabel)
+  if (exact) return exact.id
+
+  const orderedTemporalUnits = [...temporalUnits].sort((left, right) =>
+    String(left.startsOn || '').localeCompare(String(right.startsOn || '')) || Number(left.order) - Number(right.order))
+  const temporalIndex = orderedTemporalUnits.findIndex((unit) => unit.id === planningUnit?.temporalUnitId)
+  if (temporalIndex >= 0 && classUts[temporalIndex]) return classUts[temporalIndex].id
+  if (activeClassId === classId && classUts.some((ut) => ut.id === activeUtId)) return activeUtId
+  return classUts[0].id
 }

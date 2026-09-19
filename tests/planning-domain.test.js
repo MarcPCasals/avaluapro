@@ -30,7 +30,9 @@ import {
   getPlanningTotals,
   getActivityActualComparisons,
   getClassroomPromptState,
+  getClassroomEvidenceItems,
   getClassroomStudents,
+  getClassroomTrackingUtId,
   getClassroomTimerState,
   getCorrectedActualMinutes,
   findTimetableSlotConflicts,
@@ -435,6 +437,11 @@ test('el pressupost reserva cinc minuts i aplica els tres colors acordats', () =
 })
 
 test('el temporitzador de Mode aula passa de compte enrere a excés sense so ni salts', () => {
+  const waiting = getClassroomTimerState({ plannedMinutes: 10, startedAtMs: null, nowMs: 721_000 })
+  assert.equal(waiting.elapsedSeconds, 0)
+  assert.equal(waiting.remainingSeconds, 600)
+  assert.equal(waiting.isOvertime, false)
+
   const running = getClassroomTimerState({ plannedMinutes: 10, startedAtMs: 1_000, nowMs: 541_000 })
   assert.equal(running.elapsedSeconds, 540)
   assert.equal(running.remainingSeconds, 60)
@@ -460,6 +467,32 @@ test('Mode aula avisa cinc minuts abans i filtra exactament el mig grup de la se
   ]
   assert.deepEqual(getClassroomStudents(students, 'class-1', 'Grup A').map((item) => item.id), ['a'])
   assert.deepEqual(getClassroomStudents(students, 'class-1').map((item) => item.id), ['a', 'b'])
+})
+
+test('Mode aula activa l’evidència final només a l’últim fragment i relaciona la UT de seguiment', () => {
+  const items = [
+    { id: 'none', sourceActivity: { evidenceMode: 'none' } },
+    { id: 'first', segmentCount: 2, segmentIndex: 1, sourceActivity: { evidenceMode: 'final' } },
+    { id: 'last', segmentCount: 2, segmentIndex: 2, sourceActivity: { evidenceMode: 'final' } },
+    { id: 'each', segmentCount: 3, segmentIndex: 1, sourceActivity: { evidenceMode: 'perSession' } },
+  ]
+  assert.deepEqual(getClassroomEvidenceItems(items).map((item) => item.id), ['last', 'each'])
+
+  assert.equal(getClassroomTrackingUtId({
+    activeClassId: 'other',
+    activeUtId: 'ut-other',
+    classId: 'class-1',
+    planningUnit: { temporalUnitId: 'planning-ut-2' },
+    semesters: [{ id: 'semester-1', classId: 'class-1', order: 1 }],
+    temporalUnits: [
+      { id: 'planning-ut-1', label: 'Primer', startsOn: '2026-09-01' },
+      { id: 'planning-ut-2', label: 'Segon', startsOn: '2027-01-01' },
+    ],
+    uts: [
+      { id: 'ut-1', classId: 'class-1', semesterId: 'semester-1', name: 'UT1', order: 1 },
+      { id: 'ut-2', classId: 'class-1', semesterId: 'semester-1', name: 'UT2', order: 2 },
+    ],
+  }), 'ut-2')
 })
 
 test('una versió nova de l’horari copia les franges amb identitats noves', () => {

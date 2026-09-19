@@ -4,6 +4,12 @@ import {
   Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
   Settings2, Trash2,
 } from 'lucide-react'
+import {
+  getClassroomStudents,
+  getClassroomTrackingUtId,
+  isClassroomEvidenceDue,
+} from '../../domain/planning'
+import { findAbsenceForSession } from '../../lib/attendance'
 import { getPendingReminderSummary } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassroomMode } from '../classroom/ClassroomMode'
@@ -240,11 +246,19 @@ export default function AgendaModule() {
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
+  const semesters = useAvaluaproStore((state) => state.semesters)
+  const uts = useAvaluaproStore((state) => state.uts)
+  const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
   const tasks = useAvaluaproStore((state) => state.tasks)
   const taskRecords = useAvaluaproStore((state) => state.taskRecords)
+  const behaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const absenceRecords = useAvaluaproStore((state) => state.absenceRecords)
   const toggleStudentAbsence = useAvaluaproStore((state) => state.toggleStudentAbsence)
+  const activateClassroomTask = useAvaluaproStore((state) => state.activateClassroomTask)
+  const updateTaskRecord = useAvaluaproStore((state) => state.updateTaskRecord)
+  const addBehaviorEvent = useAvaluaproStore((state) => state.addBehaviorEvent)
   const workspace = useAgendaWorkspace(user)
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
@@ -331,10 +345,11 @@ export default function AgendaModule() {
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, to: addDateDays(weekStart, 4) })
   const openClassroom = async (bundle) => {
     try {
-      const session = await workspace.saveSessionClassroomState(bundle, {
-        classroomOpenedAt: bundle.session.classroomOpenedAt || new Date().toISOString(),
+      const bundleWithPrivateNotes = await workspace.loadClassroomPrivateNotes(bundle)
+      const session = await workspace.saveSessionClassroomState(bundleWithPrivateNotes, {
+        classroomOpenedAt: bundleWithPrivateNotes.session.classroomOpenedAt || new Date().toISOString(),
       })
-      setActiveBundle({ ...bundle, session })
+      setActiveBundle({ ...bundleWithPrivateNotes, session })
       setDialog(null)
       setView('classroom')
     } catch (error) {
@@ -350,8 +365,46 @@ export default function AgendaModule() {
     workspace.loadSessionRange({ from: currentStart, to: addDateDays(currentStart, 4) })
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut actualitzar la setmana.'))
   }
+  const activateClassroomEvidence = async (bundle, item) => {
+    if (!isClassroomEvidenceDue(item)) return null
+    const utId = getClassroomTrackingUtId({
+      activeClassId,
+      activeUtId,
+      classId: bundle.session.classId,
+      planningUnit: bundle.planningUnit,
+      semesters,
+      temporalUnits: workspace.temporalUnits,
+      uts,
+    })
+    if (!utId) throw new Error('Aquest grup necessita una UT d’AvaluaPro per activar la tasca de seguiment.')
+    const visibleStudents = getClassroomStudents(students, bundle.session.classId, bundle.session.subgroupId)
+    const absentStudentIds = visibleStudents
+      .filter((student) => findAbsenceForSession(absenceRecords, student.id, bundle.session.classId, bundle.session))
+      .map((student) => student.id)
+    const evidenceMode = item.sourceActivity?.evidenceMode || 'none'
+    const evidenceKey = evidenceMode === 'perSession'
+      ? `${bundle.application.id}:${item.sourceActivityId}:${bundle.session.id}`
+      : `${bundle.application.id}:${item.sourceActivityId}:final`
+    return activateClassroomTask({
+      applicationId: bundle.application.id,
+      classId: bundle.session.classId,
+      date: String(bundle.session.startsAt).slice(0, 10),
+      evidenceKey,
+      evidenceMode,
+      planningUnitId: bundle.planningUnit.id,
+      sessionId: bundle.session.id,
+      sessionItemId: item.id,
+      sourceActivityId: item.sourceActivityId,
+      studentIds: visibleStudents.map((student) => student.id),
+      absentStudentIds,
+      title: item.title,
+      utId,
+    })
+  }
   const confirmClassroomContinuation = async (preview) => {
     const confirmed = await workspace.confirmContinuationPreview(preview)
+    const sourceItem = confirmed.changedExistingItems.find((item) => item.id === confirmed.item.id) || confirmed.item
+    await activateClassroomEvidence(confirmed.bundle, { ...sourceItem, sourceActivity: confirmed.item.sourceActivity })
     setActiveBundle((current) => {
       if (!current || !confirmed.sourceResult) return current
       const results = current.results.some((result) => result.id === confirmed.sourceResult.id)
@@ -369,16 +422,23 @@ export default function AgendaModule() {
     return <>
       <ClassroomMode
         absenceRecords={absenceRecords}
+        behaviorEvents={behaviorEvents}
         bundle={activeBundle}
         classes={classes}
         key={`${activeBundle.session.id}:${classroomRevision}`}
         onCloseSession={workspace.closeClassroomSession}
         onContinue={(bundle, item) => adjustSession(bundle, 'continuation', item)}
+        onActivateEvidence={activateClassroomEvidence}
+        onAddBehavior={addBehaviorEvent}
         onExit={exitClassroom}
         onSaveResult={workspace.saveActivityResult}
+        onSavePrivateNote={workspace.saveClassroomPrivateNote}
         onToggleAbsence={toggleStudentAbsence}
         onUpdateSession={workspace.saveSessionClassroomState}
         students={students}
+        taskRecords={taskRecords}
+        tasks={tasks}
+        onUpdateTaskRecord={updateTaskRecord}
       />
       {dialog === 'session-adjust' && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={confirmClassroomContinuation} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </>

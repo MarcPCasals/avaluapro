@@ -26,6 +26,7 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createPlanningPrivateNote,
   createSessionItem,
   createTimetableSlot,
   createTimetableVersion,
@@ -175,16 +176,22 @@ test('Mode aula conserva offline l’obertura, el temps real i el tancament de l
     sessionId: session.id, sessionItemId: 'item-1', sourceActivityId: 'activity-1',
     status: 'completed', actualMinutes: 12.5,
   }, { now })
+  const privateNote = createPlanningPrivateNote({
+    id: 'plan-private-note-classroom', ownerUid: uid, planningUnitId: 'up-1',
+    sessionId: session.id, text: 'Recordar una incidència només per a mi.',
+  }, { now })
 
   await savePlanningEntityLocally(uid, session, { planningUnitId: 'up-1' })
   await savePlanningEntityLocally(uid, result, { planningUnitId: 'up-1' })
+  await savePlanningEntityLocally(uid, privateNote)
 
   const storedSession = (await loadPlanningScope(uid, 'application:application-1:sessions'))[0]
   const storedResult = (await loadPlanningScope(uid, `session:${session.id}:detail`))[0]
   assert.equal(storedSession.status, 'held')
   assert.equal(storedSession.attendanceConfirmedAt, '2026-09-19T10:01:00.000Z')
   assert.equal(storedResult.actualMinutes, 12.5)
-  assert.equal((await loadPlanningOutbox(uid)).length, 2)
+  assert.equal((await loadPlanningScope(uid, `session:${session.id}:privateNotes`))[0].text, 'Recordar una incidència només per a mi.')
+  assert.equal((await loadPlanningOutbox(uid)).length, 3)
 })
 
 test('una segona edició substitueix la pendent i una confirmació antiga no la retira', async () => {

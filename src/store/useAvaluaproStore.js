@@ -90,6 +90,7 @@ import {
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
 import { findAbsenceForSession, findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
+import { buildClassroomTaskActivation } from '../lib/classroomTracking'
 import {
   STUDENT_PROFILE_MOMENT_SOURCE,
   buildStudentProfileFriendshipSnapshot,
@@ -5022,25 +5023,26 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['taskRecords'])
   },
 
-  addBehaviorEvent: async (studentId, type, text = '') => {
-    const classId = get().ui.activeClassId
+  addBehaviorEvent: async (studentId, type, text = '', meta = {}) => {
+    const student = get().students.find((item) => item.id === studentId)
+    const classId = meta.classId || student?.classId || get().ui.activeClassId
     const label = text.trim() || (type === 'incident' ? 'Incidència pendent de detallar' : 'Observació positiva')
     const createdAt = new Date().toISOString()
+    const behaviorEvent = {
+      ...meta,
+      id: createId('beh'),
+      classId,
+      studentId,
+      type,
+      text: label,
+      date: createdAt.slice(0, 10),
+      createdAt,
+    }
     set((state) => ({
-      behaviorEvents: [
-        ...state.behaviorEvents,
-        {
-          id: createId('beh'),
-          classId,
-          studentId,
-          type,
-          text: label,
-          date: createdAt.slice(0, 10),
-          createdAt,
-        },
-      ],
+      behaviorEvents: [...state.behaviorEvents, behaviorEvent],
     }))
     await persistCollections(set, get, ['behaviorEvents'])
+    return behaviorEvent
   },
 
   deferTaskAgendaWarning: async (studentId, missingCount) => {
@@ -5426,6 +5428,51 @@ export const useAvaluaproStore = create((set, get) => ({
       ],
     }))
     await persistCollections(set, get, ['tasks'])
+  },
+
+  /**
+   * Activa una evidència de Mode aula una sola vegada. L'alumnat present es
+   * dona per fet i l'absent queda exempt, de manera que crear la tasca no
+   * introdueix cap negatiu de constància abans que el docent revisi excepcions.
+   */
+  activateClassroomTask: async ({
+    applicationId,
+    classId,
+    date,
+    evidenceKey,
+    evidenceMode,
+    planningUnitId,
+    sessionId,
+    sessionItemId,
+    sourceActivityId,
+    studentIds = [],
+    absentStudentIds = [],
+    title,
+    utId,
+  }) => {
+    const state = get()
+    const activation = buildClassroomTaskActivation(state, {
+      applicationId,
+      classId,
+      date,
+      evidenceKey,
+      evidenceMode,
+      planningUnitId,
+      sessionId,
+      sessionItemId,
+      sourceActivityId,
+      studentIds,
+      absentStudentIds,
+      title,
+      utId,
+    }, createId)
+    if (!activation) return null
+    set((current) => ({
+      tasks: activation.isNewTask ? [...current.tasks, activation.task] : current.tasks,
+      taskRecords: [...current.taskRecords, ...activation.records],
+    }))
+    await persistCollections(set, get, activation.isNewTask ? ['tasks', 'taskRecords'] : ['taskRecords'])
+    return { records: activation.records, task: activation.task }
   },
 
   addTasksToClasses: async ({ title, entries }) => {
