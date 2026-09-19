@@ -43,6 +43,7 @@ import {
   orderActivitiesForScheduling,
   planActivityChange,
   selectEffectiveTimetable,
+  summarizeAssignedActivityProgress,
   updatePlanningActivity,
 } from '../src/domain/planning/index.js'
 
@@ -726,8 +727,37 @@ test('una proposta divide una activitat llarga, manté indicacions i no duplica 
   assert.deepEqual(longSegments.map((item) => item.segmentIndex), [1, 2, 3])
   assert.ok(longSegments.every((item) => item.segmentCount === 3))
   assert.equal(longSegments.reduce((total, item) => total + item.plannedMinutes, 0), 120)
+  assert.equal(result.scheduledMinutes, 120)
   assert.deepEqual(result.skippedAlreadyScheduled, ['already'])
   assert.deepEqual(result.unscheduled, [])
+})
+
+test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar dues vegades la UP', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const result = buildActivitySessionDistribution({
+    activities: [{ id: 'experiment', title: 'Experiment', type: 'activity', plannedMinutes: 80 }],
+    application,
+    candidates: [
+      { date: '2026-09-25', startsAt: '2026-09-25T08:30:00', durationMinutes: 60, subgroupId: 'Grup B', space: 'Lab 2', timetableSlotId: 'slot-b' },
+      { date: '2026-09-25', startsAt: '2026-09-25T12:00:00', durationMinutes: 60, subgroupId: 'Grup A', space: 'Lab 2', timetableSlotId: 'slot-a' },
+      { date: '2026-09-28', startsAt: '2026-09-28T08:30:00', durationMinutes: 60, subgroupId: null, timetableSlotId: 'slot-all' },
+    ],
+    options: options(idFactory),
+  })
+
+  assert.equal(result.sessions.length, 3)
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items[0].plannedMinutes), [55, 55, 25])
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items[0].segmentIndex), [1, 1, 2])
+  assert.ok(result.sessions.every((bundle) => bundle.items[0].segmentCount === 2))
+  assert.equal(result.scheduledMinutes, 80)
+  assert.equal(result.sessions[0].candidate.space, 'Lab 2')
+
+  const progress = summarizeAssignedActivityProgress(result.sessions)
+  assert.equal(progress.assignedMinutesByActivityId.experiment, 80)
+  assert.equal(progress.assignedSourceActivityIds.has('experiment'), true)
 })
 
 test('la previsualització avisa si el calendari no té prou sessions i no perd la resta', () => {

@@ -33,6 +33,94 @@ function candidateKey(candidate) {
   return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${candidate.startsAt}`
 }
 
+function existingItemsSignature(items = []) {
+  return items.map((item) => [
+    item.sourceActivityId || '',
+    Number(item.segmentIndex) || 0,
+    item.plannedMinutes == null ? '' : Number(item.plannedMinutes),
+    item.type || 'activity',
+  ].join(':')).join('|')
+}
+
+function parallelDraftKey(draft) {
+  if (!draft?.candidate?.subgroupId) return ''
+  return [
+    draft.candidate.date,
+    Number(draft.candidate.durationMinutes) || 0,
+    existingItemsSignature(draft.existingItems),
+  ].join('__')
+}
+
+/**
+ * Dues franges de mig grup del mateix dia representen una sola passa de la
+ * seqüència: A i B han de rebre el mateix contingut encara que tinguin hores
+ * diferents. La unitat lògica conserva totes dues sessions reals, però només
+ * consumeix una vegada els minuts de la UP.
+ */
+function buildLogicalDrafts(drafts) {
+  const parallelBuckets = new Map()
+  for (const draft of drafts) {
+    const key = parallelDraftKey(draft)
+    if (!key) continue
+    parallelBuckets.set(key, [...(parallelBuckets.get(key) || []), draft])
+  }
+  const validParallelKeys = new Set([...parallelBuckets.entries()]
+    .filter(([, bucket]) => new Set(bucket.map((draft) => draft.candidate.subgroupId)).size > 1)
+    .map(([key]) => key))
+  const logicalByParallelKey = new Map()
+  const logicalDrafts = []
+  const logicalByDraft = new Map()
+
+  for (const draft of drafts) {
+    const key = parallelDraftKey(draft)
+    let logical = key && validParallelKeys.has(key) ? logicalByParallelKey.get(key) : null
+    if (!logical) {
+      logical = {
+        drafts: [],
+        items: [],
+        remainingMinutes: draft.remainingMinutes,
+      }
+      logicalDrafts.push(logical)
+      if (key && validParallelKeys.has(key)) logicalByParallelKey.set(key, logical)
+    }
+    logical.drafts.push(draft)
+    logical.remainingMinutes = Math.min(logical.remainingMinutes, draft.remainingMinutes)
+    logicalByDraft.set(draft, logical)
+  }
+  return { logicalByDraft, logicalDrafts }
+}
+
+/**
+ * Resumeix el progrés real d'una aplicació sense comptar dues vegades una
+ * activitat impartida en paral·lel als mitjos grups A i B.
+ */
+export function summarizeAssignedActivityProgress(sessionBundles = []) {
+  const drafts = sessionBundles
+    .filter((bundle) => bundle?.session && !['cancelled', 'notHeld'].includes(bundle.session.status))
+    .map((bundle) => ({
+      candidate: {
+        date: String(bundle.session.startsAt).slice(0, 10),
+        durationMinutes: bundle.session.durationMinutes,
+        subgroupId: bundle.session.subgroupId,
+      },
+      existingItems: bundle.items || [],
+      remainingMinutes: 0,
+    }))
+    .sort((left, right) => String(left.candidate.date).localeCompare(String(right.candidate.date)))
+  const { logicalDrafts } = buildLogicalDrafts(drafts)
+  const assignedMinutesByActivityId = {}
+  const assignedSourceActivityIds = new Set()
+  for (const logical of logicalDrafts) {
+    for (const item of logical.drafts[0]?.existingItems || []) {
+      if (!item.sourceActivityId) continue
+      assignedSourceActivityIds.add(item.sourceActivityId)
+      assignedMinutesByActivityId[item.sourceActivityId] =
+        (assignedMinutesByActivityId[item.sourceActivityId] || 0) + (Number(item.plannedMinutes) || 0)
+    }
+  }
+  return { assignedMinutesByActivityId, assignedSourceActivityIds }
+}
+
 /**
  * Converteix l'arbre de fases en una única seqüència pedagògica. Les subfases
  * apareixen just després de la fase mare i els elements orfes es conserven al
@@ -115,8 +203,10 @@ export function buildTimetableSessionCandidates({
         const candidate = {
           date: dateKey,
           durationMinutes: Number(slot.durationMinutes),
+          space: slot.space || '',
           startsAt: `${dateKey}T${slot.startsAt}:00`,
           subgroupId: slot.subgroupId || null,
+          subject: slot.subject || '',
           timetableSlotId: slot.id,
           timetableVersionId: timetable.id,
         }
@@ -135,8 +225,10 @@ export function buildTimetableSessionCandidates({
         calendarEventId: event.id,
         date: dateKey,
         durationMinutes: Number(event.durationMinutes),
+        space: '',
         startsAt: `${dateKey}T${event.startsAt}:00`,
         subgroupId: event.subgroupId || null,
+        subject: '',
         timetableSlotId: null,
         timetableVersionId: timetable?.id || null,
       }
@@ -205,14 +297,15 @@ export function buildActivitySessionDistribution({
       session: null,
     })),
   ].sort((left, right) => left.candidate.startsAt.localeCompare(right.candidate.startsAt))
+  const { logicalByDraft, logicalDrafts } = buildLogicalDrafts(drafts)
   const unscheduled = []
   let draftIndex = 0
   let currentDraft = null
 
   const takeDraft = () => {
     if (currentDraft && currentDraft.remainingMinutes > 0) return currentDraft
-    while (draftIndex < drafts.length) {
-      const draft = drafts[draftIndex]
+    while (draftIndex < logicalDrafts.length) {
+      const draft = logicalDrafts[draftIndex]
       draftIndex += 1
       if (draft.remainingMinutes > 0) {
         currentDraft = draft
@@ -251,13 +344,22 @@ export function buildActivitySessionDistribution({
   }
 
   const segmentCounts = new Map()
-  for (const draft of drafts) {
+  for (const draft of logicalDrafts) {
     for (const item of draft.items) {
       segmentCounts.set(item.activity.id, (segmentCounts.get(item.activity.id) || 0) + 1)
     }
   }
   const segmentIndexes = new Map()
-  const sessions = drafts.filter((draft) => draft.items.length > 0).map((draft) => {
+  for (const draft of logicalDrafts) {
+    draft.items = draft.items.map((item) => {
+      const segmentIndex = (segmentIndexes.get(item.activity.id) || 0) + 1
+      segmentIndexes.set(item.activity.id, segmentIndex)
+      return { ...item, segmentCount: segmentCounts.get(item.activity.id), segmentIndex }
+    })
+  }
+  const sessions = drafts.filter((draft) => (logicalByDraft.get(draft)?.items || []).length > 0).map((draft) => {
+    const logical = logicalByDraft.get(draft)
+    const logicalItems = logical?.items || []
     const session = draft.session || createCalendarSession(
       {
         applicationId: application.id,
@@ -271,22 +373,20 @@ export function buildActivitySessionDistribution({
       },
       options,
     )
-    const items = draft.items.map(({ activity, plannedMinutes }, order) => {
-      const segmentIndex = (segmentIndexes.get(activity.id) || 0) + 1
-      segmentIndexes.set(activity.id, segmentIndex)
-      return createSessionItem({
+    const items = logicalItems.map(({ activity, plannedMinutes, segmentCount, segmentIndex }, order) => (
+      createSessionItem({
         applicationId: application.id,
         order: draft.existingItems.length + order,
         ownerUid: application.ownerUid,
         plannedMinutes,
-        segmentCount: segmentCounts.get(activity.id),
+        segmentCount,
         segmentIndex,
         sessionId: session.id,
         sourceActivityId: activity.id,
         title: activity.title,
         type: activity.type || 'activity',
       }, options)
-    })
+    ))
     return {
       candidate: draft.candidate,
       existingItems: draft.existingItems,
@@ -301,6 +401,8 @@ export function buildActivitySessionDistribution({
     scheduledActivityIds: [...new Set(sessions.flatMap((bundle) =>
       bundle.items.map((item) => item.sourceActivityId)))],
     sessions,
+    scheduledMinutes: logicalDrafts.reduce((total, draft) => total + draft.items.reduce(
+      (sum, item) => sum + (Number(item.plannedMinutes) || 0), 0), 0),
     skippedAlreadyScheduled,
     unscheduled,
   }

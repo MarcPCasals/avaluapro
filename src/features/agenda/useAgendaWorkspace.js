@@ -34,6 +34,7 @@ import {
   orderActivitiesForScheduling,
   planActivityChange,
   selectEffectiveTimetable,
+  summarizeAssignedActivityProgress,
 } from '../../domain/planning'
 
 const EMPTY_SYNC = {
@@ -743,7 +744,6 @@ export function useAgendaWorkspace(user, classes = []) {
       status: 'draft',
     })
     let existingSessions = []
-    let existingItems = []
     let existingSessionBundles = []
     if (applications[0]) {
       const sessionResult = await repository.loadScope(
@@ -766,8 +766,6 @@ export function useAgendaWorkspace(user, classes = []) {
         },
         { completeSnapshot: true },
       )))
-      existingItems = detailResults.flatMap((result) =>
-        result.entities.filter((item) => item.entityType === 'sessionItem'))
       existingSessionBundles = existingSessions.map((session, index) => ({
         items: detailResults[index].entities.filter((item) => item.entityType === 'sessionItem'),
         session,
@@ -777,18 +775,12 @@ export function useAgendaWorkspace(user, classes = []) {
       timetable.id,
       sortSlots(slotResults[index]?.entities || []),
     ]))
-    const activeSessionIds = new Set(existingSessions
-      .filter((session) => !['cancelled', 'notHeld'].includes(session.status))
-      .map((session) => session.id))
-    const activeItems = existingItems.filter((item) => activeSessionIds.has(item.sessionId))
-    const assignedMinutesByActivityId = activeItems.reduce((totals, item) => {
-      totals[item.sourceActivityId] = (totals[item.sourceActivityId] || 0) + (Number(item.plannedMinutes) || 0)
-      return totals
-    }, {})
+    const { assignedMinutesByActivityId, assignedSourceActivityIds } =
+      summarizeAssignedActivityProgress(existingSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
       const plannedMinutes = Number(activity.plannedMinutes)
       if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
-        return [activity.id, activeItems.some((item) => item.sourceActivityId === activity.id) ? 0 : null]
+        return [activity.id, assignedSourceActivityIds.has(activity.id) ? 0 : null]
       }
       return [activity.id, Math.max(0, plannedMinutes - (assignedMinutesByActivityId[activity.id] || 0))]
     }))
