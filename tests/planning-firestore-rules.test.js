@@ -364,7 +364,14 @@ describe('Planificació compartida', () => {
     const db = authDb(AGENDA_EDITOR)
     await assertSucceeds(getDoc(appRef(db, APP_ONE)))
     await assertFails(getDoc(appRef(db, APP_TWO)))
-    await assertSucceeds(updateDoc(sessionRef(db), { status: 'held', updatedAt: NOW }))
+    await assertSucceeds(updateDoc(sessionRef(db), {
+      attendanceConfirmedAt: NOW,
+      classroomClosedAt: NOW,
+      classroomOpenedAt: NOW,
+      status: 'held',
+      updatedAt: NOW,
+    }))
+    await assertFails(updateDoc(sessionRef(db), { timerStartedAt: NOW, updatedAt: NOW }))
     await assertSucceeds(setDoc(
       doc(sessionRef(db), 'items', 'plan-session-item-two'),
       sessionItemData({ id: 'plan-session-item-two', title: 'Tancament', order: 2 }),

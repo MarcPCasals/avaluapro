@@ -29,6 +29,10 @@ import {
   getPlanningPermissions,
   getPlanningTotals,
   getActivityActualComparisons,
+  getClassroomPromptState,
+  getClassroomStudents,
+  getClassroomTimerState,
+  getCorrectedActualMinutes,
   findTimetableSlotConflicts,
   getProgrammableMinutes,
   getSessionLoad,
@@ -428,6 +432,34 @@ test('el pressupost reserva cinc minuts i aplica els tres colors acordats', () =
   assert.equal(getSessionLoad([{ plannedMinutes: 46 }], 60).status, 'green')
   assert.equal(getSessionLoad([{ plannedMinutes: 47 }], 60).status, 'orange')
   assert.equal(getSessionLoad([{ plannedMinutes: 56 }], 60).status, 'red')
+})
+
+test('el temporitzador de Mode aula passa de compte enrere a excés sense so ni salts', () => {
+  const running = getClassroomTimerState({ plannedMinutes: 10, startedAtMs: 1_000, nowMs: 541_000 })
+  assert.equal(running.elapsedSeconds, 540)
+  assert.equal(running.remainingSeconds, 60)
+  assert.equal(running.isOvertime, false)
+
+  const overtime = getClassroomTimerState({ plannedMinutes: 10, startedAtMs: 1_000, nowMs: 721_000 })
+  assert.equal(overtime.remainingSeconds, 0)
+  assert.equal(overtime.overtimeSeconds, 120)
+  assert.equal(overtime.isOvertime, true)
+  assert.equal(getCorrectedActualMinutes({ startedAtMs: 1_000, endedAtMs: 721_000, endedMinutesAgo: 2 }), 10)
+})
+
+test('Mode aula avisa cinc minuts abans i filtra exactament el mig grup de la sessió', () => {
+  const session = { startsAt: '2026-09-21T09:30:00', durationMinutes: 60, status: 'planned' }
+  assert.deepEqual(getClassroomPromptState(session, new Date('2026-09-21T09:25:00')), { kind: 'upcoming', minutesUntil: 5 })
+  assert.deepEqual(getClassroomPromptState(session, new Date('2026-09-21T09:45:00')), { kind: 'active', minutesUntil: 0 })
+  assert.equal(getClassroomPromptState(session, new Date('2026-09-21T09:24:59')), null)
+
+  const students = [
+    { id: 'b', classId: 'class-1', halfGroup: 'Grup B', name: 'Biel' },
+    { id: 'a', classId: 'class-1', halfGroup: 'Grup A', name: 'Aina' },
+    { id: 'other', classId: 'class-2', halfGroup: 'Grup A', name: 'Clara' },
+  ]
+  assert.deepEqual(getClassroomStudents(students, 'class-1', 'Grup A').map((item) => item.id), ['a'])
+  assert.deepEqual(getClassroomStudents(students, 'class-1').map((item) => item.id), ['a', 'b'])
 })
 
 test('una versió nova de l’horari copia les franges amb identitats noves', () => {

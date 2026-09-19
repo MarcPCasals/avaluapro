@@ -2,7 +2,8 @@ import {
   ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarRange, Clock3, Edit3,
   ExternalLink, Layers3, ListChecks, Loader2, MapPin, Plus, RotateCcw,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getClassroomPromptState } from '../../domain/planning'
 
 const STATUS_LABELS = {
   cancelled: 'Anul·lada',
@@ -45,7 +46,7 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.filter((item) => item?.url).map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, classes, onAdjust }) {
+function SessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
   return (
@@ -63,7 +64,10 @@ function SessionDetail({ bundle, classes, onAdjust }) {
         <div className="agenda-session-subheading"><ExternalLink size={16} /><strong>Materials</strong><span>{materials.length}</span></div>
         {materials.length === 0 ? <p className="agenda-session-muted">No hi ha cap material enllaçat.</p> : <div>{materials.map((material) => <a href={material.url} key={material.url} rel="noreferrer" target="_blank"><ExternalLink size={13} /><span>{material.label || material.url}</span></a>)}</div>}
       </div>
-      <button className="secondary-action compact agenda-adjust-session" onClick={() => onAdjust(bundle)} type="button"><Edit3 size={15} />Reajustar la sessió</button>
+      <div className="agenda-session-actions">
+        {onOpenClassroom && !['cancelled', 'notHeld'].includes(bundle.session.status) && <button className="primary-action compact" onClick={() => onOpenClassroom(bundle)} type="button"><Clock3 size={15} />{bundle.session.classroomOpenedAt ? 'Reobrir Mode aula' : 'Obrir Mode aula'}</button>}
+        <button className="secondary-action compact agenda-adjust-session" onClick={() => onAdjust(bundle)} type="button"><Edit3 size={15} />Reajustar la sessió</button>
+      </div>
     </div>
   )
 }
@@ -75,14 +79,16 @@ export function AgendaTodayView({
   loading,
   onAdjust,
   onOpenCalendar,
+  onOpenClassroom,
   onOpenScheduling,
   onOpenTimetable,
   reminders,
   timetable,
   today,
 }) {
+  const [now, setNow] = useState(() => new Date())
   const todayBundles = bundles.filter((bundle) => sessionDate(bundle) === today)
-  const nowTime = new Date().toTimeString().slice(0, 5)
+  const nowTime = now.toTimeString().slice(0, 5)
   const nowMinutes = Number(nowTime.slice(0, 2)) * 60 + Number(nowTime.slice(3, 5))
   const currentBundle = todayBundles.find((bundle) => {
     if (bundle.session.status !== 'planned') return false
@@ -93,12 +99,18 @@ export function AgendaTodayView({
     bundle.session.status === 'planned' && bundle.session.startsAt >= `${today}T${nowTime}`) || null
   const [selectedSessionId, setSelectedSessionId] = useState('')
   const selectedBundle = bundles.find((bundle) => bundle.session.id === selectedSessionId) || automaticBundle
+  const classroomPrompt = automaticBundle ? getClassroomPromptState(automaticBundle.session, now) : null
   const upcomingEvents = calendarEvents.filter((event) => event.endsOn >= today && event.startsOn <= addDays(today, 3)).slice(0, 4)
+  useEffect(() => {
+    const interval = globalThis.setInterval(() => setNow(new Date()), 30000)
+    return () => globalThis.clearInterval(interval)
+  }, [])
   return (
     <div className="agenda-today-layout agenda-today-live">
       <section className="agenda-today-main">
         <div className="agenda-section-heading"><span className="agenda-section-icon"><CalendarDays size={20} /></span><div><span>Avui</span><h2>{formatDate(today, { long: true, weekday: true })}</h2></div>{loading && <Loader2 className="spin agenda-heading-loader" size={17} />}</div>
-        {selectedBundle ? <SessionDetail bundle={selectedBundle} classes={classes} onAdjust={onAdjust} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p><div className="agenda-today-actions"><button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button><button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button></div></div>}
+        {classroomPrompt && <div className={`agenda-classroom-prompt ${classroomPrompt.kind}`}><Clock3 size={20} /><div><strong>{classroomPrompt.kind === 'upcoming' ? `${classNameFor(classes, automaticBundle.session.classId)} comença d’aquí ${classroomPrompt.minutesUntil} min` : `${classNameFor(classes, automaticBundle.session.classId)} està en curs`}</strong><span>{automaticBundle.items.length} activitats · {sessionMaterials(automaticBundle).length} materials preparats</span></div><button className="primary-action compact" onClick={() => onOpenClassroom(automaticBundle)} type="button">Obrir Mode aula</button></div>}
+        {selectedBundle ? <SessionDetail bundle={selectedBundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p><div className="agenda-today-actions"><button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button><button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button></div></div>}
       </section>
       <aside className="agenda-today-side">
         <section>
@@ -149,6 +161,6 @@ export function AgendaTimelineView({ bundles, classes, loading, onChangeClass, o
   )
 }
 
-export function AgendaSessionDetail({ bundle, classes, onAdjust }) {
-  return <SessionDetail bundle={bundle} classes={classes} onAdjust={onAdjust} />
+export function AgendaSessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
+  return <SessionDetail bundle={bundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} />
 }

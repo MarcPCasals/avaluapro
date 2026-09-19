@@ -89,7 +89,7 @@ import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
-import { findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
+import { findAbsenceForSession, findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
 import {
   STUDENT_PROFILE_MOMENT_SOURCE,
   buildStudentProfileFriendshipSnapshot,
@@ -4953,20 +4953,21 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['taskRecords'])
   },
 
-  toggleStudentAbsence: async (studentId, occurredAt = new Date()) => {
+  toggleStudentAbsence: async (studentId, occurredAt = new Date(), options = {}) => {
     const state = get()
     const student = state.students.find((item) => item.id === studentId)
     const classId = student?.classId || state.ui.activeClassId
     if (!student || !classId) return null
 
     const timestamp = occurredAt instanceof Date ? occurredAt : new Date(occurredAt)
-    const timeParts = getAbsenceTimeParts(timestamp)
-    const existing = findAbsenceInSlot(
-      state.absenceRecords,
-      studentId,
-      classId,
-      timeParts.slotKey,
-    )
+    const sessionStartsAt = options.sessionStartsAt || null
+    const timeParts = getAbsenceTimeParts(sessionStartsAt || timestamp)
+    const existing = options.sessionId
+      ? findAbsenceForSession(state.absenceRecords, studentId, classId, {
+          id: options.sessionId,
+          startsAt: sessionStartsAt,
+        })
+      : findAbsenceInSlot(state.absenceRecords, studentId, classId, timeParts.slotKey)
 
     if (existing) {
       set((current) => ({
@@ -4983,8 +4984,11 @@ export const useAvaluaproStore = create((set, get) => ({
       date: timeParts.date,
       time: timeParts.time,
       slotKey: timeParts.slotKey,
-      hours: 1,
+      hours: Number(options.hours) > 0 ? Number(options.hours) : 1,
       recordedAt: timestamp.toISOString(),
+      sessionId: options.sessionId || null,
+      sessionStartsAt,
+      source: options.source || null,
     }
     set((current) => ({ absenceRecords: [...current.absenceRecords, record] }))
     await persistCollections(set, get, ['absenceRecords'])

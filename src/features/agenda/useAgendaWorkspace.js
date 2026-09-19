@@ -17,6 +17,7 @@ import {
   copyTimetableVersionStructure,
   buildActivitySessionDistribution,
   buildTimetableSessionCandidates,
+  createActivityResult,
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
@@ -446,6 +447,88 @@ export function useAgendaWorkspace(user) {
     return session
   }, [persist])
 
+  const saveSessionClassroomState = useCallback(async (bundle, changes) => {
+    const now = new Date().toISOString()
+    const session = createCalendarSession({ ...bundle.session, ...changes, updatedAt: now }, { now })
+    await persist({ entity: session, context: { planningUnitId: bundle.planningUnit.id } })
+    setSessionBundles((items) => items.map((item) => item.session.id === session.id ? { ...item, session } : item))
+    return session
+  }, [persist])
+
+  /**
+   * Un resultat és únic per element de sessió. Aturar o revisar el temporitzador
+   * actualitza el mateix document, de manera que no duplica mesures reals.
+   */
+  const saveActivityResult = useCallback(async (bundle, item, changes = {}) => {
+    const now = new Date().toISOString()
+    const existing = bundle.results.find((result) => result.sessionItemId === item.id)
+    const result = createActivityResult({
+      ...existing,
+      ...changes,
+      applicationId: bundle.application.id,
+      ownerUid: bundle.session.ownerUid,
+      sessionId: bundle.session.id,
+      sessionItemId: item.id,
+      sourceActivityId: item.sourceActivityId,
+      updatedAt: now,
+    }, { now })
+    await persist({
+      entity: result,
+      context: {
+        applicationId: bundle.application.id,
+        planningUnitId: bundle.planningUnit.id,
+        sessionId: bundle.session.id,
+      },
+    })
+    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+      ? { ...current, results: replaceById(current.results, result) }
+      : current))
+    return result
+  }, [persist])
+
+  /**
+   * Tancar Mode aula confirma com a fet tot element que no tingui una excepció.
+   * Aquest és el comportament mínim acordat per evitar marcar cada activitat.
+   */
+  const closeClassroomSession = useCallback(async (bundle) => {
+    const now = new Date().toISOString()
+    const session = createCalendarSession({
+      ...bundle.session,
+      classroomClosedAt: now,
+      classroomOpenedAt: bundle.session.classroomOpenedAt || now,
+      status: 'held',
+      updatedAt: now,
+    }, { now })
+    const resultByItemId = new Map(bundle.results.map((result) => [result.sessionItemId, result]))
+    const results = [...bundle.results]
+    const entries = [{ entity: session, context: { planningUnitId: bundle.planningUnit.id } }]
+    for (const item of bundle.items) {
+      if (resultByItemId.has(item.id)) continue
+      const result = createActivityResult({
+        applicationId: bundle.application.id,
+        ownerUid: bundle.session.ownerUid,
+        sessionId: bundle.session.id,
+        sessionItemId: item.id,
+        sourceActivityId: item.sourceActivityId,
+        status: 'completed',
+      }, { now })
+      results.push(result)
+      entries.push({
+        entity: result,
+        context: {
+          applicationId: bundle.application.id,
+          planningUnitId: bundle.planningUnit.id,
+          sessionId: bundle.session.id,
+        },
+      })
+    }
+    await persist(entries)
+    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+      ? { ...current, results, session }
+      : current))
+    return { results, session }
+  }, [persist])
+
   /**
    * Carrega sota demanda la UP, les franges de totes les versions d'horari i
    * les sessions ja creades. La finestra de proposta pot així detectar què ja
@@ -754,10 +837,30 @@ export function useAgendaWorkspace(user) {
   /** Desa en una sola cua la continuació confirmada i els comptadors revisats. */
   const confirmContinuationPreview = useCallback(async (preview) => {
     const planningUnitId = preview.setup.planningUnit.id
+    const now = new Date().toISOString()
+    const existingResult = preview.bundle.results.find((result) => result.sessionItemId === preview.item.id)
+    const sourceResult = createActivityResult({
+      ...existingResult,
+      applicationId: preview.bundle.application.id,
+      ownerUid: preview.bundle.session.ownerUid,
+      sessionId: preview.bundle.session.id,
+      sessionItemId: preview.item.id,
+      sourceActivityId: preview.item.sourceActivityId,
+      status: 'continued',
+      updatedAt: now,
+    }, { now })
     const entries = preview.changedExistingItems.map((item) => ({
       entity: item,
       context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
     }))
+    entries.push({
+      entity: sourceResult,
+      context: {
+        applicationId: preview.bundle.application.id,
+        planningUnitId,
+        sessionId: preview.bundle.session.id,
+      },
+    })
     for (const bundle of preview.sessions) {
       if (!bundle.isExisting) entries.push({ entity: bundle.session, context: { planningUnitId } })
       for (const item of bundle.items) {
@@ -780,6 +883,9 @@ export function useAgendaWorkspace(user) {
               : currentItem),
             ...(continuation?.items || []).map((newItem) => ({ ...newItem, sourceActivity: preview.item.sourceActivity })),
           ].sort((left, right) => Number(left.order) - Number(right.order)),
+          results: current.session.id === preview.bundle.session.id
+            ? replaceById(current.results, sourceResult)
+            : current.results,
         }
       })
       const knownIds = new Set(next.map((current) => current.session.id))
@@ -794,7 +900,7 @@ export function useAgendaWorkspace(user) {
       }
       return next.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
     })
-    return preview
+    return { ...preview, sourceResult }
   }, [persist])
 
   return {
@@ -808,6 +914,7 @@ export function useAgendaWorkspace(user) {
     buildContinuationPreview,
     confirmContinuationPreview,
     confirmSchedulingPreview,
+    closeClassroomSession,
     createTimetable,
     error,
     isOnline,
@@ -818,6 +925,8 @@ export function useAgendaWorkspace(user) {
     removeCalendarEvent,
     removeSlot,
     saveCalendarEvent,
+    saveActivityResult,
+    saveSessionClassroomState,
     saveSessionItemChange,
     saveSessionStatus,
     saveSlot,

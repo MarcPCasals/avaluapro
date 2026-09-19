@@ -34,6 +34,15 @@ export function findAbsenceInSlot(records = [], studentId, classId, slotKey) {
   )
 }
 
+export function findAbsenceForSession(records = [], studentId, classId, session = {}) {
+  const exact = session.id && records.find(
+    (record) => record.studentId === studentId && record.classId === classId && record.sessionId === session.id,
+  )
+  if (exact) return exact
+  if (!session.startsAt) return undefined
+  return findAbsenceInSlot(records, studentId, classId, getAbsenceTimeParts(session.startsAt).slotKey)
+}
+
 export function getStudentAbsenceHours(records = [], studentId, classId = '') {
   return getStudentAbsenceRecords(records, studentId, classId).reduce(
     (total, record) => total + (Number(record.hours) || 1),

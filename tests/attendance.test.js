@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   findAbsenceInSlot,
+  findAbsenceForSession,
   formatAbsenceDateTime,
   formatAbsenceHours,
   getAbsenceTimeParts,
@@ -55,6 +56,19 @@ test('creates a stable local date, exact time and hourly slot', () => {
 test('finds the current hour without duplicating another student', () => {
   assert.equal(findAbsenceInSlot(records, 'student_1', 'class_1', '2026-09-18T10')?.id, 'absence_1')
   assert.equal(findAbsenceInSlot(records, 'student_1', 'class_1', '2026-09-18T11'), undefined)
+})
+
+test('prioritza la sessió exacta i conserva compatibilitat amb absències horàries antigues', () => {
+  const sessionRecords = [
+    ...records,
+    { ...records[0], id: 'absence_session', sessionId: 'session-1' },
+  ]
+  assert.equal(findAbsenceForSession(sessionRecords, 'student_1', 'class_1', {
+    id: 'session-1', startsAt: '2026-09-18T10:30:00',
+  })?.id, 'absence_session')
+  assert.equal(findAbsenceForSession(records, 'student_1', 'class_1', {
+    id: 'session-old', startsAt: '2026-09-18T10:30:00',
+  })?.id, 'absence_1')
 })
 
 test('calculates one hour per absence and sorts the exact history newest first', () => {

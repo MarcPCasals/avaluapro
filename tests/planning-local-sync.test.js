@@ -22,6 +22,7 @@ import {
 } from '../src/data/sync/planningSync.js'
 import {
   createAcademicYear,
+  createActivityResult,
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
@@ -158,6 +159,32 @@ test('una calendarització confirmada conserva aplicació, sessió i vincle amb 
   assert.equal((await loadPlanningScope(uid, `application:${application.id}:sessions`))[0].startsAt, '2026-09-21T09:30:00')
   assert.equal((await loadPlanningScope(uid, `session:${session.id}:detail`))[0].sourceActivityId, 'activity-1')
   assert.equal((await loadPlanningOutbox(uid)).length, 3)
+})
+
+test('Mode aula conserva offline l’obertura, el temps real i el tancament de la sessió', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-09-19T10:00:00.000Z'
+  const session = createCalendarSession({
+    id: 'plan-session-classroom', ownerUid: uid, applicationId: 'application-1',
+    classId: 'class-1', startsAt: '2026-09-21T09:30:00', durationMinutes: 60,
+    classroomOpenedAt: now, attendanceConfirmedAt: '2026-09-19T10:01:00.000Z',
+    classroomClosedAt: '2026-09-19T10:55:00.000Z', status: 'held',
+  }, { now })
+  const result = createActivityResult({
+    id: 'plan-result-classroom', ownerUid: uid, applicationId: 'application-1',
+    sessionId: session.id, sessionItemId: 'item-1', sourceActivityId: 'activity-1',
+    status: 'completed', actualMinutes: 12.5,
+  }, { now })
+
+  await savePlanningEntityLocally(uid, session, { planningUnitId: 'up-1' })
+  await savePlanningEntityLocally(uid, result, { planningUnitId: 'up-1' })
+
+  const storedSession = (await loadPlanningScope(uid, 'application:application-1:sessions'))[0]
+  const storedResult = (await loadPlanningScope(uid, `session:${session.id}:detail`))[0]
+  assert.equal(storedSession.status, 'held')
+  assert.equal(storedSession.attendanceConfirmedAt, '2026-09-19T10:01:00.000Z')
+  assert.equal(storedResult.actualMinutes, 12.5)
+  assert.equal((await loadPlanningOutbox(uid)).length, 2)
 })
 
 test('una segona edició substitueix la pendent i una confirmació antiga no la retira', async () => {

@@ -17,16 +17,18 @@ function dateLabel(startsAt) {
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
 }
 
-export function AgendaSessionDetailDialog({ bundle, classes, onAdjust, onClose }) {
+export function AgendaSessionDetailDialog({ bundle, classes, onAdjust, onClose, onOpenClassroom }) {
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-session-dialog" size="lg" title="Detall de la sessió">
-      <AgendaSessionDetail bundle={bundle} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} />
+      <AgendaSessionDetail bundle={bundle} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} />
     </Modal>
   )
 }
 
 export function AgendaSessionAdjustDialog({
   bundle,
+  initialAction = 'session',
+  initialItemId = '',
   onBuildContinuation,
   onClose,
   onConfirmContinuation,
@@ -35,8 +37,8 @@ export function AgendaSessionAdjustDialog({
   onStatus,
 }) {
   const editableItems = useMemo(() => bundle.items.filter((item) => item.sourceActivityId), [bundle.items])
-  const [action, setAction] = useState('session')
-  const [itemId, setItemId] = useState(editableItems[0]?.id || '')
+  const [action, setAction] = useState(initialAction)
+  const [itemId, setItemId] = useState(initialItemId || editableItems[0]?.id || '')
   const item = editableItems.find((candidate) => candidate.id === itemId) || editableItems[0] || null
   const [title, setTitle] = useState(item?.title || '')
   const [plannedMinutes, setPlannedMinutes] = useState(item?.plannedMinutes || '')

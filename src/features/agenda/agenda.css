@@ -262,6 +262,13 @@
 .agenda-session-materials a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-session-muted { margin: 0; color: #94a3b8; font-size: 10px; font-weight: 750; }
 .agenda-adjust-session { justify-self: start; }
+.agenda-session-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.agenda-classroom-prompt { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 17px; border: 1px solid #fed7aa; border-radius: 11px; padding: 10px 11px; color: #ea580c; background: #fff7ed; }
+.agenda-classroom-prompt.active { border-color: #c4b5fd; color: #7c3aed; background: #faf5ff; }
+.agenda-classroom-prompt > svg { justify-self: center; }
+.agenda-classroom-prompt > div { min-width: 0; display: grid; gap: 1px; }
+.agenda-classroom-prompt strong { color: #334155; font-size: 11px; }
+.agenda-classroom-prompt span { color: #64748b; font-size: 8px; font-weight: 750; }
 .agenda-today-session-list { display: grid; gap: 5px; }
 .agenda-today-session-list > button { width: 100%; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: center; border: 1px solid #edf0f4; border-radius: 8px; padding: 7px 8px; color: #64748b; background: white; text-align: left; }
 .agenda-today-session-list > button.active { border-color: #fed7aa; background: #fff7ed; }
@@ -372,5 +379,7 @@
   .agenda-proposed-sessions article { grid-template-columns: 98px minmax(0, 1fr); }
   .agenda-session-detail > header { grid-template-columns: 82px minmax(0, 1fr); }
   .agenda-session-detail > header > .agenda-session-status { grid-column: 2; justify-self: start; }
+  .agenda-classroom-prompt { grid-template-columns: 30px minmax(0, 1fr); }
+  .agenda-classroom-prompt button { grid-column: 2; justify-self: start; }
   .agenda-timeline-list { min-width: 670px; }
 }

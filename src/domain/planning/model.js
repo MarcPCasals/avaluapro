@@ -569,6 +569,9 @@ export function createCalendarSession(input, options = {}) {
     durationMinutes: positiveMinutes(input.durationMinutes, 'durada de la sessió'),
     subgroupId: optionalText(input.subgroupId),
     status: enumValue(input.status || 'planned', SESSION_STATUSES, 'estat de la sessió'),
+    classroomOpenedAt: input.classroomOpenedAt ? isoDateTime(input.classroomOpenedAt, "obertura de Mode aula") : null,
+    attendanceConfirmedAt: input.attendanceConfirmedAt ? isoDateTime(input.attendanceConfirmedAt, "confirmació de l'assistència") : null,
+    classroomClosedAt: input.classroomClosedAt ? isoDateTime(input.classroomClosedAt, "tancament de Mode aula") : null,
   }
 }
 

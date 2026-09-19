@@ -1,4 +1,5 @@
 export * from './constants.js'
+export * from './classroom.js'
 export * from './ids.js'
 export * from './model.js'
 export * from './permissions.js'

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { getPendingReminderSummary } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { ClassroomMode } from '../classroom/ClassroomMode'
 import {
   CalendarEventDialog,
   TimetableDialog,
@@ -242,6 +243,8 @@ export default function AgendaModule() {
   const tasks = useAvaluaproStore((state) => state.tasks)
   const taskRecords = useAvaluaproStore((state) => state.taskRecords)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
+  const absenceRecords = useAvaluaproStore((state) => state.absenceRecords)
+  const toggleStudentAbsence = useAvaluaproStore((state) => state.toggleStudentAbsence)
   const workspace = useAgendaWorkspace(user)
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
@@ -262,6 +265,9 @@ export default function AgendaModule() {
   const [slotPosition, setSlotPosition] = useState(null)
   const [editingEvent, setEditingEvent] = useState(null)
   const [scheduleNotice, setScheduleNotice] = useState('')
+  const [adjustInitialAction, setAdjustInitialAction] = useState('session')
+  const [adjustItemId, setAdjustItemId] = useState('')
+  const [classroomRevision, setClassroomRevision] = useState(0)
 
   if (!user) {
     return <section className="agenda-auth-required"><CalendarDays size={32} /><h1>Agenda</h1><p>Inicia sessió amb Google des de «Dades i Compte» per protegir l’horari i tenir-lo disponible als teus dispositius.</p></section>
@@ -316,11 +322,67 @@ export default function AgendaModule() {
     setActiveBundle(bundle)
     setDialog('session-detail')
   }
-  const adjustSession = (bundle) => {
+  const adjustSession = (bundle, initialAction = 'session', item = null) => {
     setActiveBundle(bundle)
+    setAdjustInitialAction(initialAction)
+    setAdjustItemId(item?.id || '')
     setDialog('session-adjust')
   }
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, to: addDateDays(weekStart, 4) })
+  const openClassroom = async (bundle) => {
+    try {
+      const session = await workspace.saveSessionClassroomState(bundle, {
+        classroomOpenedAt: bundle.session.classroomOpenedAt || new Date().toISOString(),
+      })
+      setActiveBundle({ ...bundle, session })
+      setDialog(null)
+      setView('classroom')
+    } catch (error) {
+      workspace.setError(error.message || 'No s’ha pogut obrir Mode aula.')
+    }
+  }
+  const exitClassroom = () => {
+    setDialog(null)
+    setActiveBundle(null)
+    setView('today')
+    const currentStart = startOfWeek(workspace.today)
+    setWeekStart(currentStart)
+    workspace.loadSessionRange({ from: currentStart, to: addDateDays(currentStart, 4) })
+      .catch((error) => workspace.setError(error.message || 'No s’ha pogut actualitzar la setmana.'))
+  }
+  const confirmClassroomContinuation = async (preview) => {
+    const confirmed = await workspace.confirmContinuationPreview(preview)
+    setActiveBundle((current) => {
+      if (!current || !confirmed.sourceResult) return current
+      const results = current.results.some((result) => result.id === confirmed.sourceResult.id)
+        ? current.results.map((result) => result.id === confirmed.sourceResult.id ? confirmed.sourceResult : result)
+        : [...current.results, confirmed.sourceResult]
+      return { ...current, results }
+    })
+    // El canvi de clau reinicia només la pantalla de classe i avança al primer
+    // element pendent després d'haver registrat la continuació.
+    setClassroomRevision((revision) => revision + 1)
+    return confirmed
+  }
+
+  if (view === 'classroom' && activeBundle) {
+    return <>
+      <ClassroomMode
+        absenceRecords={absenceRecords}
+        bundle={activeBundle}
+        classes={classes}
+        key={`${activeBundle.session.id}:${classroomRevision}`}
+        onCloseSession={workspace.closeClassroomSession}
+        onContinue={(bundle, item) => adjustSession(bundle, 'continuation', item)}
+        onExit={exitClassroom}
+        onSaveResult={workspace.saveActivityResult}
+        onToggleAbsence={toggleStudentAbsence}
+        onUpdateSession={workspace.saveSessionClassroomState}
+        students={students}
+      />
+      {dialog === 'session-adjust' && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={confirmClassroomContinuation} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
+    </>
+  }
 
   return (
     <section className="agenda-screen">
@@ -350,7 +412,7 @@ export default function AgendaModule() {
         <section className="agenda-large-empty"><span><CalendarDays size={29} /></span><h2>Primer crea el curs a Programació</h2><p>L’Agenda utilitza les mateixes dates del curs acadèmic per evitar informació duplicada.</p></section>
       ) : (
         <main className="agenda-main">
-          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={classes} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={() => setView('calendar')} onOpenScheduling={() => setDialog('scheduling')} onOpenTimetable={() => setView('timetable')} reminders={upcomingReminders} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={classes} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={() => setView('calendar')} onOpenClassroom={openClassroom} onOpenScheduling={() => setDialog('scheduling')} onOpenTimetable={() => setView('timetable')} reminders={upcomingReminders} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} classes={classes} loading={workspace.sessionsLoading} onMoveWeek={moveWeek} onOpenSession={openSession} onReload={reloadCurrentWeek} weekStart={weekStart} />}
           {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} classes={classes} loading={workspace.sessionsLoading} onChangeClass={openTimeline} onOpenSession={openSession} onSchedule={() => setDialog('scheduling')} selectedClassId={timelineClassId} />}
           {view === 'timetable' && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut moure la classe.')} onMove={workspace.moveSlot} onSelectVersion={workspace.setActiveTimetableId} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
@@ -362,8 +424,8 @@ export default function AgendaModule() {
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent} onClose={() => setDialog(null)} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => setDialog(null)} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(`${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadCurrentWeek() }} planningUnits={workspace.planningUnits} today={workspace.today} />}
-      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} classes={classes} onAdjust={adjustSession} onClose={() => setDialog(null)} />}
-      {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
+      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} classes={classes} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
+      {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>
   )
 }
