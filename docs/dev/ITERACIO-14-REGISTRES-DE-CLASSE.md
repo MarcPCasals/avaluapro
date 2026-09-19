@@ -63,6 +63,17 @@ La revisió visual també va detectar i corregir un defecte del compte enrere: a
 
 Commit funcional: `a4abce0`.
 
+## Publicació verificada
+
+La versió s'ha publicat a `https://avaluapro.web.app` el 19 de setembre de 2026.
+
+- `?preview=agenda` mostra el botó Agenda i protegeix les dades demanant iniciar sessió;
+- la navegació normal continua ocultant Agenda i Programació durant el pilot;
+- el paquet publicat conté **Seguiment de tasques**, els botons de comportament, **Altres…**, **Revisió posterior**, **Reflexió pedagògica** i **Nota privada**;
+- les regles locals i les desplegades continuen sent idèntiques;
+- l'auditoria posterior no detecta bloquejos ni respostes sense sincronitzar;
+- la comprovació publicada no ha creat ni modificat cap dada real.
+
 ## Pas següent
 
 La iteració 15 completarà les absències i sortides a mitja sessió amb activitats perdudes, recuperació, recordatoris, text de correu copiable, materials per preparar i avisos d'adaptacions dins de Mode aula.
