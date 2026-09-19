@@ -345,6 +345,10 @@ describe('Planificació compartida', () => {
         assessmentCriteria: [],
         indicators: [],
       },
+      resourceSections: {
+        specific: { attitudesAndValues: [], factsAndConcepts: ['Densitat'], procedures: ['Mesurar'] },
+        transversal: { attitudesAndValues: ['Constància'], factsAndConcepts: [], procedures: [] },
+      },
       title: 'Títol revisat',
       updatedAt: NOW,
     }))
@@ -354,7 +358,7 @@ describe('Planificació compartida', () => {
     ))
     await assertSucceeds(updateDoc(
       doc(upRef(db), 'activities', 'plan-activity-one'),
-      { plannedMinutes: 45, updatedAt: NOW },
+      { pedagogicalType: 'acquisition', plannedMinutes: 45, updatedAt: NOW },
     ))
     await assertFails(updateDoc(upRef(db), { authorizedEmails: [EDITOR.email], updatedAt: NOW }))
     await assertFails(getDoc(appRef(db)))
@@ -497,6 +501,14 @@ describe('Planificació compartida', () => {
       doc(upRef(ownerDb), 'activities', 'plan-activity-one'),
       { id: 'another-id', updatedAt: NOW },
     ))
+    await assertFails(updateDoc(
+      doc(upRef(ownerDb), 'activities', 'plan-activity-one'),
+      { pedagogicalType: 'diagnosis', updatedAt: NOW },
+    ))
+    await assertFails(updateDoc(upRef(ownerDb), {
+      resourceSections: { specific: [], transversal: [] },
+      updatedAt: NOW,
+    }))
   })
 
   test('només s’accepten els tres tipus d’element previstos a la cronologia', async () => {

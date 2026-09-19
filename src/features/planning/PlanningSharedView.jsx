@@ -4,11 +4,13 @@ import {
   ChevronDown,
   Clock3,
   Eye,
+  FileText,
   Loader2,
   ShieldCheck,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
+import { PlanningDocumentView } from './PlanningDocumentView'
 
 const ROLE_LABELS = {
   directionReader: 'Vista de direcció',
@@ -256,6 +258,9 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <button className={tab === 'program' ? 'active' : ''} onClick={() => setTab('program')} type="button">
             Programació
           </button>
+          <button className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} type="button">
+            <FileText size={13} />Document
+          </button>
           {loadApplications && (
             <button className={tab === 'applications' ? 'active' : ''} onClick={openApplications} type="button">
               Aplicació real
@@ -265,6 +270,8 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
       </header>
       {tab === 'program' ? (
         <BaseProgramView activities={activities} phases={phases} unit={unit} />
+      ) : tab === 'document' ? (
+        <PlanningDocumentView activities={activities} phases={phases} unit={unit} />
       ) : loading ? (
         <div className="planning-shared-loading"><Loader2 className="spin" size={22} />Carregant les sessions…</div>
       ) : error ? (

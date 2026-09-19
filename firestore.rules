@@ -1290,6 +1290,7 @@ service cloud.firestore {
           'ownerEmailLower',
           'ownerUid',
           'procedures',
+          'resourceSections',
           'schemaVersion',
           'specificResources',
           'status',
@@ -1333,6 +1334,23 @@ service cloud.firestore {
           )
         )
         && (
+          !('resourceSections' in request.resource.data)
+          || (
+            request.resource.data.resourceSections is map
+            && request.resource.data.resourceSections.keys().hasOnly(['specific', 'transversal'])
+            && request.resource.data.resourceSections.specific is map
+            && request.resource.data.resourceSections.specific.keys().hasOnly(['attitudesAndValues', 'factsAndConcepts', 'procedures'])
+            && request.resource.data.resourceSections.specific.attitudesAndValues is list
+            && request.resource.data.resourceSections.specific.factsAndConcepts is list
+            && request.resource.data.resourceSections.specific.procedures is list
+            && request.resource.data.resourceSections.transversal is map
+            && request.resource.data.resourceSections.transversal.keys().hasOnly(['attitudesAndValues', 'factsAndConcepts', 'procedures'])
+            && request.resource.data.resourceSections.transversal.attitudesAndValues is list
+            && request.resource.data.resourceSections.transversal.factsAndConcepts is list
+            && request.resource.data.resourceSections.transversal.procedures is list
+          )
+        )
+        && (
           !('improvementProposals' in request.resource.data)
           || (
             request.resource.data.improvementProposals is list
@@ -1368,6 +1386,7 @@ service cloud.firestore {
           'improvementProposals',
           'level',
           'procedures',
+          'resourceSections',
           'specificResources',
           'status',
           'title',
@@ -1396,7 +1415,7 @@ service cloud.firestore {
     function validPlanningActivity(upId, activityId) {
       return request.resource.data.keys().hasOnly([
           'applicationComment', 'copiedFrom', 'createdAt', 'description', 'diversityMeasureIds', 'diversityMeasures',
-          'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order',
+          'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order', 'pedagogicalType',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
           'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
         ])
@@ -1407,6 +1426,11 @@ service cloud.firestore {
         && request.resource.data.planningUnitId == upId
         && request.resource.data.type in ['activity', 'indication', 'transition']
         && request.resource.data.evidenceMode in ['none', 'final', 'perSession']
+        && request.resource.data.pedagogicalType in [
+          'explanation', 'priorKnowledge', 'motivation', 'situation', 'hypothesis',
+          'workPlan', 'acquisition', 'metacognition', 'regulation', 'mobilization',
+          'response', 'theorization', 'competencyTest', 'custom'
+        ]
         && request.resource.data.indicatorIds is list
         && request.resource.data.diversityMeasureIds is list
         && request.resource.data.diversityMeasures is list

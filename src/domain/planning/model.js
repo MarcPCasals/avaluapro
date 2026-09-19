@@ -14,6 +14,7 @@ import {
 } from './constants.js'
 import { ensurePlanningId } from './ids.js'
 import { createId } from '../../lib/ids.js'
+import { normalizeResourceSections, PEDAGOGICAL_TYPES } from './documents.js'
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -274,6 +275,7 @@ export function createPlanningUnit(input, options = {}) {
     factsAndConcepts: textList(input.factsAndConcepts),
     procedures: textList(input.procedures),
     attitudesAndValues: textList(input.attitudesAndValues),
+    resourceSections: normalizeResourceSections(input.resourceSections, input),
     improvementProposals: normalizeImprovementProposals(input.improvementProposals, options),
     copiedFrom: input.copiedFrom
       ? {
@@ -343,6 +345,7 @@ export function createPlanningActivity(input, options = {}) {
     diversityMeasures,
     applicationComment: optionalText(input.applicationComment),
     evidenceMode: enumValue(input.evidenceMode || 'none', EVIDENCE_MODES, "mode d'evidència"),
+    pedagogicalType: enumValue(input.pedagogicalType || 'custom', PEDAGOGICAL_TYPES, 'tipus pedagògic'),
     copiedFrom: input.copiedFrom
       ? {
           planningUnitId: requiredText(input.copiedFrom.planningUnitId, 'UP original de l’activitat'),

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Clock3, Copy, History, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
 function DialogActions({ busy, onClose, submitLabel }) {
@@ -125,6 +126,7 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
     evidenceMode: initialValue?.evidenceMode || 'none',
     grouping: initialValue?.grouping || '',
     hasTiming: initialValue?.plannedMinutes !== null && initialValue?.plannedMinutes !== undefined,
+    pedagogicalType: initialValue?.pedagogicalType || 'custom',
     phaseId: initialValue?.phaseId || initialPhaseId || phases[0]?.id || '',
     plannedMinutes: initialValue?.plannedMinutes || '',
     space: initialValue?.space || '',
@@ -179,6 +181,11 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
           {phases.map((phase) => <option key={phase.id} value={phase.id}>{phase.title}</option>)}
         </select></label>
       </div>
+      {values.type === 'activity' && (
+        <label>Moment pedagògic<select value={values.pedagogicalType} onChange={(event) => setValues({ ...values, pedagogicalType: event.target.value })}>
+          {Object.entries(PEDAGOGICAL_TYPE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select><small className="planning-field-help">Aquest tipus reservarà la icona oficial corresponent quan ens facilitis les imatges originals.</small></label>
+      )}
       <label>Títol<input autoFocus required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
       <label>Descripció<textarea rows="3" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></label>
       <div className="planning-timing-fields">

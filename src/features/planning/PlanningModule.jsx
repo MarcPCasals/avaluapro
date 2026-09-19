@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Archive, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
-  Pencil, Plus, RotateCcw, Save, Share2, X,
+  FileText, Pencil, Plus, RotateCcw, Save, Share2, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import {
@@ -10,6 +10,7 @@ import {
   PlanningUnitDialog, TemporalUnitDialog,
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
+import { PlanningDocumentDialog } from './PlanningDocumentDialog'
 import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
 import { PlanningSharingDialog } from './PlanningSharingDialog'
 import { PlanningSharedView } from './PlanningSharedView'
@@ -128,7 +129,7 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
@@ -170,6 +171,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
           <h2>{unit.title}</h2>
         </div>
         <div className="planning-editor-actions">
+          {canManageUnit && <button className="secondary-action compact" onClick={onOpenDocuments} type="button"><FileText size={16} />Document i imports</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenPreview} type="button"><Eye size={16} />Vista direcció</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenSharing} type="button"><Share2 size={16} />Compartir</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenHistory} type="button"><History size={16} />Recuperar activitat</button>}
@@ -400,6 +402,7 @@ export default function PlanningModule() {
                 onEditActivity={(activity) => handleOpenActivity(activity)}
                 onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
                 onMoveActivity={(move) => handleActivityAction(() => workspace.moveActivity(move))}
+                onOpenDocuments={() => setDialog('documents')}
                 onOpenHistory={() => setDialog('history')}
                 onOpenPreview={() => setDialog('preview')}
                 onOpenSharing={() => setDialog('sharing')}
@@ -439,6 +442,7 @@ export default function PlanningModule() {
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={workspace.duplicateUnitToAcademicYear} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
+      {dialog === 'documents' && workspace.activePlanningUnit && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.importPlanningTable} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <div className="planning-dialog-backdrop"><section aria-modal="true" className="planning-preview-dialog" role="dialog"><button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={() => setDialog(null)} type="button"><X size={18} /></button><PlanningSharedView activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} phases={workspace.phases} role="owner" unit={workspace.activePlanningUnit} /></section></div>}
     </section>
   )

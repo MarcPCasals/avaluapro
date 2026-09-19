@@ -52,6 +52,10 @@ function sortByOrder(items) {
   return [...items].sort((first, second) => Number(first.order) - Number(second.order))
 }
 
+function comparableLabel(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim()
+}
+
 /**
  * Manté el primer flux vertical de Programació fora del component visual. Tota
  * escriptura passa pel repositori local-first i la interfície només rep l'estat
@@ -310,6 +314,73 @@ export function usePlanningWorkspace(user) {
     return unit
   }, [activeAcademicYearId, persist, user])
 
+  /**
+   * Una importació sempre crea una UP nova i regenera tots els identificadors.
+   * Això impedeix heretar permisos, propietaris o vincles del fitxer d’origen.
+   */
+  const importPlanningBundle = useCallback(async (bundle, temporalUnitId) => {
+    if (!activeAcademicYearId || !temporalUnitId) throw new Error('Selecciona la UT on vols crear la còpia importada.')
+    const now = new Date().toISOString()
+    const importedCurriculum = Object.fromEntries(
+      ['competencies', 'expectedLearnings', 'assessmentCriteria', 'indicators'].map((key) => [
+        key,
+        (bundle.unit.curriculum?.[key] || []).map((item) => ({ ...item, id: null })),
+      ]),
+    )
+    const unit = {
+      ...createPlanningUnit({
+        ...bundle.unit,
+        academicYearId: activeAcademicYearId,
+        curriculum: importedCurriculum,
+        id: null,
+        ownerUid: user.uid,
+        status: 'draft',
+        temporalUnitId,
+      }, { now }),
+      accessByEmail: {},
+      authorizedEmails: [],
+      ownerEmailLower: String(user.email || '').trim().toLowerCase(),
+    }
+    const phaseIdByKey = new Map()
+    const importedPhases = []
+    const pendingPhases = [...bundle.phases]
+    while (pendingPhases.length) {
+      const sourceIndex = pendingPhases.findIndex((source) => !source.parentKey || phaseIdByKey.has(source.parentKey))
+      if (sourceIndex < 0) throw new Error('Les fases importades contenen una jerarquia no vàlida.')
+      const [source] = pendingPhases.splice(sourceIndex, 1)
+      const phase = createPlanningPhase({
+        kind: source.kind || 'custom',
+        order: Number.isFinite(Number(source.order)) ? Number(source.order) : 0,
+        ownerUid: user.uid,
+        parentPhaseId: source.parentKey ? phaseIdByKey.get(source.parentKey) || null : null,
+        planningUnitId: unit.id,
+        title: source.title,
+      }, { now })
+      phaseIdByKey.set(source.key, phase.id)
+      importedPhases.push(phase)
+    }
+    const indicatorByLabel = new Map((unit.curriculum?.indicators || [])
+      .map((indicator) => [comparableLabel(indicator.label), indicator.id]))
+    const importedActivities = bundle.activities.map((source, index) => createPlanningActivity({
+      ...source,
+      diversityMeasures: (source.diversityMeasures || []).map((measure) => ({ ...measure, id: null })),
+      id: null,
+      indicatorIds: (source.indicatorLabels || []).map((label) => indicatorByLabel.get(comparableLabel(label))).filter(Boolean),
+      order: Number.isFinite(Number(source.order)) ? Number(source.order) : index,
+      ownerUid: user.uid,
+      phaseId: phaseIdByKey.get(source.phaseKey),
+      planningUnitId: unit.id,
+      studentMaterials: (source.studentMaterials || []).map((material) => ({ ...material, id: null })),
+      teacherMaterials: (source.teacherMaterials || []).map((material) => ({ ...material, id: null })),
+    }, { now }))
+    await persist([unit, ...importedPhases, ...importedActivities])
+    setPlanningUnits((items) => [unit, ...items])
+    setPhases(sortByOrder(importedPhases))
+    setActivities(sortByOrder(importedActivities))
+    setActivePlanningUnitId(unit.id)
+    return unit
+  }, [activeAcademicYearId, persist, user])
+
   const saveUnit = useCallback(async (current, values) => {
     const next = preserveSharingFields(current, createPlanningUnit({
       ...current,
@@ -321,6 +392,82 @@ export function usePlanningWorkspace(user) {
     else setSharedPlanningUnits((items) => replaceById(items, next))
     return next
   }, [persist, user?.uid])
+
+  /**
+   * Afegeix files previsualitzades d’Excel/Numbers a la UP activa. Les fases i
+   * els IA desconeguts s’incorporen abans de crear les activitats.
+   */
+  const importPlanningTable = useCallback(async (rows, fallbackPhaseId) => {
+    if (!activePlanningUnit || rows.length === 0) throw new Error('No hi ha cap activitat per importar.')
+    const now = new Date().toISOString()
+    const nextPhases = [...phases]
+    const createdPhases = []
+    const findRoot = (label) => {
+      const normalized = comparableLabel(label)
+      return nextPhases.find((phase) => !phase.parentPhaseId && (
+        comparableLabel(phase.title) === normalized
+        || normalized.includes(comparableLabel(phase.kind))
+        || (phase.kind === 'preparation' && normalized.includes('preparaci'))
+        || (phase.kind === 'resolution' && normalized.includes('resoluci'))
+        || (phase.kind === 'closing' && normalized.includes('tancament'))
+      )) || nextPhases.find((phase) => phase.id === fallbackPhaseId) || nextPhases[0]
+    }
+    const resolvePhase = (row) => {
+      const root = findRoot(row.phaseLabel)
+      if (!root) throw new Error('La UP necessita almenys una fase.')
+      if (!row.subphaseLabel) return root
+      const normalized = comparableLabel(row.subphaseLabel)
+      let child = nextPhases.find((phase) => phase.parentPhaseId === root.id && comparableLabel(phase.title) === normalized)
+      if (!child) {
+        child = createPlanningPhase({
+          kind: root.kind,
+          order: nextPhases.filter((phase) => phase.parentPhaseId === root.id).length,
+          ownerUid: activePlanningUnit.ownerUid,
+          parentPhaseId: root.id,
+          planningUnitId: activePlanningUnit.id,
+          title: row.subphaseLabel,
+        }, { now })
+        nextPhases.push(child)
+        createdPhases.push(child)
+      }
+      return child
+    }
+    const newIndicatorLabels = [...new Set(rows.flatMap((row) => row.indicatorLabels || []))]
+      .filter((label) => !(activePlanningUnit.curriculum?.indicators || [])
+        .some((indicator) => comparableLabel(indicator.label) === comparableLabel(label)))
+    const nextUnit = newIndicatorLabels.length ? preserveSharingFields(activePlanningUnit, createPlanningUnit({
+      ...activePlanningUnit,
+      curriculum: {
+        ...activePlanningUnit.curriculum,
+        indicators: [
+          ...(activePlanningUnit.curriculum?.indicators || []),
+          ...newIndicatorLabels.map((label) => ({ label })),
+        ],
+      },
+      updatedAt: now,
+    })) : activePlanningUnit
+    const indicatorByLabel = new Map((nextUnit.curriculum?.indicators || [])
+      .map((indicator) => [comparableLabel(indicator.label), indicator.id]))
+    const rowPhases = rows.map(resolvePhase)
+    const imported = rows.map((row, index) => {
+      const phase = rowPhases[index]
+      return createPlanningActivity({
+        ...row,
+        indicatorIds: (row.indicatorLabels || []).map((label) => indicatorByLabel.get(comparableLabel(label))).filter(Boolean),
+        order: activities.filter((activity) => activity.phaseId === phase.id).length
+          + rowPhases.slice(0, index).filter((candidate) => candidate.id === phase.id).length,
+        ownerUid: activePlanningUnit.ownerUid,
+        phaseId: phase.id,
+        planningUnitId: activePlanningUnit.id,
+      }, { now })
+    })
+    const changedUnit = nextUnit !== activePlanningUnit
+    await persist([...(changedUnit ? [nextUnit] : []), ...createdPhases, ...imported])
+    if (changedUnit) setPlanningUnits((items) => replaceById(items, nextUnit))
+    setPhases(sortByOrder(nextPhases))
+    setActivities((items) => sortByOrder([...items, ...imported]))
+    return imported
+  }, [activePlanningUnit, activities, persist, phases])
 
   const archiveUnit = useCallback((unit) => saveUnit(unit, { status: 'archived' }), [saveUnit])
 
@@ -630,6 +777,8 @@ export function usePlanningWorkspace(user) {
     createYear,
     duplicateUnitToAcademicYear,
     error,
+    importPlanningBundle,
+    importPlanningTable,
     isOnline,
     loading: loading || sharedLoading,
     loadHistoricalUnits,

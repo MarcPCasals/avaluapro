@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 import { createId } from '../../lib/ids'
+import { normalizeResourceSections } from '../../domain/planning/documents'
 
 const CURRICULUM_FIELDS = [
   { key: 'competencies', label: 'Competències', placeholder: 'Afegeix una competència' },
@@ -9,9 +10,7 @@ const CURRICULUM_FIELDS = [
   { key: 'indicators', label: 'Indicadors d’avaluació', placeholder: 'Afegeix un indicador' },
 ]
 
-const CONTENT_FIELDS = [
-  { key: 'specificResources', label: 'Recursos de competències específiques' },
-  { key: 'transversalResources', label: 'Recursos de competències transversals' },
+const RESOURCE_FIELDS = [
   { key: 'factsAndConcepts', label: 'Fets i conceptes' },
   { key: 'procedures', label: 'Procediments' },
   { key: 'attitudesAndValues', label: 'Actituds i valors' },
@@ -100,11 +99,32 @@ function TextCollection({ items, label, onChange }) {
   )
 }
 
+function ResourceSection({ label, onChange, value }) {
+  return (
+    <section className="planning-resource-section">
+      <header><strong>{label}</strong><span>Els tres apartats de la plantilla oficial</span></header>
+      {RESOURCE_FIELDS.map((field) => (
+        <TextCollection
+          items={value[field.key] || []}
+          key={field.key}
+          label={field.label}
+          onChange={(items) => onChange({ ...value, [field.key]: items })}
+        />
+      ))}
+    </section>
+  )
+}
+
 export function PlanningPedagogicalContent({ catalog, onChange, values }) {
   const curriculum = values.curriculum || {
     competencies: [], expectedLearnings: [], assessmentCriteria: [], indicators: [],
   }
+  const resourceSections = normalizeResourceSections(values.resourceSections, values)
   const updateCurriculum = (key, items) => onChange('curriculum', { ...curriculum, [key]: items })
+  const updateResourceSection = (key, section) => onChange('resourceSections', {
+    ...resourceSections,
+    [key]: section,
+  })
   return (
     <section className="planning-editor-section planning-pedagogical-section">
       <div className="planning-section-title">
@@ -127,16 +147,10 @@ export function PlanningPedagogicalContent({ catalog, onChange, values }) {
         </div>
       </details>
       <details>
-        <summary>Recursos i sabers</summary>
-        <div className="planning-content-grid">
-          {CONTENT_FIELDS.map((field) => (
-            <TextCollection
-              items={values[field.key] || []}
-              key={field.key}
-              label={field.label}
-              onChange={(items) => onChange(field.key, items)}
-            />
-          ))}
+        <summary>Recursos de competències</summary>
+        <div className="planning-resource-grid">
+          <ResourceSection label="Competències específiques" onChange={(section) => updateResourceSection('specific', section)} value={resourceSections.specific} />
+          <ResourceSection label="Competències transversals" onChange={(section) => updateResourceSection('transversal', section)} value={resourceSections.transversal} />
         </div>
       </details>
       <p className="planning-content-help">Les opcions d’AvaluaPro són suggeriments. En desar, la UP conserva el text visible perquè continuï sent llegible encara que el currículum d’avaluació canviï més endavant.</p>
