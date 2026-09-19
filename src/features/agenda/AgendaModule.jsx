@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
   Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
@@ -259,15 +259,22 @@ export default function AgendaModule() {
   const activateClassroomTask = useAvaluaproStore((state) => state.activateClassroomTask)
   const updateTaskRecord = useAvaluaproStore((state) => state.updateTaskRecord)
   const addBehaviorEvent = useAvaluaproStore((state) => state.addBehaviorEvent)
+  const saveClassroomRecovery = useAvaluaproStore((state) => state.saveClassroomRecovery)
+  const cancelClassroomRecovery = useAvaluaproStore((state) => state.cancelClassroomRecovery)
+  const syncPlanningMaterialReminders = useAvaluaproStore((state) => state.syncPlanningMaterialReminders)
+  const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const workspace = useAgendaWorkspace(user)
+  const materialReminderBundles = workspace.sessionBundles
+  const setWorkspaceError = workspace.setError
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
   )
   const upcomingReminders = useMemo(() => {
     const horizon = addDateDays(workspace.today, 3)
-    return reminderSummary.items.filter((item) =>
-      item.reminder.date >= workspace.today && item.reminder.date <= horizon)
+    // Els pendents vençuts no desapareixen d'Avui: es mantenen al radar fins
+    // que el docent els marca com a fets, juntament amb els pròxims tres dies.
+    return reminderSummary.items.filter((item) => item.reminder.date <= horizon)
   }, [reminderSummary.items, workspace.today])
   const [view, setView] = useState('today')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(workspace.today))
@@ -282,6 +289,12 @@ export default function AgendaModule() {
   const [adjustInitialAction, setAdjustInitialAction] = useState('session')
   const [adjustItemId, setAdjustItemId] = useState('')
   const [classroomRevision, setClassroomRevision] = useState(0)
+
+  useEffect(() => {
+    if (!materialReminderBundles.length) return
+    syncPlanningMaterialReminders(materialReminderBundles)
+      .catch((error) => setWorkspaceError(error.message || 'No s’han pogut preparar els recordatoris de material.'))
+  }, [materialReminderBundles, setWorkspaceError, syncPlanningMaterialReminders])
 
   if (!user) {
     return <section className="agenda-auth-required"><CalendarDays size={32} /><h1>Agenda</h1><p>Inicia sessió amb Google des de «Dades i Compte» per protegir l’horari i tenir-lo disponible als teus dispositius.</p></section>
@@ -401,6 +414,30 @@ export default function AgendaModule() {
       utId,
     })
   }
+  const registerClassroomRecovery = (bundle, student, recovery) => saveClassroomRecovery({
+    activities: recovery.items.map((item) => ({
+      evidenceMode: item.sourceActivity?.evidenceMode || 'none',
+      itemId: item.id,
+      sourceActivityId: item.sourceActivityId,
+      title: item.title,
+    })),
+    applicationId: bundle.application.id,
+    classId: bundle.session.classId,
+    emailText: recovery.emailText,
+    kind: recovery.kind,
+    nextSession: recovery.nextSession,
+    planningUnitId: bundle.planningUnit.id,
+    sessionId: bundle.session.id,
+    sessionStartsAt: bundle.session.startsAt,
+    studentId: student.id,
+  })
+  const completeMaterialPreparation = async (note) => {
+    const completedAt = new Date().toISOString()
+    await updateAgendaNote(note.id, {
+      preparation: { ...note.preparation, completedAt },
+      reminder: { ...note.reminder, dismissedAt: completedAt },
+    })
+  }
   const confirmClassroomContinuation = async (preview) => {
     const confirmed = await workspace.confirmContinuationPreview(preview)
     const sourceItem = confirmed.changedExistingItems.find((item) => item.id === confirmed.item.id) || confirmed.item
@@ -422,15 +459,24 @@ export default function AgendaModule() {
     return <>
       <ClassroomMode
         absenceRecords={absenceRecords}
+        agendaNotes={agendaNotes}
         behaviorEvents={behaviorEvents}
         bundle={activeBundle}
         classes={classes}
         key={`${activeBundle.session.id}:${classroomRevision}`}
         onCloseSession={workspace.closeClassroomSession}
+        onCancelRecovery={(bundle, studentId, kind) => cancelClassroomRecovery({
+          kind,
+          sessionId: bundle.session.id,
+          studentId,
+        })}
         onContinue={(bundle, item) => adjustSession(bundle, 'continuation', item)}
         onActivateEvidence={activateClassroomEvidence}
         onAddBehavior={addBehaviorEvent}
         onExit={exitClassroom}
+        onFindNextSession={workspace.findNextClassroomSession}
+        onCompleteMaterialPreparation={completeMaterialPreparation}
+        onSaveRecovery={registerClassroomRecovery}
         onSaveResult={workspace.saveActivityResult}
         onSavePrivateNote={workspace.saveClassroomPrivateNote}
         onToggleAbsence={toggleStudentAbsence}

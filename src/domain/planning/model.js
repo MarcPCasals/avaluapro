@@ -197,12 +197,21 @@ function entityBase(entityType, input, options = {}) {
 function normalizeMaterials(materials) {
   return (materials || []).map((material) => {
     const kind = enumValue(material.kind || 'link', ['link', 'physical'], 'tipus de material')
+    const preparationKind = enumValue(
+      material.preparationKind || 'reference',
+      ['reference', 'student', 'teacher', 'print', 'buy', 'reserve'],
+      'funció del material',
+    )
     const url = optionalText(material.url)
     if (kind === 'link' && !url) throw new Error("Un material d'enllaç necessita una URL")
     return {
       id: optionalText(material.id),
       kind,
       label: requiredText(material.label, 'nom del material'),
+      preparationKind,
+      reminderDaysBefore: preparationKind === 'reference'
+        ? 0
+        : Math.min(365, Math.max(0, Math.round(Number(material.reminderDaysBefore ?? 1) || 0))),
       url,
     }
   })

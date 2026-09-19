@@ -90,6 +90,12 @@ import {
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
 import { findAbsenceForSession, findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
+import {
+  clearRecoveryTaskLinks,
+  completeRecoveryTaskRecords,
+  linkRecoveryToTaskRecords,
+  reconcileMaterialPreparationReminders,
+} from '../lib/classroomRecovery'
 import { buildClassroomTaskActivation } from '../lib/classroomTracking'
 import {
   STUDENT_PROFILE_MOMENT_SOURCE,
@@ -5081,6 +5087,150 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['agendaNotes'])
   },
 
+  /**
+   * Converteix els materials marcats a Programació en recordatoris reals
+   * d'AvaluaPro. La clau estable impedeix duplicar-los cada vegada que s'obre
+   * Agenda i una preparació completada no es reactiva en recarregar la setmana.
+   */
+  syncPlanningMaterialReminders: async (bundles = []) => {
+    const state = get()
+    const now = new Date().toISOString()
+    const reconciliation = reconcileMaterialPreparationReminders(state.agendaNotes, bundles, createId, now)
+    if (!reconciliation.changed) return []
+    set({ agendaNotes: reconciliation.notes })
+    await persistCollections(set, get, ['agendaNotes'])
+    return reconciliation.materialNotes
+  },
+
+  saveClassroomRecovery: async ({
+    activities = [],
+    applicationId,
+    classId,
+    emailText = '',
+    kind,
+    nextSession = null,
+    planningUnitId,
+    sessionId,
+    sessionStartsAt,
+    studentId,
+  }) => {
+    const state = get()
+    const now = new Date().toISOString()
+    const existing = state.agendaNotes.find((note) => note.type === 'activityRecovery'
+      && note.sessionId === sessionId && note.studentId === studentId && note.recovery?.kind === kind)
+    const reminderDate = nextSession?.startsAt ? String(nextSession.startsAt).slice(0, 10) : String(sessionStartsAt).slice(0, 10)
+    const reminderTime = nextSession?.startsAt ? String(nextSession.startsAt).slice(11, 16) : ''
+    const student = state.students.find((item) => item.id === studentId)
+    const studentName = student?.name || 'L’alumne'
+    const text = activities.length
+      ? `Recuperació pendent de ${studentName}: ${activities.map((activity) => activity.title).join(', ')}`
+      : kind === 'earlyDeparture'
+        ? `${studentName} ha marxat abans d’acabar la sessió.`
+        : `${studentName} ha estat absent, sense activitats pendents de recuperar.`
+    const note = {
+      ...(existing || {}),
+      applicationId,
+      classId,
+      createdAt: existing?.createdAt || now,
+      date: now.slice(0, 10),
+      id: existing?.id || createId('note'),
+      planningUnitId,
+      recovery: {
+        activities: activities.map((activity) => ({
+          evidenceMode: activity.evidenceMode || 'none',
+          itemId: activity.itemId,
+          sourceActivityId: activity.sourceActivityId,
+          title: activity.title,
+        })),
+        emailText: String(emailText || ''),
+        kind,
+        nextSessionId: nextSession?.id || '',
+        nextSessionStartsAt: nextSession?.startsAt || '',
+        recoveredAt: '',
+        status: activities.length ? 'pending' : 'none',
+      },
+      reminder: activities.length ? {
+        date: reminderDate,
+        dismissedAt: '',
+        snoozeUntil: '',
+        text,
+        time: reminderTime,
+      } : null,
+      sessionId,
+      sessionStartsAt,
+      source: 'classroom-recovery',
+      studentId,
+      text,
+      type: 'activityRecovery',
+      updatedAt: now,
+    }
+    const taskRecordsWithoutPreviousSelection = clearRecoveryTaskLinks(
+      state.taskRecords,
+      note.id,
+      kind === 'earlyDeparture' ? 'DONE' : 'EXEMPT',
+    )
+    const linked = linkRecoveryToTaskRecords({
+      ...state,
+      taskRecords: taskRecordsWithoutPreviousSelection,
+    }, {
+      activities,
+      applicationId,
+      classId,
+      noteId: note.id,
+      sessionId,
+      studentId,
+    }, createId)
+    const agendaNotes = existing
+      ? state.agendaNotes.map((item) => item.id === note.id ? note : item)
+      : [...state.agendaNotes, note]
+    set({ agendaNotes, taskRecords: linked.records })
+    const taskRecordsChanged = taskRecordsWithoutPreviousSelection.some((record, index) => record !== state.taskRecords[index])
+      || linked.linkedCount > 0
+    await persistCollections(set, get, taskRecordsChanged ? ['agendaNotes', 'taskRecords'] : ['agendaNotes'])
+    return note
+  },
+
+  cancelClassroomRecovery: async ({ kind, sessionId, studentId }) => {
+    const state = get()
+    const note = state.agendaNotes.find((item) => item.type === 'activityRecovery'
+      && item.sessionId === sessionId
+      && item.studentId === studentId
+      && item.recovery?.kind === kind)
+    if (!note) return null
+    const cancelledAt = new Date().toISOString()
+    const cancelled = {
+      ...note,
+      recovery: { ...note.recovery, cancelledAt, status: 'cancelled' },
+      reminder: note.reminder ? { ...note.reminder, dismissedAt: cancelledAt } : null,
+      updatedAt: cancelledAt,
+    }
+    set({
+      agendaNotes: state.agendaNotes.map((item) => item.id === note.id ? cancelled : item),
+      taskRecords: clearRecoveryTaskLinks(state.taskRecords, note.id, 'DONE'),
+    })
+    await persistCollections(set, get, ['agendaNotes', 'taskRecords'])
+    return cancelled
+  },
+
+  completeClassroomRecovery: async (noteId) => {
+    const state = get()
+    const note = state.agendaNotes.find((item) => item.id === noteId && item.type === 'activityRecovery')
+    if (!note) return null
+    const completedAt = new Date().toISOString()
+    const completed = {
+      ...note,
+      recovery: { ...note.recovery, recoveredAt: completedAt, status: 'completed' },
+      reminder: note.reminder ? { ...note.reminder, dismissedAt: completedAt } : null,
+      updatedAt: completedAt,
+    }
+    set((current) => ({
+      agendaNotes: current.agendaNotes.map((item) => item.id === noteId ? completed : item),
+      taskRecords: completeRecoveryTaskRecords(current.taskRecords, noteId, completedAt),
+    }))
+    await persistCollections(set, get, ['agendaNotes', 'taskRecords'])
+    return completed
+  },
+
   updateAgendaNote: async (noteId, patch) => {
     const updatedAt = new Date().toISOString()
     set((state) => ({
@@ -5467,12 +5617,28 @@ export const useAvaluaproStore = create((set, get) => ({
       utId,
     }, createId)
     if (!activation) return null
+    const recoveryByStudentId = new Map(state.agendaNotes
+      .filter((note) => note.type === 'activityRecovery'
+        && note.sessionId === sessionId
+        && note.recovery?.status === 'pending'
+        && note.recovery.activities?.some((activity) => activity.sourceActivityId === sourceActivityId))
+      .map((note) => [note.studentId, note]))
+    const records = activation.records.map((record) => {
+      const recovery = recoveryByStudentId.get(record.studentId)
+      return recovery ? {
+        ...record,
+        recoveredAt: '',
+        recoveryNoteId: recovery.id,
+        recoveryPending: true,
+        status: 'EXEMPT',
+      } : record
+    })
     set((current) => ({
       tasks: activation.isNewTask ? [...current.tasks, activation.task] : current.tasks,
-      taskRecords: [...current.taskRecords, ...activation.records],
+      taskRecords: [...current.taskRecords, ...records],
     }))
     await persistCollections(set, get, activation.isNewTask ? ['tasks', 'taskRecords'] : ['taskRecords'])
-    return { records: activation.records, task: activation.task }
+    return { records, task: activation.task }
   },
 
   addTasksToClasses: async ({ title, entries }) => {

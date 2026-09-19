@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3,
-  ExternalLink, Loader2, MessageSquarePlus, Pause, PencilLine, Play, Save,
-  ThumbsUp, TimerReset, UserCheck, Users, UserX, X,
+  Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus, PackageCheck,
+  Pause, PencilLine, Play, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
+  Users, UserX, X,
 } from 'lucide-react'
 import {
   CLASSROOM_BEHAVIOR_CATEGORIES,
@@ -12,6 +13,11 @@ import {
   getCorrectedActualMinutes,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
+import {
+  buildRecoveryEmail,
+  getMaterialPreparationKey,
+  getRecoverableClassroomItems,
+} from '../../lib/classroomRecovery'
 import './classroom.css'
 
 function formatClock(seconds) {
@@ -26,9 +32,9 @@ function formatSessionDate(startsAt) {
 
 function itemMaterials(item) {
   return [
-    ...(item.sourceActivity?.teacherMaterials || []),
-    ...(item.sourceActivity?.studentMaterials || []),
-  ].filter((material) => material?.url)
+    ...(item.sourceActivity?.teacherMaterials || []).map((material) => ({ ...material, audience: 'teacher' })),
+    ...(item.sourceActivity?.studentMaterials || []).map((material) => ({ ...material, audience: 'students' })),
+  ]
 }
 
 function replaceResult(results, nextResult) {
@@ -98,6 +104,73 @@ function ActivityReviewDialog({ item, onClose, onSave, result }) {
   </section></div>
 }
 
+function RecoveryDialog({ bundle, existing, kind, nextSession, onClose, onSave, student }) {
+  const recoverableItems = getRecoverableClassroomItems(bundle.items)
+  const existingIds = new Set((existing?.recovery?.activities || []).map((activity) => activity.itemId))
+  const [selectedIds, setSelectedIds] = useState(() => existing
+    ? recoverableItems.filter((item) => existingIds.has(item.id)).map((item) => item.id)
+    : kind === 'absence' ? recoverableItems.map((item) => item.id) : [])
+  const selectedItems = recoverableItems.filter((item) => selectedIds.includes(item.id))
+  const generatedEmail = buildRecoveryEmail({
+    items: selectedItems,
+    kind,
+    nextSessionStartsAt: nextSession?.startsAt || existing?.recovery?.nextSessionStartsAt || '',
+    sessionStartsAt: bundle.session.startsAt,
+    student,
+    subject: bundle.planningUnit.title,
+  })
+  const [emailText, setEmailText] = useState(existing?.recovery?.emailText || generatedEmail)
+  const [emailTouched, setEmailTouched] = useState(Boolean(existing?.recovery?.emailText))
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const changeSelection = (itemId, checked) => {
+    const nextIds = checked ? [...selectedIds, itemId] : selectedIds.filter((id) => id !== itemId)
+    setSelectedIds(nextIds)
+    if (!emailTouched) {
+      setEmailText(buildRecoveryEmail({
+        items: recoverableItems.filter((item) => nextIds.includes(item.id)),
+        kind,
+        nextSessionStartsAt: nextSession?.startsAt || existing?.recovery?.nextSessionStartsAt || '',
+        sessionStartsAt: bundle.session.startsAt,
+        student,
+        subject: bundle.planningUnit.title,
+      }))
+    }
+  }
+
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await onSave({ emailText, items: selectedItems, kind, nextSession })
+      onClose()
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut desar la recuperació.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  const copy = async () => {
+    try {
+      if (!globalThis.navigator?.clipboard?.writeText) throw new Error('Clipboard unavailable')
+      await globalThis.navigator.clipboard.writeText(emailText)
+      setCopied(true)
+    } catch {
+      setError('No s’ha pogut copiar automàticament. Pots seleccionar el text manualment.')
+    }
+  }
+  return <div className="classroom-close-backdrop"><section aria-modal="true" className="classroom-recovery-dialog" role="dialog">
+    <header><span>{kind === 'absence' ? <UserX size={20} /> : <DoorOpen size={20} />}</span><div><small>{kind === 'absence' ? 'Absència completa' : 'Sortida a mitja sessió'}</small><h2>{student.name}</h2></div></header>
+    <p>{kind === 'absence' ? 'Totes les activitats apareixen seleccionades. Desmarca les que no cal recuperar.' : 'Selecciona només les activitats que s’ha perdut des que ha marxat.'}</p>
+    <div className="classroom-recovery-activities">{recoverableItems.map((item) => <label key={item.id}><input checked={selectedIds.includes(item.id)} onChange={(event) => changeSelection(item.id, event.target.checked)} type="checkbox" /><span><strong>{item.title}</strong><small>{item.sourceActivity?.evidenceMode !== 'none' ? 'Genera una tasca pendent justificada' : 'Activitat per recuperar'}</small></span></label>)}</div>
+    <div className="classroom-recovery-next"><Clock3 size={16} /><span>{nextSession?.startsAt ? `Recordatori programat per a la pròxima sessió: ${String(nextSession.startsAt).slice(0, 10)} · ${String(nextSession.startsAt).slice(11, 16)}` : 'No s’ha trobat una sessió posterior. El pendent quedarà visible des d’avui.'}</span></div>
+    <label className="classroom-recovery-email"><span><Mail size={15} />Text de correu per copiar</span><textarea rows="11" value={emailText} onChange={(event) => { setEmailTouched(true); setEmailText(event.target.value) }} /></label>
+    {error && <p className="classroom-review-error">{error}</p>}
+    <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onClose} type="button">Cancel·lar</button><button className="secondary-action" disabled={!emailText.trim()} onClick={copy} type="button"><Copy size={15} />{copied ? 'Copiat' : 'Copiar text'}</button><button className="primary-action" disabled={saving} onClick={save} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}Desar registre</button></div>
+  </section></div>
+}
+
 function ClassroomTimelineItem({ active, item, position, result, onSelect }) {
   return (
     <button
@@ -118,14 +191,19 @@ function ClassroomTimelineItem({ active, item, position, result, onSelect }) {
 
 export function ClassroomMode({
   absenceRecords,
+  agendaNotes = [],
   behaviorEvents,
   bundle,
   classes,
   onActivateEvidence,
   onAddBehavior,
+  onCancelRecovery,
   onCloseSession,
+  onCompleteMaterialPreparation,
   onContinue,
   onExit,
+  onFindNextSession,
+  onSaveRecovery,
   onSaveResult,
   onSavePrivateNote,
   onToggleAbsence,
@@ -150,6 +228,7 @@ export function ClassroomMode({
   const [otherMinutes, setOtherMinutes] = useState('')
   const [closeReview, setCloseReview] = useState(false)
   const [reviewItem, setReviewItem] = useState(null)
+  const [recoveryDraft, setRecoveryDraft] = useState(null)
   const [selectedStudentIds, setSelectedStudentIds] = useState([])
   const [behaviorKind, setBehaviorKind] = useState('incident')
   const [otherBehavior, setOtherBehavior] = useState('')
@@ -176,9 +255,22 @@ export function ClassroomMode({
     ? sessionTasks.find((task) => task.evidenceKey === classroomEvidenceKey(currentBundle, selectedEvidenceItem)) || null
     : null
   const sessionTaskRecords = taskRecords.filter((record) => sessionTasks.some((task) => task.id === record.taskId))
-  const pendingTaskRecords = sessionTaskRecords.filter((record) => ['LATE', 'MISSING'].includes(record.status))
+  const pendingTaskRecords = sessionTaskRecords.filter((record) => record.recoveryPending || ['LATE', 'MISSING'].includes(record.status))
+  const sessionRecoveryNotes = agendaNotes.filter((note) => note.type === 'activityRecovery' && note.sessionId === currentBundle.session.id)
+  const departedStudents = visibleStudents.filter((student) => sessionRecoveryNotes.some((note) =>
+    note.studentId === student.id && note.recovery?.kind === 'earlyDeparture'))
+  const attendanceIssueIds = new Set([...absentStudents, ...departedStudents].map((student) => student.id))
+  const attendanceIssueDetail = [
+    absentStudents.length ? `Absents: ${absentStudents.map((student) => student.name).join(' · ')}` : '',
+    departedStudents.length ? `Han marxat: ${departedStudents.map((student) => student.name).join(' · ')}` : '',
+  ].filter(Boolean).join(' — ')
+  const sessionPreparationNotes = agendaNotes.filter((note) => note.type === 'materialPreparation'
+    && note.sessionId === currentBundle.session.id
+    && !note.preparation?.cancelledAt)
   const reminderCount = sessionTaskRecords.filter((record) => record.reminder && !record.reminder.dismissedAt).length
     + sessionTasks.filter((task) => task.reminder && !task.reminder.dismissedAt).length
+    + sessionRecoveryNotes.filter((note) => note.reminder && !note.reminder.dismissedAt).length
+    + sessionPreparationNotes.filter((note) => note.reminder && !note.reminder.dismissedAt).length
   const existingPrivateNote = currentBundle.privateNotes?.[0]?.text || ''
   const reflectionResult = [...currentBundle.results].reverse().find((result) => result.pedagogicalReflection)
   const existingReflection = reflectionResult?.pedagogicalReflection || ''
@@ -193,6 +285,8 @@ export function ClassroomMode({
     startedAtMs: timerStartedAt,
   })
   const materials = currentItem ? itemMaterials(currentItem) : []
+  const diversityMeasures = (currentItem?.sourceActivity?.diversityMeasures || [])
+    .filter((measure) => !measure.classId || measure.classId === currentBundle.session.classId)
 
   useEffect(() => {
     if (!timerStartedAt || timerStoppedAt) return undefined
@@ -313,14 +407,58 @@ export function ClassroomMode({
     setBusy(`absence:${studentId}`)
     setError('')
     try {
+      const wasAbsent = Boolean(findAbsenceForSession(
+        absenceRecords,
+        studentId,
+        currentBundle.session.classId,
+        currentBundle.session,
+      ))
       await onToggleAbsence(studentId, new Date(), {
         hours: Number(currentBundle.session.durationMinutes) / 60,
         sessionId: currentBundle.session.id,
         sessionStartsAt: currentBundle.session.startsAt,
         source: 'classroom',
       })
+      if (wasAbsent) await onCancelRecovery(currentBundle, studentId, 'absence')
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut actualitzar l’assistència.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const openRecovery = async (student, kind) => {
+    setBusy(`recovery:${student.id}`)
+    setError('')
+    try {
+      const nextSession = await onFindNextSession(currentBundle)
+      const existing = sessionRecoveryNotes.find((note) => note.studentId === student.id && note.recovery?.kind === kind) || null
+      setRecoveryDraft({ existing, kind, nextSession, student })
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut preparar el registre de recuperació.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const saveRecovery = async (recovery) => {
+    const absence = findAbsenceForSession(
+      absenceRecords,
+      recoveryDraft.student.id,
+      currentBundle.session.classId,
+      currentBundle.session,
+    )
+    if (recovery.kind === 'absence' && !absence) await toggleAbsence(recoveryDraft.student.id)
+    return onSaveRecovery(currentBundle, recoveryDraft.student, recovery)
+  }
+
+  const completeMaterialPreparation = async (note) => {
+    setBusy(`material:${note.id}`)
+    setError('')
+    try {
+      await onCompleteMaterialPreparation(note)
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut marcar el material com a preparat.')
     } finally {
       setBusy('')
     }
@@ -387,7 +525,16 @@ export function ClassroomMode({
               {currentResult?.actualMinutes && <span>{currentResult.actualMinutes} minuts reals registrats</span>}
             </div>
 
-            {materials.length > 0 && <div className="classroom-materials">{materials.map((material) => <a href={material.url} key={material.id || material.url} rel="noreferrer" target="_blank"><ExternalLink size={15} />{material.label}</a>)}</div>}
+            {materials.length > 0 && <div className="classroom-materials">{materials.map((material) => {
+              const preparationNote = sessionPreparationNotes.find((note) => note.materialPreparationKey === getMaterialPreparationKey(currentBundle.session.id, currentItem, material))
+              const prepared = Boolean(preparationNote?.preparation?.completedAt)
+              return <div className={`${material.preparationKind && material.preparationKind !== 'reference' ? 'preparable' : ''} ${prepared ? 'prepared' : ''}`} key={`${material.audience}:${material.id || material.label}`}>
+                {material.url ? <a href={material.url} rel="noreferrer" target="_blank"><ExternalLink size={15} />{material.label}</a> : <span><PackageCheck size={15} />{material.label}</span>}
+                {preparationNote && <button disabled={prepared || busy === `material:${preparationNote.id}`} onClick={() => completeMaterialPreparation(preparationNote)} type="button">{busy === `material:${preparationNote.id}` ? <Loader2 className="spin" size={13} /> : prepared ? <Check size={13} /> : <PackageCheck size={13} />}{prepared ? 'Preparat' : 'Marcar preparat'}</button>}
+              </div>
+            })}</div>}
+
+            {diversityMeasures.length > 0 && <section className="classroom-adaptation-reminder"><ShieldCheck size={19} /><div><strong>Mesures previstes per a aquesta activitat</strong>{diversityMeasures.map((measure) => <p key={measure.id}><span>{measure.label}</span>{measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}</p>)}</div></section>}
 
             {currentItem.plannedMinutes ? <div className={`classroom-timer ${timer.isOvertime ? 'overtime' : ''}`}>
               <span>{timerStartedAt ? timer.isOvertime ? 'Temps excedit' : timerStoppedAt ? 'Temps aturat' : 'Temps restant' : 'Temporitzador opcional'}</span>
@@ -421,10 +568,11 @@ export function ClassroomMode({
             const absence = findAbsenceForSession(absenceRecords, student.id, currentBundle.session.classId, currentBundle.session)
             const loading = busy === `absence:${student.id}`
             const selected = selectedStudentIds.includes(student.id)
+            const departed = departedStudents.some((item) => item.id === student.id)
             const behaviorCount = behaviorEvents.filter((event) => event.studentId === student.id && event.sessionId === currentBundle.session.id).length
             return <div className={`${absence ? 'absent' : ''} ${selected ? 'selected' : ''}`} key={student.id}>
               <button aria-pressed={selected} className="classroom-student-select" onClick={() => toggleStudentSelection(student.id)} type="button"><span>{selected ? <Check size={15} /> : <Users size={15} />}</span><strong>{student.name}</strong>{behaviorCount > 0 && <small>{behaviorCount} registre{behaviorCount === 1 ? '' : 's'}</small>}</button>
-              <button aria-label={`${absence ? 'Marcar present' : 'Marcar absent'} ${student.name}`} aria-pressed={Boolean(absence)} className="classroom-absence-toggle" disabled={loading} onClick={() => toggleAbsence(student.id)} type="button">{loading ? <Loader2 className="spin" size={14} /> : absence ? <UserX size={16} /> : <UserCheck size={16} />}<small>{absence ? 'Absent' : 'Present'}</small></button>
+              <div className="classroom-presence-actions"><button aria-label={`${absence ? 'Marcar present' : 'Marcar absent'} ${student.name}`} aria-pressed={Boolean(absence)} className="classroom-absence-toggle" disabled={loading || busy === `recovery:${student.id}`} onClick={() => absence ? toggleAbsence(student.id) : openRecovery(student, 'absence')} type="button">{loading || busy === `recovery:${student.id}` ? <Loader2 className="spin" size={14} /> : absence ? <UserX size={16} /> : <UserCheck size={16} />}<small>{absence ? 'Absent' : 'Present'}</small></button><button aria-label={`Registrar sortida de ${student.name}`} aria-pressed={departed} className={`classroom-departure-toggle ${departed ? 'active' : ''}`} disabled={busy === `recovery:${student.id}`} onClick={() => openRecovery(student, 'earlyDeparture')} type="button"><DoorOpen size={15} /><small>Sortida</small></button></div>
             </div>
           })}</div>
           {selectedStudentIds.length > 0 && <section className="classroom-behavior-controls"><header><MessageSquarePlus size={16} /><strong>{selectedStudentIds.length} seleccionat{selectedStudentIds.length === 1 ? '' : 's'}</strong></header><div className="classroom-behavior-kind"><button className={behaviorKind === 'incident' ? 'active incident' : ''} onClick={() => setBehaviorKind('incident')} type="button"><AlertTriangle size={14} />Incidència</button><button className={behaviorKind === 'positive' ? 'active positive' : ''} onClick={() => setBehaviorKind('positive')} type="button"><ThumbsUp size={14} />Positiu</button></div><div className="classroom-behavior-categories">{CLASSROOM_BEHAVIOR_CATEGORIES[behaviorKind].map(([id, label]) => <button disabled={busy === 'behavior'} key={id} onClick={() => saveBehavior(id, label)} type="button">{label}</button>)}<button className={showOtherBehavior ? 'active' : ''} onClick={() => setShowOtherBehavior((value) => !value)} type="button">Altres…</button></div>{showOtherBehavior && <div className="classroom-behavior-other"><input maxLength="500" placeholder="Escriu el registre" value={otherBehavior} onChange={(event) => setOtherBehavior(event.target.value)} /><button disabled={!otherBehavior.trim() || busy === 'behavior'} onClick={() => saveBehavior('other', otherBehavior)} type="button"><Save size={14} /></button></div>}</section>}
@@ -440,7 +588,7 @@ export function ClassroomMode({
             })}</div>
             {!selectedTask ? <div className="classroom-panel-empty"><Clock3 size={24} /><strong>Encara no està activada</strong><p>La graella apareixerà quan confirmis que l’activitat s’ha treballat.</p></div> : <div className="classroom-task-students">{visibleStudents.map((student) => {
               const record = taskRecords.find((candidate) => candidate.taskId === selectedTask.id && candidate.studentId === student.id)
-              return <article key={student.id}><strong>{student.name}</strong><div>{TASK_STATUSES.map(([status, label]) => <button className={record?.status === status ? `active ${status.toLocaleLowerCase()}` : ''} disabled={busy === `task:${student.id}` || record?.status === status} key={status} onClick={() => updateTaskStatus(student.id, selectedTask.id, status)} type="button">{label}</button>)}</div></article>
+              return <article key={student.id}><strong>{student.name}{record?.recoveryPending && <small>Recuperació pendent justificada</small>}</strong><div>{TASK_STATUSES.map(([status, label]) => <button className={record?.status === status ? `active ${status.toLocaleLowerCase()}` : ''} disabled={busy === `task:${student.id}` || record?.status === status} key={status} onClick={() => updateTaskStatus(student.id, selectedTask.id, status)} type="button">{label}</button>)}</div></article>
             })}</div>}
           </>}
         </aside>}
@@ -458,8 +606,9 @@ export function ClassroomMode({
         <button className="classroom-close-button" disabled={Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => setCloseReview(true)} type="button"><CheckCircle2 size={17} />Tancar la classe</button>
       </footer>
 
-      {closeReview && <div className="classroom-close-backdrop" role="presentation"><section aria-modal="true" className="classroom-close-review" role="dialog"><header><span><CheckCircle2 size={21} /></span><div><small>Resum abans de tancar</small><h2>{classItem?.name || 'Classe'} · {String(currentBundle.session.startsAt).slice(11, 16)}</h2></div></header><div className="classroom-close-summary"><article><strong>{absentStudents.length}</strong><span>{absentStudents.length === 1 ? 'alumne absent' : 'alumnes absents'}</span><small>{absentStudents.map((student) => student.name).join(' · ') || 'Cap absència registrada'}</small></article><article><strong>{pendingTaskRecords.length}</strong><span>tasques pendents</span><small>{pendingTaskRecords.length ? 'Incompletes o no fetes registrades en aquesta sessió.' : 'Cap tasca pendent registrada.'}</small></article><article><strong>{reminderCount}</strong><span>recordatoris creats</span><small>{reminderCount ? 'Es conservaran a la capa global de recordatoris.' : 'Cap recordatori nou.'}</small></article></div><div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota privada <span>només per a tu</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>{!currentBundle.session.attendanceConfirmedAt && <p className="classroom-close-warning">Encara no has confirmat la llista d’assistència.</p>}<div className="classroom-close-actions"><button className="secondary-action" disabled={busy === 'close'} onClick={() => setCloseReview(false)} type="button">Continuar la classe</button><button className="primary-action" disabled={busy === 'close'} onClick={closeSession} type="button">{busy === 'close' ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}Confirmar i tancar</button></div></section></div>}
+      {closeReview && <div className="classroom-close-backdrop" role="presentation"><section aria-modal="true" className="classroom-close-review" role="dialog"><header><span><CheckCircle2 size={21} /></span><div><small>Resum abans de tancar</small><h2>{classItem?.name || 'Classe'} · {String(currentBundle.session.startsAt).slice(11, 16)}</h2></div></header><div className="classroom-close-summary"><article><strong>{attendanceIssueIds.size}</strong><span>{attendanceIssueIds.size === 1 ? 'alumne absent o que ha marxat' : 'alumnes absents o que han marxat'}</span><small>{attendanceIssueDetail || 'Cap absència ni sortida registrada'}</small></article><article><strong>{pendingTaskRecords.length}</strong><span>tasques pendents</span><small>{pendingTaskRecords.length ? 'Inclou les recuperacions justificades de la sessió.' : 'Cap tasca pendent registrada.'}</small></article><article><strong>{reminderCount}</strong><span>recordatoris creats</span><small>{reminderCount ? 'Es conservaran a la capa global de recordatoris.' : 'Cap recordatori nou.'}</small></article></div><div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota privada <span>només per a tu</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>{!currentBundle.session.attendanceConfirmedAt && <p className="classroom-close-warning">Encara no has confirmat la llista d’assistència.</p>}<div className="classroom-close-actions"><button className="secondary-action" disabled={busy === 'close'} onClick={() => setCloseReview(false)} type="button">Continuar la classe</button><button className="primary-action" disabled={busy === 'close'} onClick={closeSession} type="button">{busy === 'close' ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}Confirmar i tancar</button></div></section></div>}
       {reviewItem && <ActivityReviewDialog item={reviewItem} onClose={() => setReviewItem(null)} onSave={(changes) => saveReview(reviewItem, changes)} result={currentBundle.results.find((result) => result.sessionItemId === reviewItem.id)} />}
+      {recoveryDraft && <RecoveryDialog bundle={currentBundle} existing={recoveryDraft.existing} kind={recoveryDraft.kind} nextSession={recoveryDraft.nextSession} onClose={() => setRecoveryDraft(null)} onSave={saveRecovery} student={recoveryDraft.student} />}
     </section>
   )
 }

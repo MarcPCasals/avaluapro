@@ -142,6 +142,8 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
     id: globalThis.crypto?.randomUUID?.() || `material-${Date.now()}`,
     kind: 'link',
     label: '',
+    preparationKind: 'reference',
+    reminderDaysBefore: 1,
     url: '',
   }])
   const save = () => {
@@ -149,6 +151,8 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
       id: material.id,
       kind: material.kind,
       label: material.label,
+      preparationKind: material.preparationKind || 'reference',
+      reminderDaysBefore: Number(material.reminderDaysBefore ?? 1),
       url: material.kind === 'link' ? material.url : '',
     }))
     return onSave({
@@ -211,8 +215,12 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
             <select aria-label="Tipus de material" value={material.kind} onChange={(event) => updateMaterial(index, 'kind', event.target.value)}>
               <option value="link">Enllaç</option><option value="physical">Material físic</option>
             </select>
+            <select aria-label="Funció del material" value={material.preparationKind || 'reference'} onChange={(event) => updateMaterial(index, 'preparationKind', event.target.value)}>
+              <option value="reference">Consulta</option><option value="student">L’ha de portar l’alumnat</option><option value="teacher">Preparar</option><option value="print">Imprimir</option><option value="buy">Comprar</option><option value="reserve">Reservar espai</option>
+            </select>
             <input aria-label="Nom del material" placeholder="Nom" required value={material.label} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
             {material.kind === 'link' && <input aria-label="Enllaç del material" placeholder="https://…" required type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} />}
+            {(material.preparationKind || 'reference') !== 'reference' && <label className="planning-material-reminder">Avisar<input aria-label="Dies d’antelació" min="0" onChange={(event) => updateMaterial(index, 'reminderDaysBefore', event.target.value)} type="number" value={material.reminderDaysBefore ?? 1} /><span>dies abans</span></label>}
             <button aria-label="Eliminar material" className="icon-action" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 size={15} /></button>
           </div>
         ))}

@@ -23,6 +23,7 @@ export function RemindersModal({ onClose }) {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
+  const completeClassroomRecovery = useAvaluaproStore((state) => state.completeClassroomRecovery)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
@@ -41,6 +42,17 @@ export function RemindersModal({ onClose }) {
   const markDone = async (item) => {
     const dismissedAt = new Date().toISOString()
     const reminder = { ...item.reminder, dismissedAt }
+    if (item.kind === 'recovery') {
+      await completeClassroomRecovery(item.note.id)
+      return
+    }
+    if (item.kind === 'material') {
+      await updateAgendaNote(item.note.id, {
+        preparation: { ...item.note.preparation, completedAt: dismissedAt },
+        reminder,
+      })
+      return
+    }
     if (item.kind === 'agenda' || item.kind === 'general') {
       await updateAgendaNote(item.note.id, { reminder })
       return

@@ -82,7 +82,7 @@ function baseActivity(idFactory = sequenceIdFactory()) {
       order: 1,
       plannedMinutes: 40,
       evidenceMode: 'final',
-      teacherMaterials: [{ kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
+      teacherMaterials: [{ kind: 'link', label: 'Àudio', preparationKind: 'teacher', reminderDaysBefore: 2, url: 'https://example.test/audio' }],
     },
     options(idFactory),
   )
@@ -97,6 +97,8 @@ test('els identificadors es mantenen quan una activitat es revisa o es reordena'
   assert.equal(revised.createdAt, activity.createdAt)
   assert.equal(revised.order, 3)
   assert.equal(revised.title, 'Escolta en parelles')
+  assert.equal(revised.teacherMaterials[0].preparationKind, 'teacher')
+  assert.equal(revised.teacherMaterials[0].reminderDaysBefore, 2)
 })
 
 test('una indicació queda dins la seqüència sense exigir temporització', () => {

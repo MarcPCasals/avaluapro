@@ -19,18 +19,28 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
 
   return [
     ...agendaNotes
-      .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type) && isPendingReminder(note.reminder))
+      .filter((note) => ['activityRecovery', 'agendaReminder', 'generalReminder', 'materialPreparation'].includes(note.type)
+        && isPendingReminder(note.reminder))
       .map((note) => {
         const student = studentById.get(note.studentId)
         const classItem = classById.get(note.classId)
+        const kind = note.type === 'activityRecovery'
+          ? 'recovery'
+          : note.type === 'materialPreparation'
+            ? 'material'
+            : note.type === 'agendaReminder' ? 'agenda' : 'general'
         return {
           classItem,
           detail: student ? `Alumne: ${student.name}` : classItem ? `Grup: ${classItem.name}` : 'Recordatori general',
           id: `agenda_${note.id}`,
-          kind: note.type === 'agendaReminder' ? 'agenda' : 'general',
+          kind,
           note,
           reminder: note.reminder,
-          title: note.type === 'agendaReminder' ? 'Nota a l’agenda pendent' : note.text,
+          title: note.type === 'activityRecovery'
+            ? 'Recuperació pendent'
+            : note.type === 'materialPreparation'
+              ? note.text
+              : note.type === 'agendaReminder' ? 'Nota a l’agenda pendent' : note.text,
         }
       }),
     ...tasks

@@ -514,6 +514,51 @@ export function useAgendaWorkspace(user) {
     return nextBundle
   }, [repository, user])
 
+  /**
+   * La recuperació necessita la data de la pròxima classe real del mateix
+   * grup. La consulta revisa les aplicacions del grup fins al final de curs i,
+   * sense connexió, aprofita les sessions que ja existeixen a la còpia local.
+   */
+  const findNextClassroomSession = useCallback(async (bundle) => {
+    if (!repository || !activeAcademicYear) return null
+    const isNextValidSession = (session) => session.entityType === 'calendarSession'
+      && session.id !== bundle.session.id
+      && session.classId === bundle.session.classId
+      && session.startsAt > bundle.session.startsAt
+      && !['cancelled', 'notHeld'].includes(session.status)
+    const alreadyLoaded = sessionBundles
+      .map((candidate) => candidate.session)
+      .filter(isNextValidSession)
+      .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
+    if (alreadyLoaded) return alreadyLoaded
+
+    // La pròxima classe pot pertànyer a una altra UP. Busquem totes les
+    // aplicacions del grup, però només carreguem els encapçalaments de sessió:
+    // no cal descarregar activitats ni resultats per programar el recordatori.
+    const visibleUnits = planningUnits.filter((unit) => unit.status !== 'archived')
+    const applicationResults = await Promise.all(visibleUnits.map((unit) => repository.loadScope(
+      `planningUnit:${unit.id}:applications`,
+      () => loadPlanningApplications(unit.id, bundle.session.classId, 100),
+    )))
+    const applications = applicationResults.flatMap((result, index) => result.entities
+      .filter((application) => application.classId === bundle.session.classId)
+      .filter((application) => application.status !== 'archived')
+      .map((application) => ({ application, planningUnit: visibleUnits[index] })))
+    const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) => repository.loadScope(
+      `application:${application.id}:sessions`,
+      () => loadPlanningSessions({
+        applicationId: application.id,
+        from: bundle.session.startsAt,
+        maxItems: 500,
+        planningUnitId: planningUnit.id,
+        to: `${activeAcademicYear.endsOn}T23:59:59`,
+      }),
+    )))
+    return sessionResults.flatMap((result) => result.entities)
+      .filter(isNextValidSession)
+      .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0] || null
+  }, [activeAcademicYear, planningUnits, repository, sessionBundles])
+
   const saveClassroomPrivateNote = useCallback(async (bundle, text) => {
     const cleanText = String(text || '').trim()
     const existing = (bundle.privateNotes || [])[0]
@@ -971,6 +1016,7 @@ export function useAgendaWorkspace(user) {
     closeClassroomSession,
     createTimetable,
     error,
+    findNextClassroomSession,
     isOnline,
     loading,
     loadSchedulingSetup,
