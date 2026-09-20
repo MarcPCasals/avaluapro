@@ -24,7 +24,8 @@ function PlanningDialog({ children, error, onClose, onSubmit, size = 'md', submi
     setBusy(true)
     setLocalError('')
     try {
-      await onSubmit()
+      const result = await onSubmit()
+      if (result === false) return
       onClose()
     } catch (submitError) {
       setLocalError(submitError.message || 'No s’ha pogut desar.')

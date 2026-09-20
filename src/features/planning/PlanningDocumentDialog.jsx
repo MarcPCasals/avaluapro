@@ -90,6 +90,7 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
     setError('')
     try {
       const result = await onImportTable(tablePreview.activities, targetPhaseId)
+      if (result === false) return
       setSuccess(`S’han afegit ${result.length} activitats a la UP oberta.`)
       setTablePreview(null)
       setTableText('')

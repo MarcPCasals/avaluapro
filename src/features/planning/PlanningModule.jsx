@@ -154,6 +154,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
   const acceptImprovements = async (proposalIds) => {
     const result = await onAcceptImprovements(proposalIds)
+    if (result === false) return false
     setValues((current) => ({
       ...current,
       improvementProposals: result.planningUnit.improvementProposals,
@@ -328,7 +329,7 @@ export default function PlanningModule() {
     ) !== false
   }
   const withConnectedConfirmation = async (action) => {
-    if (!confirmConnectedChange()) throw new Error('No s’ha desat el canvi a la programació connectada.')
+    if (!confirmConnectedChange()) return false
     return action()
   }
   const planningReminderSummary = useMemo(
