@@ -5,6 +5,7 @@ import {
 import { useEffect, useState } from 'react'
 import { getClassroomPromptState } from '../../domain/planning'
 import { findNextTimetableOccurrence } from '../../lib/agendaToday'
+import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
   cancelled: 'Anul·lada',
@@ -184,7 +185,7 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
           ...dayBundles.map((bundle) => ({ bundle, kind: 'session', time: sessionTime(bundle) })),
           ...dayReminders.map((reminder) => ({ kind: 'reminder', reminder, time: reminder.reminder.time })),
         ].sort((left, right) => left.time.localeCompare(right.time))
-        return <section key={dateKey}><header><span>{formatDate(dateKey, { weekday: true })}</span><strong>{dateKey.slice(8, 10)}</strong><small>{dayBundles.length} sessions{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small></header><div>{dayItems.length === 0 ? <p>Sense sessions ni recordatoris</p> : dayItems.map((item) => item.kind === 'session' ? <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button> : <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><Bell size={12} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>)}</div></section>
+        return <section key={dateKey}><header><span>{formatDate(dateKey, { weekday: true })}</span><strong>{dateKey.slice(8, 10)}</strong><small>{dayBundles.length} sessions{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small></header><div>{dayItems.length === 0 ? <p>Sense sessions ni recordatoris</p> : dayItems.map((item) => item.kind === 'session' ? <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button> : <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>)}</div></section>
       })}</div>
     </section>
   )

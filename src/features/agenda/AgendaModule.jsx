@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Bell, CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
+  CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
   Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
   Palette, Settings2, Share2, Trash2,
 } from 'lucide-react'
@@ -33,6 +33,7 @@ import {
   AgendaSessionAdjustDialog,
   AgendaSessionDetailDialog,
 } from './AgendaSessionDialogs'
+import { AgendaDoubleBell } from './AgendaDoubleBell'
 import './agenda.css'
 
 const WEEKDAYS = [
@@ -369,10 +370,10 @@ function CalendarView({ classes, coordinationReminders, events, onAdd, onDelete,
       </header>
       {coordinationReminders.length > 0 && (
         <section className="agenda-shared-reminders">
-          <header><Bell size={18} /><div><strong>Recordatoris de cotutoria</strong><span>Visibles al calendari dels dos tutors</span></div></header>
+          <header><AgendaDoubleBell size={14} /><div><strong>Recordatoris de cotutoria</strong><span>Visibles al calendari dels dos tutors</span></div></header>
           <div>{coordinationReminders.map((item) => (
             <button key={item.id} onClick={() => onOpenCoordination(item)} type="button">
-              <span className="agenda-event-mark shared"><Bell size={16} /></span>
+              <span className="agenda-event-mark shared"><AgendaDoubleBell size={12} /></span>
               <span className="agenda-event-content"><span>Cotutoria compartida</span><strong>{item.title}</strong><small>{formatDate(item.reminder.date)} · {item.reminder.time} · {item.classLabel}</small></span>
               <span className="agenda-event-impact shared">Obrir coordinació</span>
             </button>
