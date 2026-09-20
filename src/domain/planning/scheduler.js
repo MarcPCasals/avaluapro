@@ -4,7 +4,7 @@ import {
 } from './model.js'
 import { getProgrammableMinutes, selectEffectiveTimetable } from './rules.js'
 
-const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'cancellation'])
+const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
 function compareOrder(left, right) {
   return Number(left.order) - Number(right.order) || String(left.id).localeCompare(String(right.id))

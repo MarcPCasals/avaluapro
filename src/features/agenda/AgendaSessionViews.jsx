@@ -1,9 +1,17 @@
 import {
-  ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarRange, ChevronDown, Clock3, Edit3,
-  ExternalLink, Layers3, ListChecks, Loader2, MapPin, Plus, RotateCcw,
+  ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
+  ExternalLink, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getClassroomPromptState } from '../../domain/planning'
+import {
+  calendarEventCoversSchoolWeek,
+  getCalendarEventsForDate,
+  getMonthCalendarWeeks,
+  getNoClassCalendarEvent,
+  isNoClassCalendarEvent,
+  startOfCalendarWeek,
+} from '../../lib/agendaCalendar'
 import { findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../../lib/agendaToday'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
@@ -12,6 +20,14 @@ const STATUS_LABELS = {
   held: 'Feta',
   notHeld: 'No realitzada',
   planned: 'Prevista',
+}
+
+const CALENDAR_EVENT_LABELS = {
+  cancellation: 'Classe anul·lada',
+  extraordinarySession: 'Classe extraordinària',
+  holiday: 'Festiu',
+  nonTeaching: 'Dia no lectiu o vacances',
+  specialDay: 'Jornada especial',
 }
 
 function addDays(dateKey, amount) {
@@ -26,6 +42,18 @@ function formatDate(dateKey, options = {}) {
     month: options.long ? 'long' : 'short',
     weekday: options.weekday ? 'long' : undefined,
   }).format(new Date(`${dateKey}T12:00:00`))
+}
+
+function formatMonth(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00`)
+  const month = new Intl.DateTimeFormat('ca-AD', { month: 'long' }).format(date)
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${date.getFullYear()}`
+}
+
+function formatDateRange(event) {
+  return event.endsOn && event.endsOn !== event.startsOn
+    ? `${formatDate(event.startsOn)} – ${formatDate(event.endsOn)}`
+    : formatDate(event.startsOn)
 }
 
 function sessionDate(bundle) {
@@ -170,19 +198,24 @@ export function AgendaTodayView({
   )
 }
 
-export function AgendaWeekView({ bundles, classes, coordinationReminders, loading, onMoveWeek, onOpenCoordination, onOpenSession, onOpenTimetable, onReload, slots, timetable, weekStart }) {
+export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenSession, onOpenTimetable, onReload, onShowMonth, slots, timetable, weekStart }) {
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
   const timetableOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
   return (
     <section className="agenda-week-view">
       <header className="agenda-view-toolbar">
         <div><span className="agenda-view-kicker">Setmana lectiva</span><h2>{formatDate(days[0])} – {formatDate(days[4])}</h2><p>Classes de l’horari, sessions programades i recordatoris.</p></div>
-        <div className="agenda-toolbar-actions"><button aria-label="Setmana anterior" className="secondary-action compact" onClick={() => onMoveWeek(-7)} type="button"><ArrowLeft size={15} /></button><button className="secondary-action compact" onClick={() => onMoveWeek(0)} type="button">Avui</button><button aria-label="Setmana següent" className="secondary-action compact" onClick={() => onMoveWeek(7)} type="button"><ArrowRight size={15} /></button><button aria-label="Recarregar setmana" className="secondary-action compact" onClick={onReload} type="button"><RotateCcw className={loading ? 'spin' : ''} size={15} /></button></div>
+        <div className="agenda-calendar-toolbar-actions">
+          <div aria-label="Vista del calendari" className="agenda-calendar-view-switch" role="group"><button className="active" type="button">Setmana</button><button onClick={onShowMonth} type="button">Mes</button></div>
+          {onAddEvent && <button className="secondary-action compact agenda-mark-calendar" onClick={() => onAddEvent({ endsOn: weekStart, startsOn: weekStart, type: 'holiday' })} type="button"><Moon size={14} />Marcar festiu o canvi</button>}
+          <div className="agenda-toolbar-actions"><button aria-label="Setmana anterior" className="secondary-action compact" onClick={() => onMoveWeek(-7)} type="button"><ArrowLeft size={15} /></button><button className="secondary-action compact" onClick={() => onMoveWeek(0)} type="button">Avui</button><button aria-label="Setmana següent" className="secondary-action compact" onClick={() => onMoveWeek(7)} type="button"><ArrowRight size={15} /></button><button aria-label="Recarregar setmana" className="secondary-action compact" onClick={onReload} type="button"><RotateCcw className={loading ? 'spin' : ''} size={15} /></button></div>
+        </div>
       </header>
       <div className="agenda-week-columns">{days.map((dateKey) => {
         const dayBundles = bundles.filter((bundle) => sessionDate(bundle) === dateKey)
         const dayReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
         const dayTimetable = timetableOccurrences.filter((item) => item.date === dateKey)
+        const dayEvents = getCalendarEventsForDate(calendarEvents, dateKey)
         const dayItems = [
           ...dayBundles.map((bundle) => ({ bundle, kind: 'session', time: sessionTime(bundle) })),
           ...dayReminders.map((reminder) => ({ kind: 'reminder', reminder, time: reminder.reminder.time })),
@@ -196,9 +229,14 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
               <strong>{dateKey.slice(8, 10)}</strong>
               <small>{totalClasses} {totalClasses === 1 ? 'classe' : 'classes'}{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small>
             </header>
-            <div>{dayItems.length === 0 ? <p>Sense classes ni recordatoris</p> : dayItems.map((item) => {
+            <div>
+              {dayEvents.map((event) => <button className="agenda-week-day-event" disabled={!onAddEvent} key={event.id} onClick={() => onAddEvent?.(event)} type="button">{isNoClassCalendarEvent(event) ? <Moon size={12} /> : <CalendarPlus size={12} />}<span><strong>{event.title}</strong><small>{CALENDAR_EVENT_LABELS[event.type] || 'Canvi de calendari'}</small></span></button>)}
+              {dayItems.length === 0 ? <p>Sense classes ni recordatoris</p> : dayItems.map((item) => {
               if (item.kind === 'session') {
-                return <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button>
+                const blockingEvent = getNoClassCalendarEvent(calendarEvents, dateKey, item.bundle.session.classId)
+                const stoppedStatus = ['cancelled', 'notHeld'].includes(item.bundle.session.status)
+                const stopReason = blockingEvent?.title || (stoppedStatus ? STATUS_LABELS[item.bundle.session.status] : '')
+                return <button className={`agenda-week-session ${item.bundle.session.status} ${stopReason ? 'calendar-blocked' : ''}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{stopReason && <Moon size={12} />}{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{stopReason ? `${stopReason} · la sessió no es fa` : `${item.bundle.planningUnit.code} · ${item.bundle.items.length} activitats`}</small></button>
               }
               if (item.kind === 'reminder') {
                 return <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>
@@ -211,8 +249,10 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
                 slot.subgroupId,
                 slot.space,
               ].filter(Boolean).join(' · ')
-              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'}`} key={item.occurrence.id} onClick={onOpenTimetable} type="button"><span><CalendarRange size={12} />{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{slotDetails}</small><em>Horari · sense programació</em></button>
-            })}</div>
+              const blockingEvent = getNoClassCalendarEvent(calendarEvents, dateKey, slot.classId)
+              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'} ${blockingEvent ? 'calendar-blocked' : ''}`} key={item.occurrence.id} onClick={onOpenTimetable} type="button"><span>{blockingEvent ? <Moon size={12} /> : <CalendarRange size={12} />}{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{blockingEvent ? `${blockingEvent.title} · la classe no es fa` : slotDetails}</small><em>{blockingEvent ? 'No lectiu' : 'Horari · sense programació'}</em></button>
+            })}
+            </div>
           </section>
         )
       })}</div>
@@ -220,15 +260,80 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
   )
 }
 
-export function AgendaTimelineView({ bundles, classes, loading, onChangeClass, onOpenSession, onSchedule, selectedClassId }) {
+export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordinationReminders, monthKey, onAddEvent, onDeleteEvent, onEditEvent, onMoveMonth, onSelectWeek, onShowWeek, slots, timetable, today }) {
+  const weeks = getMonthCalendarWeeks(monthKey, academicYear || {})
+  const monthPrefix = monthKey.slice(0, 7)
+  const nextMonthDate = new Date(`${monthKey}T12:00:00Z`)
+  nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1)
+  const nextMonthKey = nextMonthDate.toISOString().slice(0, 10)
+  const monthEnd = addDays(nextMonthKey, -1)
+  const monthEvents = calendarEvents.filter((event) => event.startsOn <= monthEnd && (event.endsOn || event.startsOn) >= monthKey)
+  const nextWeekStart = addDays(startOfCalendarWeek(today), 7)
+  const proposedEditableDate = academicYear?.startsOn && monthKey < academicYear.startsOn ? academicYear.startsOn : monthKey
+  const firstEditableDate = academicYear?.endsOn && proposedEditableDate > academicYear.endsOn ? academicYear.endsOn : proposedEditableDate
+  const firstCourseMonth = String(academicYear?.startsOn || '').slice(0, 7)
+  const lastCourseMonth = String(academicYear?.endsOn || '').slice(0, 7)
+
+  return (
+    <section className="agenda-month-view">
+      <header className="agenda-view-toolbar">
+        <div><span className="agenda-view-kicker">Calendari mensual</span><h2>{formatMonth(monthKey)}</h2><p>Setmanes lectives, vacances, festius i canvis de jornada.</p></div>
+        <div className="agenda-calendar-toolbar-actions">
+          <div aria-label="Vista del calendari" className="agenda-calendar-view-switch" role="group"><button onClick={onShowWeek} type="button">Setmana</button><button className="active" type="button">Mes</button></div>
+          {onAddEvent && <button className="primary-action compact" onClick={() => onAddEvent({ endsOn: firstEditableDate, startsOn: firstEditableDate, type: 'holiday' })} type="button"><CalendarPlus size={15} />Marcar dia o període</button>}
+          <div className="agenda-toolbar-actions"><button aria-label="Mes anterior" className="secondary-action compact" disabled={Boolean(firstCourseMonth && monthPrefix <= firstCourseMonth)} onClick={() => onMoveMonth(-1)} type="button"><ArrowLeft size={15} /></button><button className="secondary-action compact" onClick={() => onMoveMonth(0)} type="button">Avui</button><button aria-label="Mes següent" className="secondary-action compact" disabled={Boolean(lastCourseMonth && monthPrefix >= lastCourseMonth)} onClick={() => onMoveMonth(1)} type="button"><ArrowRight size={15} /></button></div>
+        </div>
+      </header>
+      <div className="agenda-month-weeks">{weeks.map((week) => {
+        const vacationEvent = calendarEvents.find((event) => calendarEventCoversSchoolWeek(event, week.weekStart))
+        const weekOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart: week.weekStart })
+        const weekBundles = bundles.filter((bundle) => sessionDate(bundle) >= week.weekStart && sessionDate(bundle) <= week.weekEnd)
+        const isNextWeek = week.weekStart === nextWeekStart
+        const editableWeekStart = academicYear?.startsOn && week.weekStart < academicYear.startsOn ? academicYear.startsOn : week.weekStart
+        const editableWeekEnd = academicYear?.endsOn && week.weekEnd > academicYear.endsOn ? academicYear.endsOn : week.weekEnd
+        return (
+          <article className={`${vacationEvent ? 'vacation' : ''} ${isNextWeek ? 'next' : ''}`} key={week.weekStart}>
+            <header>
+              <button onClick={() => onSelectWeek(week.weekStart)} type="button"><span>Setmana {formatDate(week.weekStart, { long: true })}</span><small>{formatDate(week.weekStart)} – {formatDate(week.weekEnd)}</small>{isNextWeek && <em>Següent setmana</em>}</button>
+              {onAddEvent && <button aria-label={vacationEvent ? `Editar ${vacationEvent.title}` : `Marcar la setmana del ${formatDate(week.weekStart)} com a vacances`} className={`agenda-week-vacation ${vacationEvent ? 'active' : ''}`} onClick={() => vacationEvent ? onEditEvent(vacationEvent) : onAddEvent({ endsOn: editableWeekEnd, startsOn: editableWeekStart, title: 'Vacances', type: 'nonTeaching' })} title={vacationEvent ? vacationEvent.title : 'Marcar tota la setmana com a no lectiva'} type="button"><Moon size={17} /></button>}
+            </header>
+            <div className="agenda-month-days">{week.days.map((dateKey) => {
+              const dayEvents = getCalendarEventsForDate(calendarEvents, dateKey)
+              const noClassEvent = getNoClassCalendarEvent(calendarEvents, dateKey, '')
+              const classCount = weekOccurrences.filter((item) => item.date === dateKey).length
+                + weekBundles.filter((bundle) => sessionDate(bundle) === dateKey).length
+              const reminderCount = coordinationReminders.filter((item) => item.reminder.date === dateKey).length
+              const dateIsEditable = (!academicYear?.startsOn || dateKey >= academicYear.startsOn)
+                && (!academicYear?.endsOn || dateKey <= academicYear.endsOn)
+              return (
+                <div className={`${dateKey.slice(0, 7) === monthPrefix ? '' : 'outside'} ${noClassEvent ? 'non-teaching' : ''}`} key={dateKey}>
+                  <button className="agenda-month-day-open" onClick={() => onSelectWeek(week.weekStart)} type="button"><span>{formatDate(dateKey, { weekday: true }).split(',')[0]}</span><strong>{dateKey.slice(8, 10)}</strong></button>
+                  {onAddEvent && dateIsEditable && <button aria-label={noClassEvent ? `Editar ${noClassEvent.title}` : `Marcar ${formatDate(dateKey, { weekday: true })} com a no lectiu`} className="agenda-month-day-moon" onClick={() => noClassEvent ? onEditEvent(noClassEvent) : onAddEvent({ endsOn: dateKey, startsOn: dateKey, title: 'Festiu', type: 'holiday' })} title={noClassEvent?.title || 'Marcar tot el dia com a no lectiu'} type="button"><Moon size={12} /></button>}
+                  <small>{dayEvents[0]?.title || [classCount ? `${classCount} ${classCount === 1 ? 'classe' : 'classes'}` : '', reminderCount ? `${reminderCount} avís` : ''].filter(Boolean).join(' · ') || '—'}</small>
+                </div>
+              )
+            })}</div>
+          </article>
+        )
+      })}</div>
+      <section className="agenda-month-events">
+        <header><Moon size={18} /><div><strong>Festius i canvis del mes</strong><span>{monthEvents.length} configurats</span></div></header>
+        {monthEvents.length === 0 ? <p>Encara no hi ha cap festiu, vacances o canvi de jornada aquest mes.</p> : <div>{monthEvents.map((event) => <article key={event.id}><span>{isNoClassCalendarEvent(event) ? <Moon size={15} /> : <CalendarPlus size={15} />}</span><div><strong>{event.title}</strong><small>{CALENDAR_EVENT_LABELS[event.type] || 'Canvi de calendari'} · {formatDateRange(event)}</small>{event.reason && <p>{event.reason}</p>}</div>{onAddEvent && <><button aria-label={`Editar ${event.title}`} className="icon-action" onClick={() => onEditEvent(event)} type="button"><Edit3 size={14} /></button><button aria-label={`Eliminar ${event.title}`} className="icon-action danger" onClick={() => onDeleteEvent(event)} type="button"><Trash2 size={14} /></button></>}</article>)}</div>}
+      </section>
+    </section>
+  )
+}
+
+export function AgendaTimelineView({ bundles, classes, loading, onOpenSession, onSchedule, selectedClassId }) {
   const classBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
+  const selectedClass = classes.find((item) => item.id === selectedClassId)
   return (
     <section className="agenda-timeline-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Cronologia del grup</span><div className="agenda-version-line"><select aria-label="Grup de la cronologia" value={selectedClassId} onChange={(event) => onChangeClass(event.target.value)}><option value="">Selecciona un grup</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{loading && <Loader2 className="spin" size={16} />}</div><p>Totes les sessions del curs, de la primera a l’última.</p></div>
+        <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{loading && <Loader2 className="spin" size={16} />}</div><p>Totes les sessions del curs, de la primera a l’última.</p></div>
         {onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}
       </header>
-      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup</strong><p>La cronologia reunirà totes les seves UP en ordre real.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-list">{classBundles.map((bundle, index) => <button key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{index + 1}</span><span className="agenda-timeline-dot" /><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}</span><strong>{bundle.planningUnit.title}</strong><small>{bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${bundle.session.status}`}>{STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>)}</div>}
+      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-list">{classBundles.map((bundle, index) => <button key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{index + 1}</span><span className="agenda-timeline-dot" /><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}</span><strong>{bundle.planningUnit.title}</strong><small>{bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${bundle.session.status}`}>{STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>)}</div>}
     </section>
   )
 }

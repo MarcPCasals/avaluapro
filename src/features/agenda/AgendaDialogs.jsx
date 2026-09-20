@@ -149,6 +149,7 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
 }
 
 export function CalendarEventDialog({ academicYear, classes, initialValue, onClose, onSave, today }) {
+  const currentEvent = initialValue?.isPreset ? null : initialValue
   const [values, setValues] = useState(() => ({
     classIds: initialValue?.classIds || [],
     consumesPlannedSession: initialValue?.consumesPlannedSession || false,
@@ -174,10 +175,10 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
   }))
   const save = () => onSave(values.type === 'extraordinarySession'
     ? values
-    : { ...values, durationMinutes: null, startsAt: null, subgroupId: null }, initialValue)
+    : { ...values, durationMinutes: null, startsAt: null, subgroupId: null }, currentEvent)
   return (
-    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={initialValue ? 'Desar excepció' : 'Afegir al calendari'} title={initialValue ? 'Editar excepció del calendari' : 'Nova excepció del calendari'}>
-      <div className="agenda-event-intro"><CalendarPlus size={19} /><p>Aquesta informació ajusta la calendarització de les UP. Abans de crear cap sessió, Agenda sempre en mostra la proposta.</p></div>
+    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={currentEvent ? 'Desar canvi' : 'Afegir al calendari'} title={currentEvent ? 'Editar el calendari' : 'Marcar un festiu o canvi'}>
+      <div className="agenda-event-intro"><CalendarPlus size={19} /><p>Els festius, les vacances i els canvis de jornada es mostraran al calendari i a les sessions afectades.</p></div>
       <label>Tipus<select value={values.type} onChange={(event) => setType(event.target.value)}>{EVENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Títol<input autoFocus placeholder={eventLabel} required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
       <div className="agenda-form-row">

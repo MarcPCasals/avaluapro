@@ -669,13 +669,14 @@ test('la seqüència de calendarització respecta fases, subfases i activitats s
   )
 })
 
-test('la proposta usa la versió d’horari vigent i salta festius i anul·lacions del grup', () => {
+test('la proposta usa la versió d’horari vigent i salta festius, jornades especials i anul·lacions del grup', () => {
   const result = buildTimetableSessionCandidates({
     calendarEvents: [
       { id: 'holiday', type: 'holiday', title: 'Festa', startsOn: '2026-09-21', endsOn: '2026-09-21', classIds: [] },
       { id: 'other-class', type: 'cancellation', title: 'Sortida 2B', startsOn: '2026-09-28', endsOn: '2026-09-28', classIds: ['class-2'] },
       { id: 'our-class', type: 'cancellation', title: 'Sortida 1A', startsOn: '2026-10-05', endsOn: '2026-10-05', classIds: ['class-1'] },
       { id: 'extra-class', type: 'extraordinarySession', title: 'Substitució', startsOn: '2026-10-05', endsOn: '2026-10-05', startsAt: '12:00', durationMinutes: 60, consumesPlannedSession: true, classIds: ['class-1'] },
+      { id: 'intensive', type: 'specialDay', title: 'Jornada intensiva', startsOn: '2026-10-12', endsOn: '2026-10-12', classIds: [] },
     ],
     classId: 'class-1',
     from: '2026-09-21',
@@ -693,10 +694,9 @@ test('la proposta usa la versió d’horari vigent i salta festius i anul·lacio
   assert.deepEqual(result.candidates.map((candidate) => [candidate.date, candidate.startsAt, candidate.durationMinutes]), [
     ['2026-09-28', '2026-09-28T09:30:00', 60],
     ['2026-10-05', '2026-10-05T12:00:00', 60],
-    ['2026-10-12', '2026-10-12T10:30:00', 90],
   ])
   assert.equal(result.candidates[1].calendarEventId, 'extra-class')
-  assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05'])
+  assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05', '2026-10-12'])
 })
 
 test('una proposta divide una activitat llarga, manté indicacions i no duplica les ja assignades', () => {

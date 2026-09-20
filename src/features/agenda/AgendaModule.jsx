@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
-  Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
-  Palette, Settings2, Share2, Trash2,
+  Copy, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
+  Palette, Share2, Trash2,
 } from 'lucide-react'
 import {
   getClassroomStudents,
@@ -25,6 +25,7 @@ import {
 import { useAgendaWorkspace } from './useAgendaWorkspace'
 import { AgendaSchedulingDialog } from './AgendaSchedulingDialog'
 import {
+  AgendaMonthView,
   AgendaTodayView,
   AgendaTimelineView,
   AgendaWeekView,
@@ -33,7 +34,6 @@ import {
   AgendaSessionAdjustDialog,
   AgendaSessionDetailDialog,
 } from './AgendaSessionDialogs'
-import { AgendaDoubleBell } from './AgendaDoubleBell'
 import './agenda.css'
 
 const WEEKDAYS = [
@@ -54,14 +54,6 @@ const GRID_END = 17 * 60
 const GRID_STEP = 15
 const GRID_ROWS = Array.from({ length: (GRID_END - GRID_START) / GRID_STEP }, (_, index) => GRID_START + index * GRID_STEP)
 
-const EVENT_DETAILS = {
-  holiday: ['Festiu', 'holiday'],
-  nonTeaching: ['Dia no lectiu', 'non-teaching'],
-  specialDay: ['Jornada especial', 'special'],
-  extraordinarySession: ['Classe extraordinària', 'extra'],
-  cancellation: ['Classe anul·lada', 'cancelled'],
-}
-
 function minutesToTime(minutes) {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
@@ -78,12 +70,6 @@ function formatDate(dateKey) {
     .format(new Date(`${dateKey}T12:00:00`))
 }
 
-function formatDateRange(item) {
-  return item.endsOn && item.endsOn !== item.startsOn
-    ? `${formatDate(item.startsOn)} – ${formatDate(item.endsOn)}`
-    : formatDate(item.startsOn)
-}
-
 function addDateDays(dateKey, amount) {
   const date = new Date(`${dateKey}T12:00:00Z`)
   date.setUTCDate(date.getUTCDate() + amount)
@@ -95,6 +81,25 @@ function startOfWeek(dateKey) {
   const weekday = date.getUTCDay() || 7
   date.setUTCDate(date.getUTCDate() - weekday + 1)
   return date.toISOString().slice(0, 10)
+}
+
+function firstDayOfMonth(dateKey) {
+  return `${String(dateKey).slice(0, 7)}-01`
+}
+
+function moveMonthKey(dateKey, amount) {
+  const date = new Date(`${firstDayOfMonth(dateKey)}T12:00:00Z`)
+  date.setUTCMonth(date.getUTCMonth() + amount)
+  return date.toISOString().slice(0, 10)
+}
+
+function monthSessionRange(monthKey) {
+  const nextMonth = moveMonthKey(monthKey, 1)
+  const lastDay = addDateDays(nextMonth, -1)
+  return {
+    from: startOfWeek(monthKey),
+    to: addDateDays(startOfWeek(lastDay), 6),
+  }
 }
 
 function SyncBadge({ isOnline, sync }) {
@@ -360,47 +365,6 @@ function TimetableView({ classes, onAdd, onAddClass, onCreateVersion, onDelete, 
   )
 }
 
-function CalendarView({ classes, coordinationReminders, events, onAdd, onDelete, onEdit, onOpenCoordination }) {
-  const classById = new Map(classes.map((item) => [item.id, item.name]))
-  return (
-    <section className="agenda-calendar-view">
-      <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Calendari docent</span><h2>Cotutoria i excepcions lectives</h2><p>Recordatoris compartits, festes, canvis puntuals i classes extraordinàries.</p></div>
-        {onAdd && <button className="primary-action compact" onClick={onAdd} type="button"><CalendarPlus size={16} />Nova excepció</button>}
-      </header>
-      {coordinationReminders.length > 0 && (
-        <section className="agenda-shared-reminders">
-          <header><AgendaDoubleBell size={14} /><div><strong>Recordatoris de cotutoria</strong><span>Visibles al calendari dels dos tutors</span></div></header>
-          <div>{coordinationReminders.map((item) => (
-            <button key={item.id} onClick={() => onOpenCoordination(item)} type="button">
-              <span className="agenda-event-mark shared"><AgendaDoubleBell size={12} /></span>
-              <span className="agenda-event-content"><span>Cotutoria compartida</span><strong>{item.title}</strong><small>{formatDate(item.reminder.date)} · {item.reminder.time} · {item.classLabel}</small></span>
-              <span className="agenda-event-impact shared">Obrir coordinació</span>
-            </button>
-          ))}</div>
-        </section>
-      )}
-      {events.length > 0 && (
-        <div className="agenda-event-list">{events.map((event) => {
-          const [typeLabel, colorClass] = EVENT_DETAILS[event.type] || ['Excepció', 'special']
-          const groups = event.classIds?.length ? event.classIds.map((id) => classById.get(id)).filter(Boolean).join(' · ') : 'Tots els grups'
-          return (
-            <article key={event.id}>
-              <span className={`agenda-event-mark ${colorClass}`}><CalendarDays size={17} /></span>
-              <div className="agenda-event-content"><span>{typeLabel}</span><strong>{event.title}</strong><small>{formatDateRange(event)}{event.startsAt ? ` · ${event.startsAt} · ${event.durationMinutes} min` : ''} · {groups}</small>{event.reason && <p>{event.reason}</p>}</div>
-              <span className={`agenda-event-impact ${event.consumesPlannedSession ? 'advances' : ''}`}>{event.consumesPlannedSession ? 'Avança 1 sessió' : 'No consumeix sessió'}</span>
-              <div className="agenda-event-actions"><button aria-label={`Editar ${event.title}`} className="icon-action" onClick={() => onEdit(event)} type="button"><Edit3 size={15} /></button><button aria-label={`Eliminar ${event.title}`} className="icon-action danger" onClick={() => onDelete(event)} type="button"><Trash2 size={15} /></button></div>
-            </article>
-          )
-        })}</div>
-      )}
-      {events.length === 0 && coordinationReminders.length === 0 && (
-        <div className="agenda-calendar-empty"><CalendarDays size={28} /><strong>El calendari encara és buit</strong><p>Els recordatoris de cotutoria amb data apareixeran aquí automàticament per als dos tutors.</p></div>
-      )}
-    </section>
-  )
-}
-
 export default function AgendaModule() {
   const [initialSchedulingUnitId] = useState(consumeAgendaSchedulingRequest)
   const user = useAvaluaproStore((state) => state.cloud.user)
@@ -443,6 +407,10 @@ export default function AgendaModule() {
   const hasAgendaWorkspace = hasOwnCalendar || workspace.sharedPlanningUnits.length > 0 || sharedTutoringSpaces.length > 0
   const materialReminderBundles = workspace.sessionBundles
   const setWorkspaceError = workspace.setError
+  const loadSessionRange = workspace.loadSessionRange
+  const academicYearStartsOn = workspace.activeAcademicYear?.startsOn
+  const academicYearEndsOn = workspace.activeAcademicYear?.endsOn
+  const agendaToday = workspace.today
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
@@ -472,13 +440,15 @@ export default function AgendaModule() {
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
   const [view, setView] = useState('today')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(workspace.today))
-  const [timelineClassId, setTimelineClassId] = useState(() => classes[0]?.id || '')
+  const [calendarMode, setCalendarMode] = useState('week')
+  const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))
   const [dialog, setDialog] = useState(() => initialSchedulingUnitId ? 'scheduling' : null)
   const [activeBundle, setActiveBundle] = useState(null)
   const [editingTimetable, setEditingTimetable] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
   const [slotPosition, setSlotPosition] = useState(null)
   const [editingEvent, setEditingEvent] = useState(null)
+  const [eventPreset, setEventPreset] = useState(null)
   const [scheduleNotice, setScheduleNotice] = useState('')
   const [schedulingUnitId, setSchedulingUnitId] = useState(initialSchedulingUnitId)
   const [adjustInitialAction, setAdjustInitialAction] = useState('session')
@@ -490,6 +460,19 @@ export default function AgendaModule() {
     syncPlanningMaterialReminders(materialReminderBundles)
       .catch((error) => setWorkspaceError(error.message || 'No s’han pogut preparar els recordatoris de material.'))
   }, [materialReminderBundles, setWorkspaceError, syncPlanningMaterialReminders])
+
+  useEffect(() => {
+    if (view !== 'timeline' || !activeClassId) return undefined
+    let cancelled = false
+    loadSessionRange({
+      classId: activeClassId,
+      from: academicYearStartsOn || addDateDays(agendaToday, -180),
+      to: academicYearEndsOn || addDateDays(agendaToday, 365),
+    }).catch((error) => {
+      if (!cancelled) setWorkspaceError(error.message || 'No s’ha pogut carregar la cronologia.')
+    })
+    return () => { cancelled = true }
+  }, [activeClassId, academicYearEndsOn, academicYearStartsOn, agendaToday, loadSessionRange, setWorkspaceError, view])
 
   if (!user) {
     return <section className="agenda-auth-required"><CalendarDays size={32} /><h1>Agenda</h1><p>Inicia sessió amb Google des de «Dades i Compte» per protegir l’horari i tenir-lo disponible als teus dispositius.</p></section>
@@ -507,6 +490,16 @@ export default function AgendaModule() {
   const removeEvent = async (event) => {
     if (!globalThis.confirm?.(`Vols eliminar «${event.title}» del calendari?`)) return
     try { await workspace.removeCalendarEvent(event) } catch (error) { workspace.setError(error.message) }
+  }
+  const openCalendarEvent = (event = null) => {
+    if (event?.id) {
+      setEditingEvent(event)
+      setEventPreset(null)
+    } else {
+      setEditingEvent(null)
+      setEventPreset(event ? { ...event, isPreset: true } : null)
+    }
+    setDialog('event')
   }
   const openCoordinationReminder = async (reminder) => {
     const item = reminder.coordinationItem || reminder
@@ -538,21 +531,42 @@ export default function AgendaModule() {
   const moveWeek = (amount) => {
     const nextStart = amount === 0 ? startOfWeek(workspace.today) : addDateDays(weekStart, amount)
     setView('week')
+    setCalendarMode('week')
     loadWeek(nextStart)
   }
-  const openTimeline = async (classId = timelineClassId || agendaClasses[0]?.id || '') => {
-    setTimelineClassId(classId)
+  const openCalendar = () => {
+    setCalendarMode('week')
+    setView('week')
+    loadWeek(weekStart)
+  }
+  const openMonth = () => {
+    const nextMonth = firstDayOfMonth(weekStart)
+    const range = monthSessionRange(nextMonth)
+    setMonthKey(nextMonth)
+    setCalendarMode('month')
+    setView('week')
+    workspace.loadSessionRange(range)
+      .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar el mes.'))
+  }
+  const moveMonth = (amount) => {
+    const requestedMonth = amount === 0 ? firstDayOfMonth(workspace.today) : moveMonthKey(monthKey, amount)
+    const firstCourseMonth = workspace.activeAcademicYear?.startsOn ? firstDayOfMonth(workspace.activeAcademicYear.startsOn) : requestedMonth
+    const lastCourseMonth = workspace.activeAcademicYear?.endsOn ? firstDayOfMonth(workspace.activeAcademicYear.endsOn) : requestedMonth
+    const nextMonth = requestedMonth < firstCourseMonth
+      ? firstCourseMonth
+      : requestedMonth > lastCourseMonth ? lastCourseMonth : requestedMonth
+    const range = monthSessionRange(nextMonth)
+    setMonthKey(nextMonth)
+    workspace.loadSessionRange(range)
+      .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar el mes.'))
+  }
+  const selectCalendarWeek = (nextStart) => {
+    setCalendarMode('week')
+    setView('week')
+    loadWeek(nextStart)
+  }
+  const openTimeline = () => {
     setView('timeline')
-    if (!classId) return
-    try {
-      await workspace.loadSessionRange({
-        classId,
-        from: workspace.activeAcademicYear?.startsOn || addDateDays(workspace.today, -180),
-        to: workspace.activeAcademicYear?.endsOn || addDateDays(workspace.today, 365),
-      })
-    } catch (error) {
-      workspace.setError(error.message || 'No s’ha pogut carregar la cronologia.')
-    }
   }
   const openSession = (bundle) => {
     setActiveBundle(bundle)
@@ -566,7 +580,12 @@ export default function AgendaModule() {
   }
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, to: addDateDays(weekStart, 4) })
   const reloadActiveView = () => {
-    if (view === 'timeline') return openTimeline(timelineClassId)
+    if (view === 'timeline') return workspace.loadSessionRange({
+      classId: activeClassId,
+      from: workspace.activeAcademicYear?.startsOn || addDateDays(workspace.today, -180),
+      to: workspace.activeAcademicYear?.endsOn || addDateDays(workspace.today, 365),
+    })
+    if (view === 'week' && calendarMode === 'month') return workspace.loadSessionRange(monthSessionRange(monthKey))
     if (view === 'week') return reloadCurrentWeek()
     return workspace.loadTodaySessions()
   }
@@ -711,10 +730,9 @@ export default function AgendaModule() {
 
       <nav aria-label="Vistes d’Agenda" className="agenda-view-tabs">
         <button className={view === 'today' ? 'active' : ''} onClick={openToday} type="button"><CalendarDays size={17} />Avui</button>
-        <button className={view === 'week' ? 'active' : ''} onClick={() => { setView('week'); loadWeek(weekStart) }} type="button"><Clock3 size={17} />Setmana</button>
-        <button className={view === 'timeline' ? 'active' : ''} onClick={() => openTimeline()} type="button"><ListChecks size={17} />Cronologia</button>
+        <button className={view === 'week' ? 'active' : ''} onClick={openCalendar} type="button"><Clock3 size={17} />Calendari</button>
+        <button className={view === 'timeline' ? 'active' : ''} onClick={openTimeline} type="button"><ListChecks size={17} />Cronologia</button>
         {hasOwnCalendar && <button className={view === 'timetable' ? 'active' : ''} onClick={() => setView('timetable')} type="button"><LayoutGrid size={17} />Horari</button>}
-        <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')} type="button"><Settings2 size={17} />Calendari</button>
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
@@ -726,17 +744,17 @@ export default function AgendaModule() {
         <section className="agenda-large-empty"><span><CalendarDays size={29} /></span><h2>Primer crea el curs a Programació</h2><p>L’Agenda utilitza les mateixes dates del curs acadèmic per evitar informació duplicada.</p></section>
       ) : (
         <main className="agenda-main">
-          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={() => setView('calendar')} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
-          {view === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenSession={openSession} onOpenTimetable={() => setView('timetable')} onReload={reloadCurrentWeek} slots={workspace.slots} timetable={workspace.activeTimetable} weekStart={weekStart} />}
-          {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onChangeClass={openTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? () => setDialog('scheduling') : null} selectedClassId={timelineClassId} />}
+          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={openCalendar} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'week' && calendarMode === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenSession={openSession} onOpenTimetable={() => setView('timetable')} onReload={reloadCurrentWeek} onShowMonth={openMonth} slots={workspace.slots} timetable={workspace.activeTimetable} weekStart={weekStart} />}
+          {view === 'week' && calendarMode === 'month' && <AgendaMonthView academicYear={workspace.activeAcademicYear} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} coordinationReminders={tutoringCalendarReminders} monthKey={monthKey} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onDeleteEvent={removeEvent} onEditEvent={openCalendarEvent} onMoveMonth={moveMonth} onSelectWeek={selectCalendarWeek} onShowWeek={() => selectCalendarWeek(startOfWeek(monthKey))} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onOpenSession={openSession} onSchedule={hasOwnCalendar ? () => setDialog('scheduling') : null} selectedClassId={activeClassId} />}
           {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
-          {view === 'calendar' && <CalendarView classes={classes} coordinationReminders={tutoringCalendarReminders} events={workspace.calendarEvents} onAdd={hasOwnCalendar ? () => { setEditingEvent(null); setDialog('event') } : null} onDelete={removeEvent} onEdit={(event) => { setEditingEvent(event); setDialog('event') }} onOpenCoordination={openCoordinationReminder} />}
         </main>
       )}
 
       {dialog === 'timetable' && <TimetableDialog academicYear={workspace.activeAcademicYear} currentTimetable={workspace.activeTimetable} initialValue={editingTimetable} onClose={() => setDialog(null)} onSave={(values, current) => current ? workspace.saveTimetable(current, values) : workspace.createTimetable(values)} />}
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
-      {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent} onClose={() => setDialog(null)} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
+      {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(result.reflowed ? `${result.sessionCount} sessions futures reorganitzades amb l’efecte dominó.` : `${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadActiveView() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
