@@ -19,9 +19,7 @@ import { getAntecedentsToImport, matchAntecedentStudents, validateAntecedentAssi
 import { Modal } from '../../components/Modal'
 import { COLLECTIONS } from '../../data/seedData'
 import { buildBackupStatusMessage, summarizeBackup } from '../../lib/backupDiagnostics'
-import { compareCloudConflictDatasets } from '../../lib/cloudConflictComparison'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
-import { loadCloudWorkspace } from '../../lib/firebase'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const CONTACT_EMAIL = 'mperezc@educand.ad'
@@ -133,6 +131,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const bulkUpsertStudentAntecedents = useAvaluaproStore((store) => store.bulkUpsertStudentAntecedents)
   const createCloudBackup = useAvaluaproStore((store) => store.createCloudBackup)
   const loadCloudBackups = useAvaluaproStore((store) => store.loadCloudBackups)
+  const compareCurrentCloudWorkspace = useAvaluaproStore((store) => store.compareCurrentCloudWorkspace)
   const pushAllToCloud = useAvaluaproStore((store) => store.pushAllToCloud)
   const retryCloudSync = useAvaluaproStore((store) => store.retryCloudSync)
   const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
@@ -332,14 +331,9 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
     if (!uid) return
     setConflictComparison({ status: 'loading' })
     try {
-      const workspace = await loadCloudWorkspace(uid)
-      const localDataset = COLLECTIONS.reduce((dataset, collection) => ({
-        ...dataset,
-        [collection]: state[collection] || [],
-      }), {})
       setConflictComparison({
         status: 'ready',
-        ...compareCloudConflictDatasets(localDataset, workspace.dataset, COLLECTIONS),
+        ...await compareCurrentCloudWorkspace(),
       })
     } catch (error) {
       setConflictComparison({

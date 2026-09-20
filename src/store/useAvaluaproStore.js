@@ -78,6 +78,7 @@ import {
   isFirestoreNetworkError,
   isFirestoreQuotaError,
 } from '../lib/cloudSyncDiff'
+import { compareCloudConflictDatasets } from '../lib/cloudConflictComparison'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
 import {
   getCloudStartupAction,
@@ -976,9 +977,14 @@ function getComparableCloudWorkspace(dataset) {
 }
 
 function cloudWorkspacesMatch(localDataset, remoteDataset) {
+  // Tant l'estat local com el remot poden provenir de versions antigues que
+  // encara no desaven els camps opcionals. Normalitzar els dos costats evita
+  // presentar com a conflicte un valor absent i el seu valor predeterminat.
+  const normalizedLocalDataset = normalizeDataset(localDataset)
+  const normalizedRemoteDataset = normalizeDataset(remoteDataset)
   return areCloudDocumentsEqual(
-    getComparableCloudWorkspace(localDataset),
-    getComparableCloudWorkspace(remoteDataset),
+    getComparableCloudWorkspace(normalizedLocalDataset),
+    getComparableCloudWorkspace(normalizedRemoteDataset),
   )
 }
 
@@ -1981,6 +1987,18 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       return []
     }
+  },
+
+  compareCurrentCloudWorkspace: async () => {
+    const state = get()
+    if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de comparar les dades.')
+    const workspace = await loadCloudWorkspace(state.cloud.user.uid)
+    if (!workspace.exists) throw new Error('Encara no hi ha cap còpia de dades desada a Firebase.')
+    return compareCloudConflictDatasets(
+      normalizeDataset(getDatasetFromState(state)),
+      normalizeDataset(workspace.dataset),
+      COLLECTIONS,
+    )
   },
 
   restoreCloudBackup: async (backupId) => {
