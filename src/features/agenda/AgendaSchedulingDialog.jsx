@@ -17,6 +17,13 @@ function initialStartDate(academicYear, today) {
   return today
 }
 
+function firstFuturePlannedDate(setup, today, fallback) {
+  return setup?.existingSessions
+    .filter((session) => session.status === 'planned' && String(session.startsAt).slice(0, 10) >= today)
+    .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
+    ?.startsAt.slice(0, 10) || fallback
+}
+
 export function AgendaSchedulingDialog({
   academicYear,
   classes,
@@ -64,6 +71,10 @@ export function AgendaSchedulingDialog({
       const remaining = nextSetup.activities.filter((activity) =>
         !nextSetup.scheduledSourceActivityIds.includes(activity.id))
       setSetup(nextSetup)
+      if (values.mode === 'smart') {
+        const smartStartDate = firstFuturePlannedDate(nextSetup, today, values.startDate)
+        setValues((current) => ({ ...current, startDate: smartStartDate }))
+      }
       setSelectedActivityIds(values.mode === 'smart'
         ? nextSetup.activities.map((activity) => activity.id)
         : values.mode === 'complete'
@@ -77,7 +88,11 @@ export function AgendaSchedulingDialog({
   }
 
   const changeMode = (mode) => {
-    setValues((current) => ({ ...current, mode }))
+    setValues((current) => ({
+      ...current,
+      mode,
+      startDate: mode === 'smart' ? firstFuturePlannedDate(setup, today, current.startDate) : current.startDate,
+    }))
     setPreview(null)
     if (!setup) return
     setSelectedActivityIds(mode === 'smart'
