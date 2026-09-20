@@ -2806,6 +2806,10 @@ button.tutorial-record-pill {
   min-height: unset;
 }
 
+.tutorial-record-form-card.family-interview-active {
+  grid-column: 1 / -1;
+}
+
 .tutorial-record-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2840,6 +2844,163 @@ button.tutorial-record-pill {
   font-size: 14px;
   font-weight: 850;
   text-transform: none;
+}
+
+.family-interview-mode {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.family-interview-mode > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.family-interview-mode button {
+  min-height: 40px;
+  grid-column: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #64748b;
+  background: white;
+  font-weight: 900;
+}
+
+.family-interview-mode button.active {
+  border-color: #5eead4;
+  color: #0f766e;
+  background: #f0fdfa;
+  box-shadow: 0 0 0 2px rgb(204 251 241 / 70%);
+}
+
+.family-interview-template {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  border: 1px solid #99f6e4;
+  border-radius: 12px;
+  padding: 14px;
+  background: linear-gradient(145deg, #f0fdfa, #fff);
+}
+
+.family-interview-template > header,
+.family-interview-agreements > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #0f766e;
+}
+
+.family-interview-template > header > div,
+.family-interview-agreements > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.family-interview-template > header strong,
+.family-interview-agreements > header strong {
+  color: #134e4a;
+  font-size: 14px;
+}
+
+.family-interview-template > header span,
+.family-interview-agreements > header span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.family-interview-topics {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.family-interview-topics legend {
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.family-interview-topics > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.family-interview-topics button {
+  min-height: 31px;
+  grid-column: auto;
+  border: 1px solid #ccfbf1;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #0f766e;
+  background: white;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.family-interview-topics button.active {
+  border-color: #14b8a6;
+  color: white;
+  background: #0f766e;
+}
+
+.family-interview-fields,
+.family-interview-agreements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.family-interview-fields .full,
+.family-interview-agreements > header {
+  grid-column: 1 / -1;
+}
+
+.family-interview-fields textarea,
+.family-interview-agreements textarea,
+.family-interview-other textarea {
+  min-height: 112px;
+  background: rgb(255 255 255 / 90%);
+}
+
+.family-interview-agreements {
+  border-top: 1px solid #ccfbf1;
+  padding-top: 13px;
+}
+
+.family-interview-agreements label:last-child {
+  grid-column: 1 / -1;
+}
+
+.tutorial-record-entry p,
+.tutorial-important-records p {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .family-interview-fields,
+  .family-interview-agreements {
+    grid-template-columns: 1fr;
+  }
+
+  .family-interview-fields .full,
+  .family-interview-agreements > header,
+  .family-interview-agreements label:last-child {
+    grid-column: 1;
+  }
 }
 
 .tutorial-record-form textarea {

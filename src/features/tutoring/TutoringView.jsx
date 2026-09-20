@@ -53,6 +53,11 @@ import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
 import {
+  buildFamilyInterviewNote,
+  createFamilyInterviewDraft,
+  FAMILY_INTERVIEW_TOPICS,
+} from '../../lib/familyInterview'
+import {
   ensureSociometricSurveyPublicForm,
   listSociometricSurveyResponses,
   subscribeToTutoringSpaceChangeSignals,
@@ -314,6 +319,109 @@ const SOCIOMETRIC_CATEGORY_META = {
 const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 const TUTORING_TEXT_LIMIT = 700
+const FAMILY_INTERVIEW_FIELD_LIMIT = 1400
+
+function FamilyInterviewTemplate({ draft, onChange, onToggleTopic }) {
+  return (
+    <section className="family-interview-template">
+      <header>
+        <HeartHandshake size={21} />
+        <div>
+          <strong>Guió de l’entrevista</strong>
+          <span>Comença pel que funciona, escolta la família i acaba amb acords concrets.</span>
+        </div>
+      </header>
+
+      <fieldset className="family-interview-topics">
+        <legend>Temes que tractareu</legend>
+        <div>{FAMILY_INTERVIEW_TOPICS.map((topic) => (
+          <button
+            aria-pressed={draft.topics.includes(topic.id)}
+            className={draft.topics.includes(topic.id) ? 'active' : ''}
+            key={topic.id}
+            onClick={() => onToggleTopic(topic.id)}
+            type="button"
+          >{topic.label}</button>
+        ))}</div>
+      </fieldset>
+
+      <div className="family-interview-fields">
+        <label className="full">
+          Motiu i objectiu de la reunió
+          <textarea
+            maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+            onChange={(event) => onChange('objective', event.target.value)}
+            placeholder="Què volem entendre, compartir o acordar avui?"
+            required
+            value={draft.objective}
+          />
+        </label>
+        <label>
+          Fortaleses i evolució positiva
+          <textarea
+            maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+            onChange={(event) => onChange('strengths', event.target.value)}
+            placeholder="Què està funcionant i quins progressos volem reconèixer?"
+            value={draft.strengths}
+          />
+        </label>
+        <label>
+          Mirada del centre
+          <textarea
+            maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+            onChange={(event) => onChange('schoolView', event.target.value)}
+            placeholder="Aprenentatge, hàbits, assistència, benestar, convivència o suports."
+            value={draft.schoolView}
+          />
+        </label>
+        <label>
+          Aportacions de la família
+          <textarea
+            maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+            onChange={(event) => onChange('familyView', event.target.value)}
+            placeholder="Què observa la família? Què li preocupa i què creu que ajuda?"
+            value={draft.familyView}
+          />
+        </label>
+        <label>
+          Veu de l’alumne · si participa
+          <textarea
+            maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+            onChange={(event) => onChange('studentVoice', event.target.value)}
+            placeholder="Com valora la situació i què es proposa?"
+            value={draft.studentVoice}
+          />
+        </label>
+      </div>
+
+      <div className="family-interview-agreements">
+        <header><ClipboardList size={17} /><div><strong>Acords i responsables</strong><span>Escriu accions petites, concretes i revisables.</span></div></header>
+        <label>
+          Tutor o centre
+          <textarea maxLength={FAMILY_INTERVIEW_FIELD_LIMIT} onChange={(event) => onChange('schoolCommitments', event.target.value)} placeholder="Què farem des del centre?" value={draft.schoolCommitments} />
+        </label>
+        <label>
+          Família
+          <textarea maxLength={FAMILY_INTERVIEW_FIELD_LIMIT} onChange={(event) => onChange('familyCommitments', event.target.value)} placeholder="Què farà la família?" value={draft.familyCommitments} />
+        </label>
+        <label>
+          Alumne
+          <textarea maxLength={FAMILY_INTERVIEW_FIELD_LIMIT} onChange={(event) => onChange('studentCommitments', event.target.value)} placeholder="Què provarà o farà l’alumne?" value={draft.studentCommitments} />
+        </label>
+      </div>
+
+      <label className="full family-interview-other">
+        Altres informacions rellevants · opcional
+        <textarea
+          maxLength={FAMILY_INTERVIEW_FIELD_LIMIT}
+          onChange={(event) => onChange('other', event.target.value)}
+          placeholder="Anota només la informació educativa necessària per al seguiment."
+          value={draft.other}
+        />
+      </label>
+    </section>
+  )
+}
 const RELATION_NOTE_LIMIT = 400
 const SEATING_GRID_COLUMNS = 9
 const SEATING_GRID_ROWS = 5
@@ -4146,6 +4254,8 @@ export function TutoringView() {
     contactOutcome: 'contacted',
     contactPerson: '',
     followUpDate: '',
+    familyInterview: createFamilyInterviewDraft(),
+    familyInterviewEnabled: false,
     isImportant: false,
     studentId: '',
     type: 'family-contact',
@@ -5558,6 +5668,10 @@ export function TutoringView() {
     ],
   )
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
+  const familyInterviewActive = recordForm.type === 'family-contact' && recordForm.familyInterviewEnabled
+  const preparedRecordNote = familyInterviewActive
+    ? buildFamilyInterviewNote(recordForm.familyInterview)
+    : recordForm.note
 
   const handleSubmitTutorialRecord = async (event) => {
     event.preventDefault()
@@ -5569,7 +5683,7 @@ export function TutoringView() {
       studentId,
       type: recordForm.type,
       date: recordForm.date,
-      note: recordForm.note,
+      note: preparedRecordNote,
       agendaKind: recordForm.agendaKind,
       contactChannel: recordForm.contactChannel,
       contactOutcome: recordForm.contactOutcome,
@@ -5582,6 +5696,7 @@ export function TutoringView() {
       studentId,
       date: getTodayDateInput(),
       contactPerson: '',
+      familyInterview: createFamilyInterviewDraft(),
       followUpDate: '',
       isImportant: false,
       note: '',
@@ -7363,7 +7478,7 @@ export function TutoringView() {
           )}
 
           <div className="tutorial-tracking-grid">
-            <article className="tutoring-card tutorial-record-form-card">
+            <article className={`tutoring-card tutorial-record-form-card ${familyInterviewActive ? 'family-interview-active' : ''}`}>
               <div>
                 <Plus size={24} />
                 <h2>Nova anotació</h2>
@@ -7416,6 +7531,13 @@ export function TutoringView() {
 
                 {recordForm.type === 'family-contact' && (
                   <>
+                    <div className="family-interview-mode">
+                      <span>Format del registre</span>
+                      <div>
+                        <button className={!recordForm.familyInterviewEnabled ? 'active' : ''} onClick={() => setRecordForm((current) => ({ ...current, familyInterviewEnabled: false }))} type="button">Anotació breu</button>
+                        <button className={recordForm.familyInterviewEnabled ? 'active' : ''} onClick={() => setRecordForm((current) => ({ ...current, contactChannel: 'meeting', contactOutcome: 'contacted', familyInterviewEnabled: true }))} type="button">Entrevista completa</button>
+                      </div>
+                    </div>
                     <label>
                       Canal
                       <select
@@ -7439,7 +7561,7 @@ export function TutoringView() {
                       </select>
                     </label>
                     <label className="full">
-                      Persona de contacte · opcional
+                      {familyInterviewActive ? 'Assistents · opcional' : 'Persona de contacte · opcional'}
                       <input
                         onChange={(event) => setRecordForm((current) => ({ ...current, contactPerson: event.target.value }))}
                         placeholder="Ex: mare, pare, tutor legal..."
@@ -7447,6 +7569,25 @@ export function TutoringView() {
                       />
                     </label>
                   </>
+                )}
+
+                {familyInterviewActive && (
+                  <FamilyInterviewTemplate
+                    draft={recordForm.familyInterview}
+                    onChange={(field, value) => setRecordForm((current) => ({
+                      ...current,
+                      familyInterview: { ...current.familyInterview, [field]: value },
+                    }))}
+                    onToggleTopic={(topicId) => setRecordForm((current) => ({
+                      ...current,
+                      familyInterview: {
+                        ...current.familyInterview,
+                        topics: current.familyInterview.topics.includes(topicId)
+                          ? current.familyInterview.topics.filter((id) => id !== topicId)
+                          : [...current.familyInterview.topics, topicId],
+                      },
+                    }))}
+                  />
                 )}
 
                 {recordForm.type === 'agenda' && (
@@ -7476,7 +7617,7 @@ export function TutoringView() {
                   />
                 </label>
 
-                <label className="full">
+                {!familyInterviewActive && <label className="full">
                   Resum
                   <textarea
                     maxLength={TUTORING_TEXT_LIMIT}
@@ -7489,7 +7630,7 @@ export function TutoringView() {
                     required={isTutorialRegistryRecord(recordForm)}
                     value={recordForm.note}
                   />
-                </label>
+                </label>}
 
                 {isTutorialRegistryRecord(recordForm) && (
                   <>
@@ -7519,7 +7660,7 @@ export function TutoringView() {
                   </>
                 )}
 
-                <button className="primary-action" disabled={classStudents.length === 0} type="submit">
+                <button className="primary-action" disabled={classStudents.length === 0 || (isTutorialRegistryRecord(recordForm) && !preparedRecordNote.trim())} type="submit">
                   Desar anotació
                 </button>
               </form>
