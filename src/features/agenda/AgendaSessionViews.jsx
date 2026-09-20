@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getClassroomPromptState } from '../../domain/planning'
-import { findNextTimetableOccurrence } from '../../lib/agendaToday'
+import { findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../../lib/agendaToday'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
@@ -170,8 +170,9 @@ export function AgendaTodayView({
   )
 }
 
-export function AgendaWeekView({ bundles, classes, coordinationReminders, loading, onMoveWeek, onOpenCoordination, onOpenSession, onReload, weekStart }) {
+export function AgendaWeekView({ bundles, classes, coordinationReminders, loading, onMoveWeek, onOpenCoordination, onOpenSession, onOpenTimetable, onReload, slots, timetable, weekStart }) {
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
+  const timetableOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
   return (
     <section className="agenda-week-view">
       <header className="agenda-view-toolbar">
@@ -181,11 +182,39 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
       <div className="agenda-week-columns">{days.map((dateKey) => {
         const dayBundles = bundles.filter((bundle) => sessionDate(bundle) === dateKey)
         const dayReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
+        const dayTimetable = timetableOccurrences.filter((item) => item.date === dateKey)
         const dayItems = [
           ...dayBundles.map((bundle) => ({ bundle, kind: 'session', time: sessionTime(bundle) })),
           ...dayReminders.map((reminder) => ({ kind: 'reminder', reminder, time: reminder.reminder.time })),
+          ...dayTimetable.map((occurrence) => ({ kind: 'timetable', occurrence, time: occurrence.slot.startsAt })),
         ].sort((left, right) => left.time.localeCompare(right.time))
-        return <section key={dateKey}><header><span>{formatDate(dateKey, { weekday: true })}</span><strong>{dateKey.slice(8, 10)}</strong><small>{dayBundles.length} sessions{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small></header><div>{dayItems.length === 0 ? <p>Sense sessions ni recordatoris</p> : dayItems.map((item) => item.kind === 'session' ? <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button> : <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>)}</div></section>
+        const totalClasses = dayBundles.length + dayTimetable.length
+        return (
+          <section key={dateKey}>
+            <header>
+              <span>{formatDate(dateKey, { weekday: true })}</span>
+              <strong>{dateKey.slice(8, 10)}</strong>
+              <small>{totalClasses} {totalClasses === 1 ? 'classe' : 'classes'}{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small>
+            </header>
+            <div>{dayItems.length === 0 ? <p>Sense classes ni recordatoris</p> : dayItems.map((item) => {
+              if (item.kind === 'session') {
+                return <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button>
+              }
+              if (item.kind === 'reminder') {
+                return <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>
+              }
+              const classItem = classes.find((candidate) => candidate.id === item.occurrence.slot.classId)
+              const slot = item.occurrence.slot
+              const slotDetails = [
+                slot.subject && slot.subject !== classItem?.name ? slot.subject : '',
+                `${slot.durationMinutes} min`,
+                slot.subgroupId,
+                slot.space,
+              ].filter(Boolean).join(' · ')
+              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'}`} key={item.occurrence.id} onClick={onOpenTimetable} type="button"><span><CalendarRange size={12} />{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{slotDetails}</small><em>Horari · sense programació</em></button>
+            })}</div>
+          </section>
+        )
       })}</div>
     </section>
   )

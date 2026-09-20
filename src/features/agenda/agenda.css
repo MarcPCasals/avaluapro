@@ -375,6 +375,17 @@
 .agenda-week-session > span { font-size: 10px; font-weight: 950; }
 .agenda-week-session strong { color: #334155; font-size: 9px; }
 .agenda-week-session small { overflow: hidden; color: #94a3b8; font-size: 7px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-week-timetable { --week-class-accent: #3b82f6; --week-class-border: #bfdbfe; --week-class-color: #1e40af; --week-class-soft: #eff6ff; display: grid; gap: 2px; border: 1px solid var(--week-class-border); border-left: 3px solid var(--week-class-accent); border-radius: 8px; padding: 8px; color: var(--week-class-color); background: var(--week-class-soft); text-align: left; }
+.agenda-week-timetable.green { --week-class-accent: #10b981; --week-class-border: #a7f3d0; --week-class-color: #065f46; --week-class-soft: #ecfdf5; }
+.agenda-week-timetable.red { --week-class-accent: #ef4444; --week-class-border: #fecaca; --week-class-color: #991b1b; --week-class-soft: #fff1f2; }
+.agenda-week-timetable.purple { --week-class-accent: #8b5cf6; --week-class-border: #c4b5fd; --week-class-color: #5b21b6; --week-class-soft: #f5f3ff; }
+.agenda-week-timetable.yellow { --week-class-accent: #f59e0b; --week-class-border: #fde68a; --week-class-color: #92400e; --week-class-soft: #fffbeb; }
+.agenda-week-timetable.orange { --week-class-accent: #f97316; --week-class-border: #fed7aa; --week-class-color: #9a3412; --week-class-soft: #fff7ed; }
+.agenda-week-timetable > span { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 950; }
+.agenda-week-timetable strong { color: currentColor; font-size: 9px; }
+.agenda-week-timetable small { overflow: hidden; color: #64748b; font-size: 7px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-week-timetable em { width: fit-content; margin-top: 2px; border-radius: 999px; padding: 2px 5px; color: #64748b; background: rgb(255 255 255 / 72%); font-size: 6px; font-style: normal; font-weight: 900; }
+.agenda-week-timetable:hover { filter: saturate(1.1) brightness(.99); }
 .agenda-week-reminder { display: grid; gap: 2px; border: 1px solid #fde68a; border-left: 3px solid #f59e0b; border-radius: 8px; padding: 8px; color: #b45309; background: #fffbeb; text-align: left; }
 .agenda-week-reminder > span { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 950; }
 .agenda-week-reminder strong { color: #92400e; font-size: 9px; }

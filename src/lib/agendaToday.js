@@ -40,3 +40,39 @@ export function findNextTimetableOccurrence(slots = [], today, nowTime = '00:00'
   }
   return null
 }
+
+/**
+ * Converteix les franges recurrents de l'horari en entrades visibles de la
+ * setmana. Les franges que ja tenen una sessió de Programació es descarten
+ * perquè la sessió completa ocuparà el seu lloc i no s'ha de duplicar.
+ */
+export function getWeekTimetableOccurrences({ bundles = [], slots = [], timetable = null, weekStart }) {
+  if (!weekStart) return []
+
+  return slots
+    .filter((slot) => Number(slot.weekday) >= 1 && Number(slot.weekday) <= 5)
+    .map((slot) => {
+      const date = addDays(weekStart, Number(slot.weekday) - 1)
+      if (timetable?.effectiveFrom && date < timetable.effectiveFrom) return null
+      if (timetable?.effectiveTo && date > timetable.effectiveTo) return null
+
+      const programmed = bundles.some((bundle) => {
+        const session = bundle.session || {}
+        if (String(session.startsAt || '').slice(0, 10) !== date) return false
+        if (session.timetableSlotId && session.timetableSlotId === slot.id) return true
+        return session.classId === slot.classId
+          && String(session.startsAt || '').slice(11, 16) === slot.startsAt
+          && String(session.subgroupId || '') === String(slot.subgroupId || '')
+      })
+      if (programmed) return null
+
+      return {
+        date,
+        id: `timetable_${date}_${slot.id}`,
+        slot,
+        startsAt: `${date}T${slot.startsAt}:00`,
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+}
