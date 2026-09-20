@@ -1379,6 +1379,7 @@
 
 .cloud-comparison-result > div { display: grid; gap: 4px; }
 .cloud-comparison-result span { color: #475569; font-size: 12px; font-weight: 750; }
+.cloud-comparison-result span small { display: block; margin-top: 2px; color: #64748b; font-size: 11px; }
 .cloud-comparison-result p, .cloud-comparison-error { margin: 0; font-size: 12px; font-weight: 800; }
 .cloud-comparison-error { color: #b91c1c; }
 

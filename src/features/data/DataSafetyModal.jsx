@@ -599,6 +599,11 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                           {row.localOnly > 0 && ` · ${row.localOnly} només aquí`}
                           {row.cloudOnly > 0 && ` · ${row.cloudOnly} només a Firebase`}
                           {row.uncertain > 0 && ` · ${row.uncertain} sense data comparable`}
+                          {row.examples.map((example) => (
+                            <small key={`${row.collection}_${example.id}`}>
+                              {example.label}: {example.fields.join(', ')}
+                            </small>
+                          ))}
                         </span>
                       ))}
                     </div>

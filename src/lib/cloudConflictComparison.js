@@ -62,14 +62,21 @@ export function compareCloudConflictDatasets(localDataset = {}, cloudDataset = {
     let localNewer = 0
     let cloudNewer = 0
     let uncertain = 0
+    const examples = []
 
     localById.forEach((localRow, id) => {
       const cloudRow = cloudById.get(id)
       if (!cloudRow) {
         localOnly += 1
+        if (examples.length < 3) examples.push({ id, label: localRow.name || localRow.title || id, fields: ['només aquí'] })
         return
       }
       if (areCloudDocumentsEqual(localRow, cloudRow)) return
+      if (examples.length < 3) {
+        const fields = [...new Set([...Object.keys(localRow), ...Object.keys(cloudRow)])]
+          .filter((field) => !areCloudDocumentsEqual(localRow[field], cloudRow[field]))
+        examples.push({ id, label: localRow.name || localRow.title || cloudRow.name || cloudRow.title || id, fields })
+      }
       const localUpdatedAt = getRowUpdatedAt(localRow)
       const cloudUpdatedAt = getRowUpdatedAt(cloudRow)
       if (!localUpdatedAt || !cloudUpdatedAt || localUpdatedAt === cloudUpdatedAt) uncertain += 1
@@ -78,7 +85,13 @@ export function compareCloudConflictDatasets(localDataset = {}, cloudDataset = {
     })
 
     cloudById.forEach((_cloudRow, id) => {
-      if (!localById.has(id)) cloudOnly += 1
+      if (!localById.has(id)) {
+        cloudOnly += 1
+        if (examples.length < 3) {
+          const cloudRow = cloudById.get(id)
+          examples.push({ id, label: cloudRow.name || cloudRow.title || id, fields: ['només a Firebase'] })
+        }
+      }
     })
 
     return {
@@ -92,6 +105,7 @@ export function compareCloudConflictDatasets(localDataset = {}, cloudDataset = {
       localOnly,
       uncertain,
       differenceCount: localOnly + cloudOnly + localNewer + cloudNewer + uncertain,
+      examples,
     }
   }).filter((row) => row.differenceCount > 0)
 
