@@ -149,6 +149,19 @@
 .agenda-slot-content span { font-size: 9px; font-weight: 800; }
 .agenda-slot-content small { opacity: .78; font-size: 8px; font-weight: 750; }
 
+.agenda-late-slots { min-width: 920px; display: grid; gap: 9px; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px 12px; background: #f8fafc; }
+.agenda-late-slots > header { display: flex; align-items: center; gap: 8px; color: #7c3aed; }
+.agenda-late-slots > header > div { display: grid; gap: 1px; }
+.agenda-late-slots > header strong { color: #334155; font-size: 10px; }
+.agenda-late-slots > header span { color: #94a3b8; font-size: 8px; font-weight: 750; }
+.agenda-late-slots > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.agenda-late-slot-card { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 43px 22px; gap: 5px; align-items: center; border: 1px solid #c4b5fd; border-left: 4px solid #8b5cf6; border-radius: 8px; padding: 7px; color: #4c1d95; background: #f5f3ff; }
+.agenda-late-slot-card.green { border-color: #a7f3d0; border-left-color: #10b981; color: #065f46; background: #ecfdf5; }
+.agenda-late-slot-card.blue { border-color: #bfdbfe; border-left-color: #3b82f6; color: #1e40af; background: #eff6ff; }
+.agenda-late-slot-card.red { border-color: #fecaca; border-left-color: #ef4444; color: #991b1b; background: #fff1f2; }
+.agenda-late-slot-card.yellow { border-color: #fde68a; border-left-color: #f59e0b; color: #92400e; background: #fffbeb; }
+.agenda-late-slot-card.orange { border-color: #fed7aa; border-left-color: #f97316; color: #9a3412; background: #fff7ed; }
+
 .agenda-calendar-view { min-height: 490px; }
 .agenda-calendar-empty { min-height: 360px; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 28px; color: #f97316; text-align: center; }
 .agenda-calendar-empty strong { color: #334155; font-size: 15px; }
@@ -408,6 +421,7 @@
   .agenda-schedule-preview { min-height: 360px; border-top: 1px solid #e2e8f0; border-left: 0; padding-top: 15px; padding-left: 0; }
   .agenda-preview-placeholder { min-height: 330px; }
   .agenda-timetable-class-list { grid-template-columns: 1fr; }
+  .agenda-late-slots > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
@@ -427,6 +441,7 @@
   .agenda-timetable-class-row > svg { display: none; }
   .agenda-timetable-class-add { grid-template-columns: 1fr 100px; }
   .agenda-timetable-class-add button { grid-column: 1 / -1; justify-content: center; }
+  .agenda-late-slots > div { grid-template-columns: 1fr; }
   .agenda-schedule-modes { grid-template-columns: 1fr; }
   .agenda-proposed-sessions article { grid-template-columns: 98px minmax(0, 1fr); }
   .agenda-session-detail > header, .agenda-next-timetable-slot > header { grid-template-columns: 82px minmax(0, 1fr); }

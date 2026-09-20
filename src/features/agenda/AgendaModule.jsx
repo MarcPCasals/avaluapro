@@ -12,6 +12,7 @@ import {
 } from '../../domain/planning'
 import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassroomMode } from '../classroom/ClassroomMode'
@@ -47,7 +48,7 @@ function consumeAgendaSchedulingRequest() {
   return planningUnitId
 }
 const GRID_START = 7 * 60 + 30
-const GRID_END = 18 * 60
+const GRID_END = 17 * 60
 const GRID_STEP = 15
 const GRID_ROWS = Array.from({ length: (GRID_END - GRID_START) / GRID_STEP }, (_, index) => GRID_START + index * GRID_STEP)
 
@@ -61,11 +62,6 @@ const EVENT_DETAILS = {
 
 function minutesToTime(minutes) {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
-}
-
-function timeToMinutes(value) {
-  const [hours, minutes] = String(value || '00:00').split(':').map(Number)
-  return hours * 60 + minutes
 }
 
 function compactDurationLabel(durationMinutes) {
@@ -170,7 +166,7 @@ function TimetableClassPalette({ classes, onAddClass, onError, onSelectClass, on
     if (!name) return
     setSaving(true)
     try {
-      await onAddClass({ color: newClass.color, name })
+      await onAddClass({ color: newClass.color, name, subject: name })
       setNewClass((current) => ({ ...current, color: CLASS_COLORS[(classes.length + 1) % CLASS_COLORS.length]?.id || 'blue', name: '' }))
     } catch (error) {
       onError(error)
@@ -196,6 +192,7 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
   const [dragId, setDragId] = useState('')
   const [busyKey, setBusyKey] = useState('')
   const classById = useMemo(() => new Map(classes.map((item) => [item.id, item])), [classes])
+  const visibleSlots = useMemo(() => splitTimetableSlots(slots), [slots])
   const selectedClass = classById.get(selectedClassId) || null
   const drop = async (weekday, startsAt) => {
     const slot = slots.find((item) => item.id === dragId)
@@ -242,6 +239,55 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
       setBusyKey('')
     }
   }
+  const slotCard = (slot, late = false) => {
+    const classItem = classById.get(slot.classId)
+    return (
+      <article
+        className={`${late ? 'agenda-late-slot-card' : 'agenda-slot-card'} ${classItem?.color || 'purple'} ${dragId === slot.id ? 'dragging' : ''}`}
+        key={slot.id}
+        {...(!late ? {
+          style: {
+            gridColumn: slot.weekday + 1,
+            gridRow: `${Math.max(0, Math.round((timetableTimeToMinutes(slot.startsAt) - GRID_START) / GRID_STEP)) + 2} / span ${Math.max(1, Math.min(
+              Math.ceil(Number(slot.durationMinutes) / GRID_STEP),
+              Math.ceil((GRID_END - timetableTimeToMinutes(slot.startsAt)) / GRID_STEP),
+            ))}`,
+          },
+        } : {})}
+      >
+        {!late && <button
+          aria-label={`Arrossegar ${classItem?.name || slot.subject}`}
+          className="agenda-slot-handle"
+          draggable
+          onDragEnd={() => setDragId('')}
+          onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; setDragId(slot.id) }}
+          onPointerCancel={() => setDragId('')}
+          onPointerDown={(event) => {
+            if (event.pointerType === 'mouse') return
+            event.preventDefault()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            setDragId(slot.id)
+          }}
+          onPointerUp={(event) => {
+            if (event.pointerType === 'mouse') return
+            event.currentTarget.releasePointerCapture(event.pointerId)
+            touchDrop(event.clientX, event.clientY)
+          }}
+          title="Arrossega per canviar dia o hora"
+          type="button"
+        ><Menu size={16} /></button>}
+        <button className="agenda-slot-content" onClick={() => onEdit(slot)} title="Obrir els detalls de la franja" type="button">
+          {late && <small>{WEEKDAYS.find(([weekday]) => weekday === Number(slot.weekday))?.[1]} · {slot.startsAt}</small>}
+          <strong>{classItem?.name || 'Grup'}</strong>
+          <span>{slot.subject}</span>
+          {!late && <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}</small>}
+          {late && (slot.subgroupId || slot.space) && <small>{[slot.subgroupId, slot.space].filter(Boolean).join(' · ')}</small>}
+        </button>
+        <button aria-label={`Canviar la durada de ${classItem?.name || slot.subject}`} className="agenda-slot-duration" disabled={busyKey === `duration-${slot.id}`} onClick={() => resize(slot)} title="Clica per canviar entre 1 h, 1:30 h i 2 h" type="button">{busyKey === `duration-${slot.id}` ? <Loader2 className="spin" size={13} /> : compactDurationLabel(slot.durationMinutes)}</button>
+        <button aria-label={`Eliminar ${classItem?.name || slot.subject}`} className="agenda-slot-delete" onClick={() => onDelete(slot)} type="button"><Trash2 size={14} /></button>
+      </article>
+    )
+  }
   return (
     <div className="agenda-grid-scroll">
       <div className="agenda-week-grid" style={{ '--agenda-grid-rows': GRID_ROWS.length }}>
@@ -263,48 +309,12 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
             title={selectedClass ? `Afegir ${selectedClass.name} a les ${minutesToTime(minutes)}` : 'Selecciona primer una classe'}
           />
         )))}
-        {slots.filter((slot) => slot.weekday <= 5).map((slot) => {
-          const startRow = Math.max(0, Math.round((timeToMinutes(slot.startsAt) - GRID_START) / GRID_STEP))
-          const rowSpan = Math.max(2, Math.ceil(Number(slot.durationMinutes) / GRID_STEP))
-          const classItem = classById.get(slot.classId)
-          return (
-            <article
-              className={`agenda-slot-card ${classItem?.color || 'purple'} ${dragId === slot.id ? 'dragging' : ''}`}
-              key={slot.id}
-              style={{ gridColumn: slot.weekday + 1, gridRow: `${startRow + 2} / span ${rowSpan}` }}
-            >
-              <button
-                aria-label={`Arrossegar ${classItem?.name || slot.subject}`}
-                className="agenda-slot-handle"
-                draggable
-                onDragEnd={() => setDragId('')}
-                onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; setDragId(slot.id) }}
-                onPointerCancel={() => setDragId('')}
-                onPointerDown={(event) => {
-                  if (event.pointerType === 'mouse') return
-                  event.preventDefault()
-                  event.currentTarget.setPointerCapture(event.pointerId)
-                  setDragId(slot.id)
-                }}
-                onPointerUp={(event) => {
-                  if (event.pointerType === 'mouse') return
-                  event.currentTarget.releasePointerCapture(event.pointerId)
-                  touchDrop(event.clientX, event.clientY)
-                }}
-                title="Arrossega per canviar dia o hora"
-                type="button"
-              ><Menu size={16} /></button>
-              <button className="agenda-slot-content" onClick={() => onEdit(slot)} title="Obrir els detalls de la franja" type="button">
-                <strong>{classItem?.name || 'Grup'}</strong>
-                <span>{slot.subject}</span>
-                <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}</small>
-              </button>
-              <button aria-label={`Canviar la durada de ${classItem?.name || slot.subject}`} className="agenda-slot-duration" disabled={busyKey === `duration-${slot.id}`} onClick={() => resize(slot)} title="Clica per canviar entre 1 h, 1:30 h i 2 h" type="button">{busyKey === `duration-${slot.id}` ? <Loader2 className="spin" size={13} /> : compactDurationLabel(slot.durationMinutes)}</button>
-              <button aria-label={`Eliminar ${classItem?.name || slot.subject}`} className="agenda-slot-delete" onClick={() => onDelete(slot)} type="button"><Trash2 size={14} /></button>
-            </article>
-          )
-        })}
+        {visibleSlots.daytime.map((slot) => slotCard(slot))}
       </div>
+      {visibleSlots.late.length > 0 && <section className="agenda-late-slots">
+        <header><Clock3 size={17} /><div><strong>Després de les 17 h</strong><span>Aquestes franges no allarguen la graella.</span></div></header>
+        <div>{visibleSlots.late.map((slot) => slotCard(slot, true))}</div>
+      </section>}
     </div>
   )
 }
