@@ -76,16 +76,18 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.filter((item) => item?.url).map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
+function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom }) {
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
+  const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId)
   return (
     <div className="agenda-session-detail">
       <header>
         <div className="agenda-session-time"><span>{formatDate(sessionDate(bundle), { weekday: true })}</span><strong>{sessionTime(bundle)}</strong><small>{bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div>
         <div><span>{bundle.planningUnit.code}</span><h3>{bundle.planningUnit.title}</h3><p>{classNameFor(classes, bundle.session.classId)}</p></div>
-        <span className={`agenda-session-status ${bundle.session.status}`}>{STATUS_LABELS[bundle.session.status]}</span>
+        <span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span>
       </header>
+      {blockingEvent && <div className="agenda-session-calendar-blocked"><Moon size={18} /><div><strong>{blockingEvent.title}</strong><span>{CALENDAR_EVENT_LABELS[blockingEvent.type] || 'Canvi de calendari'} · aquesta sessió no es fa.</span>{blockingEvent.reason && <p>{blockingEvent.reason}</p>}</div></div>}
       <div className="agenda-session-activities">
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
         {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
@@ -98,7 +100,7 @@ function SessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
         {materials.length === 0 ? <p className="agenda-session-muted">No hi ha cap material enllaçat.</p> : <div>{materials.map((material) => <a href={material.url} key={material.url} rel="noreferrer" target="_blank"><ExternalLink size={13} /><span>{material.label || material.url}</span></a>)}</div>}
       </div>
       <div className="agenda-session-actions">
-        {onOpenClassroom && !['cancelled', 'notHeld'].includes(bundle.session.status) && <button className="primary-action compact" onClick={() => onOpenClassroom(bundle)} type="button"><Clock3 size={15} />{bundle.session.classroomOpenedAt ? 'Reobrir Mode aula' : 'Obrir Mode aula'}</button>}
+        {onOpenClassroom && !blockingEvent && !['cancelled', 'notHeld'].includes(bundle.session.status) && <button className="primary-action compact" onClick={() => onOpenClassroom(bundle)} type="button"><Clock3 size={15} />{bundle.session.classroomOpenedAt ? 'Reobrir Mode aula' : 'Obrir Mode aula'}</button>}
         <button className="secondary-action compact agenda-adjust-session" onClick={() => onAdjust(bundle)} type="button"><Edit3 size={15} />Reajustar la sessió</button>
       </div>
     </div>
@@ -160,7 +162,7 @@ export function AgendaTodayView({
             <div className="agenda-timetable-placeholder"><CalendarRange size={19} /><div><strong>Encara no té activitats calendaritzades</strong><p>Pots preparar la UP o consultar l’horari, però la pròxima classe sempre queda visible.</p></div></div>
             <div className="agenda-session-actions">{onOpenTimetable && <button className="secondary-action compact" onClick={onOpenTimetable} type="button"><CalendarRange size={15} />Veure l’horari</button>}</div>
           </div>
-        ) : selectedBundle ? <SessionDetail bundle={selectedBundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p>{(onOpenScheduling || onOpenTimetable) && <div className="agenda-today-actions">{onOpenScheduling && <button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button>}{onOpenTimetable && <button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button>}</div>}</div>}
+        ) : selectedBundle ? <SessionDetail bundle={selectedBundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p>{(onOpenScheduling || onOpenTimetable) && <div className="agenda-today-actions">{onOpenScheduling && <button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button>}{onOpenTimetable && <button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button>}</div>}</div>}
       </section>
       <aside className="agenda-today-side">
         <section>
@@ -325,7 +327,7 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
   )
 }
 
-export function AgendaTimelineView({ bundles, classes, loading, onOpenSession, onSchedule, selectedClassId }) {
+export function AgendaTimelineView({ bundles, calendarEvents = [], classes, loading, onOpenSession, onSchedule, selectedClassId }) {
   const classBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
   const selectedClass = classes.find((item) => item.id === selectedClassId)
   return (
@@ -334,11 +336,14 @@ export function AgendaTimelineView({ bundles, classes, loading, onOpenSession, o
         <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{loading && <Loader2 className="spin" size={16} />}</div><p>Totes les sessions del curs, de la primera a l’última.</p></div>
         {onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}
       </header>
-      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-list">{classBundles.map((bundle, index) => <button key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{index + 1}</span><span className="agenda-timeline-dot" /><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}</span><strong>{bundle.planningUnit.title}</strong><small>{bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${bundle.session.status}`}>{STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>)}</div>}
+      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-list">{classBundles.map((bundle, index) => {
+        const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId)
+        return <button className={blockingEvent ? 'calendar-blocked' : ''} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{index + 1}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
+      })}</div>}
     </section>
   )
 }
 
-export function AgendaSessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
-  return <SessionDetail bundle={bundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} />
+export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom }) {
+  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} />
 }
