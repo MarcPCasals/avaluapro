@@ -200,7 +200,7 @@ export function AgendaTodayView({
   )
 }
 
-export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenSession, onOpenTimetable, onReload, onShowMonth, slots, timetable, weekStart }) {
+export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenReminders, onOpenSession, onOpenTimetable, onReload, onShowMonth, personalReminders, slots, timetable, weekStart }) {
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
   const timetableOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
   return (
@@ -215,12 +215,14 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
       </header>
       <div className="agenda-week-columns">{days.map((dateKey) => {
         const dayBundles = bundles.filter((bundle) => sessionDate(bundle) === dateKey)
-        const dayReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
+        const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
+        const dayPersonalReminders = personalReminders.filter((item) => item.reminder.date === dateKey)
         const dayTimetable = timetableOccurrences.filter((item) => item.date === dateKey)
         const dayEvents = getCalendarEventsForDate(calendarEvents, dateKey)
         const dayItems = [
           ...dayBundles.map((bundle) => ({ bundle, kind: 'session', time: sessionTime(bundle) })),
-          ...dayReminders.map((reminder) => ({ kind: 'reminder', reminder, time: reminder.reminder.time })),
+          ...dayCoordinationReminders.map((reminder) => ({ kind: 'coordination-reminder', reminder, time: reminder.reminder.time || '00:00' })),
+          ...dayPersonalReminders.map((reminder) => ({ kind: 'personal-reminder', reminder, time: reminder.reminder.time || '00:00' })),
           ...dayTimetable.map((occurrence) => ({ kind: 'timetable', occurrence, time: occurrence.slot.startsAt })),
         ].sort((left, right) => left.time.localeCompare(right.time))
         const totalClasses = dayBundles.length + dayTimetable.length
@@ -229,7 +231,7 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
             <header>
               <span>{formatDate(dateKey, { weekday: true })}</span>
               <strong>{dateKey.slice(8, 10)}</strong>
-              <small>{totalClasses} {totalClasses === 1 ? 'classe' : 'classes'}{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small>
+              <small>{totalClasses} {totalClasses === 1 ? 'classe' : 'classes'}{dayCoordinationReminders.length + dayPersonalReminders.length ? ` · ${dayCoordinationReminders.length + dayPersonalReminders.length} ${dayCoordinationReminders.length + dayPersonalReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small>
             </header>
             <div>
               {dayEvents.map((event) => <button className="agenda-week-day-event" disabled={!onAddEvent} key={event.id} onClick={() => onAddEvent?.(event)} type="button">{isNoClassCalendarEvent(event) ? <Moon size={12} /> : <CalendarPlus size={12} />}<span><strong>{event.title}</strong><small>{CALENDAR_EVENT_LABELS[event.type] || 'Canvi de calendari'}</small></span></button>)}
@@ -240,8 +242,11 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
                 const stopReason = blockingEvent?.title || (stoppedStatus ? STATUS_LABELS[item.bundle.session.status] : '')
                 return <button className={`agenda-week-session ${item.bundle.session.status} ${stopReason ? 'calendar-blocked' : ''}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{stopReason && <Moon size={12} />}{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{stopReason ? `${stopReason} · la sessió no es fa` : `${item.bundle.planningUnit.code} · ${item.bundle.items.length} activitats`}</small></button>
               }
-              if (item.kind === 'reminder') {
+              if (item.kind === 'coordination-reminder') {
                 return <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>
+              }
+              if (item.kind === 'personal-reminder') {
+                return <button className="agenda-week-reminder" key={item.reminder.id} onClick={onOpenReminders} type="button"><span><Bell size={11} />{item.reminder.reminder.time || 'Tot el dia'}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classItem?.name || 'Recordatori general'}</small></button>
               }
               const classItem = classes.find((candidate) => candidate.id === item.occurrence.slot.classId)
               const slot = item.occurrence.slot
@@ -262,7 +267,7 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
   )
 }
 
-export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordinationReminders, monthKey, onAddEvent, onDeleteEvent, onEditEvent, onMoveMonth, onSelectWeek, onShowWeek, slots, timetable, today }) {
+export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordinationReminders, monthKey, onAddEvent, onDeleteEvent, onEditEvent, onMoveMonth, onOpenCoordination, onOpenReminders, onSelectWeek, onShowWeek, personalReminders, slots, timetable, today }) {
   const calendarStartsOn = [academicYear?.startsOn, timetable?.effectiveFrom].filter(Boolean).sort().at(-1)
   const weeks = getMonthCalendarWeeks(monthKey, { ...academicYear, startsOn: calendarStartsOn })
   const monthPrefix = monthKey.slice(0, 7)
@@ -305,7 +310,9 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
               const noClassEvent = getNoClassCalendarEvent(calendarEvents, dateKey, '')
               const classCount = weekOccurrences.filter((item) => item.date === dateKey).length
                 + weekBundles.filter((bundle) => sessionDate(bundle) === dateKey).length
-              const reminderCount = coordinationReminders.filter((item) => item.reminder.date === dateKey).length
+              const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
+              const dayPersonalReminders = personalReminders.filter((item) => item.reminder.date === dateKey)
+              const reminderCount = dayCoordinationReminders.length + dayPersonalReminders.length
               const dateIsEditable = (!academicYear?.startsOn || dateKey >= academicYear.startsOn)
                 && (!academicYear?.endsOn || dateKey <= academicYear.endsOn)
               return (
@@ -313,6 +320,10 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
                   <button className="agenda-month-day-open" onClick={() => onSelectWeek(week.weekStart)} type="button"><span>{formatDate(dateKey, { weekday: true }).split(',')[0]}</span><strong>{dateKey.slice(8, 10)}</strong></button>
                   {onAddEvent && dateIsEditable && <button aria-label={noClassEvent ? `Editar ${noClassEvent.title}` : `Marcar ${formatDate(dateKey, { weekday: true })} com a no lectiu`} className="agenda-month-day-moon" onClick={() => noClassEvent ? onEditEvent(noClassEvent) : onAddEvent({ endsOn: dateKey, startsOn: dateKey, title: 'Festiu', type: 'holiday' })} title={noClassEvent?.title || 'Marcar tot el dia com a no lectiu'} type="button"><Moon size={12} /></button>}
                   <small>{dayEvents[0]?.title || [classCount ? `${classCount} ${classCount === 1 ? 'classe' : 'classes'}` : '', reminderCount ? `${reminderCount} avís` : ''].filter(Boolean).join(' · ') || '—'}</small>
+                  {reminderCount > 0 && <div className="agenda-month-reminders">
+                    {dayPersonalReminders.length > 0 && <button aria-label={`${dayPersonalReminders.length} ${dayPersonalReminders.length === 1 ? 'recordatori' : 'recordatoris'} del ${formatDate(dateKey, { weekday: true })}`} onClick={onOpenReminders} title="Obrir recordatoris" type="button"><Bell size={10} /><span>{dayPersonalReminders.length}</span></button>}
+                    {dayCoordinationReminders.length > 0 && <button aria-label={`${dayCoordinationReminders.length} ${dayCoordinationReminders.length === 1 ? 'recordatori compartit' : 'recordatoris compartits'} del ${formatDate(dateKey, { weekday: true })}`} onClick={() => onOpenCoordination(dayCoordinationReminders[0])} title="Obrir recordatori de cotutoria" type="button"><AgendaDoubleBell size={10} /><span>{dayCoordinationReminders.length}</span></button>}
+                  </div>}
                 </div>
               )
             })}</div>

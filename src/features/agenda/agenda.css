@@ -432,6 +432,9 @@
 .agenda-month-day-moon { width: 20px; height: 20px; display: grid; place-items: center; border: 0; border-radius: 6px; padding: 0; color: #94a3b8; background: #f1f5f9; }
 .agenda-month-day-moon:hover, .agenda-month-days > div.non-teaching .agenda-month-day-moon { color: #7c3aed; background: #ede9fe; }
 .agenda-month-days > div > small { grid-column: 1 / -1; overflow: hidden; color: #94a3b8; font-size: 6px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-month-reminders { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.agenda-month-reminders button { display: inline-flex; align-items: center; gap: 3px; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 5px; color: #92400e; background: #fffbeb; font-size: 7px; font-weight: 900; }
+.agenda-month-reminders button:hover { border-color: #f59e0b; background: #fef3c7; }
 .agenda-month-events { display: grid; gap: 10px; border-top: 1px solid #edf0f4; padding: 17px 18px 20px; }
 .agenda-month-events > header { display: flex; align-items: center; gap: 8px; color: #7c3aed; }
 .agenda-month-events > header > div { display: grid; gap: 1px; }

@@ -11,7 +11,7 @@ import {
   linkRecoveryToTaskRecords,
   reconcileMaterialPreparationReminders,
 } from '../src/lib/classroomRecovery.js'
-import { getPendingReminderSummary, getPlanningReminderSummary } from '../src/lib/reminders.js'
+import { getPendingReminderSummary, getPersonalCalendarReminders, getPlanningReminderSummary } from '../src/lib/reminders.js'
 
 test('el correu usa només el nom de pila i incorpora activitats i enllaços', () => {
   const text = buildRecoveryEmail({
@@ -94,6 +94,18 @@ test('la preparació de materials queda separada dels recordatoris generals', ()
   assert.deepEqual(summary.items.map((item) => item.kind), ['recovery'])
   assert.equal(planningSummary.count, 1)
   assert.deepEqual(planningSummary.items.map((item) => item.title), ['Imprimir: fitxa'])
+})
+
+test('el calendari rep només els recordatoris generals i de l’agenda', () => {
+  const calendarItems = getPersonalCalendarReminders([
+    { id: 'general-1', kind: 'general' },
+    { id: 'agenda-1', kind: 'agenda' },
+    { id: 'recovery-1', kind: 'recovery' },
+    { id: 'task-1', kind: 'task' },
+    { id: 'record-1', kind: 'record' },
+  ])
+
+  assert.deepEqual(calendarItems.map((item) => item.id), ['general-1', 'agenda-1'])
 })
 
 test('la mateixa preparació es mostra una sola vegada per sessió', () => {

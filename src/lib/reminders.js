@@ -153,3 +153,12 @@ export function getPendingReminderSummary({ agendaNotes = [], classes = [], stud
     items,
   }
 }
+
+/**
+ * El calendari mostra els recordatoris creats expressament des de l'Agenda.
+ * Els avisos de recuperació i de tasques es mantenen als seus fluxos de
+ * seguiment perquè no omplin el calendari amb accions de l'alumnat.
+ */
+export function getPersonalCalendarReminders(items = []) {
+  return items.filter((item) => ['agenda', 'general'].includes(item.kind))
+}
