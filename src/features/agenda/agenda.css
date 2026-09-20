@@ -240,6 +240,16 @@
 .agenda-today-live .agenda-today-main { min-height: 540px; }
 .agenda-session-detail { display: grid; align-content: start; gap: 16px; margin-top: 22px; }
 .agenda-session-detail > header { display: grid; grid-template-columns: 102px minmax(0, 1fr) auto; gap: 15px; align-items: center; border-bottom: 1px solid #edf0f4; padding-bottom: 15px; }
+.agenda-next-timetable-slot { display: grid; align-content: start; gap: 16px; margin-top: 22px; }
+.agenda-next-timetable-slot > header { display: grid; grid-template-columns: 102px minmax(0, 1fr) auto; gap: 15px; align-items: center; border-bottom: 1px solid #edf0f4; padding-bottom: 15px; }
+.agenda-next-timetable-slot > header > div:nth-child(2) > span { color: #f97316; font-size: 8px; font-weight: 950; text-transform: uppercase; }
+.agenda-next-timetable-slot > header h3 { margin: 1px 0; color: #243044; font-size: 19px; }
+.agenda-next-timetable-slot > header p { margin: 0; color: #94a3b8; font-size: 9px; font-weight: 750; }
+.agenda-session-status.timetable { color: #0369a1; background: #e0f2fe; }
+.agenda-timetable-placeholder { display: flex; align-items: flex-start; gap: 10px; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 15px; color: #64748b; background: #f8fafc; }
+.agenda-timetable-placeholder > div { display: grid; gap: 3px; }
+.agenda-timetable-placeholder strong { color: #334155; font-size: 11px; }
+.agenda-timetable-placeholder p { margin: 0; font-size: 9px; font-weight: 700; line-height: 1.45; }
 .agenda-session-time { display: grid; gap: 1px; border-right: 1px solid #e2e8f0; }
 .agenda-session-time span, .agenda-session-detail > header > div:nth-child(2) > span { color: #f97316; font-size: 8px; font-weight: 950; text-transform: capitalize; }
 .agenda-session-time strong { color: #334155; font-size: 24px; }
@@ -378,8 +388,9 @@
   .agenda-form-row, .agenda-class-picker > div { grid-template-columns: 1fr; }
   .agenda-schedule-modes { grid-template-columns: 1fr; }
   .agenda-proposed-sessions article { grid-template-columns: 98px minmax(0, 1fr); }
-  .agenda-session-detail > header { grid-template-columns: 82px minmax(0, 1fr); }
-  .agenda-session-detail > header > .agenda-session-status { grid-column: 2; justify-self: start; }
+  .agenda-session-detail > header, .agenda-next-timetable-slot > header { grid-template-columns: 82px minmax(0, 1fr); }
+  .agenda-session-detail > header > .agenda-session-status,
+  .agenda-next-timetable-slot > header > .agenda-session-status { grid-column: 2; justify-self: start; }
   .agenda-classroom-prompt { grid-template-columns: 30px minmax(0, 1fr); }
   .agenda-classroom-prompt button { grid-column: 2; justify-self: start; }
   .agenda-timeline-list { min-width: 670px; }

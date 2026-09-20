@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Archive, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
+  Archive, Bell, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
   FileText, Pencil, Plus, RotateCcw, Save, Share2, X,
 } from 'lucide-react'
@@ -13,9 +13,11 @@ import {
 import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { PlanningDocumentDialog } from './PlanningDocumentDialog'
 import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
+import { PlanningRemindersDialog } from './PlanningRemindersDialog'
 import { PlanningSharingDialog } from './PlanningSharingDialog'
 import { PlanningSharedView } from './PlanningSharedView'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
+import { getPlanningReminderSummary } from '../../lib/reminders'
 import './planning.css'
 
 const PHASE_LABELS = {
@@ -281,6 +283,8 @@ export default function PlanningModule() {
   const competencies = useAvaluaproStore((state) => state.competencies)
   const criteria = useAvaluaproStore((state) => state.criteria)
   const indicators = useAvaluaproStore((state) => state.indicators)
+  const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
+  const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const workspace = usePlanningWorkspace(user)
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
@@ -303,6 +307,14 @@ export default function PlanningModule() {
       indicators: unique(indicators.map((item) => ({ label: item.name || item.label || item.title, sourceId: item.id }))),
     }
   }, [competencies, criteria, indicators])
+  const planningReminderSummary = useMemo(
+    () => getPlanningReminderSummary({
+      agendaNotes,
+      classes,
+      planningUnitId: workspace.activePlanningUnit?.id || '',
+    }),
+    [agendaNotes, classes, workspace.activePlanningUnit?.id],
+  )
 
   if (!user) {
     return (
@@ -354,6 +366,12 @@ export default function PlanningModule() {
           )}
           <button className="secondary-action compact" onClick={() => setDialog('year')} type="button"><Plus size={16} />Nou curs</button>
           {workspace.activeAcademicYear && <button className="secondary-action compact" onClick={() => setShowUtManager((value) => !value)} type="button"><CalendarRange size={16} />Dates de les UT</button>}
+          {workspace.activePlanningUnit && (
+            <button className="secondary-action compact planning-reminders-trigger" onClick={() => setDialog('reminders')} type="button">
+              <Bell size={16} />Recordatoris
+              {planningReminderSummary.count > 0 && <span>{planningReminderSummary.count}</span>}
+            </button>
+          )}
           <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
         </div>
       </header>
@@ -460,6 +478,7 @@ export default function PlanningModule() {
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.activePlanningUnit ? workspace.importPlanningTable : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
+      {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
     </section>
   )
 }

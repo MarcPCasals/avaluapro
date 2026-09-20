@@ -19,16 +19,14 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
 
   return [
     ...agendaNotes
-      .filter((note) => ['activityRecovery', 'agendaReminder', 'generalReminder', 'materialPreparation'].includes(note.type)
+      .filter((note) => ['activityRecovery', 'agendaReminder', 'generalReminder'].includes(note.type)
         && isPendingReminder(note.reminder))
       .map((note) => {
         const student = studentById.get(note.studentId)
         const classItem = classById.get(note.classId)
         const kind = note.type === 'activityRecovery'
           ? 'recovery'
-          : note.type === 'materialPreparation'
-            ? 'material'
-            : note.type === 'agendaReminder' ? 'agenda' : 'general'
+          : note.type === 'agendaReminder' ? 'agenda' : 'general'
         return {
           classItem,
           detail: student ? `Alumne: ${student.name}` : classItem ? `Grup: ${classItem.name}` : 'Recordatori general',
@@ -38,9 +36,7 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
           reminder: note.reminder,
           title: note.type === 'activityRecovery'
             ? 'Recuperació pendent'
-            : note.type === 'materialPreparation'
-              ? note.text
-              : note.type === 'agendaReminder' ? 'Nota a l’agenda pendent' : note.text,
+            : note.type === 'agendaReminder' ? 'Nota a l’agenda pendent' : note.text,
         }
       }),
     ...tasks
@@ -77,6 +73,41 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
     const right = reminderDateTime(b.reminder)?.getTime() || 0
     return left - right
   })
+}
+
+/**
+ * Els avisos que neixen dels materials d'una UP tenen el seu propi espai a
+ * Programació. Així no fan créixer el comptador de recordatoris personals,
+ * però continuen sent accionables i conserven l'historial de preparació.
+ */
+export function getPlanningReminderSummary({ agendaNotes = [], classes = [], planningUnitId = '' }) {
+  const classById = new Map(classes.map((classItem) => [classItem.id, classItem]))
+  const items = agendaNotes
+    .filter((note) => note.type === 'materialPreparation'
+      && (!planningUnitId || note.planningUnitId === planningUnitId))
+    .map((note) => {
+      const completed = Boolean(note.preparation?.completedAt)
+      const cancelled = Boolean(note.preparation?.cancelledAt)
+      return {
+        classItem: classById.get(note.classId),
+        id: `planning_${note.id}`,
+        note,
+        reminder: note.reminder,
+        status: cancelled ? 'cancelled' : completed ? 'completed' : 'pending',
+        title: note.text || note.reminder?.text || 'Preparació pendent',
+      }
+    })
+    .sort((left, right) => {
+      const statusOrder = { pending: 0, completed: 1, cancelled: 2 }
+      return (statusOrder[left.status] ?? 9) - (statusOrder[right.status] ?? 9)
+        || String(left.reminder?.date || '').localeCompare(String(right.reminder?.date || ''))
+        || left.title.localeCompare(right.title, 'ca')
+    })
+
+  return {
+    count: items.filter((item) => item.status === 'pending').length,
+    items,
+  }
 }
 
 export function getPendingReminderSummary({ agendaNotes = [], classes = [], students = [], taskRecords = [], tasks = [] }) {

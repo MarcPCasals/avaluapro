@@ -11,7 +11,7 @@ import {
   linkRecoveryToTaskRecords,
   reconcileMaterialPreparationReminders,
 } from '../src/lib/classroomRecovery.js'
-import { getPendingReminderSummary } from '../src/lib/reminders.js'
+import { getPendingReminderSummary, getPlanningReminderSummary } from '../src/lib/reminders.js'
 
 test('el correu usa només el nom de pila i incorpora activitats i enllaços', () => {
   const text = buildRecoveryEmail({
@@ -80,16 +80,20 @@ test('els materials preparables avisen el dia anterior per defecte i conserven l
   assert.equal(reminder.preparation.completedAt, '')
 })
 
-test('les recuperacions i la preparació de materials entren a la capa global de recordatoris', () => {
+test('la preparació de materials queda separada dels recordatoris generals', () => {
+  const agendaNotes = [
+    { id: 'recovery-1', type: 'activityRecovery', studentId: 'student-1', reminder: { date: '2099-01-01', text: 'Recuperar la pràctica' } },
+    { id: 'material-1', type: 'materialPreparation', planningUnitId: 'up-1', text: 'Imprimir: fitxa', reminder: { date: '2099-01-02', text: 'Imprimir: fitxa' } },
+  ]
   const summary = getPendingReminderSummary({
-    agendaNotes: [
-      { id: 'recovery-1', type: 'activityRecovery', studentId: 'student-1', reminder: { date: '2099-01-01', text: 'Recuperar la pràctica' } },
-      { id: 'material-1', type: 'materialPreparation', text: 'Imprimir: fitxa', reminder: { date: '2099-01-02', text: 'Imprimir: fitxa' } },
-    ],
+    agendaNotes,
     students: [{ id: 'student-1', name: 'PUJOL FONT, Marta' }],
   })
-  assert.equal(summary.count, 2)
-  assert.deepEqual(summary.items.map((item) => item.kind), ['recovery', 'material'])
+  const planningSummary = getPlanningReminderSummary({ agendaNotes, planningUnitId: 'up-1' })
+  assert.equal(summary.count, 1)
+  assert.deepEqual(summary.items.map((item) => item.kind), ['recovery'])
+  assert.equal(planningSummary.count, 1)
+  assert.deepEqual(planningSummary.items.map((item) => item.title), ['Imprimir: fitxa'])
 })
 
 test('un material eliminat cancel·la el recordatori i si torna no queda silenciat', () => {

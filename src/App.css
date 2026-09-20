@@ -12104,6 +12104,86 @@ button.tutorial-record-pill {
   border-radius: 999px;
 }
 
+.current-ut-tabs {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 22px;
+  background: #f8fafc;
+}
+
+.current-ut-primary {
+  min-width: 215px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  padding: 9px 14px;
+  background: white;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, .07);
+}
+
+.current-ut-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 11px;
+  color: #ea580c;
+  background: #ffedd5;
+}
+
+.current-ut-primary > div { display: grid; grid-template-columns: auto auto; align-items: baseline; column-gap: 8px; }
+.current-ut-primary small { grid-column: 1 / -1; color: #9a3412; font-size: 9px; font-weight: 950; letter-spacing: .11em; text-transform: uppercase; }
+.current-ut-primary strong { color: #1f2937; font-size: 17px; }
+.current-ut-primary div > span { color: #64748b; font-size: 11px; font-weight: 800; }
+
+.other-uts-trigger,
+.current-ut-return,
+.ut-manager-trigger {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: #475569;
+  background: white;
+  font-weight: 900;
+}
+
+.current-ut-return { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
+.ut-manager-trigger { width: 42px; padding: 0; }
+.current-ut-tabs .diagnosis-library-trigger { margin-left: auto; }
+
+.current-ut-modal { width: min(620px, calc(100vw - 32px)); }
+.current-ut-modal .modal-header > div { display: grid; gap: 3px; }
+.current-ut-modal .modal-header h2,
+.current-ut-modal .modal-header p { margin: 0; }
+.current-ut-modal .modal-header p { color: #64748b; font-size: 12px; font-weight: 750; }
+.other-uts-list { display: grid; gap: 9px; }
+.other-uts-list > button { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; text-align: left; color: #334155; background: white; }
+.other-uts-list > button:hover,
+.other-uts-list > button.active { border-color: #fdba74; background: #fff7ed; }
+.other-uts-list > button > span:first-child { display: grid; gap: 2px; }
+.other-uts-list > button strong { color: #1f2937; }
+.other-uts-list > button small,
+.other-uts-list > button > span:nth-child(2) { color: #64748b; font-size: 11px; font-weight: 750; }
+.other-uts-list > button em { border-radius: 999px; padding: 5px 8px; color: #166534; background: #dcfce7; font-size: 9px; font-style: normal; font-weight: 950; text-transform: uppercase; }
+
+@media (max-width: 720px) {
+  .current-ut-tabs { flex-wrap: wrap; padding: 10px 12px; }
+  .current-ut-primary { width: 100%; }
+  .current-ut-tabs .diagnosis-library-trigger { margin-left: auto; }
+  .other-uts-list > button { grid-template-columns: minmax(0, 1fr) auto; }
+  .other-uts-list > button em { grid-column: 2; }
+}
+
 .content-area {
   flex: 1;
   min-height: 0;

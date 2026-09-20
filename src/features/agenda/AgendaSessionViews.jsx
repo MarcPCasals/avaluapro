@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getClassroomPromptState } from '../../domain/planning'
+import { findNextTimetableOccurrence } from '../../lib/agendaToday'
 
 const STATUS_LABELS = {
   cancelled: 'Anul·lada',
@@ -83,6 +84,7 @@ export function AgendaTodayView({
   onOpenScheduling,
   onOpenTimetable,
   reminders,
+  slots,
   timetable,
   today,
 }) {
@@ -99,6 +101,11 @@ export function AgendaTodayView({
     bundle.session.status === 'planned' && bundle.session.startsAt >= `${today}T${nowTime}`) || null
   const [selectedSessionId, setSelectedSessionId] = useState('')
   const selectedBundle = bundles.find((bundle) => bundle.session.id === selectedSessionId) || automaticBundle
+  const nextTimetableOccurrence = findNextTimetableOccurrence(slots, today, nowTime)
+  const showTimetableFallback = !selectedSessionId
+    && !currentBundle
+    && nextTimetableOccurrence
+    && (!automaticBundle || nextTimetableOccurrence.startsAt < automaticBundle.session.startsAt)
   const classroomPrompt = automaticBundle ? getClassroomPromptState(automaticBundle.session, now) : null
   const upcomingEvents = calendarEvents.filter((event) => event.endsOn >= today && event.startsOn <= addDays(today, 3)).slice(0, 4)
   useEffect(() => {
@@ -110,7 +117,17 @@ export function AgendaTodayView({
       <section className="agenda-today-main">
         <div className="agenda-section-heading"><span className="agenda-section-icon"><CalendarDays size={20} /></span><div><span>Avui</span><h2>{formatDate(today, { long: true, weekday: true })}</h2></div>{loading && <Loader2 className="spin agenda-heading-loader" size={17} />}</div>
         {classroomPrompt && <div className={`agenda-classroom-prompt ${classroomPrompt.kind}`}><Clock3 size={20} /><div><strong>{classroomPrompt.kind === 'upcoming' ? `${classNameFor(classes, automaticBundle.session.classId)} comença d’aquí ${classroomPrompt.minutesUntil} min` : `${classNameFor(classes, automaticBundle.session.classId)} està en curs`}</strong><span>{automaticBundle.items.length} activitats · {sessionMaterials(automaticBundle).length} materials preparats</span></div><button className="primary-action compact" onClick={() => onOpenClassroom(automaticBundle)} type="button">Obrir Mode aula</button></div>}
-        {selectedBundle ? <SessionDetail bundle={selectedBundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p>{(onOpenScheduling || onOpenTimetable) && <div className="agenda-today-actions">{onOpenScheduling && <button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button>}{onOpenTimetable && <button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button>}</div>}</div>}
+        {showTimetableFallback ? (
+          <div className="agenda-next-timetable-slot">
+            <header>
+              <div className="agenda-session-time"><span>{formatDate(nextTimetableOccurrence.date, { weekday: true })}</span><strong>{nextTimetableOccurrence.slot.startsAt}</strong><small>{nextTimetableOccurrence.slot.durationMinutes} min{nextTimetableOccurrence.slot.subgroupId ? ` · ${nextTimetableOccurrence.slot.subgroupId}` : ''}</small></div>
+              <div><span>Pròxima classe de l’horari</span><h3>{nextTimetableOccurrence.slot.subject || classNameFor(classes, nextTimetableOccurrence.slot.classId)}</h3><p>{classNameFor(classes, nextTimetableOccurrence.slot.classId)}{nextTimetableOccurrence.slot.space ? ` · ${nextTimetableOccurrence.slot.space}` : ''}</p></div>
+              <span className="agenda-session-status timetable">Horari</span>
+            </header>
+            <div className="agenda-timetable-placeholder"><CalendarRange size={19} /><div><strong>Encara no té activitats calendaritzades</strong><p>Pots preparar la UP o consultar l’horari, però la pròxima classe sempre queda visible.</p></div></div>
+            <div className="agenda-session-actions">{onOpenTimetable && <button className="secondary-action compact" onClick={onOpenTimetable} type="button"><CalendarRange size={15} />Veure l’horari</button>}</div>
+          </div>
+        ) : selectedBundle ? <SessionDetail bundle={selectedBundle} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p>{(onOpenScheduling || onOpenTimetable) && <div className="agenda-today-actions">{onOpenScheduling && <button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button>}{onOpenTimetable && <button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button>}</div>}</div>}
       </section>
       <aside className="agenda-today-side">
         <section>

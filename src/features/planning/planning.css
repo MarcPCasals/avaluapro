@@ -539,6 +539,41 @@
 .planning-table-preview > button { justify-self: end; }
 .planning-import-success { margin: 0; border-radius: 9px; padding: 9px 11px; color: #166534; background: #ecfdf5; font-size: 10px; font-weight: 850; }
 
+.planning-reminders-trigger > span {
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 6px;
+  color: white;
+  background: #7c3aed;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.planning-reminders-dialog { display: grid; gap: 16px; }
+.planning-reminders-dialog > header { display: flex; align-items: center; gap: 12px; border: 1px solid #ddd6fe; border-radius: 13px; padding: 13px 15px; background: #faf5ff; }
+.planning-reminders-dialog > header > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: #6d28d9; background: #ede9fe; }
+.planning-reminders-dialog > header div { display: grid; gap: 2px; }
+.planning-reminders-dialog > header strong { color: #4c1d95; }
+.planning-reminders-dialog > header p { margin: 0; color: #64748b; font-size: 12px; font-weight: 750; }
+.planning-reminders-empty { display: grid; justify-items: center; gap: 7px; border: 1px dashed #c4b5fd; border-radius: 13px; padding: 28px; text-align: center; color: #64748b; }
+.planning-reminders-empty svg { color: #16a34a; }
+.planning-reminders-empty p { max-width: 530px; margin: 0; line-height: 1.45; }
+.planning-reminders-list { display: grid; gap: 8px; max-height: 56vh; overflow-y: auto; padding-right: 3px; }
+.planning-reminders-list article { display: grid; grid-template-columns: 116px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px 12px; background: white; }
+.planning-reminders-list article.completed { opacity: .68; background: #f8fafc; }
+.planning-reminders-list article.cancelled { opacity: .55; background: #f8fafc; }
+.planning-reminder-date { display: flex; align-items: center; gap: 6px; color: #6d28d9; font-size: 11px; font-weight: 900; }
+.planning-reminder-copy { min-width: 0; display: grid; gap: 3px; }
+.planning-reminder-copy strong { overflow: hidden; color: #1e293b; text-overflow: ellipsis; white-space: nowrap; }
+.planning-reminder-copy span { color: #64748b; font-size: 11px; font-weight: 750; }
+.planning-reminder-status { border-radius: 999px; padding: 5px 8px; font-size: 10px; font-weight: 950; }
+.planning-reminder-status.pending { color: #9a3412; background: #ffedd5; }
+.planning-reminder-status.completed { color: #166534; background: #dcfce7; }
+.planning-reminder-status.cancelled { color: #64748b; background: #e2e8f0; }
+
 @media (max-width: 1180px) {
   .planning-workbench { grid-template-columns: 220px minmax(440px, 1fr) 235px; }
   .planning-course-controls { max-width: 650px; }
@@ -591,6 +626,9 @@
   .planning-material-row .planning-material-reminder { grid-column: 1 / 3; }
   .planning-material-row .icon-action { grid-column: 3; grid-row: 1; }
   .planning-indicator-picker > div, .planning-student-picker > div { grid-template-columns: 1fr; }
+  .planning-reminders-list article { grid-template-columns: 1fr auto; }
+  .planning-reminder-date, .planning-reminder-copy { grid-column: 1 / 2; }
+  .planning-reminder-status, .planning-reminders-list article > button { grid-column: 2; }
 }
 
 /* El focus queda visible tant a l'editor com als diàlegs carregats fora seu. */
