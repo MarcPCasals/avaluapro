@@ -411,8 +411,9 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
                 </select>
               </label>
               <label>
-                Quan ha d’avisar
+                Data i hora compartida
                 <input onChange={(event) => setDueAt(event.target.value)} type="datetime-local" value={dueAt} />
+                <small>Apareixerà al calendari dels dos tutors.</small>
               </label>
             </>
           )}

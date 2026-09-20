@@ -84,6 +84,7 @@ export function AgendaTodayView({
   onAdjust,
   onOpenCalendar,
   onOpenClassroom,
+  onOpenCoordination,
   onOpenScheduling,
   onOpenTimetable,
   reminders,
@@ -140,7 +141,23 @@ export function AgendaTodayView({
         </section>
         <section>
           <header><Bell size={18} /><div><strong>Recordatoris</strong><span>Avui i tres dies per endavant</span></div></header>
-          {reminders.length === 0 ? <p>No hi ha cap recordatori en aquest període.</p> : <ul className="agenda-reminder-list">{reminders.map((item) => <li key={item.id}><span>{item.reminder.date.slice(8, 10)}</span><div><strong>{item.title}</strong><small>{item.classItem?.name || item.detail}</small></div></li>)}</ul>}
+          {reminders.length === 0 ? <p>No hi ha cap recordatori en aquest període.</p> : (
+            <ul className="agenda-reminder-list">
+              {reminders.map((item) => (
+                <li className={item.kind === 'tutoring' ? 'shared-tutoring' : ''} key={item.id}>
+                  <span>{item.reminder.date.slice(8, 10)}</span>
+                  {item.kind === 'tutoring' ? (
+                    <button onClick={() => onOpenCoordination(item)} type="button">
+                      <strong>{item.title}</strong>
+                      <small>{item.reminder.time} · {item.classLabel}</small>
+                    </button>
+                  ) : (
+                    <div><strong>{item.title}</strong><small>{item.classItem?.name || item.detail}</small></div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
         <section>
           <header><CalendarRange size={18} /><div><strong>Excepcions properes</strong><span>Fins a tres dies</span></div></header>
@@ -152,7 +169,7 @@ export function AgendaTodayView({
   )
 }
 
-export function AgendaWeekView({ bundles, classes, loading, onMoveWeek, onOpenSession, onReload, weekStart }) {
+export function AgendaWeekView({ bundles, classes, coordinationReminders, loading, onMoveWeek, onOpenCoordination, onOpenSession, onReload, weekStart }) {
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
   return (
     <section className="agenda-week-view">
@@ -162,7 +179,12 @@ export function AgendaWeekView({ bundles, classes, loading, onMoveWeek, onOpenSe
       </header>
       <div className="agenda-week-columns">{days.map((dateKey) => {
         const dayBundles = bundles.filter((bundle) => sessionDate(bundle) === dateKey)
-        return <section key={dateKey}><header><span>{formatDate(dateKey, { weekday: true })}</span><strong>{dateKey.slice(8, 10)}</strong><small>{dayBundles.length} sessions</small></header><div>{dayBundles.length === 0 ? <p>Sense sessions</p> : dayBundles.map((bundle) => <button className={`agenda-week-session ${bundle.session.status}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span>{sessionTime(bundle)}</span><strong>{classNameFor(classes, bundle.session.classId)}</strong><small>{bundle.planningUnit.code} · {bundle.items.length} activitats</small></button>)}</div></section>
+        const dayReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
+        const dayItems = [
+          ...dayBundles.map((bundle) => ({ bundle, kind: 'session', time: sessionTime(bundle) })),
+          ...dayReminders.map((reminder) => ({ kind: 'reminder', reminder, time: reminder.reminder.time })),
+        ].sort((left, right) => left.time.localeCompare(right.time))
+        return <section key={dateKey}><header><span>{formatDate(dateKey, { weekday: true })}</span><strong>{dateKey.slice(8, 10)}</strong><small>{dayBundles.length} sessions{dayReminders.length ? ` · ${dayReminders.length} ${dayReminders.length === 1 ? 'recordatori' : 'recordatoris'}` : ''}</small></header><div>{dayItems.length === 0 ? <p>Sense sessions ni recordatoris</p> : dayItems.map((item) => item.kind === 'session' ? <button className={`agenda-week-session ${item.bundle.session.status}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{item.bundle.planningUnit.code} · {item.bundle.items.length} activitats</small></button> : <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><Bell size={12} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>)}</div></section>
       })}</div>
     </section>
   )

@@ -33,6 +33,70 @@ export function getOpenTutoringReminders(items = [], uid = '') {
   )
 }
 
+function getCalendarDateTime(value, timeZone = 'Europe/Andorra') {
+  const date = new Date(value || '')
+  if (Number.isNaN(date.getTime())) return null
+  const parts = new Intl.DateTimeFormat('ca-AD', {
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(date)
+  const valueByType = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return {
+    date: `${valueByType.year}-${valueByType.month}-${valueByType.day}`,
+    time: `${valueByType.hour}:${valueByType.minute}`,
+  }
+}
+
+/**
+ * Projecta els recordatoris compartits a l'Agenda sense duplicar-los.
+ * L'assignatari continua controlant els avisos emergents, però el calendari és
+ * comú: qualsevol recordatori amb data és visible per tots dos cotutors.
+ */
+export function getTutoringCalendarReminders(
+  items = [],
+  classes = [],
+  spaces = [],
+  timeZone = 'Europe/Andorra',
+) {
+  const classBySpaceId = new Map(
+    classes
+      .filter((classItem) => classItem.sharedTutoringSpaceId)
+      .map((classItem) => [classItem.sharedTutoringSpaceId, classItem]),
+  )
+  const spaceById = new Map(spaces.map((space) => [space.id, space]))
+
+  return items
+    .filter((item) => item.kind === 'reminder' && item.status === 'open' && !item.deletedAt && item.dueAt)
+    .map((item) => {
+      const dateTime = getCalendarDateTime(item.dueAt, timeZone)
+      if (!dateTime) return null
+      const classItem = classBySpaceId.get(item.spaceId)
+      const classLabel = classItem?.name || spaceById.get(item.spaceId)?.className || 'Tutoria compartida'
+      return {
+        classItem,
+        classLabel,
+        coordinationItem: item,
+        detail: `Cotutoria compartida · ${classLabel}`,
+        id: `tutoring_${item.spaceId}_${item.id}`,
+        kind: 'tutoring',
+        reminder: dateTime,
+        spaceId: item.spaceId,
+        title: item.text || 'Recordatori de cotutoria',
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) =>
+      `${left.reminder.date}T${left.reminder.time}`.localeCompare(
+        `${right.reminder.date}T${right.reminder.time}`,
+      ),
+    )
+}
+
 export function getDueTutoringReminders(items = [], uid = '', now = new Date()) {
   const warningLimit = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString()
   return getOpenTutoringReminders(items, uid).filter((item) => item.dueAt && item.dueAt <= warningLimit)

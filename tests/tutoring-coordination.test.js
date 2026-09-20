@@ -5,6 +5,7 @@ import {
   getDueTutoringReminders,
   getOpenTutoringReminders,
   getPendingTutoringReminderAlerts,
+  getTutoringCalendarReminders,
   getUrgentTutoringMessages,
   getUnreadTutoringCoordinationItems,
   groupTutoringCoordinationItemsByStudent,
@@ -47,6 +48,30 @@ describe('coordinacio de cotutoria', () => {
   test('obrir la conversa no completa els recordatoris', () => {
     const open = getOpenTutoringReminders(items, 'tutor-a')
     assert.deepEqual(open.map((item) => item.id), ['reminder-1'])
+  })
+
+  test('el recordatori compartit apareix al calendari dels dos cotutors encara que tingui assignatari', () => {
+    const calendarItems = getTutoringCalendarReminders(
+      [{ ...items[1], assigneeUid: 'tutor-a', text: 'Entrevista amb la família' }],
+      [{ id: 'class-1', name: '1r C', sharedTutoringSpaceId: 'space-1' }],
+      [],
+      'Europe/Andorra',
+    )
+
+    assert.equal(calendarItems.length, 1)
+    assert.equal(calendarItems[0].title, 'Entrevista amb la família')
+    assert.equal(calendarItems[0].classLabel, '1r C')
+    assert.deepEqual(calendarItems[0].reminder, { date: '2026-09-15', time: '12:00' })
+  })
+
+  test('el calendari omet recordatoris completats, eliminats o sense data', () => {
+    const calendarItems = getTutoringCalendarReminders([
+      { ...items[1], id: 'completed', status: 'completed' },
+      { ...items[1], deletedAt: '2026-09-15T09:30:00.000Z', id: 'deleted' },
+      { ...items[1], dueAt: '', id: 'undated' },
+    ])
+
+    assert.equal(calendarItems.length, 0)
   })
 
   test('un recordatori avisa dues hores abans independentment de si ja ha estat llegit', () => {

@@ -30058,6 +30058,14 @@ button.profile-followup-card:focus-visible {
   text-transform: uppercase;
 }
 
+.coordination-composer-options label > small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-transform: none;
+}
+
 .coordination-send {
   min-height: 40px;
   white-space: nowrap;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
+  Bell, CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
   Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
   Palette, Settings2, Share2, Trash2,
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary } from '../../lib/reminders'
+import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassroomMode } from '../classroom/ClassroomMode'
 import {
@@ -358,17 +359,27 @@ function TimetableView({ classes, onAdd, onAddClass, onCreateVersion, onDelete, 
   )
 }
 
-function CalendarView({ classes, events, onAdd, onDelete, onEdit }) {
+function CalendarView({ classes, coordinationReminders, events, onAdd, onDelete, onEdit, onOpenCoordination }) {
   const classById = new Map(classes.map((item) => [item.id, item.name]))
   return (
     <section className="agenda-calendar-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Calendari manual</span><h2>Excepcions lectives</h2><p>Festes, dies no lectius, canvis puntuals i classes extraordinàries.</p></div>
-        <button className="primary-action compact" onClick={onAdd} type="button"><CalendarPlus size={16} />Nova excepció</button>
+        <div><span className="agenda-view-kicker">Calendari docent</span><h2>Cotutoria i excepcions lectives</h2><p>Recordatoris compartits, festes, canvis puntuals i classes extraordinàries.</p></div>
+        {onAdd && <button className="primary-action compact" onClick={onAdd} type="button"><CalendarPlus size={16} />Nova excepció</button>}
       </header>
-      {events.length === 0 ? (
-        <div className="agenda-calendar-empty"><CalendarDays size={28} /><strong>El calendari no té excepcions</strong><p>Afegir-les ara evitarà haver de moure sessions manualment més endavant.</p></div>
-      ) : (
+      {coordinationReminders.length > 0 && (
+        <section className="agenda-shared-reminders">
+          <header><Bell size={18} /><div><strong>Recordatoris de cotutoria</strong><span>Visibles al calendari dels dos tutors</span></div></header>
+          <div>{coordinationReminders.map((item) => (
+            <button key={item.id} onClick={() => onOpenCoordination(item)} type="button">
+              <span className="agenda-event-mark shared"><Bell size={16} /></span>
+              <span className="agenda-event-content"><span>Cotutoria compartida</span><strong>{item.title}</strong><small>{formatDate(item.reminder.date)} · {item.reminder.time} · {item.classLabel}</small></span>
+              <span className="agenda-event-impact shared">Obrir coordinació</span>
+            </button>
+          ))}</div>
+        </section>
+      )}
+      {events.length > 0 && (
         <div className="agenda-event-list">{events.map((event) => {
           const [typeLabel, colorClass] = EVENT_DETAILS[event.type] || ['Excepció', 'special']
           const groups = event.classIds?.length ? event.classIds.map((id) => classById.get(id)).filter(Boolean).join(' · ') : 'Tots els grups'
@@ -381,6 +392,9 @@ function CalendarView({ classes, events, onAdd, onDelete, onEdit }) {
             </article>
           )
         })}</div>
+      )}
+      {events.length === 0 && coordinationReminders.length === 0 && (
+        <div className="agenda-calendar-empty"><CalendarDays size={28} /><strong>El calendari encara és buit</strong><p>Els recordatoris de cotutoria amb data apareixeran aquí automàticament per als dos tutors.</p></div>
       )}
     </section>
   )
@@ -400,6 +414,8 @@ export default function AgendaModule() {
   const behaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const absenceRecords = useAvaluaproStore((state) => state.absenceRecords)
+  const tutoringCoordinationItems = useAvaluaproStore((state) => state.cloud.tutoringCoordinationItems || [])
+  const sharedTutoringSpaces = useAvaluaproStore((state) => state.cloud.sharedTutoringSpaces || [])
   const toggleStudentAbsence = useAvaluaproStore((state) => state.toggleStudentAbsence)
   const activateClassroomTask = useAvaluaproStore((state) => state.activateClassroomTask)
   const updateTaskRecord = useAvaluaproStore((state) => state.updateTaskRecord)
@@ -409,6 +425,10 @@ export default function AgendaModule() {
   const syncPlanningMaterialReminders = useAvaluaproStore((state) => state.syncPlanningMaterialReminders)
   const addClass = useAvaluaproStore((state) => state.addClass)
   const updateClass = useAvaluaproStore((state) => state.updateClass)
+  const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
+  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
+  const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
+  const markTutoringCoordinationRead = useAvaluaproStore((state) => state.markTutoringCoordinationRead)
   const workspace = useAgendaWorkspace(user, classes)
   const agendaClasses = useMemo(() => Array.from(new Map([
     ...classes,
@@ -419,19 +439,36 @@ export default function AgendaModule() {
     })),
   ].map((item) => [item.id, item])).values()), [classes, workspace.sessionBundles, workspace.sharedClasses])
   const hasOwnCalendar = Boolean(workspace.activeAcademicYear)
-  const hasAgendaWorkspace = hasOwnCalendar || workspace.sharedPlanningUnits.length > 0
+  const hasAgendaWorkspace = hasOwnCalendar || workspace.sharedPlanningUnits.length > 0 || sharedTutoringSpaces.length > 0
   const materialReminderBundles = workspace.sessionBundles
   const setWorkspaceError = workspace.setError
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
   )
+  const tutoringCalendarReminders = useMemo(
+    () => getTutoringCalendarReminders(
+      tutoringCoordinationItems,
+      classes,
+      sharedTutoringSpaces,
+    ),
+    [classes, sharedTutoringSpaces, tutoringCoordinationItems],
+  )
   const upcomingReminders = useMemo(() => {
     const horizon = addDateDays(workspace.today, 3)
     // Els pendents vençuts no desapareixen d'Avui: es mantenen al radar fins
     // que el docent els marca com a fets, juntament amb els pròxims tres dies.
-    return reminderSummary.items.filter((item) => item.reminder.date <= horizon)
-  }, [reminderSummary.items, workspace.today])
+    return [
+      ...reminderSummary.items,
+      ...tutoringCalendarReminders,
+    ]
+      .filter((item) => item.reminder.date <= horizon)
+      .sort((left, right) =>
+        `${left.reminder.date}T${left.reminder.time || '00:00'}`.localeCompare(
+          `${right.reminder.date}T${right.reminder.time || '00:00'}`,
+        ),
+      )
+  }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
   const [view, setView] = useState('today')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(workspace.today))
   const [timelineClassId, setTimelineClassId] = useState(() => classes[0]?.id || '')
@@ -469,6 +506,18 @@ export default function AgendaModule() {
   const removeEvent = async (event) => {
     if (!globalThis.confirm?.(`Vols eliminar «${event.title}» del calendari?`)) return
     try { await workspace.removeCalendarEvent(event) } catch (error) { workspace.setError(error.message) }
+  }
+  const openCoordinationReminder = async (reminder) => {
+    const item = reminder.coordinationItem || reminder
+    const classItem = classes.find((candidate) => candidate.sharedTutoringSpaceId === item.spaceId)
+    try {
+      if (classItem) await setActiveClass(classItem.id)
+      setActiveMode('tutoring')
+      setActiveTutoringPanel('coordination')
+      await markTutoringCoordinationRead(item.spaceId)
+    } catch (error) {
+      workspace.setError(error.message || 'No s’ha pogut obrir la coordinació de cotutoria.')
+    }
   }
   const loadWeek = async (nextStart) => {
     setWeekStart(nextStart)
@@ -664,7 +713,7 @@ export default function AgendaModule() {
         <button className={view === 'week' ? 'active' : ''} onClick={() => { setView('week'); loadWeek(weekStart) }} type="button"><Clock3 size={17} />Setmana</button>
         <button className={view === 'timeline' ? 'active' : ''} onClick={() => openTimeline()} type="button"><ListChecks size={17} />Cronologia</button>
         {hasOwnCalendar && <button className={view === 'timetable' ? 'active' : ''} onClick={() => setView('timetable')} type="button"><LayoutGrid size={17} />Horari</button>}
-        {hasOwnCalendar && <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')} type="button"><Settings2 size={17} />Calendari</button>}
+        <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')} type="button"><Settings2 size={17} />Calendari</button>
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
@@ -676,11 +725,11 @@ export default function AgendaModule() {
         <section className="agenda-large-empty"><span><CalendarDays size={29} /></span><h2>Primer crea el curs a Programació</h2><p>L’Agenda utilitza les mateixes dates del curs acadèmic per evitar informació duplicada.</p></section>
       ) : (
         <main className="agenda-main">
-          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={hasOwnCalendar ? () => setView('calendar') : null} onOpenClassroom={openClassroom} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
-          {view === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onMoveWeek={moveWeek} onOpenSession={openSession} onReload={reloadCurrentWeek} weekStart={weekStart} />}
+          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={() => setView('calendar')} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenSession={openSession} onReload={reloadCurrentWeek} weekStart={weekStart} />}
           {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onChangeClass={openTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? () => setDialog('scheduling') : null} selectedClassId={timelineClassId} />}
           {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
-          {view === 'calendar' && <CalendarView classes={classes} events={workspace.calendarEvents} onAdd={() => { setEditingEvent(null); setDialog('event') }} onDelete={removeEvent} onEdit={(event) => { setEditingEvent(event); setDialog('event') }} />}
+          {view === 'calendar' && <CalendarView classes={classes} coordinationReminders={tutoringCalendarReminders} events={workspace.calendarEvents} onAdd={hasOwnCalendar ? () => { setEditingEvent(null); setDialog('event') } : null} onDelete={removeEvent} onEdit={(event) => { setEditingEvent(event); setDialog('event') }} onOpenCoordination={openCoordinationReminder} />}
         </main>
       )}
 
