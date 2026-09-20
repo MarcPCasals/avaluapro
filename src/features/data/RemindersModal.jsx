@@ -86,7 +86,7 @@ export function RemindersModal({ onClose }) {
         <section className="reminder-composer">
           <header>
             <Bell size={18} />
-            <strong>Nou recordatori personal</strong>
+            <strong>Nou recordatori</strong>
           </header>
           <div className="reminder-form-grid">
             <label>

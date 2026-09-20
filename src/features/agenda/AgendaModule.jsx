@@ -726,7 +726,7 @@ export default function AgendaModule() {
           <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
           <button className="secondary-action compact agenda-reminders-trigger" onClick={() => setDialog('reminders')} type="button">
             <Bell size={15} />
-            Recordatoris personals
+            Recordatoris
             {reminderSummary.count > 0 && <span aria-label={`${reminderSummary.count} recordatoris pendents`}>{reminderSummary.count}</span>}
           </button>
           {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
