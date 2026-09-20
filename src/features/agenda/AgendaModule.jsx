@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
   Copy, Edit3, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
-  Settings2, Share2, Trash2,
+  Palette, Settings2, Share2, Trash2,
 } from 'lucide-react'
 import {
   getClassroomStudents,
   getClassroomTrackingUtId,
+  getNextTimetableDuration,
   isClassroomEvidenceDue,
 } from '../../domain/planning'
+import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getPendingReminderSummary } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -66,6 +68,12 @@ function timeToMinutes(value) {
   return hours * 60 + minutes
 }
 
+function compactDurationLabel(durationMinutes) {
+  if (Number(durationMinutes) === 90) return '1:30 h'
+  if (Number(durationMinutes) === 120) return '2 h'
+  return '1 h'
+}
+
 function formatDate(dateKey) {
   if (!dateKey) return '—'
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -101,9 +109,94 @@ function SyncBadge({ isOnline, sync }) {
   )
 }
 
-function TimetableGrid({ classes, onAdd, onDelete, onEdit, onError, onMove, slots }) {
+function TimetableClassRow({ classItem, onError, onSelect, onUpdate, selected }) {
+  const [saving, setSaving] = useState(false)
+
+  const savePatch = async (patch) => {
+    setSaving(true)
+    try {
+      await onUpdate(classItem.id, patch)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setSaving(false)
+    }
+  }
+  const commitName = (event) => {
+    const nextName = event.currentTarget.value.trim()
+    if (!nextName) {
+      event.currentTarget.value = classItem.name
+      return
+    }
+    if (nextName !== classItem.name) savePatch({ name: nextName })
+  }
+
+  return (
+    <div className={`agenda-timetable-class-row ${selected ? 'selected' : ''}`}>
+      <button
+        aria-label={`Seleccionar ${classItem.name} per col·locar-la a l’horari`}
+        aria-pressed={selected}
+        className={`agenda-timetable-class-select ${classItem.color || 'blue'}`}
+        onClick={() => onSelect(classItem.id)}
+        title="Selecciona aquesta classe i després clica una hora de l’horari"
+        type="button"
+      >{selected ? <Check size={16} /> : <Palette size={15} />}</button>
+      <input
+        aria-label={`Nom de la classe ${classItem.name}`}
+        className={classItem.color || 'blue'}
+        defaultValue={classItem.name}
+        disabled={saving}
+        onBlur={commitName}
+        onFocus={() => onSelect(classItem.id)}
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
+      />
+      <select
+        aria-label={`Color de la classe ${classItem.name}`}
+        disabled={saving}
+        onChange={(event) => { onSelect(classItem.id); savePatch({ color: event.target.value }) }}
+        value={classItem.color || 'blue'}
+      >{CLASS_COLORS.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select>
+      {saving && <Loader2 className="spin" size={15} />}
+    </div>
+  )
+}
+
+function TimetableClassPalette({ classes, onAddClass, onError, onSelectClass, onUpdateClass, selectedClassId }) {
+  const [newClass, setNewClass] = useState({ color: CLASS_COLORS[classes.length % CLASS_COLORS.length]?.id || 'blue', name: '' })
+  const [saving, setSaving] = useState(false)
+  const add = async (event) => {
+    event.preventDefault()
+    const name = newClass.name.trim()
+    if (!name) return
+    setSaving(true)
+    try {
+      await onAddClass({ color: newClass.color, name })
+      setNewClass((current) => ({ ...current, color: CLASS_COLORS[(classes.length + 1) % CLASS_COLORS.length]?.id || 'blue', name: '' }))
+    } catch (error) {
+      onError(error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="agenda-timetable-classes">
+      <header><div><span>Classes de l’horari</span><strong>Tria una classe i clica l’hora on la vols posar</strong></div><small>El nom i el color són els mateixos a tot AvaluaPro.</small></header>
+      <div className="agenda-timetable-class-list">{classes.map((classItem) => <TimetableClassRow classItem={classItem} key={classItem.id} onError={onError} onSelect={onSelectClass} onUpdate={onUpdateClass} selected={classItem.id === selectedClassId} />)}</div>
+      <form className="agenda-timetable-class-add" onSubmit={add}>
+        <input aria-label="Nom de la nova classe" onChange={(event) => setNewClass({ ...newClass, name: event.target.value })} placeholder="Nom de la nova classe" value={newClass.name} />
+        <select aria-label="Color de la nova classe" onChange={(event) => setNewClass({ ...newClass, color: event.target.value })} value={newClass.color}>{CLASS_COLORS.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select>
+        <button className="primary-action compact" disabled={saving || !newClass.name.trim()} type="submit">{saving ? <Loader2 className="spin" size={15} /> : <Plus size={15} />}Afegir</button>
+      </form>
+    </section>
+  )
+}
+
+function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd, onResize, selectedClassId, slots }) {
   const [dragId, setDragId] = useState('')
+  const [busyKey, setBusyKey] = useState('')
   const classById = useMemo(() => new Map(classes.map((item) => [item.id, item])), [classes])
+  const selectedClass = classById.get(selectedClassId) || null
   const drop = async (weekday, startsAt) => {
     const slot = slots.find((item) => item.id === dragId)
     setDragId('')
@@ -119,6 +212,36 @@ function TimetableGrid({ classes, onAdd, onDelete, onEdit, onError, onMove, slot
     if (!target) return setDragId('')
     return drop(Number(target.dataset.gridWeekday), target.dataset.gridTime)
   }
+  const quickAdd = async (weekday, startsAt) => {
+    if (!selectedClass) return onError(new Error('Selecciona primer una classe de la llista.'))
+    const key = `${weekday}-${startsAt}`
+    setBusyKey(key)
+    try {
+      await onQuickAdd({
+        classId: selectedClass.id,
+        durationMinutes: 60,
+        space: '',
+        startsAt,
+        subject: selectedClass.subject || selectedClass.name,
+        subgroupId: '',
+        weekday,
+      })
+    } catch (error) {
+      onError(error)
+    } finally {
+      setBusyKey('')
+    }
+  }
+  const resize = async (slot) => {
+    setBusyKey(`duration-${slot.id}`)
+    try {
+      await onResize(slot, getNextTimetableDuration(slot.durationMinutes))
+    } catch (error) {
+      onError(error)
+    } finally {
+      setBusyKey('')
+    }
+  }
   return (
     <div className="agenda-grid-scroll">
       <div className="agenda-week-grid" style={{ '--agenda-grid-rows': GRID_ROWS.length }}>
@@ -129,15 +252,15 @@ function TimetableGrid({ classes, onAdd, onDelete, onEdit, onError, onMove, slot
         ))}
         {WEEKDAYS.flatMap(([weekday]) => GRID_ROWS.map((minutes, rowIndex) => (
           <div
-            className={`agenda-grid-cell ${minutes % 60 === 0 ? 'hour' : ''}`}
+            className={`agenda-grid-cell ${minutes % 60 === 0 ? 'hour' : ''} ${selectedClass ? 'ready' : ''} ${busyKey === `${weekday}-${minutesToTime(minutes)}` ? 'saving' : ''}`}
             data-grid-time={minutesToTime(minutes)}
             data-grid-weekday={weekday}
             key={`${weekday}-${minutes}`}
-            onDoubleClick={() => onAdd({ startsAt: minutesToTime(minutes), weekday })}
+            onClick={() => quickAdd(weekday, minutesToTime(minutes))}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => { event.preventDefault(); drop(weekday, minutesToTime(minutes)) }}
             style={{ gridColumn: weekday + 1, gridRow: rowIndex + 2 }}
-            title="Doble clic per afegir una classe"
+            title={selectedClass ? `Afegir ${selectedClass.name} a les ${minutesToTime(minutes)}` : 'Selecciona primer una classe'}
           />
         )))}
         {slots.filter((slot) => slot.weekday <= 5).map((slot) => {
@@ -171,11 +294,12 @@ function TimetableGrid({ classes, onAdd, onDelete, onEdit, onError, onMove, slot
                 title="Arrossega per canviar dia o hora"
                 type="button"
               ><Menu size={16} /></button>
-              <button className="agenda-slot-content" onClick={() => onEdit(slot)} type="button">
+              <button className="agenda-slot-content" onClick={() => onEdit(slot)} title="Obrir els detalls de la franja" type="button">
                 <strong>{classItem?.name || 'Grup'}</strong>
                 <span>{slot.subject}</span>
-                <small>{slot.startsAt} · {slot.durationMinutes} min{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}</small>
+                <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}</small>
               </button>
+              <button aria-label={`Canviar la durada de ${classItem?.name || slot.subject}`} className="agenda-slot-duration" disabled={busyKey === `duration-${slot.id}`} onClick={() => resize(slot)} title="Clica per canviar entre 1 h, 1:30 h i 2 h" type="button">{busyKey === `duration-${slot.id}` ? <Loader2 className="spin" size={13} /> : compactDurationLabel(slot.durationMinutes)}</button>
               <button aria-label={`Eliminar ${classItem?.name || slot.subject}`} className="agenda-slot-delete" onClick={() => onDelete(slot)} type="button"><Trash2 size={14} /></button>
             </article>
           )
@@ -185,7 +309,10 @@ function TimetableGrid({ classes, onAdd, onDelete, onEdit, onError, onMove, slot
   )
 }
 
-function TimetableView({ classes, onAdd, onCreateVersion, onDelete, onEdit, onEditVersion, onError, onMove, onSelectVersion, slots, timetable, timetables, today }) {
+function TimetableView({ classes, onAdd, onAddClass, onCreateVersion, onDelete, onEdit, onEditVersion, onError, onMove, onQuickAdd, onResize, onSelectVersion, onUpdateClass, slots, timetable, timetables, today }) {
+  const [requestedClassId, setRequestedClassId] = useState(() => classes[0]?.id || '')
+  const selectedClassId = classes.some((item) => item.id === requestedClassId) ? requestedClassId : classes[0]?.id || ''
+
   if (!timetable) {
     return (
       <section className="agenda-large-empty">
@@ -214,8 +341,9 @@ function TimetableView({ classes, onAdd, onCreateVersion, onDelete, onEdit, onEd
           <button className="primary-action compact" onClick={() => onAdd(null)} type="button"><Plus size={16} />Afegir classe</button>
         </div>
       </header>
-      <div className="agenda-grid-note"><Menu size={15} /><span>Arrossega una classe des de la nansa de tres línies. Fes doble clic en un espai buit per crear-ne una a aquella hora.</span></div>
-      <TimetableGrid classes={classes} onAdd={onAdd} onDelete={onDelete} onEdit={onEdit} onError={onError} onMove={onMove} slots={slots} />
+      <TimetableClassPalette classes={classes} onAddClass={onAddClass} onError={onError} onSelectClass={setRequestedClassId} onUpdateClass={onUpdateClass} selectedClassId={selectedClassId} />
+      <div className="agenda-grid-note"><Menu size={15} /><span>Selecciona una classe i clica un espai buit. Arrossega la nansa per moure-la i clica la durada per passar d’1 h a 1:30 h o 2 h.</span></div>
+      <TimetableGrid classes={classes} onDelete={onDelete} onEdit={onEdit} onError={onError} onMove={onMove} onQuickAdd={onQuickAdd} onResize={onResize} selectedClassId={selectedClassId} slots={slots} />
     </section>
   )
 }
@@ -269,6 +397,8 @@ export default function AgendaModule() {
   const saveClassroomRecovery = useAvaluaproStore((state) => state.saveClassroomRecovery)
   const cancelClassroomRecovery = useAvaluaproStore((state) => state.cancelClassroomRecovery)
   const syncPlanningMaterialReminders = useAvaluaproStore((state) => state.syncPlanningMaterialReminders)
+  const addClass = useAvaluaproStore((state) => state.addClass)
+  const updateClass = useAvaluaproStore((state) => state.updateClass)
   const workspace = useAgendaWorkspace(user, classes)
   const agendaClasses = useMemo(() => Array.from(new Map([
     ...classes,
@@ -539,7 +669,7 @@ export default function AgendaModule() {
           {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={hasOwnCalendar ? () => setView('calendar') : null} onOpenClassroom={openClassroom} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onMoveWeek={moveWeek} onOpenSession={openSession} onReload={reloadCurrentWeek} weekStart={weekStart} />}
           {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} classes={agendaClasses} loading={workspace.sessionsLoading} onChangeClass={openTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? () => setDialog('scheduling') : null} selectedClassId={timelineClassId} />}
-          {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut moure la classe.')} onMove={workspace.moveSlot} onSelectVersion={workspace.setActiveTimetableId} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
+          {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
           {view === 'calendar' && <CalendarView classes={classes} events={workspace.calendarEvents} onAdd={() => { setEditingEvent(null); setDialog('event') }} onDelete={removeEvent} onEdit={(event) => { setEditingEvent(event); setDialog('event') }} />}
         </main>
       )}

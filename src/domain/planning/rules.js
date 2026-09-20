@@ -286,6 +286,17 @@ export function moveTimetableSlot(slot, { startsAt, weekday }, options = {}) {
   }, options)
 }
 
+const TIMETABLE_DURATION_STEPS = [60, 90, 120]
+
+/**
+ * Reprodueix el gest ràpid de l'Agenda docent: cada clic avança la durada
+ * d'una franja i, després de dues hores, torna a una hora.
+ */
+export function getNextTimetableDuration(currentDuration) {
+  const currentIndex = TIMETABLE_DURATION_STEPS.indexOf(Number(currentDuration))
+  return TIMETABLE_DURATION_STEPS[(currentIndex + 1) % TIMETABLE_DURATION_STEPS.length]
+}
+
 function timeInMinutes(value) {
   const [hours, minutes] = String(value || '').split(':').map(Number)
   return hours * 60 + minutes

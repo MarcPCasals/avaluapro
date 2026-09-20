@@ -29,6 +29,7 @@ import {
   createTimetableVersion,
   getPlanningPermissions,
   getPlanningTotals,
+  getNextTimetableDuration,
   getActivityActualComparisons,
   getClassroomPromptState,
   getClassroomEvidenceItems,
@@ -584,6 +585,12 @@ test('l’horari rebutja solapaments però permet franges consecutives', () => {
   assert.equal(findTimetableSlotConflicts(existing, {
     id: 'four', weekday: 2, startsAt: '09:00', durationMinutes: 60,
   }).length, 0)
+})
+
+test('la durada ràpida de l’horari recorre una hora, una hora i mitja i dues hores', () => {
+  assert.equal(getNextTimetableDuration(60), 90)
+  assert.equal(getNextTimetableDuration(90), 120)
+  assert.equal(getNextTimetableDuration(120), 60)
 })
 
 test('les indicacions sense temps apareixen a la seqüència però no carreguen la sessió', () => {

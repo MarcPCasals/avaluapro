@@ -369,10 +369,15 @@ export function useAgendaWorkspace(user, classes = []) {
       timetableVersionId: activeTimetable.id,
       updatedAt: now,
     }, { now })
+    // Totes les entrades, inclosos el clic ràpid i el canvi de durada, passen
+    // per la mateixa validació abans d'arribar a Firestore.
+    if (findTimetableSlotConflicts(slots, next).length > 0) {
+      throw new Error('Aquesta franja se solapa amb una altra classe del mateix horari.')
+    }
     await persist(next)
     setSlots((items) => sortSlots(replaceById(items, next)))
     return next
-  }, [activeTimetable, persist, user])
+  }, [activeTimetable, persist, slots, user])
 
   const moveSlot = useCallback(async (slot, destination) => {
     const next = moveTimetableSlot(slot, destination, { now: new Date().toISOString() })
