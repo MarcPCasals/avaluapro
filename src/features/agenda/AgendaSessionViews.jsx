@@ -176,7 +176,7 @@ export function AgendaWeekView({ bundles, classes, coordinationReminders, loadin
   return (
     <section className="agenda-week-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Setmana lectiva</span><h2>{formatDate(days[0])} – {formatDate(days[4])}</h2><p>Sessions reals de totes les UP i grups.</p></div>
+        <div><span className="agenda-view-kicker">Setmana lectiva</span><h2>{formatDate(days[0])} – {formatDate(days[4])}</h2><p>Classes de l’horari, sessions programades i recordatoris.</p></div>
         <div className="agenda-toolbar-actions"><button aria-label="Setmana anterior" className="secondary-action compact" onClick={() => onMoveWeek(-7)} type="button"><ArrowLeft size={15} /></button><button className="secondary-action compact" onClick={() => onMoveWeek(0)} type="button">Avui</button><button aria-label="Setmana següent" className="secondary-action compact" onClick={() => onMoveWeek(7)} type="button"><ArrowRight size={15} /></button><button aria-label="Recarregar setmana" className="secondary-action compact" onClick={onReload} type="button"><RotateCcw className={loading ? 'spin' : ''} size={15} /></button></div>
       </header>
       <div className="agenda-week-columns">{days.map((dateKey) => {
