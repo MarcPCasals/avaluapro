@@ -1352,6 +1352,36 @@
   line-height: 1.4;
 }
 
+.cloud-conflict-comparison {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.cloud-comparison-result {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  padding: 11px 13px;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.cloud-comparison-result.local,
+.cloud-comparison-result.cloud,
+.cloud-comparison-result.equal {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.cloud-comparison-result > div { display: grid; gap: 4px; }
+.cloud-comparison-result span { color: #475569; font-size: 12px; font-weight: 750; }
+.cloud-comparison-result p, .cloud-comparison-error { margin: 0; font-size: 12px; font-weight: 800; }
+.cloud-comparison-error { color: #b91c1c; }
+
 .cloud-conflict-actions {
   flex-wrap: wrap;
   gap: 8px;

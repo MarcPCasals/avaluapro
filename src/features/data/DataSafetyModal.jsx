@@ -19,7 +19,9 @@ import { getAntecedentsToImport, matchAntecedentStudents, validateAntecedentAssi
 import { Modal } from '../../components/Modal'
 import { COLLECTIONS } from '../../data/seedData'
 import { buildBackupStatusMessage, summarizeBackup } from '../../lib/backupDiagnostics'
+import { compareCloudConflictDatasets } from '../../lib/cloudConflictComparison'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
+import { loadCloudWorkspace } from '../../lib/firebase'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 const CONTACT_EMAIL = 'mperezc@educand.ad'
@@ -144,6 +146,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const [cleanupClassId, setCleanupClassId] = useState(() => state.ui.activeClassId || state.classes[0]?.id || '')
   const [cleanupBeforeDate, setCleanupBeforeDate] = useState('')
   const [cleanupStatus, setCleanupStatus] = useState('')
+  const [conflictComparison, setConflictComparison] = useState(null)
   const [antecedentClassId, setAntecedentClassId] = useState(
     () => state.ui.activeClassId || state.classes[0]?.id || '',
   )
@@ -321,6 +324,28 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
       setRestoreStatus('Estat recuperat del núvol correctament.')
     } catch (error) {
       setRestoreStatus(error.message || 'No s’ha pogut recuperar l’estat del núvol.')
+    }
+  }
+
+  const handleCompareCloudConflict = async () => {
+    const uid = state.cloud.user?.uid
+    if (!uid) return
+    setConflictComparison({ status: 'loading' })
+    try {
+      const workspace = await loadCloudWorkspace(uid)
+      const localDataset = COLLECTIONS.reduce((dataset, collection) => ({
+        ...dataset,
+        [collection]: state[collection] || [],
+      }), {})
+      setConflictComparison({
+        status: 'ready',
+        ...compareCloudConflictDatasets(localDataset, workspace.dataset, COLLECTIONS),
+      })
+    } catch (error) {
+      setConflictComparison({
+        status: 'error',
+        message: error.message || 'No s’han pogut comparar les dues versions.',
+      })
     }
   }
 
@@ -542,6 +567,48 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
               <ShieldCheck size={17} />
               Primer descarrega una còpia manual. Si no saps quina versió és la més recent, no triïs encara cap de les dues opcions.
             </p>
+            <div className="cloud-conflict-comparison">
+              <button
+                className="primary-action compact"
+                disabled={conflictComparison?.status === 'loading'}
+                onClick={handleCompareCloudConflict}
+                type="button"
+              >
+                {conflictComparison?.status === 'loading' ? <Loader2 className="spin-icon" size={16} /> : <Info size={16} />}
+                {conflictComparison?.status === 'loading' ? 'Comparant…' : 'Comparar les dues versions'}
+              </button>
+              {conflictComparison?.status === 'error' && <p className="cloud-comparison-error">{conflictComparison.message}</p>}
+              {conflictComparison?.status === 'ready' && (
+                <div className={`cloud-comparison-result ${conflictComparison.recommendation}`}>
+                  <strong>
+                    {conflictComparison.recommendation === 'equal'
+                      ? 'Les dades ja coincideixen.'
+                      : conflictComparison.recommendation === 'local'
+                        ? 'La còpia d’aquest dispositiu és la més recent.'
+                        : conflictComparison.recommendation === 'cloud'
+                          ? 'La còpia de Firebase és la més recent.'
+                          : 'Hi ha canvis als dos costats o sense data prou clara.'}
+                  </strong>
+                  {conflictComparison.rows.length > 0 && (
+                    <div>
+                      {conflictComparison.rows.map((row) => (
+                        <span key={row.collection}>
+                          <b>{row.label}</b>
+                          {row.localNewer > 0 && ` · ${row.localNewer} més recent${row.localNewer === 1 ? '' : 's'} aquí`}
+                          {row.cloudNewer > 0 && ` · ${row.cloudNewer} més recent${row.cloudNewer === 1 ? '' : 's'} a Firebase`}
+                          {row.localOnly > 0 && ` · ${row.localOnly} només aquí`}
+                          {row.cloudOnly > 0 && ` · ${row.cloudOnly} només a Firebase`}
+                          {row.uncertain > 0 && ` · ${row.uncertain} sense data comparable`}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {conflictComparison.recommendation === 'local' && <p>Pots triar «Reconciliar tot el núvol».</p>}
+                  {conflictComparison.recommendation === 'cloud' && <p>Pots triar «Recuperar estat».</p>}
+                  {conflictComparison.recommendation === 'review' && <p>No substitueixis encara cap versió.</p>}
+                </div>
+              )}
+            </div>
             <div className="cloud-conflict-actions">
               <button className="primary-action compact" onClick={handleDownloadBackup} type="button">
                 <Download size={16} />
