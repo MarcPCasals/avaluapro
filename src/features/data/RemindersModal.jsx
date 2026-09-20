@@ -86,7 +86,7 @@ export function RemindersModal({ onClose }) {
         <section className="reminder-composer">
           <header>
             <Bell size={18} />
-            <strong>Afegir recordatori general</strong>
+            <strong>Nou recordatori personal</strong>
           </header>
           <div className="reminder-form-grid">
             <label>
@@ -95,7 +95,7 @@ export function RemindersModal({ onClose }) {
                 onChange={(event) => setDraft((current) => ({ ...current, classId: event.target.value }))}
                 value={draft.classId}
               >
-                <option value="">General</option>
+                <option value="">General (sense classe)</option>
                 {classes.map((classItem) => (
                   <option key={classItem.id} value={classItem.id}>
                     {classItem.name}

@@ -28,7 +28,7 @@
 .agenda-brand small, .agenda-view-kicker { color: #f97316; font-size: 9px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
 .agenda-brand h1, .agenda-view-toolbar h2 { margin: 0; color: #172033; }
 .agenda-brand h1 { font-size: 22px; }
-.agenda-course-controls { justify-content: flex-end; gap: 9px; }
+.agenda-course-controls { justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
 .agenda-course-controls label { display: grid; gap: 2px; color: #94a3b8; font-size: 8px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
 .agenda-course-controls select { min-width: 140px; border: 0; padding: 2px 24px 2px 0; color: #334155; background: transparent; font-size: 13px; font-weight: 900; }
 .agenda-shared-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 10px; color: #6d28d9; background: #f3e8ff; font-size: 10px; font-weight: 900; }
@@ -36,6 +36,8 @@
 .agenda-sync.pending, .agenda-sync.saving { color: #9a3412; background: #ffedd5; }
 .agenda-sync.conflict, .agenda-sync.error { color: #991b1b; background: #fee2e2; }
 .agenda-refresh { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 8px; color: #64748b; background: white; }
+.agenda-reminders-trigger { position: relative; }
+.agenda-reminders-trigger > span { min-width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 999px; padding: 0 5px; color: #92400e; background: #fde68a; font-size: 8px; font-weight: 950; }
 
 .agenda-view-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e5e7eb; padding: 7px 22px 0; overflow-x: auto; background: white; }
 .agenda-view-tabs button { min-height: 40px; display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; border: 0; border-bottom: 2px solid transparent; padding: 8px 13px; color: #64748b; background: transparent; font-size: 12px; font-weight: 900; }
