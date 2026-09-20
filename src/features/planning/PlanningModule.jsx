@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Archive, Bell, BookOpenText, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
+  Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
   FileText, Pencil, Plus, RotateCcw, Save, Share2, X,
 } from 'lucide-react'
@@ -285,6 +285,7 @@ export default function PlanningModule() {
   const indicators = useAvaluaproStore((state) => state.indicators)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
+  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const workspace = usePlanningWorkspace(user)
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
@@ -347,6 +348,10 @@ export default function PlanningModule() {
       return null
     }
   }
+  const openAgendaReflow = () => {
+    globalThis.sessionStorage?.setItem('avaluapro:open-agenda-scheduling', workspace.activePlanningUnit?.id || '')
+    setActiveMode('agenda')
+  }
 
   return (
     <section className="planning-screen">
@@ -366,6 +371,11 @@ export default function PlanningModule() {
           )}
           <button className="secondary-action compact" onClick={() => setDialog('year')} type="button"><Plus size={16} />Nou curs</button>
           {workspace.activeAcademicYear && <button className="secondary-action compact" onClick={() => setShowUtManager((value) => !value)} type="button"><CalendarRange size={16} />Dates de les UT</button>}
+          {workspace.activePlanningUnit && (
+            <button className="secondary-action compact" onClick={openAgendaReflow} type="button">
+              <CalendarClock size={16} />Actualitzar Agenda
+            </button>
+          )}
           {workspace.activePlanningUnit && (
             <button className="secondary-action compact planning-reminders-trigger" onClick={() => setDialog('reminders')} type="button">
               <Bell size={16} />Recordatoris

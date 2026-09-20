@@ -408,6 +408,92 @@ export function buildActivitySessionDistribution({
   }
 }
 
+function canReflowSession(bundle, fromDate) {
+  const session = bundle?.session
+  if (!session || String(session.startsAt).slice(0, 10) < fromDate) return false
+  if (session.status !== 'planned') return false
+  if (session.classroomOpenedAt || session.attendanceConfirmedAt || session.classroomClosedAt) return false
+  return !(bundle.results || []).length
+}
+
+/**
+ * Torna a projectar tota la part futura d'una UP sobre les sessions previstes.
+ * Les sessions impartides o amb dades reals queden bloquejades. La resta es
+ * buida només dins la proposta i es reparteix de nou en l'ordre actual de la
+ * programació, de manera que qualsevol inserció o canvi de durada produeix
+ * l'efecte dominó esperat abans de desar res.
+ */
+export function buildActivitySessionReflow({
+  activities = [],
+  application,
+  candidates = [],
+  existingSessionBundles = [],
+  fromDate,
+  marginMinutes = 5,
+  options = {},
+}) {
+  if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
+  const reflowableBundles = existingSessionBundles
+    .filter((bundle) => canReflowSession(bundle, fromDate))
+    .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+  const lockedBundles = existingSessionBundles.filter((bundle) => !reflowableBundles.includes(bundle))
+  const { assignedMinutesByActivityId, assignedSourceActivityIds } =
+    summarizeAssignedActivityProgress(lockedBundles)
+  const remainingActivities = activities.flatMap((activity) => {
+    const plannedMinutes = Number(activity.plannedMinutes)
+    if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
+      return assignedSourceActivityIds.has(activity.id) ? [] : [activity]
+    }
+    const remainingMinutes = Math.max(0, plannedMinutes - (assignedMinutesByActivityId[activity.id] || 0))
+    return remainingMinutes > 0 ? [{ ...activity, plannedMinutes: remainingMinutes }] : []
+  })
+  const segmentOffsetByActivityId = {}
+  for (const bundle of lockedBundles) {
+    for (const item of bundle.items || []) {
+      if (!item.sourceActivityId) continue
+      segmentOffsetByActivityId[item.sourceActivityId] = Math.max(
+        segmentOffsetByActivityId[item.sourceActivityId] || 0,
+        Number(item.segmentIndex) || 0,
+      )
+    }
+  }
+  const distribution = buildActivitySessionDistribution({
+    activities: remainingActivities,
+    application,
+    candidates,
+    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
+    marginMinutes,
+    options,
+  })
+  const sessions = distribution.sessions.map((bundle) => ({
+    ...bundle,
+    items: bundle.items.map((item) => {
+      const offset = segmentOffsetByActivityId[item.sourceActivityId] || 0
+      if (!offset) return item
+      return createSessionItem({
+        ...item,
+        segmentCount: offset + item.segmentCount,
+        segmentIndex: offset + item.segmentIndex,
+      }, options)
+    }),
+  }))
+  const usedSessionIds = new Set(sessions.map((bundle) => bundle.session.id))
+  const removedSessions = reflowableBundles
+    .map((bundle) => bundle.session)
+    .filter((session) => !usedSessionIds.has(session.id))
+
+  return {
+    ...distribution,
+    kind: 'reflow',
+    lockedSessionCount: lockedBundles.length,
+    removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedSessions,
+    replacedItemCount: reflowableBundles.reduce((total, bundle) => total + (bundle.items || []).length, 0),
+    reflowableSessionCount: reflowableBundles.length,
+    sessions,
+  }
+}
+
 export function getSessionCandidateKey(candidate) {
   return candidateKey(candidate)
 }

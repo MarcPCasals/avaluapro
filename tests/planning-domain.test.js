@@ -6,6 +6,7 @@ import {
   applyImprovementProposals,
   buildActivityImprovementProposals,
   buildActivitySessionDistribution,
+  buildActivitySessionReflow,
   buildTimetableSessionCandidates,
   copyPlanningActivityToPhase,
   copyTimetableVersionStructure,
@@ -803,6 +804,54 @@ test('la incorporació progressiva omple primer una sessió ja creada amb minuts
   assert.equal(result.sessions[0].session.id, existingSession.id)
   assert.equal(result.sessions[0].items[0].order, 1)
   assert.equal(result.sessions[0].items[0].plannedMinutes, 35)
+})
+
+test('afegir una activitat al mig reorganitza totes les sessions futures en cadena', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const makeBundle = (id, startsAt, activityId) => {
+    const session = createCalendarSession({
+      id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+      startsAt, durationMinutes: 60, timetableSlotId: 'slot-1',
+    }, options(idFactory))
+    return {
+      items: [createSessionItem({
+        ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+        type: 'activity', title: activityId, order: 0, plannedMinutes: 55,
+        sourceActivityId: activityId,
+      }, options(idFactory))],
+      results: [],
+      session,
+    }
+  }
+  const past = makeBundle('session-a', '2026-09-21T09:30:00', 'a')
+  past.session.status = 'completed'
+  const futureB = makeBundle('session-b', '2026-09-28T09:30:00', 'b')
+  const futureC = makeBundle('session-c', '2026-10-05T09:30:00', 'c')
+  const result = buildActivitySessionReflow({
+    activities: [
+      { id: 'a', title: 'A', type: 'activity', plannedMinutes: 55 },
+      { id: 'new', title: 'Nova', type: 'activity', plannedMinutes: 30 },
+      { id: 'b', title: 'B', type: 'activity', plannedMinutes: 55 },
+      { id: 'c', title: 'C', type: 'activity', plannedMinutes: 55 },
+    ],
+    application,
+    candidates: [{ date: '2026-10-12', startsAt: '2026-10-12T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1' }],
+    existingSessionBundles: [past, futureB, futureC],
+    fromDate: '2026-09-22',
+    options: options(idFactory),
+  })
+
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => [item.sourceActivityId, item.plannedMinutes])), [
+    [['new', 30], ['b', 25]],
+    [['b', 30], ['c', 25]],
+    [['c', 30]],
+  ])
+  assert.equal(result.replacedItemCount, 2)
+  assert.deepEqual(result.removedSessions, [])
+  assert.deepEqual(result.unscheduled, [])
 })
 
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {

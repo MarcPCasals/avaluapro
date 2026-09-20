@@ -20,6 +20,8 @@ function initialStartDate(academicYear, today) {
 export function AgendaSchedulingDialog({
   academicYear,
   classes,
+  initialClassId = '',
+  initialPlanningUnitId = '',
   onBuildPreview,
   onClose,
   onConfirm,
@@ -30,9 +32,9 @@ export function AgendaSchedulingDialog({
 }) {
   const availableUnits = useMemo(() => planningUnits.filter((item) => item.status !== 'archived'), [planningUnits])
   const [values, setValues] = useState(() => ({
-    classId: classes[0]?.id || '',
+    classId: initialClassId || classes[0]?.id || '',
     mode: 'progressive',
-    planningUnitId: availableUnits[0]?.id || '',
+    planningUnitId: initialPlanningUnitId || availableUnits[0]?.id || '',
     startDate: initialStartDate(academicYear, today),
   }))
   const [setup, setSetup] = useState(null)
@@ -62,7 +64,9 @@ export function AgendaSchedulingDialog({
       const remaining = nextSetup.activities.filter((activity) =>
         !nextSetup.scheduledSourceActivityIds.includes(activity.id))
       setSetup(nextSetup)
-      setSelectedActivityIds(values.mode === 'complete'
+      setSelectedActivityIds(values.mode === 'smart'
+        ? nextSetup.activities.map((activity) => activity.id)
+        : values.mode === 'complete'
         ? remaining.map((activity) => activity.id)
         : remaining.slice(0, 1).map((activity) => activity.id))
     } catch (loadError) {
@@ -76,7 +80,9 @@ export function AgendaSchedulingDialog({
     setValues((current) => ({ ...current, mode }))
     setPreview(null)
     if (!setup) return
-    setSelectedActivityIds(mode === 'complete'
+    setSelectedActivityIds(mode === 'smart'
+      ? setup.activities.map((activity) => activity.id)
+      : mode === 'complete'
       ? remainingActivities.map((activity) => activity.id)
       : remainingActivities.slice(0, 1).map((activity) => activity.id))
   }
@@ -91,7 +97,7 @@ export function AgendaSchedulingDialog({
   const buildPreview = () => {
     setError('')
     try {
-      setPreview(onBuildPreview(setup, { selectedActivityIds, startDate: values.startDate }))
+      setPreview(onBuildPreview(setup, { mode: values.mode, selectedActivityIds, startDate: values.startDate }))
     } catch (previewError) {
       setError(previewError.message || 'No s’ha pogut preparar la proposta.')
     }
@@ -134,6 +140,7 @@ export function AgendaSchedulingDialog({
             <legend>Com vols avançar?</legend>
             <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Tria ara només les pròximes activitats.</small></span></label>
             <label className={values.mode === 'complete' ? 'selected' : ''}><input checked={values.mode === 'complete'} name="schedule-mode" onChange={() => changeMode('complete')} type="radio" /><span><strong>Proposta completa</strong><small>Distribueix tota la UP pendent fins al final de curs.</small></span></label>
+            <label className={values.mode === 'smart' ? 'selected' : ''}><input checked={values.mode === 'smart'} name="schedule-mode" onChange={() => changeMode('smart')} type="radio" /><span><strong>Reorganització intel·ligent</strong><small>Refà les sessions futures i desplaça la resta en cadena.</small></span></label>
           </fieldset>
           {!setup ? (
             <button className="primary-action agenda-schedule-load" disabled={busy || !values.classId || !values.planningUnitId} onClick={loadSequence} type="button">{busy ? <Loader2 className="spin" size={17} /> : <Layers3 size={17} />}Carregar la seqüència</button>
@@ -142,13 +149,13 @@ export function AgendaSchedulingDialog({
           )}
           {setup && (
             <div className="agenda-activity-picker">
-              <header><div><strong>Activitats pendents</strong><span>{remainingActivities.length} per calendaritzar · {setup.scheduledSourceActivityIds.length} ja assignades</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
-              {remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{remainingActivities.map((activity) => {
+              <header><div><strong>{values.mode === 'smart' ? 'Seqüència que es recalcularà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${setup.activities.length} activitats en l’ordre actual de la UP` : `${remainingActivities.length} per calendaritzar · ${setup.scheduledSourceActivityIds.length} ja assignades`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
+              {values.mode !== 'smart' && remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{(values.mode === 'smart' ? setup.activities : remainingActivities).map((activity) => {
                 const remainingMinutes = setup.remainingMinutesByActivityId[activity.id]
                 const timeLabel = remainingMinutes && remainingMinutes !== activity.plannedMinutes
                   ? `${remainingMinutes} de ${activity.plannedMinutes} min pendents`
                   : activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'
-                return <label key={activity.id}><input checked={selectedActivityIds.includes(activity.id)} disabled={values.mode === 'complete'} onChange={(event) => toggleActivity(activity.id, event.target.checked)} type="checkbox" /><span><strong>{activity.title}</strong><small>{timeLabel}{activity.type === 'indication' ? ' · indicació' : ''}</small></span></label>
+                return <label key={activity.id}><input checked={selectedActivityIds.includes(activity.id)} disabled={['complete', 'smart'].includes(values.mode)} onChange={(event) => toggleActivity(activity.id, event.target.checked)} type="checkbox" /><span><strong>{activity.title}</strong><small>{values.mode === 'smart' ? (activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps') : timeLabel}{activity.type === 'indication' ? ' · indicació' : ''}</small></span></label>
               })}</div>}
             </div>
           )}
@@ -156,13 +163,14 @@ export function AgendaSchedulingDialog({
 
         <section className="agenda-schedule-preview">
           {!preview ? (
-            <div className="agenda-preview-placeholder"><CalendarCheck2 size={32} /><strong>La previsualització apareixerà aquí</strong><p>Veuràs cada data, els fragments d’activitat i els dies que s’han saltat abans de desar res.</p>{setup && remainingActivities.length > 0 && <button className="secondary-action" disabled={selectedActivityIds.length === 0} onClick={buildPreview} type="button"><Sparkles size={16} />Previsualitzar proposta</button>}</div>
+            <div className="agenda-preview-placeholder"><CalendarCheck2 size={32} /><strong>La previsualització apareixerà aquí</strong><p>Veuràs cada data, els fragments d’activitat i els dies que s’han saltat abans de desar res.</p>{setup && (values.mode === 'smart' || remainingActivities.length > 0) && <button className="secondary-action" disabled={selectedActivityIds.length === 0} onClick={buildPreview} type="button"><Sparkles size={16} />{values.mode === 'smart' ? 'Calcular l’efecte dominó' : 'Previsualitzar proposta'}</button>}</div>
           ) : (
             <div className="agenda-preview-result">
               <header><div><span>Proposta</span><h3>{preview.sessions.length} {preview.sessions.length === 1 ? 'sessió afectada' : 'sessions afectades'}</h3></div><button onClick={() => setPreview(null)} type="button">Modificar</button></header>
               <div className="agenda-preview-summary"><span><CalendarCheck2 size={15} />{preview.scheduledActivityIds.length} activitats</span><span><Clock3 size={15} />{preview.scheduledMinutes} min</span><span><Layers3 size={15} />{preview.skippedDates.length} dates saltades</span></div>
+              {preview.kind === 'reflow' && <div className="agenda-reflow-summary"><Sparkles size={18} /><div><strong>Reorganització en cadena</strong><p>{preview.replacedItemCount} fragments previstos es substituiran · {preview.lockedSessionCount} sessions impartides o amb dades quedaran intactes.</p></div></div>}
               {preview.skippedDates.length > 0 && <div className="agenda-skipped-dates"><strong>Calendari respectat</strong><p>{preview.skippedDates.map((item) => `${formatDate(item.date)} · ${item.titles.join(', ')}`).join(' · ')}</p></div>}
-              <div className="agenda-proposed-sessions">{preview.sessions.map((bundle) => <article key={bundle.session.id}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? ' · ja creada' : ''}</small></div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small></li>)}</ol></article>)}</div>
+              <div className="agenda-proposed-sessions">{preview.sessions.map((bundle) => <article key={bundle.session.id}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? (preview.kind === 'reflow' ? ' · reorganitzada' : ' · ja creada') : ''}</small></div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small></li>)}</ol></article>)}</div>
               {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning"><AlertTriangle size={18} /><div><strong>Falten sessions a l’horari</strong><p>{preview.unscheduled.map((item) => `${item.title}${item.remainingMinutes ? ` (${item.remainingMinutes} min pendents)` : ''}`).join(' · ')}</p></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
             </div>
           )}
@@ -171,7 +179,7 @@ export function AgendaSchedulingDialog({
       </div>
       <div className="modal-actions">
         <button className="secondary-action" disabled={busy} onClick={onClose} type="button">Cancel·lar</button>
-        <button className="primary-action" disabled={busy || !preview || preview.unscheduled.length > 0 || preview.sessions.length === 0} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}Confirmar i crear les sessions</button>
+        <button className="primary-action" disabled={busy || !preview || preview.unscheduled.length > 0 || (preview.kind !== 'reflow' && preview.sessions.length === 0)} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}{preview?.kind === 'reflow' ? 'Confirmar reorganització' : 'Confirmar i crear les sessions'}</button>
       </div>
     </Modal>
   )

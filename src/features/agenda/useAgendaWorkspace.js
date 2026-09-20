@@ -19,6 +19,7 @@ import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/plan
 import {
   copyTimetableVersionStructure,
   buildActivitySessionDistribution,
+  buildActivitySessionReflow,
   buildTimetableSessionCandidates,
   createActivityResult,
   createCalendarEvent,
@@ -779,6 +780,7 @@ export function useAgendaWorkspace(user, classes = []) {
       )))
       existingSessionBundles = existingSessions.map((session, index) => ({
         items: detailResults[index].entities.filter((item) => item.entityType === 'sessionItem'),
+        results: detailResults[index].entities.filter((item) => item.entityType === 'activityResult'),
         session,
       }))
     }
@@ -813,16 +815,8 @@ export function useAgendaWorkspace(user, classes = []) {
     }
   }, [activeAcademicYear, calendarEvents, classes, repository, timetables, user])
 
-  const buildSchedulingPreview = useCallback((setup, { selectedActivityIds, startDate }) => {
+  const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
-    const selected = new Set(selectedActivityIds || [])
-    const activities = setup.activities
-      .filter((activity) => selected.has(activity.id))
-      .map((activity) => ({
-        ...activity,
-        plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
-      }))
-    if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
     const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
       date: String(session.startsAt).slice(0, 10),
       calendarEventId: session.calendarEventId,
@@ -838,6 +832,32 @@ export function useAgendaWorkspace(user, classes = []) {
       timetables: setup.timetables,
       to: activeAcademicYear.endsOn,
     })
+    if (mode === 'smart') {
+      const distribution = buildActivitySessionReflow({
+        activities: setup.activities,
+        application: setup.application,
+        candidates: temporalProposal.candidates,
+        existingSessionBundles: setup.existingSessionBundles,
+        fromDate: startDate,
+        options: { now: new Date().toISOString() },
+      })
+      const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date
+        || String(distribution.removedSessions.at(-1)?.startsAt || startDate).slice(0, 10)
+      return {
+        ...distribution,
+        ...temporalProposal,
+        skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
+        setup,
+      }
+    }
+    const selected = new Set(selectedActivityIds || [])
+    const activities = setup.activities
+      .filter((activity) => selected.has(activity.id))
+      .map((activity) => ({
+        ...activity,
+        plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
+      }))
+    if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
     const distribution = buildActivitySessionDistribution({
       activities,
       application: setup.application,
@@ -877,9 +897,31 @@ export function useAgendaWorkspace(user, classes = []) {
         })
       }
     }
+    if (preview.kind === 'reflow') {
+      if (!repository) throw new Error('Cal iniciar sessió abans de reorganitzar l’Agenda.')
+      for (const item of preview.removedItems) {
+        await repository.remove(item, {
+          applicationId: application.id,
+          planningUnitId,
+          sessionId: item.sessionId,
+        })
+      }
+      for (const session of preview.removedSessions) {
+        await repository.remove(session, { applicationId: application.id, planningUnitId })
+      }
+      for (const entry of entries) await repository.save(entry.entity || entry, entry.context || {})
+      await refreshSync()
+      await synchronize()
+      return {
+        application,
+        reflowed: true,
+        replacedItemCount: preview.replacedItemCount,
+        sessionCount: preview.sessions.length,
+      }
+    }
     await persist(entries)
     return { application, sessionCount: preview.sessions.length }
-  }, [persist])
+  }, [persist, refreshSync, repository, synchronize])
 
   /**
    * Aplica l'abast triat pel docent: només la còpia del grup, la UP base o

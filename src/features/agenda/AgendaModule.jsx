@@ -38,6 +38,12 @@ const WEEKDAYS = [
   [4, 'Dijous', 'Dj.'],
   [5, 'Divendres', 'Dv.'],
 ]
+
+function consumeAgendaSchedulingRequest() {
+  const planningUnitId = globalThis.sessionStorage?.getItem('avaluapro:open-agenda-scheduling') || ''
+  if (planningUnitId) globalThis.sessionStorage?.removeItem('avaluapro:open-agenda-scheduling')
+  return planningUnitId
+}
 const GRID_START = 7 * 60 + 30
 const GRID_END = 18 * 60
 const GRID_STEP = 15
@@ -243,6 +249,7 @@ function CalendarView({ classes, events, onAdd, onDelete, onEdit }) {
 }
 
 export default function AgendaModule() {
+  const [initialSchedulingUnitId] = useState(consumeAgendaSchedulingRequest)
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -289,13 +296,14 @@ export default function AgendaModule() {
   const [view, setView] = useState('today')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(workspace.today))
   const [timelineClassId, setTimelineClassId] = useState(() => classes[0]?.id || '')
-  const [dialog, setDialog] = useState(null)
+  const [dialog, setDialog] = useState(() => initialSchedulingUnitId ? 'scheduling' : null)
   const [activeBundle, setActiveBundle] = useState(null)
   const [editingTimetable, setEditingTimetable] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
   const [slotPosition, setSlotPosition] = useState(null)
   const [editingEvent, setEditingEvent] = useState(null)
   const [scheduleNotice, setScheduleNotice] = useState('')
+  const [schedulingUnitId, setSchedulingUnitId] = useState(initialSchedulingUnitId)
   const [adjustInitialAction, setAdjustInitialAction] = useState('session')
   const [adjustItemId, setAdjustItemId] = useState('')
   const [classroomRevision, setClassroomRevision] = useState(0)
@@ -515,6 +523,7 @@ export default function AgendaModule() {
         <div className="agenda-course-controls">
           {workspace.academicYears.length > 0 ? <label>Curs<select value={workspace.activeAcademicYearId} onChange={(event) => workspace.setActiveAcademicYearId(event.target.value)}>{workspace.academicYears.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}</select></label> : <span className="agenda-shared-badge"><Share2 size={14} />Agenda compartida</span>}
           <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
+          {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
           <button aria-label="Sincronitzar Agenda" className="agenda-refresh" onClick={() => workspace.synchronize()} title="Sincronitzar ara" type="button"><RotateCcw size={15} /></button>
         </div>
       </header>
@@ -547,7 +556,7 @@ export default function AgendaModule() {
       {dialog === 'timetable' && <TimetableDialog academicYear={workspace.activeAcademicYear} currentTimetable={workspace.activeTimetable} initialValue={editingTimetable} onClose={() => setDialog(null)} onSave={(values, current) => current ? workspace.saveTimetable(current, values) : workspace.createTimetable(values)} />}
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent} onClose={() => setDialog(null)} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
-      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => setDialog(null)} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(`${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadActiveView() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
+      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(result.reflowed ? `${result.sessionCount} sessions futures reorganitzades amb l’efecte dominó.` : `${result.sessionCount} ${result.sessionCount === 1 ? 'sessió afectada' : 'sessions afectades'} i vinculades amb la UP.`); reloadActiveView() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onSaveItem={(item, changes, scope) => workspace.saveSessionItemChange(activeBundle, item, changes, scope)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>
