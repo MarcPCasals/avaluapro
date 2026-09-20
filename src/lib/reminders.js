@@ -82,7 +82,7 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
  */
 export function getPlanningReminderSummary({ agendaNotes = [], classes = [], planningUnitId = '' }) {
   const classById = new Map(classes.map((classItem) => [classItem.id, classItem]))
-  const items = agendaNotes
+  const rawItems = agendaNotes
     .filter((note) => note.type === 'materialPreparation'
       && (!planningUnitId || note.planningUnitId === planningUnitId))
     .map((note) => {
@@ -97,6 +97,32 @@ export function getPlanningReminderSummary({ agendaNotes = [], classes = [], pla
         title: note.text || note.reminder?.text || 'Preparació pendent',
       }
     })
+
+  // Una mateixa preparació pot provenir de més d'una activitat dins de la
+  // mateixa sessió. A la interfície es presenta com una sola acció i es manté
+  // la relació amb totes les notes originals per poder-les completar juntes.
+  const groupedItems = new Map()
+  rawItems.forEach((item) => {
+    const groupKey = [
+      item.note.classId,
+      item.note.sessionId,
+      item.note.preparation?.kind,
+      item.note.preparation?.label || item.title,
+      item.reminder?.date,
+    ].join(':')
+    const current = groupedItems.get(groupKey)
+    if (!current) {
+      groupedItems.set(groupKey, { ...item, id: `planning_group_${groupKey}`, notes: [item.note] })
+      return
+    }
+    current.notes.push(item.note)
+    const activeNotes = current.notes.filter((note) => !note.preparation?.cancelledAt)
+    current.status = activeNotes.length === 0
+      ? 'cancelled'
+      : activeNotes.every((note) => note.preparation?.completedAt) ? 'completed' : 'pending'
+  })
+
+  const items = [...groupedItems.values()]
     .sort((left, right) => {
       const statusOrder = { pending: 0, completed: 1, cancelled: 2 }
       return (statusOrder[left.status] ?? 9) - (statusOrder[right.status] ?? 9)

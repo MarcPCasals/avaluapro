@@ -96,6 +96,25 @@ test('la preparació de materials queda separada dels recordatoris generals', ()
   assert.deepEqual(planningSummary.items.map((item) => item.title), ['Imprimir: fitxa'])
 })
 
+test('la mateixa preparació es mostra una sola vegada per sessió', () => {
+  const shared = {
+    classId: 'class-1',
+    planningUnitId: 'up-1',
+    reminder: { date: '2099-01-02', text: 'Imprimir: fitxa' },
+    sessionId: 'session-1',
+    text: 'Imprimir: fitxa',
+    type: 'materialPreparation',
+  }
+  const agendaNotes = [
+    { ...shared, id: 'material-1', preparation: { kind: 'print', label: 'fitxa', sourceActivityId: 'activity-1' } },
+    { ...shared, id: 'material-2', preparation: { kind: 'print', label: 'fitxa', sourceActivityId: 'activity-2' } },
+  ]
+  const planningSummary = getPlanningReminderSummary({ agendaNotes, planningUnitId: 'up-1' })
+  assert.equal(planningSummary.count, 1)
+  assert.equal(planningSummary.items.length, 1)
+  assert.deepEqual(planningSummary.items[0].notes.map((note) => note.id), ['material-1', 'material-2'])
+})
+
 test('un material eliminat cancel·la el recordatori i si torna no queda silenciat', () => {
   const material = { id: 'material-1', label: '30 còpies', preparationKind: 'print' }
   const bundle = {

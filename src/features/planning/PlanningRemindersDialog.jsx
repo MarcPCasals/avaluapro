@@ -24,10 +24,10 @@ export function PlanningRemindersDialog({ agendaNotes, classes, onClose, onUpdat
   const toggleCompleted = async (item) => {
     if (item.status === 'cancelled') return
     const completedAt = item.status === 'completed' ? '' : new Date().toISOString()
-    await onUpdate(item.note.id, {
-      preparation: { ...item.note.preparation, completedAt },
-      reminder: { ...item.note.reminder, dismissedAt: completedAt },
-    })
+    await Promise.all(item.notes.map((note) => onUpdate(note.id, {
+      preparation: { ...note.preparation, completedAt },
+      reminder: { ...note.reminder, dismissedAt: completedAt },
+    })))
   }
 
   return (
@@ -61,6 +61,7 @@ export function PlanningRemindersDialog({ agendaNotes, classes, onClose, onUpdat
                     {item.note.preparation?.sessionStartsAt
                       ? ` · classe ${formatDate(String(item.note.preparation.sessionStartsAt).slice(0, 10))}`
                       : ''}
+                    {item.notes.length > 1 ? ` · ${item.notes.length} activitats` : ''}
                   </span>
                 </div>
                 <span className={`planning-reminder-status ${item.status}`}>{statusLabel(item.status)}</span>
