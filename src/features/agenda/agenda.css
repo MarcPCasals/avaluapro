@@ -267,11 +267,17 @@
 .agenda-session-subheading strong { color: #475569; font-size: 11px; }
 .agenda-session-subheading span { margin-left: auto; border-radius: 999px; padding: 2px 6px; color: #6d28d9; background: #f5f3ff; font-size: 8px; font-weight: 900; }
 .agenda-session-activities ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.agenda-session-activities li { min-height: 46px; display: grid; grid-template-columns: 11px minmax(0, 1fr); gap: 10px; align-items: center; border-top: 1px solid #f1f5f9; }
-.agenda-session-activities li > span { width: 8px; height: 8px; border-radius: 50%; background: #f97316; box-shadow: 0 0 0 4px #ffedd5; }
+.agenda-session-activities li { min-height: 46px; display: grid; grid-template-columns: 11px minmax(0, 1fr); gap: 10px; align-items: start; border-top: 1px solid #f1f5f9; padding: 11px 0; }
+.agenda-session-activities li > span { width: 8px; height: 8px; margin-top: 4px; border-radius: 50%; background: #f97316; box-shadow: 0 0 0 4px #ffedd5; }
 .agenda-session-activities li > div { display: grid; gap: 1px; }
 .agenda-session-activities li strong { color: #334155; font-size: 11px; }
 .agenda-session-activities li small { color: #94a3b8; font-size: 8px; font-weight: 750; }
+.agenda-activity-description { margin-top: 5px; }
+.agenda-activity-description summary { width: fit-content; display: inline-flex; align-items: center; gap: 4px; list-style: none; color: #7c3aed; cursor: pointer; font-size: 9px; font-weight: 850; }
+.agenda-activity-description summary::-webkit-details-marker { display: none; }
+.agenda-activity-description summary svg { transition: transform .18s ease; }
+.agenda-activity-description[open] summary svg { transform: rotate(180deg); }
+.agenda-activity-description p { max-width: 760px; margin: 7px 0 0; border-left: 2px solid #ddd6fe; padding: 2px 0 2px 10px; color: #475569; font-size: 10px; font-weight: 650; line-height: 1.55; white-space: pre-wrap; }
 .agenda-session-materials > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .agenda-session-materials a { max-width: 100%; display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 7px 9px; overflow: hidden; color: #6d28d9; background: #f5f3ff; font-size: 9px; font-weight: 850; text-decoration: none; }
 .agenda-session-materials a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

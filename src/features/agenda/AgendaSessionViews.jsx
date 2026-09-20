@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarRange, Clock3, Edit3,
+  ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarRange, ChevronDown, Clock3, Edit3,
   ExternalLink, Layers3, ListChecks, Loader2, MapPin, Plus, RotateCcw,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -59,7 +59,10 @@ function SessionDetail({ bundle, classes, onAdjust, onOpenClassroom }) {
       </header>
       <div className="agenda-session-activities">
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
-        {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => <li key={item.id}><span /><div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small></div></li>)}</ol>}
+        {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
+          const description = item.sourceActivity?.description?.trim()
+          return <li key={item.id}><span /><div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><p>{description}</p></details>}</div></li>
+        })}</ol>}
       </div>
       <div className="agenda-session-materials">
         <div className="agenda-session-subheading"><ExternalLink size={16} /><strong>Materials</strong><span>{materials.length}</span></div>

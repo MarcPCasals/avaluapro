@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3,
-  Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus, PackageCheck,
+  Copy, DoorOpen, Loader2, Mail, MessageSquarePlus,
   Pause, PencilLine, Play, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
   Users, UserX, X,
 } from 'lucide-react'
@@ -16,7 +16,6 @@ import { findAbsenceForSession } from '../../lib/attendance'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   buildRecoveryEmail,
-  getMaterialPreparationKey,
   getRecoverableClassroomItems,
 } from '../../lib/classroomRecovery'
 import './classroom.css'
@@ -29,13 +28,6 @@ function formatClock(seconds) {
 function formatSessionDate(startsAt) {
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long', weekday: 'long' })
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
-}
-
-function itemMaterials(item) {
-  return [
-    ...(item.sourceActivity?.teacherMaterials || []).map((material) => ({ ...material, audience: 'teacher' })),
-    ...(item.sourceActivity?.studentMaterials || []).map((material) => ({ ...material, audience: 'students' })),
-  ]
 }
 
 function replaceResult(results, nextResult) {
@@ -235,7 +227,6 @@ export function ClassroomMode({
   onAddBehavior,
   onCancelRecovery,
   onCloseSession,
-  onCompleteMaterialPreparation,
   onContinue,
   onExit,
   onFindNextSession,
@@ -300,13 +291,9 @@ export function ClassroomMode({
     absentStudents.length ? `Absents: ${absentStudents.map((student) => student.name).join(' · ')}` : '',
     departedStudents.length ? `Han marxat: ${departedStudents.map((student) => student.name).join(' · ')}` : '',
   ].filter(Boolean).join(' — ')
-  const sessionPreparationNotes = agendaNotes.filter((note) => note.type === 'materialPreparation'
-    && note.sessionId === currentBundle.session.id
-    && !note.preparation?.cancelledAt)
   const reminderCount = sessionTaskRecords.filter((record) => record.reminder && !record.reminder.dismissedAt).length
     + sessionTasks.filter((task) => task.reminder && !task.reminder.dismissedAt).length
     + sessionRecoveryNotes.filter((note) => note.reminder && !note.reminder.dismissedAt).length
-    + sessionPreparationNotes.filter((note) => note.reminder && !note.reminder.dismissedAt).length
   const existingPrivateNote = currentBundle.privateNotes?.[0]?.text || ''
   const reflectionResult = [...currentBundle.results].reverse().find((result) => result.pedagogicalReflection)
   const existingReflection = reflectionResult?.pedagogicalReflection || ''
@@ -314,13 +301,13 @@ export function ClassroomMode({
   const [summaryPrivateNote, setSummaryPrivateNote] = useState(existingPrivateNote)
   const currentItem = currentBundle.items[currentIndex] || null
   const currentResult = currentBundle.results.find((result) => result.sessionItemId === currentItem?.id) || null
+  const currentDescription = currentItem?.sourceActivity?.description?.trim() || ''
   const timer = getClassroomTimerState({
     endedAtMs: timerStoppedAt,
     nowMs,
     plannedMinutes: currentItem?.plannedMinutes,
     startedAtMs: timerStartedAt,
   })
-  const materials = currentItem ? itemMaterials(currentItem) : []
   const diversityMeasures = (currentItem?.sourceActivity?.diversityMeasures || [])
     .filter((measure) => !measure.classId || measure.classId === currentBundle.session.classId)
 
@@ -488,18 +475,6 @@ export function ClassroomMode({
     return onSaveRecovery(currentBundle, recoveryDraft.student, recovery)
   }
 
-  const completeMaterialPreparation = async (note) => {
-    setBusy(`material:${note.id}`)
-    setError('')
-    try {
-      await onCompleteMaterialPreparation(note)
-    } catch (operationError) {
-      setError(operationError.message || 'No s’ha pogut marcar el material com a preparat.')
-    } finally {
-      setBusy('')
-    }
-  }
-
   const closeSession = async () => {
     setBusy('close')
     setError('')
@@ -561,14 +536,7 @@ export function ClassroomMode({
               {currentResult?.actualMinutes && <span>{currentResult.actualMinutes} minuts reals registrats</span>}
             </div>
 
-            {materials.length > 0 && <div className="classroom-materials">{materials.map((material) => {
-              const preparationNote = sessionPreparationNotes.find((note) => note.materialPreparationKey === getMaterialPreparationKey(currentBundle.session.id, currentItem, material))
-              const prepared = Boolean(preparationNote?.preparation?.completedAt)
-              return <div className={`${material.preparationKind && material.preparationKind !== 'reference' ? 'preparable' : ''} ${prepared ? 'prepared' : ''}`} key={`${material.audience}:${material.id || material.label}`}>
-                {material.url ? <a href={material.url} rel="noreferrer" target="_blank"><ExternalLink size={15} />{material.label}</a> : <span><PackageCheck size={15} />{material.label}</span>}
-                {preparationNote && <button disabled={prepared || busy === `material:${preparationNote.id}`} onClick={() => completeMaterialPreparation(preparationNote)} type="button">{busy === `material:${preparationNote.id}` ? <Loader2 className="spin" size={13} /> : prepared ? <Check size={13} /> : <PackageCheck size={13} />}{prepared ? 'Preparat' : 'Marcar preparat'}</button>}
-              </div>
-            })}</div>}
+            {currentDescription && <section className="classroom-activity-description"><strong>Descripció de l’activitat</strong><p>{currentDescription}</p></section>}
 
             {diversityMeasures.length > 0 && <section className="classroom-adaptation-reminder"><ShieldCheck size={19} /><div><strong>Mesures previstes per a aquesta activitat</strong>{diversityMeasures.map((measure) => <p key={measure.id}><span>{measure.label}</span>{measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}</p>)}</div></section>}
 

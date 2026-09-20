@@ -269,7 +269,6 @@ export default function AgendaModule() {
   const saveClassroomRecovery = useAvaluaproStore((state) => state.saveClassroomRecovery)
   const cancelClassroomRecovery = useAvaluaproStore((state) => state.cancelClassroomRecovery)
   const syncPlanningMaterialReminders = useAvaluaproStore((state) => state.syncPlanningMaterialReminders)
-  const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const workspace = useAgendaWorkspace(user, classes)
   const agendaClasses = useMemo(() => Array.from(new Map([
     ...classes,
@@ -457,13 +456,6 @@ export default function AgendaModule() {
     sessionStartsAt: bundle.session.startsAt,
     studentId: student.id,
   })
-  const completeMaterialPreparation = async (note) => {
-    const completedAt = new Date().toISOString()
-    await updateAgendaNote(note.id, {
-      preparation: { ...note.preparation, completedAt },
-      reminder: { ...note.reminder, dismissedAt: completedAt },
-    })
-  }
   const confirmClassroomContinuation = async (preview) => {
     const confirmed = await workspace.confirmContinuationPreview(preview)
     const sourceItem = confirmed.changedExistingItems.find((item) => item.id === confirmed.item.id) || confirmed.item
@@ -501,7 +493,6 @@ export default function AgendaModule() {
         onAddBehavior={addBehaviorEvent}
         onExit={exitClassroom}
         onFindNextSession={workspace.findNextClassroomSession}
-        onCompleteMaterialPreparation={completeMaterialPreparation}
         onSaveRecovery={registerClassroomRecovery}
         onSaveResult={workspace.saveActivityResult}
         onSavePrivateNote={workspace.saveClassroomPrivateNote}
