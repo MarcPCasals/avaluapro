@@ -409,12 +409,12 @@
 .agenda-month-weeks > article.vacation { border-color: #fdba74; background: #fff7ed; }
 .agenda-month-weeks > article > header { min-height: 92px; display: grid; grid-template-columns: minmax(0, 1fr) 38px; gap: 8px; align-items: start; padding: 14px; }
 .agenda-month-weeks > article > header > button:first-child { min-width: 0; display: grid; gap: 3px; border: 0; padding: 0; color: inherit; background: transparent; text-align: left; }
-.agenda-month-weeks > article > header span { color: #243044; font-size: 17px; font-weight: 950; text-transform: capitalize; }
+.agenda-month-weeks > article > header span { color: #243044; font-size: 17px; font-weight: 950; }
 .agenda-month-weeks > article > header small { color: #64748b; font-size: 10px; font-weight: 750; }
 .agenda-month-weeks > article > header em { width: fit-content; margin-top: 5px; border-radius: 6px; padding: 4px 6px; color: white; background: #f97316; font-size: 7px; font-style: normal; font-weight: 950; letter-spacing: .03em; text-transform: uppercase; }
 .agenda-week-vacation { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #94a3b8; background: #f1f5f9; }
 .agenda-week-vacation:hover, .agenda-week-vacation.active { color: #7c3aed; background: #ede9fe; }
-.agenda-month-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid #edf0f4; }
+.agenda-month-days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid #edf0f4; }
 .agenda-month-days > div { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px; border-right: 1px solid #edf0f4; padding: 7px 5px; background: rgb(255 255 255 / 72%); }
 .agenda-month-days > div:last-child { border-right: 0; }
 .agenda-month-days > div.outside { opacity: .38; }

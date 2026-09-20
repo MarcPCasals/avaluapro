@@ -261,7 +261,8 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
 }
 
 export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordinationReminders, monthKey, onAddEvent, onDeleteEvent, onEditEvent, onMoveMonth, onSelectWeek, onShowWeek, slots, timetable, today }) {
-  const weeks = getMonthCalendarWeeks(monthKey, academicYear || {})
+  const calendarStartsOn = [academicYear?.startsOn, timetable?.effectiveFrom].filter(Boolean).sort().at(-1)
+  const weeks = getMonthCalendarWeeks(monthKey, { ...academicYear, startsOn: calendarStartsOn })
   const monthPrefix = monthKey.slice(0, 7)
   const nextMonthDate = new Date(`${monthKey}T12:00:00Z`)
   nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1)
@@ -297,7 +298,7 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
               <button onClick={() => onSelectWeek(week.weekStart)} type="button"><span>Setmana {formatDate(week.weekStart, { long: true })}</span><small>{formatDate(week.weekStart)} – {formatDate(week.weekEnd)}</small>{isNextWeek && <em>Següent setmana</em>}</button>
               {onAddEvent && <button aria-label={vacationEvent ? `Editar ${vacationEvent.title}` : `Marcar la setmana del ${formatDate(week.weekStart)} com a vacances`} className={`agenda-week-vacation ${vacationEvent ? 'active' : ''}`} onClick={() => vacationEvent ? onEditEvent(vacationEvent) : onAddEvent({ endsOn: editableWeekEnd, startsOn: editableWeekStart, title: 'Vacances', type: 'nonTeaching' })} title={vacationEvent ? vacationEvent.title : 'Marcar tota la setmana com a no lectiva'} type="button"><Moon size={17} /></button>}
             </header>
-            <div className="agenda-month-days">{week.days.map((dateKey) => {
+            <div className="agenda-month-days">{week.days.slice(0, 5).map((dateKey) => {
               const dayEvents = getCalendarEventsForDate(calendarEvents, dateKey)
               const noClassEvent = getNoClassCalendarEvent(calendarEvents, dateKey, '')
               const classCount = weekOccurrences.filter((item) => item.date === dateKey).length
