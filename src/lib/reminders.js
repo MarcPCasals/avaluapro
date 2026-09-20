@@ -106,7 +106,7 @@ export function getPlanningReminderSummary({ agendaNotes = [], classes = [], pla
     const visibleAction = String(item.title || '').trim().toLocaleLowerCase('ca')
     const groupKey = [
       item.note.classId,
-      item.note.sessionId,
+      item.note.preparation?.sessionStartsAt || item.note.sessionId,
       visibleAction,
       item.reminder?.date,
     ].join(':')

@@ -106,8 +106,8 @@ test('la mateixa preparació es mostra una sola vegada per sessió', () => {
     type: 'materialPreparation',
   }
   const agendaNotes = [
-    { ...shared, id: 'material-1', preparation: { kind: 'print', label: 'fitxa', sourceActivityId: 'activity-1' } },
-    { ...shared, id: 'material-2', preparation: { kind: 'print', label: 'fitxa', sourceActivityId: 'activity-2' } },
+    { ...shared, id: 'material-1', preparation: { kind: 'print', label: 'fitxa', sessionStartsAt: '2099-01-03T09:00:00', sourceActivityId: 'activity-1' } },
+    { ...shared, id: 'material-2', sessionId: 'replanned-session-1', preparation: { kind: 'print', label: 'fitxa', sessionStartsAt: '2099-01-03T09:00:00', sourceActivityId: 'activity-2' } },
   ]
   const planningSummary = getPlanningReminderSummary({ agendaNotes, planningUnitId: 'up-1' })
   assert.equal(planningSummary.count, 1)
