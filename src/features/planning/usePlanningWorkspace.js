@@ -19,11 +19,13 @@ import {
   copyPlanningUnitStructureToAcademicYear,
   createAccessGrant,
   createAcademicYear,
+  createGroupApplication,
   createPlanningActivity,
   createPlanningPhase,
   createPlanningUnit,
   createTemporalUnit,
 } from '../../domain/planning/model'
+import { getPlanningUnitsForClass } from '../../domain/planning/classPlanning'
 import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 
@@ -61,11 +63,13 @@ function comparableLabel(value) {
  * escriptura passa pel repositori local-first i la interfície només rep l'estat
  * final de la cua, sense confondre el desament local amb la confirmació remota.
  */
-export function usePlanningWorkspace(user) {
+export function usePlanningWorkspace(user, activeClassId = '') {
   const [academicYears, setAcademicYears] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
   const [sharedPlanningUnits, setSharedPlanningUnits] = useState([])
+  const [applications, setApplications] = useState([])
+  const [applicationsLoading, setApplicationsLoading] = useState(true)
   const [accessGrants, setAccessGrants] = useState([])
   const [phases, setPhases] = useState([])
   const [activities, setActivities] = useState([])
@@ -87,8 +91,12 @@ export function usePlanningWorkspace(user) {
   const allPlanningUnits = useMemo(() => Array.from(new Map(
     [...planningUnits, ...sharedPlanningUnits].map((item) => [item.id, item]),
   ).values()), [planningUnits, sharedPlanningUnits])
+  const classPlanningUnits = useMemo(
+    () => getPlanningUnitsForClass(allPlanningUnits, applications, activeClassId),
+    [activeClassId, allPlanningUnits, applications],
+  )
   const activeAcademicYear = academicYears.find((item) => item.id === activeAcademicYearId) || null
-  const activePlanningUnit = allPlanningUnits.find((item) => item.id === activePlanningUnitId) || null
+  const activePlanningUnit = classPlanningUnits.find((item) => item.id === activePlanningUnitId) || null
   const userEmail = String(user?.email || '').trim().toLowerCase()
   const activeRole = activePlanningUnit?.ownerUid === user?.uid
     ? 'owner'
@@ -215,6 +223,64 @@ export function usePlanningWorkspace(user) {
     return () => { cancelled = true }
   }, [repository, user?.uid, userEmail])
 
+  const applicationUnitKey = useMemo(
+    () => allPlanningUnits.map((unit) => `${unit.id}:${unit.ownerUid}`).sort().join('|'),
+    [allPlanningUnits],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    if (!repository || !applicationUnitKey) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setApplications([])
+          setApplicationsLoading(false)
+        }
+      })
+      return () => { cancelled = true }
+    }
+    queueMicrotask(() => !cancelled && setApplicationsLoading(true))
+    const units = allPlanningUnits
+    Promise.all(units.map(async (unit) => {
+      const role = unit.ownerUid === user?.uid
+        ? 'owner'
+        : unit.accessByEmail?.[userEmail]?.role || ''
+      const allowedClassIds = role === 'planningAgendaEditor'
+        ? unit.accessByEmail?.[userEmail]?.classIds || []
+        : []
+      if (!['owner', 'directionReader', 'planningAgendaEditor'].includes(role)) return []
+      if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
+      const results = allowedClassIds.length > 0
+        ? await Promise.all(allowedClassIds.map((classId) => repository.loadScope(
+            `planningUnit:${unit.id}:applications:${classId}`,
+            () => loadPlanningApplications(unit.id, classId, 100),
+            { completeSnapshot: true },
+          )))
+        : [await repository.loadScope(
+            `planningUnit:${unit.id}:applications`,
+            () => loadPlanningApplications(unit.id, undefined, 100),
+            { completeSnapshot: true },
+          )]
+      return results.flatMap((result) => result.entities)
+    })).then((groups) => {
+      if (cancelled) return
+      setApplications(Array.from(new Map(groups.flat().map((item) => [item.id, item])).values()))
+    }).catch((loadError) => {
+      if (!cancelled) setError(loadError.message || 'No s’han pogut carregar les connexions entre classes i programacions.')
+    }).finally(() => !cancelled && setApplicationsLoading(false))
+    return () => { cancelled = true }
+  // Només recarreguem quan canvia el conjunt de UP; les edicions internes no
+  // han de provocar consultes repetides de totes les connexions.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationUnitKey, repository, user?.uid, userEmail])
+
+  useEffect(() => {
+    if (applicationsLoading) return
+    queueMicrotask(() => setActivePlanningUnitId((current) => classPlanningUnits.some((unit) => unit.id === current)
+      ? current
+      : classPlanningUnits.find((unit) => unit.status !== 'archived')?.id || classPlanningUnits[0]?.id || ''))
+  }, [applicationsLoading, classPlanningUnits])
+
   useEffect(() => {
     let cancelled = false
     if (!repository || !activePlanningUnitId) return undefined
@@ -282,7 +348,7 @@ export function usePlanningWorkspace(user) {
     return temporalUnit
   }, [persist])
 
-  const createUnit = useCallback(async (values) => {
+  const createUnit = useCallback(async (values, classContext = {}) => {
     const now = new Date().toISOString()
     const unit = {
       ...createPlanningUnit({
@@ -306,19 +372,56 @@ export function usePlanningWorkspace(user) {
       planningUnitId: unit.id,
       title,
     }, { now }))
-    await persist([unit, ...defaultPhases])
+    const application = classContext.classId ? createGroupApplication({
+      academicYearId: activeAcademicYearId,
+      classId: classContext.classId,
+      classLabel: classContext.classLabel || '',
+      ownerUid: user.uid,
+      planningUnitId: unit.id,
+      planningUnitVersion: unit.versionNumber,
+      status: 'draft',
+    }, { now }) : null
+    await persist([unit, ...defaultPhases, ...(application ? [application] : [])])
     setPlanningUnits((items) => [unit, ...items])
+    if (application) setApplications((items) => replaceById(items, application))
     setPhases(defaultPhases)
     setActivities([])
     setActivePlanningUnitId(unit.id)
     return unit
   }, [activeAcademicYearId, persist, user])
 
+  const connectUnitToClass = useCallback(async (unit, classContext = {}) => {
+    if (!unit?.id || !classContext.classId) throw new Error('Selecciona una UP i una classe per connectar-les.')
+    const existing = applications.find((application) => (
+      application.planningUnitId === unit.id
+      && application.classId === classContext.classId
+      && application.status !== 'archived'
+    ))
+    if (existing) {
+      setActivePlanningUnitId(unit.id)
+      return existing
+    }
+    const now = new Date().toISOString()
+    const application = createGroupApplication({
+      academicYearId: unit.academicYearId,
+      classId: classContext.classId,
+      classLabel: classContext.classLabel || '',
+      ownerUid: unit.ownerUid,
+      planningUnitId: unit.id,
+      planningUnitVersion: unit.versionNumber,
+      status: 'draft',
+    }, { now })
+    await persist(application)
+    setApplications((items) => replaceById(items, application))
+    setActivePlanningUnitId(unit.id)
+    return application
+  }, [applications, persist])
+
   /**
    * Una importació sempre crea una UP nova i regenera tots els identificadors.
    * Això impedeix heretar permisos, propietaris o vincles del fitxer d’origen.
    */
-  const importPlanningBundle = useCallback(async (bundle, temporalUnitId) => {
+  const importPlanningBundle = useCallback(async (bundle, temporalUnitId, classContext = {}) => {
     if (!activeAcademicYearId || !temporalUnitId) throw new Error('Selecciona la UT on vols crear la còpia importada.')
     const now = new Date().toISOString()
     const importedCurriculum = Object.fromEntries(
@@ -373,8 +476,18 @@ export function usePlanningWorkspace(user) {
       studentMaterials: (source.studentMaterials || []).map((material) => ({ ...material, id: null })),
       teacherMaterials: (source.teacherMaterials || []).map((material) => ({ ...material, id: null })),
     }, { now }))
-    await persist([unit, ...importedPhases, ...importedActivities])
+    const application = classContext.classId ? createGroupApplication({
+      academicYearId: activeAcademicYearId,
+      classId: classContext.classId,
+      classLabel: classContext.classLabel || '',
+      ownerUid: user.uid,
+      planningUnitId: unit.id,
+      planningUnitVersion: unit.versionNumber,
+      status: 'draft',
+    }, { now }) : null
+    await persist([unit, ...importedPhases, ...importedActivities, ...(application ? [application] : [])])
     setPlanningUnits((items) => [unit, ...items])
+    if (application) setApplications((items) => replaceById(items, application))
     setPhases(sortByOrder(importedPhases))
     setActivities(sortByOrder(importedActivities))
     setActivePlanningUnitId(unit.id)
@@ -577,7 +690,7 @@ export function usePlanningWorkspace(user) {
     }
   }, [repository])
 
-  const duplicateUnitToAcademicYear = useCallback(async ({ academicYearId, temporalUnitId }) => {
+  const duplicateUnitToAcademicYear = useCallback(async ({ academicYearId, temporalUnitId }, classContext = {}) => {
     if (!activePlanningUnit) throw new Error('Cal seleccionar una UP per duplicar-la.')
     const copied = copyPlanningUnitStructureToAcademicYear({
       planningUnit: activePlanningUnit,
@@ -588,7 +701,17 @@ export function usePlanningWorkspace(user) {
       temporalUnitId,
       ownerEmailLower: String(user.email || '').trim().toLowerCase(),
     }, { now: new Date().toISOString() })
-    await persist([copied.planningUnit, ...copied.phases, ...copied.activities])
+    const application = classContext.classId ? createGroupApplication({
+      academicYearId,
+      classId: classContext.classId,
+      classLabel: classContext.classLabel || '',
+      ownerUid: copied.planningUnit.ownerUid,
+      planningUnitId: copied.planningUnit.id,
+      planningUnitVersion: copied.planningUnit.versionNumber,
+      status: 'draft',
+    }, { now: new Date().toISOString() }) : null
+    await persist([copied.planningUnit, ...copied.phases, ...copied.activities, ...(application ? [application] : [])])
+    if (application) setApplications((items) => replaceById(items, application))
     setActivePlanningUnitId(copied.planningUnit.id)
     setActiveAcademicYearId(academicYearId)
     if (academicYearId === activeAcademicYearId) {
@@ -766,12 +889,16 @@ export function usePlanningWorkspace(user) {
     activePlanningUnit,
     activePlanningUnitId,
     activeRole,
+    applications,
+    applicationsLoading,
     archiveUnit,
     acceptImprovementSuggestions,
     copyHistoricalActivity,
     canEditActiveUnit,
     canManageActiveAgenda,
     canReadActiveApplications,
+    classPlanningUnits,
+    connectUnitToClass,
     createTemporalUnit: createTemporalUnitForYear,
     createUnit,
     createYear,
@@ -780,7 +907,7 @@ export function usePlanningWorkspace(user) {
     importPlanningBundle,
     importPlanningTable,
     isOnline,
-    loading: loading || sharedLoading,
+    loading: loading || sharedLoading || applicationsLoading,
     loadHistoricalUnits,
     loadHistoricalUnitStructure,
     loadTemporalUnitsForYear,

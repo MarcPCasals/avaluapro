@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
-  FileText, Pencil, Plus, RotateCcw, Save, Share2, X,
+  FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Users, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
-  PlanningUnitDialog, TemporalUnitDialog,
+  PlanningConnectionDialog, PlanningUnitDialog, TemporalUnitDialog,
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { PlanningDocumentDialog } from './PlanningDocumentDialog'
@@ -18,6 +18,7 @@ import { PlanningSharingDialog } from './PlanningSharingDialog'
 import { PlanningSharedView } from './PlanningSharedView'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
 import { getPlanningReminderSummary } from '../../lib/reminders'
+import { getConnectablePlanningUnits, getConnectedClassIds } from '../../domain/planning/classPlanning'
 import './planning.css'
 
 const PHASE_LABELS = {
@@ -49,14 +50,14 @@ function PlanningPreviewDialog({ activities, classes, loadApplications, onClose,
   )
 }
 
-function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt, onImportUnit }) {
+function EmptyPlanning({ className, hasTemporalUnits, onConnectUnit, onCreateUnit, onCreateUt }) {
   return (
     <section className="planning-empty-state">
       <span><BookOpenText size={30} /></span>
       <div>
-        <h2>Comença la programació del curs</h2>
+        <h2>Comença la programació de {className || 'la classe'}</h2>
         <p>{hasTemporalUnits
-          ? 'Crea una UP buida i organitza-la amb les fases que necessitis.'
+          ? 'Crea una UP des de zero o connecta aquesta classe amb una programació que ja tens.'
           : 'Primer defineix les dates d’una UT. Després podràs crear-hi la primera UP.'}</p>
       </div>
       <div className="planning-empty-actions">
@@ -64,7 +65,7 @@ function EmptyPlanning({ hasTemporalUnits, onCreateUnit, onCreateUt, onImportUni
           <Plus size={17} />
           {hasTemporalUnits ? 'Nova UP' : 'Crear la primera UT'}
         </button>
-        {hasTemporalUnits && <button className="secondary-action" onClick={onImportUnit} type="button"><FileText size={17} />Importar la primera UP</button>}
+        {hasTemporalUnits && <button className="secondary-action" onClick={onConnectUnit} type="button"><Link2 size={17} />Connectar una programació</button>}
       </div>
     </section>
   )
@@ -279,6 +280,7 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
 export default function PlanningModule() {
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
+  const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const students = useAvaluaproStore((state) => state.students)
   const competencies = useAvaluaproStore((state) => state.competencies)
   const criteria = useAvaluaproStore((state) => state.criteria)
@@ -286,7 +288,7 @@ export default function PlanningModule() {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
-  const workspace = usePlanningWorkspace(user)
+  const workspace = usePlanningWorkspace(user, activeClassId)
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -308,6 +310,27 @@ export default function PlanningModule() {
       indicators: unique(indicators.map((item) => ({ label: item.name || item.label || item.title, sourceId: item.id }))),
     }
   }, [competencies, criteria, indicators])
+  const activeClass = classes.find((item) => item.id === activeClassId) || null
+  const connectableUnits = useMemo(
+    () => getConnectablePlanningUnits(workspace.ownedPlanningUnits, workspace.applications, activeClassId),
+    [activeClassId, workspace.applications, workspace.ownedPlanningUnits],
+  )
+  const connectedClassIds = getConnectedClassIds(workspace.applications, workspace.activePlanningUnit?.id)
+  const connectedClassLabels = connectedClassIds
+    .map((classId) => classes.find((item) => item.id === classId)?.name
+      || workspace.applications.find((application) => application.classId === classId)?.classLabel)
+    .filter(Boolean)
+  const confirmConnectedChange = () => {
+    const otherClasses = connectedClassLabels.filter((label) => label !== activeClass?.name)
+    if (otherClasses.length === 0) return true
+    return globalThis.confirm?.(
+      `Aquesta programació també està connectada amb ${otherClasses.join(', ')}. Vols aplicar-hi aquest canvi també?\n\nAccepta per desar-lo a totes les classes connectades. Cancel·la per no fer el canvi.`,
+    ) !== false
+  }
+  const withConnectedConfirmation = async (action) => {
+    if (!confirmConnectedChange()) throw new Error('No s’ha desat el canvi a la programació connectada.')
+    return action()
+  }
   const planningReminderSummary = useMemo(
     () => getPlanningReminderSummary({
       agendaNotes,
@@ -327,7 +350,7 @@ export default function PlanningModule() {
     )
   }
 
-  const visibleUnits = workspace.planningUnits.filter((unit) => showArchived || unit.status !== 'archived')
+  const visibleUnits = workspace.classPlanningUnits.filter((unit) => showArchived || unit.status !== 'archived')
   const activeTemporalUnit = workspace.temporalUnits.find((item) => item.id === workspace.activePlanningUnit?.temporalUnitId)
   const sourceYearLabel = workspace.academicYears.find((year) => year.id === workspace.activePlanningUnit?.copiedFrom?.academicYearId)?.label
   const handleOpenPhase = (phase = null, parentId = '') => {
@@ -360,6 +383,7 @@ export default function PlanningModule() {
           <span><BookOpenText size={23} /></span>
           <div><p>Planificació pedagògica</p><h1>Programació</h1></div>
         </div>
+        {activeClass && <div className="planning-class-context"><span style={{ background: activeClass.color }} /><div><small>Programació de</small><strong>{activeClass.name}</strong></div></div>}
         <div className="planning-course-controls">
           {workspace.academicYears.length > 0 && (
             <label>
@@ -402,21 +426,24 @@ export default function PlanningModule() {
         </section>
       )}
 
-      {workspace.loading && workspace.academicYears.length === 0 && workspace.planningUnits.length === 0 ? (
+      {workspace.loading ? (
         <div className="planning-loading"><Loader2 className="spin" size={26} />Carregant la programació…</div>
       ) : workspace.academicYears.length === 0 && workspace.planningUnits.length === 0 ? (
         <section className="planning-empty-state first-step">
           <span><CalendarRange size={30} /></span><div><h2>Configura el curs acadèmic</h2><p>Les dates es defineixen cada any i no afecten els cursos anteriors.</p></div>
           <button className="primary-action" onClick={() => setDialog('year')} type="button"><Plus size={17} />Crear el curs</button>
         </section>
-      ) : workspace.planningUnits.length === 0 ? (
-        <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} onImportUnit={() => setDialog('documents')} />
+      ) : workspace.classPlanningUnits.length === 0 ? (
+        <EmptyPlanning className={activeClass?.name} hasTemporalUnits={workspace.temporalUnits.length > 0} onConnectUnit={() => setDialog('connect')} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
       ) : (
         <div className={`planning-workbench ${showSummary ? '' : 'summary-hidden'}`}>
           <aside className="planning-outline-panel">
             <div className="planning-outline-heading units-heading">
-              <div><BookOpenText size={17} /><strong>Unitats</strong></div>
-              <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
+              <div><BookOpenText size={17} /><strong>Unitats de {activeClass?.name || 'la classe'}</strong></div>
+              <div className="planning-outline-actions">
+                <button className="icon-action" onClick={() => setDialog('connect')} title="Connectar una programació" type="button"><Link2 size={15} /></button>
+                <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
+              </div>
             </div>
             <div className="planning-unit-list">
               {visibleUnits.map((unit) => (
@@ -433,30 +460,35 @@ export default function PlanningModule() {
 
           <main className="planning-editor-panel">
             {workspace.activePlanningUnit && workspace.canEditActiveUnit ? (
-              <UnitEditor
-                activities={workspace.activities}
-                curriculumCatalog={curriculumCatalog}
-                key={workspace.activePlanningUnit.id}
-                canManageUnit={workspace.activeRole === 'owner'}
-                onAcceptImprovements={workspace.acceptImprovementSuggestions}
-                onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
-                onArchive={workspace.archiveUnit}
-                onDeleteActivity={(activity) => handleActivityAction(() => workspace.removeActivity(activity))}
-                onDuplicate={() => setDialog('annualCopy')}
-                onEditActivity={(activity) => handleOpenActivity(activity)}
-                onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
-                onMoveActivity={(move) => handleActivityAction(() => workspace.moveActivity(move))}
-                onOpenDocuments={() => setDialog('documents')}
-                onOpenHistory={() => setDialog('history')}
-                onOpenPreview={() => setDialog('preview')}
-                onOpenSharing={() => setDialog('sharing')}
-                onReactivate={(unit) => workspace.saveUnit(unit, { status: 'draft' })}
-                onSave={workspace.saveUnit}
-                phases={workspace.phases}
-                sourceYearLabel={sourceYearLabel}
-                temporalUnit={activeTemporalUnit}
-                unit={workspace.activePlanningUnit}
-              />
+              <>
+                {connectedClassLabels.length > 1 && (
+                  <div className="planning-connected-banner"><Users size={17} /><span>Aquesta UP està connectada amb <strong>{connectedClassLabels.join(' i ')}</strong>. Abans de desar un canvi, podràs confirmar si s’aplica a totes.</span></div>
+                )}
+                <UnitEditor
+                  activities={workspace.activities}
+                  curriculumCatalog={curriculumCatalog}
+                  key={workspace.activePlanningUnit.id}
+                  canManageUnit={workspace.activeRole === 'owner'}
+                  onAcceptImprovements={(proposalIds) => withConnectedConfirmation(() => workspace.acceptImprovementSuggestions(proposalIds))}
+                  onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
+                  onArchive={(unit) => withConnectedConfirmation(() => workspace.archiveUnit(unit))}
+                  onDeleteActivity={(activity) => handleActivityAction(() => withConnectedConfirmation(() => workspace.removeActivity(activity)))}
+                  onDuplicate={() => setDialog('annualCopy')}
+                  onEditActivity={(activity) => handleOpenActivity(activity)}
+                  onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
+                  onMoveActivity={(move) => handleActivityAction(() => withConnectedConfirmation(() => workspace.moveActivity(move)))}
+                  onOpenDocuments={() => setDialog('documents')}
+                  onOpenHistory={() => setDialog('history')}
+                  onOpenPreview={() => setDialog('preview')}
+                  onOpenSharing={() => setDialog('sharing')}
+                  onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
+                  onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))}
+                  phases={workspace.phases}
+                  sourceYearLabel={sourceYearLabel}
+                  temporalUnit={activeTemporalUnit}
+                  unit={workspace.activePlanningUnit}
+                />
+              </>
             ) : workspace.activePlanningUnit ? (
               <PlanningSharedView
                 activities={workspace.activities}
@@ -467,7 +499,7 @@ export default function PlanningModule() {
                 unit={workspace.activePlanningUnit}
               />
             ) : (
-              <EmptyPlanning hasTemporalUnits={workspace.temporalUnits.length > 0} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} onImportUnit={() => setDialog('documents')} />
+              <EmptyPlanning className={activeClass?.name} hasTemporalUnits={workspace.temporalUnits.length > 0} onConnectUnit={() => setDialog('connect')} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
             )}
           </main>
 
@@ -480,13 +512,14 @@ export default function PlanningModule() {
 
       {dialog === 'year' && <AcademicYearDialog onClose={() => setDialog(null)} onSave={workspace.createYear} />}
       {dialog === 'ut' && <TemporalUnitDialog initialValue={editingUt} onClose={() => { setDialog(null); setEditingUt(null) }} onSave={(values) => editingUt ? workspace.saveTemporalUnit(editingUt, values) : workspace.createTemporalUnit(values)} />}
-      {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={workspace.createUnit} temporalUnits={workspace.temporalUnits} />}
-      {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={workspace.savePhase} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={workspace.saveActivity} phases={workspace.phases} students={students} />}
-      {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={workspace.duplicateUnitToAcademicYear} sourceYearId={workspace.activeAcademicYearId} />}
-      {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={workspace.copyHistoricalActivity} phases={workspace.phases} />}
+      {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={(values) => workspace.createUnit(values, { classId: activeClassId, classLabel: activeClass?.name })} temporalUnits={workspace.temporalUnits} />}
+      {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
+      {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
+      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.saveActivity(values, current))} phases={workspace.phases} students={students} />}
+      {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={(values) => workspace.duplicateUnitToAcademicYear(values, { classId: activeClassId, classLabel: activeClass?.name })} sourceYearId={workspace.activeAcademicYearId} />}
+      {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
-      {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={workspace.importPlanningBundle} onImportTable={workspace.activePlanningUnit ? workspace.importPlanningTable : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
+      {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
     </section>

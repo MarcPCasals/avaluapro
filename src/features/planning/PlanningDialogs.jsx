@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Clock3, Copy, History, Loader2, Plus, Search, Trash2 } from 'lucide-react'
+import { Clock3, Copy, History, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
@@ -91,6 +91,58 @@ export function PlanningUnitDialog({ onClose, onSave, temporalUnits }) {
       <label>Unitat temporal<select required value={values.temporalUnitId} onChange={(event) => setValues({ ...values, temporalUnitId: event.target.value })}>
         {temporalUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.label}</option>)}
       </select></label>
+    </PlanningDialog>
+  )
+}
+
+export function PlanningConnectionDialog({ applications = [], classes = [], currentClass, onClose, onSave, units = [] }) {
+  const [planningUnitId, setPlanningUnitId] = useState(units[0]?.id || '')
+  const classNames = useMemo(() => new Map(classes.map((item) => [item.id, item.name])), [classes])
+  const sourceLabels = (unit) => [...new Set(applications
+    .filter((application) => application.planningUnitId === unit.id && application.status !== 'archived')
+    .map((application) => application.classLabel || classNames.get(application.classId))
+    .filter(Boolean))]
+  const selectedUnit = units.find((unit) => unit.id === planningUnitId)
+
+  return (
+    <PlanningDialog
+      onClose={onClose}
+      onSubmit={() => onSave(selectedUnit)}
+      size="lg"
+      submitLabel={`Connectar amb ${currentClass?.name || 'la classe'}`}
+      title="Connectar una programació existent"
+    >
+      <div className="planning-copy-intro">
+        <Link2 size={20} />
+        <p>Les classes connectades comparteixen la mateixa UP, però cadascuna conserva el seu calendari, les seves sessions i el seu seguiment.</p>
+      </div>
+      {units.length === 0 ? (
+        <p className="planning-empty-inline">No hi ha cap altra programació disponible en aquest curs. Pots crear-ne una de zero per a {currentClass?.name || 'aquesta classe'}.</p>
+      ) : (
+        <div className="planning-connection-list" role="radiogroup" aria-label="Programacions disponibles">
+          {units.map((unit) => {
+            const sources = sourceLabels(unit)
+            const selected = planningUnitId === unit.id
+            return (
+              <button
+                aria-checked={selected}
+                className={selected ? 'selected' : ''}
+                key={unit.id}
+                onClick={() => setPlanningUnitId(unit.id)}
+                role="radio"
+                type="button"
+              >
+                <span>{unit.code}</span>
+                <div>
+                  <strong>{unit.title}</strong>
+                  <small>{unit.level} · {sources.length ? `Connectada amb ${sources.join(', ')}` : 'Encara sense classe'}</small>
+                </div>
+                <Users size={17} />
+              </button>
+            )
+          })}
+        </div>
+      )}
     </PlanningDialog>
   )
 }

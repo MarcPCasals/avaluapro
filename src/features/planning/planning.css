@@ -31,6 +31,7 @@
 }
 
 .planning-title-lockup,
+.planning-class-context,
 .planning-course-controls,
 .planning-course-controls label,
 .planning-ut-manager > div:first-child,
@@ -46,6 +47,15 @@
 .planning-title-lockup p, .planning-title-lockup h1 { margin: 0; }
 .planning-title-lockup p { color: #8b5cf6; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .planning-title-lockup h1 { font-size: 24px; line-height: 1.1; }
+
+.planning-class-context {
+  gap: 9px; margin-left: auto; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 8px 11px; background: #fff;
+}
+.planning-class-context > span { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: #8b5cf6; }
+.planning-class-context > div { display: grid; gap: 1px; }
+.planning-class-context small { color: #94a3b8; font-size: 9px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.planning-class-context strong { color: #334155; font-size: 13px; }
 
 .planning-course-controls { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .planning-course-controls label { gap: 7px; border: 1px solid #e2e8f0; border-radius: 9px; padding-left: 10px; background: #fff; }
@@ -92,6 +102,7 @@
 .planning-outline-heading { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .planning-outline-heading > div { gap: 7px; color: #475569; }
 .planning-outline-heading.units-heading { margin-bottom: 10px; }
+.planning-outline-actions { display: flex; align-items: center; gap: 4px; }
 .icon-action { width: 28px; height: 28px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 7px; color: #64748b; background: transparent; }
 .icon-action:hover { color: #334155; background: #eef2f7; }
 .icon-action.accent { color: var(--planning-accent); background: var(--planning-soft); }
@@ -131,6 +142,12 @@
   display: flex; align-items: center; gap: 7px; border-bottom: 1px solid #ddd6fe;
   padding: 8px 20px; color: #6d28d9; background: #faf5ff; font-size: 11px; font-weight: 800;
 }
+
+.planning-connected-banner {
+  display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ddd6fe;
+  padding: 9px 20px; color: #5b21b6; background: #faf5ff; font-size: 11px; font-weight: 750;
+}
+.planning-connected-banner svg { flex: 0 0 auto; }
 
 .planning-editor-section { display: grid; gap: 13px; border-bottom: 1px solid #edf0f4; padding: 22px; }
 .planning-editor-section.muted { min-height: 118px; background: #fafafa; }
@@ -299,6 +316,19 @@
 .planning-empty-state p, .planning-auth-required p { max-width: 480px; margin-top: 5px; color: #64748b; font-weight: 700; line-height: 1.5; }
 .planning-empty-state.first-step { min-height: 470px; }
 .planning-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+.planning-connection-list { display: grid; gap: 8px; }
+.planning-connection-list > button {
+  width: 100%; display: grid; grid-template-columns: 50px minmax(0, 1fr) 24px; align-items: center; gap: 10px;
+  border: 1px solid #e2e8f0; border-radius: 11px; padding: 11px; color: #475569; background: #fff; text-align: left;
+}
+.planning-connection-list > button:hover { border-color: #c4b5fd; background: #faf5ff; }
+.planning-connection-list > button.selected { border-color: #8b5cf6; box-shadow: 0 0 0 3px #ede9fe; color: #5b21b6; background: #faf5ff; }
+.planning-connection-list > button > span { display: grid; place-items: center; min-height: 34px; border-radius: 8px; color: #6d28d9; background: #ede9fe; font-size: 11px; font-weight: 950; }
+.planning-connection-list > button > div { min-width: 0; display: grid; gap: 3px; }
+.planning-connection-list strong, .planning-connection-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planning-connection-list small { color: #64748b; font-size: 10px; font-weight: 750; }
+.planning-connection-list svg { justify-self: end; }
 .planning-loading { min-height: 360px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #7c3aed; font-weight: 900; }
 
 .planning-dialog .modal-body { display: grid; gap: 14px; }
