@@ -13,6 +13,16 @@ export function startOfCalendarWeek(dateKey) {
   return date.toISOString().slice(0, 10)
 }
 
+/**
+ * Durant el cap de setmana, l'Agenda ja prepara la setmana entrant. Els dies
+ * lectius continua obrint la setmana que conté la data indicada.
+ */
+export function getAgendaDefaultWeekStart(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00Z`)
+  const currentWeekStart = startOfCalendarWeek(dateKey)
+  return [0, 6].includes(date.getUTCDay()) ? addDays(currentWeekStart, 7) : currentWeekStart
+}
+
 export function getMonthCalendarWeeks(monthKey, range = {}) {
   const monthStart = `${String(monthKey).slice(0, 7)}-01`
   const nextMonth = new Date(`${monthStart}T12:00:00Z`)

@@ -12,6 +12,7 @@ import {
 } from '../../domain/planning'
 import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { getAgendaDefaultWeekStart } from '../../lib/agendaCalendar'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
@@ -444,7 +445,7 @@ export default function AgendaModule() {
       )
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
   const [view, setView] = useState('today')
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(workspace.today))
+  const [weekStart, setWeekStart] = useState(() => getAgendaDefaultWeekStart(workspace.today))
   const [calendarMode, setCalendarMode] = useState('week')
   const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))
   const [dialog, setDialog] = useState(() => initialSchedulingUnitId ? 'scheduling' : null)
@@ -528,13 +529,13 @@ export default function AgendaModule() {
   }
   const openToday = () => {
     setView('today')
-    const currentStart = startOfWeek(workspace.today)
+    const currentStart = getAgendaDefaultWeekStart(workspace.today)
     setWeekStart(currentStart)
     workspace.loadTodaySessions()
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar la pròxima sessió.'))
   }
   const moveWeek = (amount) => {
-    const nextStart = amount === 0 ? startOfWeek(workspace.today) : addDateDays(weekStart, amount)
+    const nextStart = amount === 0 ? getAgendaDefaultWeekStart(workspace.today) : addDateDays(weekStart, amount)
     setView('week')
     setCalendarMode('week')
     loadWeek(nextStart)
@@ -611,7 +612,7 @@ export default function AgendaModule() {
     setDialog(null)
     setActiveBundle(null)
     setView('today')
-    const currentStart = startOfWeek(workspace.today)
+    const currentStart = getAgendaDefaultWeekStart(workspace.today)
     setWeekStart(currentStart)
     workspace.loadTodaySessions()
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut actualitzar la setmana.'))

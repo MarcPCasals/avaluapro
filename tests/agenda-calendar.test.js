@@ -3,9 +3,17 @@ import test from 'node:test'
 
 import {
   calendarEventCoversSchoolWeek,
+  getAgendaDefaultWeekStart,
   getMonthCalendarWeeks,
   getNoClassCalendarEvent,
 } from '../src/lib/agendaCalendar.js'
+
+test('el calendari obre la setmana entrant durant el cap de setmana', () => {
+  assert.equal(getAgendaDefaultWeekStart('2026-09-18'), '2026-09-14')
+  assert.equal(getAgendaDefaultWeekStart('2026-09-19'), '2026-09-21')
+  assert.equal(getAgendaDefaultWeekStart('2026-09-20'), '2026-09-21')
+  assert.equal(getAgendaDefaultWeekStart('2026-09-21'), '2026-09-21')
+})
 
 test('el mes mostra les setmanes lectives que se superposen amb el curs', () => {
   const weeks = getMonthCalendarWeeks('2026-09-01', {
