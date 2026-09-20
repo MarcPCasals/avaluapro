@@ -9,6 +9,13 @@ function formatDate(dateKey) {
     .format(new Date(`${dateKey}T12:00:00`))
 }
 
+function formatSessionMoment(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('ca-AD', {
+    day: 'numeric', hour: '2-digit', minute: '2-digit', month: 'short', weekday: 'short',
+  }).format(new Date(value))
+}
+
 function statusLabel(status) {
   if (status === 'completed') return 'Fet'
   if (status === 'cancelled') return 'Cancel·lat'
@@ -59,7 +66,7 @@ export function PlanningRemindersDialog({ agendaNotes, classes, onClose, onUpdat
                   <span>
                     {item.classItem?.name || 'Grup'}
                     {item.note.preparation?.sessionStartsAt
-                      ? ` · classe ${formatDate(String(item.note.preparation.sessionStartsAt).slice(0, 10))}`
+                      ? ` · classe ${formatSessionMoment(item.note.preparation.sessionStartsAt)}`
                       : ''}
                     {item.notes.length > 1 ? ` · ${item.notes.length} activitats` : ''}
                   </span>

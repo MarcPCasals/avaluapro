@@ -103,11 +103,11 @@ export function getPlanningReminderSummary({ agendaNotes = [], classes = [], pla
   // la relació amb totes les notes originals per poder-les completar juntes.
   const groupedItems = new Map()
   rawItems.forEach((item) => {
+    const visibleAction = String(item.title || '').trim().toLocaleLowerCase('ca')
     const groupKey = [
       item.note.classId,
       item.note.sessionId,
-      item.note.preparation?.kind,
-      item.note.preparation?.label || item.title,
+      visibleAction,
       item.reminder?.date,
     ].join(':')
     const current = groupedItems.get(groupKey)
