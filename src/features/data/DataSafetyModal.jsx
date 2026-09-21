@@ -45,9 +45,20 @@ function getBackupFilename(state) {
   return `avaluapro-copia-manual-${slugify(userLabel)}-${state.classes.length}classes-${state.students.length}alumnes-${getTodaySlug()}.json`
 }
 
+function getCloudBackupFilename(backup) {
+  const label = slugify(backup?.label || 'copia-nuvol')
+  return `avaluapro-${label}-${getTodaySlug()}.json`
+}
+
 function formatDateTime(value) {
   if (!value) return 'Encara no sincronitzat'
   return new Date(value).toLocaleString('ca-ES')
+}
+
+function getCloudBackupTypeLabel(reason = '') {
+  if (reason.startsWith('pre-update-')) return 'Preactualització'
+  if (reason === 'auto-daily') return 'Automàtica diària'
+  return 'Manual'
 }
 
 function getCloudStatusText(cloud) {
@@ -136,6 +147,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const retryCloudSync = useAvaluaproStore((store) => store.retryCloudSync)
   const pullFromCloud = useAvaluaproStore((store) => store.pullFromCloud)
   const restoreCloudBackup = useAvaluaproStore((store) => store.restoreCloudBackup)
+  const exportCloudBackup = useAvaluaproStore((store) => store.exportCloudBackup)
   const resetToSeed = useAvaluaproStore((store) => store.resetToSeed)
   const deleteOldTrackingData = useAvaluaproStore((store) => store.deleteOldTrackingData)
   const [storageEstimate, setStorageEstimate] = useState(null)
@@ -154,6 +166,7 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
   const [antecedentCourseLabel, setAntecedentCourseLabel] = useState('')
   const [antecedentImport, setAntecedentImport] = useState(null)
   const [isImportingAntecedents, setIsImportingAntecedents] = useState(false)
+  const [downloadingCloudBackupId, setDownloadingCloudBackupId] = useState('')
   const [excludedAntecedentStudentIds, setExcludedAntecedentStudentIds] = useState(() => new Set())
 
   const collectionSummary = useMemo(() => buildCollectionSummary(state), [state])
@@ -241,6 +254,19 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
 
   const handleDownloadBackup = () => {
     downloadJson(createBackup(), getBackupFilename(state))
+  }
+
+  const handleDownloadCloudBackup = async (backup) => {
+    setDownloadingCloudBackupId(backup.id)
+    setRestoreStatus('')
+    try {
+      const cloudBackup = await exportCloudBackup(backup.id)
+      downloadJson(cloudBackup, getCloudBackupFilename(backup))
+    } catch (error) {
+      setRestoreStatus(error.message || 'No s’ha pogut descarregar aquesta còpia del núvol.')
+    } finally {
+      setDownloadingCloudBackupId('')
+    }
   }
 
   const handleResetToSeed = async () => {
@@ -760,21 +786,32 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
                     <strong>{backup.label || 'Còpia de seguretat'}</strong>
                     <span>
                       {formatDateTime(backup.createdAt)}
-                      <em>{backup.reason === 'auto-daily' ? 'Automàtica diària' : 'Manual'}</em>
+                      <em>{getCloudBackupTypeLabel(backup.reason)}</em>
                     </span>
                     <small>
                       {backup.counts?.classes || 0} classes · {backup.counts?.students || 0} alumnes ·{' '}
                       {backup.counts?.marks || 0} notes · {backup.counts?.tasks || 0} tasques
                     </small>
                   </div>
-                  <button
-                    className="secondary-action compact"
-                    disabled={state.cloud.backupStatus === 'restoring'}
-                    onClick={() => handleRestoreCloudBackup(backup)}
-                    type="button"
-                  >
-                    Restaurar
-                  </button>
+                  <div className="cloud-backup-row-actions">
+                    <button
+                      className="secondary-action compact"
+                      disabled={Boolean(downloadingCloudBackupId)}
+                      onClick={() => handleDownloadCloudBackup(backup)}
+                      type="button"
+                    >
+                      {downloadingCloudBackupId === backup.id ? <Loader2 size={16} className="spin-icon" /> : <Download size={16} />}
+                      Descarregar
+                    </button>
+                    <button
+                      className="secondary-action compact"
+                      disabled={state.cloud.backupStatus === 'restoring'}
+                      onClick={() => handleRestoreCloudBackup(backup)}
+                      type="button"
+                    >
+                      Restaurar
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

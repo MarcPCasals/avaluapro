@@ -31009,3 +31009,239 @@ button.profile-followup-card:focus-visible {
     grid-column: 1;
   }
 }
+
+.release-protection-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 18px 0;
+  border: 1px solid #c4b5fd;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #5b21b6;
+  background: #f5f3ff;
+}
+
+.release-protection-banner.blocked {
+  border-color: #fdba74;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.release-protection-banner > span {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.release-protection-banner.blocked > span {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+.release-protection-banner > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.release-protection-banner strong {
+  color: #312e81;
+  font-size: 14px;
+}
+
+.release-protection-banner.blocked strong {
+  color: #7c2d12;
+}
+
+.release-protection-banner p {
+  margin: 0;
+  color: #6d5f8f;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.release-protection-banner.blocked p {
+  color: #9a3412;
+}
+
+.release-announcement-modal {
+  max-width: 900px;
+}
+
+.release-announcement {
+  display: grid;
+  gap: 18px;
+  color: #1f2937;
+}
+
+.release-backup-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid #86efac;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #f0fdf4;
+}
+
+.release-backup-confirmation > span {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.release-backup-confirmation > div,
+.release-introduction,
+.release-feature-grid article > div,
+.release-verification-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.release-backup-confirmation strong {
+  color: #166534;
+  font-size: 16px;
+}
+
+.release-backup-confirmation p,
+.release-introduction p,
+.release-verification-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.release-backup-confirmation b,
+.release-verification-card b {
+  color: inherit;
+}
+
+.release-introduction > span {
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.release-introduction h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 22px;
+}
+
+.release-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.release-feature-grid article {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  padding: 13px 14px;
+  background: #ffffff;
+}
+
+.release-feature-grid article svg {
+  flex: 0 0 auto;
+  color: #7c3aed;
+}
+
+.release-feature-grid article strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.release-feature-grid article span,
+.release-verification-heading span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.release-verification-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #fff7ed;
+}
+
+.release-verification-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ea580c;
+}
+
+.release-verification-heading strong {
+  color: #9a3412;
+  font-size: 14px;
+}
+
+.release-verification-card a {
+  color: #7c3aed;
+  font-weight: 900;
+}
+
+.release-announcement-actions {
+  justify-content: space-between;
+}
+
+.release-announcement-actions a {
+  text-decoration: none;
+}
+
+.cloud-backup-list article > .cloud-backup-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  grid-auto-flow: column;
+  gap: 7px;
+}
+
+@media (max-width: 720px) {
+  .release-protection-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-inline: 10px;
+  }
+
+  .release-protection-banner > div {
+    flex-basis: calc(100% - 52px);
+  }
+
+  .release-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .release-announcement-actions,
+  .cloud-backup-list article > .cloud-backup-row-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .release-announcement-actions > *,
+  .cloud-backup-list article > .cloud-backup-row-actions > * {
+    justify-content: center;
+  }
+}

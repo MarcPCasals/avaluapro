@@ -252,7 +252,11 @@ function getInitialProfile() {
 
 function buildCloudBackupLabel(state, reason = 'manual') {
   const dateLabel = new Date().toLocaleDateString('ca-ES')
-  const typeLabel = reason === 'auto-daily' ? 'Còpia automàtica diària' : 'Còpia manual al núvol'
+  const typeLabel = reason.startsWith('pre-update-')
+    ? 'Còpia de seguretat pre actualització'
+    : reason === 'auto-daily'
+      ? 'Còpia automàtica diària'
+      : 'Còpia manual al núvol'
   return `${typeLabel} · ${dateLabel} · ${state.classes.length} classes · ${state.students.length} alumnes`
 }
 
@@ -1068,6 +1072,11 @@ async function synchronizeAfterSignIn(set, get, uid) {
       }))
     }
   })().finally(() => {
+    if (get().cloud.user?.uid === uid) {
+      set((current) => ({
+        cloud: { ...current.cloud, startupComplete: true },
+      }))
+    }
     if (cloudStartupUid === uid) {
       cloudStartupPromise = null
       cloudStartupUid = ''
@@ -1631,6 +1640,7 @@ export const useAvaluaproStore = create((set, get) => ({
   cloud: {
     user: null,
     status: 'signed-out',
+    startupComplete: false,
     error: '',
     errorKind: '',
     lastSyncedAt: '',
@@ -1686,6 +1696,7 @@ export const useAvaluaproStore = create((set, get) => ({
                 ...state.cloud,
                 user,
                 status: user ? 'signed-in' : keepLoginError ? 'error' : 'signed-out',
+                startupComplete: !user,
                 error: user ? '' : keepLoginError ? state.cloud.error : '',
                 errorKind: user ? '' : keepLoginError ? state.cloud.errorKind : '',
               },
@@ -1738,6 +1749,7 @@ export const useAvaluaproStore = create((set, get) => ({
           ...state.cloud,
           user: user || state.cloud.user,
           status: user ? 'signed-in' : 'signing-in',
+          startupComplete: false,
           error: '',
           errorKind: '',
         },
@@ -1771,6 +1783,7 @@ export const useAvaluaproStore = create((set, get) => ({
           ...state.cloud,
           user: null,
           status: 'signed-out',
+          startupComplete: false,
           error: '',
           errorKind: '',
           lastSyncedAt: '',
@@ -1864,7 +1877,7 @@ export const useAvaluaproStore = create((set, get) => ({
     await flushQueuedCloudSync(set, get)
   },
 
-  createCloudBackup: async (reason = 'manual') => {
+  createCloudBackup: async (reason = 'manual', options = {}) => {
     const state = get()
     if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
     if (cloudBackupInFlight) throw new Error('Ja hi ha una còpia al núvol en curs.')
@@ -1879,12 +1892,26 @@ export const useAvaluaproStore = create((set, get) => ({
         collections: backup.collections,
         profile: backup.profile,
       })
+      const stableBackupId = options.backupId
+        ? `${options.backupId}_${fingerprint.slice(0, 12)}`
+        : ''
       const savedBackup = await saveCloudBackup(state.cloud.user.uid, backup, {
         reason,
-        label: buildCloudBackupLabel(state, reason),
+        label: options.label || buildCloudBackupLabel(state, reason),
+        backupId: stableBackupId,
         fingerprint,
       })
-      const recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
+      let recentBackups
+      try {
+        recentBackups = await listCloudBackups(state.cloud.user.uid, 5)
+      } catch {
+        // La còpia ja ha quedat escrita. Si la quota de lectures està esgotada,
+        // la confirmem amb el resultat de l’escriptura en lloc de repetir-la.
+        recentBackups = [
+          savedBackup,
+          ...get().cloud.recentBackups.filter((item) => item.id !== savedBackup.id),
+        ].slice(0, 5)
+      }
       set((current) => ({
         cloud: {
           ...current.cloud,
@@ -1907,6 +1934,41 @@ export const useAvaluaproStore = create((set, get) => ({
     } finally {
       cloudBackupInFlight = false
     }
+  },
+
+  ensureCloudBackup: async ({ backupId = '', label = '', reason = 'manual' } = {}) => {
+    const state = get()
+    const uid = state.cloud.user?.uid
+    if (!uid) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
+
+    let allRecentBackups = []
+    try {
+      allRecentBackups = await listCloudBackups(uid, 100)
+    } catch {
+      // La còpia usa un identificador estable derivat de les dades. Si no podem
+      // consultar l’historial, repetir l’escriptura continua sent idempotent.
+    }
+    const existingBackup = allRecentBackups.find(
+      (backup) => (backupId && backup.id === backupId) || backup.reason === reason,
+    )
+    if (existingBackup) {
+      const visibleBackups = [
+        existingBackup,
+        ...allRecentBackups.filter((backup) => backup.id !== existingBackup.id),
+      ].slice(0, 5)
+      set((current) => ({
+        cloud: {
+          ...current.cloud,
+          backupStatus: 'saved',
+          backupError: '',
+          lastCloudBackupAt: allRecentBackups[0]?.createdAt || existingBackup.createdAt,
+          recentBackups: visibleBackups,
+        },
+      }))
+      return existingBackup
+    }
+
+    return get().createCloudBackup(reason, { backupId, label })
   },
 
   maybeCreateDailyCloudBackup: async ({ triggeredByConfirmedChange = false } = {}) => {
@@ -1987,6 +2049,12 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       return []
     }
+  },
+
+  exportCloudBackup: async (backupId) => {
+    const state = get()
+    if (!state.cloud.user) throw new Error('Cal iniciar sessió amb Google abans de descarregar una còpia del núvol.')
+    return loadCloudBackup(state.cloud.user.uid, backupId)
   },
 
   compareCurrentCloudWorkspace: async () => {

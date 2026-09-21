@@ -1278,7 +1278,7 @@ export async function loadCloudDataset(uid) {
 export async function saveCloudBackup(uid, backup, meta = {}) {
   if (!uid) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
 
-  const backupId = `backup_${Date.now()}`
+  const backupId = meta.backupId || `backup_${Date.now()}`
   const collections = backup?.collections || {}
   const createdAt = new Date().toISOString()
   const counts = COLLECTIONS.reduce(
@@ -1288,6 +1288,12 @@ export async function saveCloudBackup(uid, backup, meta = {}) {
     }),
     {},
   )
+
+  // La capçalera és el senyal que la còpia és completa. Es desa al final perquè
+  // una interrupció no presenti mai una còpia parcial com a restaurable.
+  for (const collectionName of COLLECTIONS) {
+    await saveBackupRows(uid, backupId, collectionName, collections[collectionName] || [])
+  }
 
   await setDoc(
     getCloudBackupDocRef(uid, backupId),
@@ -1305,10 +1311,6 @@ export async function saveCloudBackup(uid, backup, meta = {}) {
       counts,
     }),
   )
-
-  for (const collectionName of COLLECTIONS) {
-    await saveBackupRows(uid, backupId, collectionName, collections[collectionName] || [])
-  }
 
   return {
     id: backupId,

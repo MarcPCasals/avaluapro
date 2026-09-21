@@ -12,14 +12,16 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { Modal } from './Modal'
-import { featureFlags } from '../config/featureFlags'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
 import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
-const modes = [
-  ...(featureFlags.agenda ? [{ id: 'agenda', label: 'Agenda', icon: CalendarDays, optional: true }] : []),
-  ...(featureFlags.planning ? [{ id: 'planning', label: 'Programació', icon: BookOpenText, optional: true }] : []),
+const optionalModes = [
+  { id: 'agenda', label: 'Agenda', icon: CalendarDays, optional: true },
+  { id: 'planning', label: 'Programació', icon: BookOpenText, optional: true },
+]
+
+const coreModes = [
   { id: 'evaluation', label: 'Avaluació', icon: TableProperties },
   { id: 'tracking', label: 'Seguiment', icon: ClipboardCheck },
   { id: 'students', label: 'Alumnes', icon: UsersRound },
@@ -103,7 +105,7 @@ function UrgentModal({ profiles, onClose }) {
   )
 }
 
-export function MainNavigation() {
+export function MainNavigation({ optionalModulesEnabled = false }) {
   const [showUrgent, setShowUrgent] = useState(false)
   const state = useAvaluaproStore()
   const { activeClassId, activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)
@@ -126,7 +128,8 @@ export function MainNavigation() {
     ],
   )
   const hasTutoringMode = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
-  const hasOptionalModules = featureFlags.agenda || featureFlags.planning
+  const modes = optionalModulesEnabled ? [...optionalModes, ...coreModes] : coreModes
+  const hasOptionalModules = optionalModulesEnabled
   const handleOpenTutoring = () => {
     setActiveMode('tutoring')
     if (!onboarding.tutoringGuideSeen) {

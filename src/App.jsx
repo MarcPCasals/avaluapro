@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { CheckCircle2, Info, Loader2, PlayCircle, Share2, Trash2, XCircle } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Info, Loader2, PlayCircle, Share2, ShieldCheck, Trash2, XCircle } from 'lucide-react'
 import { GlobalReminderLayer } from './components/GlobalReminderLayer'
 import { MainNavigation } from './components/MainNavigation'
 import { Modal } from './components/Modal'
@@ -7,7 +7,14 @@ import { SemesterUtTabs } from './components/SemesterUtTabs'
 import { TopBar } from './components/TopBar'
 import { GuidedTour } from './features/help/GuidedTour'
 import { TeacherProfileModal } from './features/profile/TeacherProfileModal'
-import { isOptionalModeEnabled } from './config/featureFlags'
+import { ReleaseAnnouncementModal } from './features/release/ReleaseAnnouncementModal'
+import {
+  PRE_UPDATE_RELEASE,
+  acknowledgeRelease,
+  getPreUpdateReleaseGate,
+  isReleaseAcknowledged,
+  isReleaseModeEnabled,
+} from './lib/preUpdateRelease'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
 
@@ -36,6 +43,36 @@ const TutoringView = lazy(() =>
 )
 
 const TIMELINE_MODES = new Set(['evaluation', 'tracking', 'analytics', 'tutoring'])
+
+function ReleaseProtectionBanner({ error = '', onRetry, state }) {
+  if (state === 'ready' || state === 'demo') return null
+
+  const isBlocked = state === 'review' || state === 'error'
+  const message = state === 'signed-out'
+    ? 'Inicia sessió amb Google per crear la còpia al núvol i activar Agenda i Programació.'
+    : state === 'review'
+      ? 'Hi ha dues versions diferents de les dades. Resol «Revisió necessària» abans d’activar les pantalles noves.'
+      : state === 'error'
+        ? error || 'No s’ha pogut confirmar la còpia al núvol. La versió anterior continua disponible.'
+        : state === 'saving'
+          ? 'Estem creant «Còpia de seguretat pre actualització» al teu compte.'
+          : 'Estem esperant que Firebase acabi de confirmar les dades abans de crear la còpia.'
+
+  return (
+    <section className={`release-protection-banner ${isBlocked ? 'blocked' : ''}`} role="status">
+      <span>{isBlocked ? <AlertTriangle size={20} /> : <ShieldCheck size={20} />}</span>
+      <div>
+        <strong>{isBlocked ? 'La protecció necessita una revisió' : 'Preparant l’actualització amb seguretat'}</strong>
+        <p>{message}</p>
+      </div>
+      {state === 'error' && (
+        <button className="secondary-action compact" onClick={onRetry} type="button">
+          Tornar-ho a provar
+        </button>
+      )}
+    </section>
+  )
+}
 
 function ModuleLoadingFallback({ label = 'Carregant espai...' }) {
   return (
@@ -186,11 +223,41 @@ function App() {
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
   const cloud = useAvaluaproStore((state) => state.cloud)
+  const ensureCloudBackup = useAvaluaproStore((state) => state.ensureCloudBackup)
   const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
   const onboarding = useAvaluaproStore((state) => state.onboarding)
-  const effectiveActiveMode = isOptionalModeEnabled(activeMode) ? activeMode : 'evaluation'
+  const [releaseBackupState, setReleaseBackupState] = useState('')
+  const [releaseBackupError, setReleaseBackupError] = useState('')
+  const [releaseBackupCreatedAt, setReleaseBackupCreatedAt] = useState('')
+  const [releaseRetryCount, setReleaseRetryCount] = useState(0)
+  const [releaseAnnouncementDismissed, setReleaseAnnouncementDismissed] = useState(false)
+  const releaseAttemptRef = useRef('')
+  const releaseGate = getPreUpdateReleaseGate({
+    appStatus: status,
+    cloudStatus: cloud.status,
+    cloudStartupComplete: cloud.startupComplete,
+    isDemo: onboarding.demoMode,
+    pendingOperationCount: cloud.pendingOperationCount,
+    recentBackups: cloud.recentBackups,
+    user: cloud.user,
+  })
+  const releaseReady = releaseGate === 'demo' || releaseGate === 'ready' || releaseBackupState === 'ready'
+  const releaseDisplayState = releaseGate === 'backup-required'
+    ? releaseBackupState || 'waiting'
+    : releaseGate
+  const knownReleaseBackup = cloud.recentBackups.find(
+    (item) => item.id === PRE_UPDATE_RELEASE.backupId || item.reason === PRE_UPDATE_RELEASE.backupReason,
+  )
+  const showReleaseAnnouncement = Boolean(
+    releaseReady &&
+    releaseGate !== 'demo' &&
+    cloud.user?.uid &&
+    !releaseAnnouncementDismissed &&
+    !isReleaseAcknowledged(cloud.user.uid, window.localStorage),
+  )
+  const effectiveActiveMode = isReleaseModeEnabled(activeMode, releaseReady) ? activeMode : 'evaluation'
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId) return
@@ -200,6 +267,51 @@ function App() {
   useEffect(() => {
     if (effectiveActiveMode !== activeMode) setActiveMode(effectiveActiveMode)
   }, [activeMode, effectiveActiveMode, setActiveMode])
+
+  useEffect(() => {
+    if (sociometricSurveyId || studentProfileSurveyId) return
+
+    if (releaseGate !== 'backup-required') return
+
+    const attemptKey = `${cloud.user.uid}:${releaseRetryCount}`
+    if (releaseAttemptRef.current === attemptKey) return
+    releaseAttemptRef.current = attemptKey
+    let cancelled = false
+
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return null
+        setReleaseBackupState('saving')
+        setReleaseBackupError('')
+        return ensureCloudBackup({
+          backupId: PRE_UPDATE_RELEASE.backupId,
+          label: PRE_UPDATE_RELEASE.backupLabel,
+          reason: PRE_UPDATE_RELEASE.backupReason,
+        })
+      })
+      .then((backup) => {
+        if (cancelled || !backup) return
+        setReleaseBackupState('ready')
+        setReleaseBackupCreatedAt(backup?.createdAt || '')
+      })
+      .catch((backupError) => {
+        if (cancelled) return
+        setReleaseBackupState('error')
+        setReleaseBackupError(backupError.message || 'No s’ha pogut crear la còpia al núvol.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    cloud.recentBackups,
+    cloud.user,
+    ensureCloudBackup,
+    releaseGate,
+    releaseRetryCount,
+    sociometricSurveyId,
+    studentProfileSurveyId,
+  ])
 
   if (sociometricSurveyId) {
     return (
@@ -239,6 +351,18 @@ function App() {
     <div className="app-shell">
       <TopBar />
       {onboarding.demoMode && <DemoBanner />}
+      {!onboarding.demoMode && (
+        <ReleaseProtectionBanner
+          error={releaseBackupError}
+          onRetry={() => {
+            releaseAttemptRef.current = ''
+            setReleaseBackupState('')
+            setReleaseBackupError('')
+            setReleaseRetryCount((value) => value + 1)
+          }}
+          state={releaseDisplayState}
+        />
+      )}
       {error && (
         <div className="storage-alert">
           <strong>{error}</strong>
@@ -259,7 +383,7 @@ function App() {
           <span>{cloud.error}</span>
         </div>
       )}
-      <MainNavigation />
+      <MainNavigation optionalModulesEnabled={releaseReady} />
       {TIMELINE_MODES.has(effectiveActiveMode) && <SemesterUtTabs />}
       <main className="content-area">
         <Suspense fallback={<ModuleLoadingFallback />}>
@@ -275,6 +399,15 @@ function App() {
       <GlobalReminderLayer />
       <TutoringInvitationCenter />
       {!defaultSubject && !onboarding.demoMode && <TeacherProfileModal forceSetup onClose={() => {}} />}
+      {showReleaseAnnouncement && cloud.user?.uid && (
+        <ReleaseAnnouncementModal
+          backupCreatedAt={releaseBackupCreatedAt || knownReleaseBackup?.createdAt || ''}
+          onAcknowledge={() => {
+            acknowledgeRelease(cloud.user.uid, window.localStorage)
+            setReleaseAnnouncementDismissed(true)
+          }}
+        />
+      )}
       <GuidedTour />
     </div>
   )
