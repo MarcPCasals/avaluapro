@@ -15,6 +15,7 @@ import {
   saveCollections,
   saveCollectionsWithCloudQueue,
   saveDataset,
+  saveReconciledDatasetWithCloudQueue,
 } from '../db/indexedDb'
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { clearPlanningLocalData } from '../data/local/planningIndexedDb'
@@ -79,6 +80,7 @@ import {
   isFirestoreQuotaError,
 } from '../lib/cloudSyncDiff'
 import { compareCloudConflictDatasets } from '../lib/cloudConflictComparison'
+import { reconcileCloudDatasets } from '../lib/cloudReconciliation'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
 import {
   getCloudStartupAction,
@@ -972,6 +974,56 @@ async function applyCloudWorkspace(set, get, uid, workspace) {
   return true
 }
 
+async function applyReconciledCloudWorkspace(set, get, uid, workspace) {
+  if (!workspace?.exists || get().cloud.user?.uid !== uid) return false
+
+  const pendingOperations = await loadCloudSyncQueue(uid)
+  if (pendingOperations.length > 0 || get().cloud.user?.uid !== uid) return false
+
+  const localDataset = normalizeDataset(getDatasetFromState(get()))
+  const cloudDataset = normalizeDataset(workspace.dataset)
+  const reconciliation = reconcileCloudDatasets(localDataset, cloudDataset, COLLECTIONS)
+  if (!reconciliation.canReconcile) return false
+
+  // La dada local i la cua de pujada es desen en una sola transacció. Si el
+  // navegador es tanca a mig procés, no queda una fusió sense sincronitzar.
+  await saveReconciledDatasetWithCloudQueue(reconciliation.dataset, cloudDataset, uid)
+  const queuedOperations = await loadCloudSyncQueue(uid)
+  const preferences = getCloudWorkspacePreferences(
+    readPreferences(),
+    workspace.meta?.preferences || {},
+  )
+  const profile = {
+    ...getInitialProfile(),
+    ...(workspace.meta?.profile || {}),
+  }
+  writePreferences({ ...preferences, ...profile })
+  const ui = getInitialUi(reconciliation.dataset)
+
+  set((current) => ({
+    ...reconciliation.dataset,
+    ui,
+    profile,
+    onboarding: getInitialOnboarding(reconciliation.dataset.classes.length > 0),
+    status: 'ready',
+    error: '',
+    cloud: {
+      ...current.cloud,
+      status: queuedOperations.length > 0 ? 'pending' : 'synced',
+      error: '',
+      errorKind: '',
+      lastSyncedAt: queuedOperations.length > 0 ? current.cloud.lastSyncedAt : new Date().toISOString(),
+      lastSyncStats: { reconciliation: reconciliation.stats },
+      pendingCollections: getPendingCollectionNames(queuedOperations),
+      pendingOperationCount: queuedOperations.length,
+      retryAvailableAt: '',
+    },
+  }))
+
+  await flushQueuedCloudSync(set, get)
+  return true
+}
+
 function getComparableCloudWorkspace(dataset) {
   return COLLECTIONS.reduce((result, collectionName) => ({
     ...result,
@@ -1045,12 +1097,14 @@ async function synchronizeAfterSignIn(set, get, uid) {
           }))
           return
         }
-        if (action === 'review-conflict') {
+        if (action === 'auto-reconcile') {
+          const reconciled = await applyReconciledCloudWorkspace(set, get, uid, workspace)
+          if (reconciled) return
           set((current) => ({
             cloud: {
               ...current.cloud,
               status: 'review',
-              error: 'Les dades locals i Firebase són diferents. S’han conservat les dades d’aquest dispositiu sense substituir-les.',
+              error: 'Hi ha edicions incompatibles del mateix registre sense una data fiable. S’han conservat les dades d’aquest dispositiu sense substituir-les.',
               errorKind: 'conflict',
               pendingCollections: [],
               pendingOperationCount: 0,

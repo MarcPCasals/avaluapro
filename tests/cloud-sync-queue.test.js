@@ -9,6 +9,7 @@ import {
   recordCloudSyncQueueFailure,
   saveCollections,
   saveCollectionsWithCloudQueue,
+  saveReconciledDatasetWithCloudQueue,
 } from '../src/db/indexedDb.js'
 import { getSafeCloudSyncError } from '../src/lib/cloudSyncQueue.js'
 
@@ -107,6 +108,35 @@ test('una eliminació queda registrada com una única operació concreta', async
   assert.equal(entry.operation, 'delete')
   assert.equal(entry.documentId, 'student-1')
   assert.equal('value' in entry, false)
+})
+
+test('la conciliació conserva la unió local i remota i només puja el que falta a Firebase', async () => {
+  const remoteDataset = {
+    classes: [
+      { id: 'class-cloud', name: 'Tutoria' },
+      { id: 'class-shared', name: '1rC' },
+    ],
+  }
+  const reconciledDataset = {
+    classes: [
+      { id: 'class-local', name: 'Classe local' },
+      { id: 'class-shared', name: '1rC' },
+      { id: 'class-cloud', name: 'Tutoria' },
+    ],
+  }
+
+  await saveReconciledDatasetWithCloudQueue(reconciledDataset, remoteDataset, 'teacher-1')
+
+  const dataset = await loadDataset()
+  assert.deepEqual(dataset.classes.map((item) => item.id).sort(), [
+    'class-cloud',
+    'class-local',
+    'class-shared',
+  ])
+  const entries = await loadCloudSyncQueue('teacher-1')
+  assert.deepEqual(entries.map((entry) => ({ id: entry.documentId, operation: entry.operation })), [
+    { id: 'class-local', operation: 'upsert' },
+  ])
 })
 
 test('les cues de dos docents es mantenen separades i es poden netejar per compte', async () => {

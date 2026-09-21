@@ -201,6 +201,46 @@ export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
   }
 }
 
+/**
+ * Desa una conciliació local i prepara només les operacions que Firebase encara
+ * no té. La comparació es fa contra la còpia remota llegida a l'arrencada; així
+ * els registres recuperats des del núvol no generen escriptures redundants i els
+ * registres que només existien al dispositiu queden pendents de pujada.
+ */
+export async function saveReconciledDatasetWithCloudQueue(dataset, remoteDataset, uid) {
+  if (!uid) return saveDataset(dataset)
+  let db
+  try {
+    db = await openDatabase()
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([...COLLECTIONS, CLOUD_SYNC_QUEUE_STORE], 'readwrite')
+      const queueStore = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+
+      COLLECTIONS.forEach((collection) => {
+        const nextRows = dataset[collection] || []
+        const changes = buildCloudSyncQueueChanges({
+          uid,
+          collectionName: collection,
+          previousRows: remoteDataset[collection] || [],
+          nextRows,
+        })
+        const store = transaction.objectStore(collection)
+        store.clear()
+        nextRows.forEach((row) => store.put(row))
+        changes.forEach((change) => queueStore.put(change))
+      })
+
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } catch (error) {
+    throw new Error(getStorageErrorMessage(error), { cause: error })
+  } finally {
+    if (db) db.close()
+  }
+}
+
 export async function loadCloudSyncQueue(uid) {
   if (!uid) return []
   const db = await openDatabase()

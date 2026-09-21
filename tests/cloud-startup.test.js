@@ -42,7 +42,7 @@ test('un compte sense cap còpia remota conserva les dades locals', () => {
   )
 })
 
-test('mai se substitueixen automàticament dades locals reals diferents de Firebase', () => {
+test('les còpies locals i remotes diferents passen a conciliació automàtica', () => {
   assert.equal(
     getCloudStartupAction({
       cloudWorkspaceExists: true,
@@ -50,7 +50,7 @@ test('mai se substitueixen automàticament dades locals reals diferents de Fireb
       localWorkspaceIsDemo: false,
       workspacesMatch: false,
     }),
-    'review-conflict',
+    'auto-reconcile',
   )
 })
 
