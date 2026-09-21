@@ -23,6 +23,7 @@ import {
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
   applyPlanningActivityOverrides,
+  createAcademicYear,
   createActivityResult,
   createCalendarEvent,
   createCalendarSession,
@@ -246,6 +247,19 @@ export function useAgendaWorkspace(user, classes = []) {
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
   }, [activeAcademicYear, repository, today, user?.uid])
+
+  /**
+   * L'Agenda també pot iniciar el curs acadèmic. Això evita obligar un docent
+   * nou a descobrir Programació abans de poder configurar el seu horari.
+   */
+  const createYear = useCallback(async (values) => {
+    const year = createAcademicYear({ ...values, ownerUid: user.uid })
+    await persist(year)
+    setAcademicYears((items) => [...items, year]
+      .sort((left, right) => right.startsOn.localeCompare(left.startsOn)))
+    setActiveAcademicYearId(year.id)
+    return year
+  }, [persist, user])
 
   useEffect(() => {
     let cancelled = false
@@ -1158,6 +1172,7 @@ export function useAgendaWorkspace(user, classes = []) {
     confirmContinuationPreview,
     confirmSchedulingPreview,
     closeClassroomSession,
+    createYear,
     createTimetable,
     error,
     findNextClassroomSession,
