@@ -208,6 +208,7 @@
 .planning-drag-handle { width: 30px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 7px; color: #94a3b8; background: transparent; cursor: grab; touch-action: none; }
 .planning-drag-handle:hover, .planning-drag-handle:focus-visible { color: #6d28d9; background: #f5f3ff; outline: 0; }
 .planning-drag-handle:active { cursor: grabbing; }
+.planning-group-override-mark { border-radius: 999px; padding: 2px 7px; color: #6d28d9; background: #ede9fe; font-weight: 800; }
 .planning-activity-type { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #6d28d9; background: #ede9fe; }
 .planning-activity-type.indication { color: #0369a1; background: #e0f2fe; }
 .planning-activity-type.transition { color: #047857; background: #d1fae5; }
@@ -366,6 +367,18 @@
 .planning-material-reminder input { min-width: 0; padding-inline: 6px; }
 
 .planning-dialog-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 28px; background: rgba(15, 23, 42, .54); backdrop-filter: blur(7px); }
+.planning-connected-change-dialog { position: relative; width: min(560px, 100%); display: grid; gap: 20px; border: 1px solid #e5e7eb; border-radius: 22px; padding: 28px; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
+.planning-connected-change-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; color: #6d28d9; background: #ede9fe; }
+.planning-connected-change-dialog > div:nth-of-type(2) { display: grid; gap: 6px; }
+.planning-connected-change-dialog p { margin: 0; color: #7c3aed; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.planning-connected-change-dialog h2 { margin: 0; color: #1e293b; font-size: 24px; }
+.planning-connected-change-dialog span { color: #64748b; font-size: 14px; font-weight: 650; }
+.planning-connected-change-actions { display: grid; gap: 10px; }
+.planning-connected-change-actions > button:not(.planning-cancel-change) { min-height: 66px; display: grid; justify-items: start; gap: 3px; padding: 13px 16px; text-align: left; }
+.planning-connected-change-actions strong { font-size: 15px; }
+.planning-connected-change-actions small { font-size: 12px; font-weight: 650; opacity: .78; }
+.planning-cancel-change { justify-self: center; border: 0; padding: 8px 12px; color: #64748b; background: transparent; font-weight: 750; cursor: pointer; }
+.planning-cancel-change:hover, .planning-cancel-change:focus-visible { color: #334155; text-decoration: underline; outline: 0; }
 .planning-sharing-dialog, .planning-preview-dialog { width: min(920px, 100%); max-height: calc(100vh - 56px); overflow-y: auto; border: 1px solid rgba(255, 255, 255, .7); border-radius: 22px; box-shadow: 0 28px 80px rgba(15, 23, 42, .22); background: white; }
 .planning-sharing-dialog { display: grid; gap: 17px; padding: 24px; }
 .planning-sharing-dialog > header { display: flex; align-items: center; gap: 12px; }

@@ -50,6 +50,36 @@ function PlanningPreviewDialog({ activities, classes, loadApplications, onClose,
   )
 }
 
+function ConnectedChangeDialog({ activeClassName, otherClassNames, onChoose, supportsCurrentClass }) {
+  const dialogRef = useDialogAccessibility(() => onChoose('cancel'))
+  return (
+    <div className="planning-dialog-backdrop">
+      <section aria-labelledby="planning-change-scope-title" aria-modal="true" className="planning-connected-change-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
+        <button aria-label="Cancel·lar" className="planning-preview-close" onClick={() => onChoose('cancel')} type="button"><X size={18} /></button>
+        <div className="planning-connected-change-icon"><Users size={22} /></div>
+        <div>
+          <p>Programació connectada</p>
+          <h2 id="planning-change-scope-title">On vols aplicar aquest canvi?</h2>
+          <span>La UP també està connectada amb {otherClassNames.join(' i ')}.</span>
+        </div>
+        <div className="planning-connected-change-actions">
+          {supportsCurrentClass && (
+            <button className="primary-action" onClick={() => onChoose('current')} type="button">
+              <strong>Només {activeClassName}</strong>
+              <small>{otherClassNames.join(' i ')} quedarà sense aquest canvi.</small>
+            </button>
+          )}
+          <button className={supportsCurrentClass ? 'secondary-action' : 'primary-action'} onClick={() => onChoose('all')} type="button">
+            <strong>{[activeClassName, ...otherClassNames].join(' i ')}</strong>
+            <small>Actualitza la UP compartida per a totes les classes connectades.</small>
+          </button>
+          <button className="planning-cancel-change" onClick={() => onChoose('cancel')} type="button">Cancel·lar i no desar res</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function EmptyPlanning({ className, hasTemporalUnits, onConnectUnit, onCreateUnit, onCreateUt }) {
   return (
     <section className="planning-empty-state">
@@ -299,6 +329,7 @@ export default function PlanningModule() {
   const [editingActivity, setEditingActivity] = useState(null)
   const [activityPhaseId, setActivityPhaseId] = useState('')
   const [phaseParentId, setPhaseParentId] = useState('')
+  const [connectedDecision, setConnectedDecision] = useState(null)
   const curriculumCatalog = useMemo(() => {
     const unique = (items) => Array.from(new Map(items
       .filter((item) => item.label)
@@ -321,16 +352,20 @@ export default function PlanningModule() {
     .map((classId) => classes.find((item) => item.id === classId)?.name
       || workspace.applications.find((application) => application.classId === classId)?.classLabel)
     .filter(Boolean)
-  const confirmConnectedChange = () => {
-    const otherClasses = connectedClassLabels.filter((label) => label !== activeClass?.name)
-    if (otherClasses.length === 0) return true
-    return globalThis.confirm?.(
-      `Aquesta programació també està connectada amb ${otherClasses.join(', ')}. Vols aplicar-hi aquest canvi també?\n\nAccepta per desar-lo a totes les classes connectades. Cancel·la per no fer el canvi.`,
-    ) !== false
+  const otherConnectedClassLabels = connectedClassLabels.filter((label) => label !== activeClass?.name)
+  const requestConnectedScope = (supportsCurrentClass) => {
+    if (otherConnectedClassLabels.length === 0) return Promise.resolve('all')
+    return new Promise((resolve) => setConnectedDecision({ resolve, supportsCurrentClass }))
   }
-  const withConnectedConfirmation = async (action) => {
-    if (!confirmConnectedChange()) return false
-    return action()
+  const resolveConnectedDecision = (scope) => {
+    const resolve = connectedDecision?.resolve
+    setConnectedDecision(null)
+    resolve?.(scope)
+  }
+  const withConnectedConfirmation = async (allClassesAction, currentClassAction = null) => {
+    const scope = await requestConnectedScope(Boolean(currentClassAction))
+    if (scope === 'cancel') return false
+    return scope === 'current' ? currentClassAction() : allClassesAction()
   }
   const planningReminderSummary = useMemo(
     () => getPlanningReminderSummary({
@@ -463,7 +498,7 @@ export default function PlanningModule() {
             {workspace.activePlanningUnit && workspace.canEditActiveUnit ? (
               <>
                 {connectedClassLabels.length > 1 && (
-                  <div className="planning-connected-banner"><Users size={17} /><span>Aquesta UP està connectada amb <strong>{connectedClassLabels.join(' i ')}</strong>. Abans de desar un canvi, podràs confirmar si s’aplica a totes.</span></div>
+                  <div className="planning-connected-banner"><Users size={17} /><span>Aquesta UP està connectada amb <strong>{connectedClassLabels.join(' i ')}</strong>. En canviar una activitat podràs aplicar-ho només a la classe actual o a totes.</span></div>
                 )}
                 <UnitEditor
                   activities={workspace.activities}
@@ -473,11 +508,17 @@ export default function PlanningModule() {
                   onAcceptImprovements={(proposalIds) => withConnectedConfirmation(() => workspace.acceptImprovementSuggestions(proposalIds))}
                   onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
                   onArchive={(unit) => withConnectedConfirmation(() => workspace.archiveUnit(unit))}
-                  onDeleteActivity={(activity) => handleActivityAction(() => withConnectedConfirmation(() => workspace.removeActivity(activity)))}
+                  onDeleteActivity={(activity) => handleActivityAction(() => withConnectedConfirmation(
+                    () => workspace.removeActivity(activity),
+                    () => workspace.removeActivityForActiveClass(activity),
+                  ))}
                   onDuplicate={() => setDialog('annualCopy')}
                   onEditActivity={(activity) => handleOpenActivity(activity)}
                   onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
-                  onMoveActivity={(move) => handleActivityAction(() => withConnectedConfirmation(() => workspace.moveActivity(move)))}
+                  onMoveActivity={(move) => handleActivityAction(() => withConnectedConfirmation(
+                    () => workspace.moveActivity(move),
+                    () => workspace.moveActivityForActiveClass(move),
+                  ))}
                   onOpenDocuments={() => setDialog('documents')}
                   onOpenHistory={() => setDialog('history')}
                   onOpenPreview={() => setDialog('preview')}
@@ -516,13 +557,17 @@ export default function PlanningModule() {
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={(values) => workspace.createUnit(values, { classId: activeClassId, classLabel: activeClass?.name })} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.saveActivity(values, current))} phases={workspace.phases} students={students} />}
+      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
+        () => workspace.saveActivity(values, current),
+        () => workspace.saveActivityForActiveClass(values, current),
+      )} phases={workspace.phases} students={students} />}
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={(values) => workspace.duplicateUnitToAcademicYear(values, { classId: activeClassId, classLabel: activeClass?.name })} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
+      {connectedDecision && <ConnectedChangeDialog activeClassName={activeClass?.name || 'aquesta classe'} onChoose={resolveConnectedDecision} otherClassNames={otherConnectedClassLabels} supportsCurrentClass={connectedDecision.supportsCurrentClass} />}
     </section>
   )
 }

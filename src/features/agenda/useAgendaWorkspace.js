@@ -3,6 +3,7 @@ import {
   applyPlanningCloudOperation,
   loadPlanningAcademicYears,
   loadOwnedPlanningUnits,
+  loadPlanningActivityOverrides,
   loadPlanningApplications,
   loadPlanningCalendarEvents,
   loadPlanningPrivateNotes,
@@ -21,6 +22,7 @@ import {
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
+  applyPlanningActivityOverrides,
   createActivityResult,
   createCalendarEvent,
   createCalendarSession,
@@ -474,15 +476,31 @@ export function useAgendaWorkspace(user, classes = []) {
         },
         { completeSnapshot: true },
       )))
-      const activitiesByUnitId = new Map(unitIds.map((planningUnitId, index) => [
+      const applicationRecords = Array.from(new Map(sessionRecords.map((record) => [
+        `${record.planningUnit.id}:${record.application.id}`,
+        record,
+      ])).values())
+      const overrideResults = await Promise.all(applicationRecords.map((record) => repository.loadScope(
+        `application:${record.application.id}:overrides`,
+        () => loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
+        { completeSnapshot: true },
+      )))
+      const baseActivitiesByUnitId = new Map(unitIds.map((planningUnitId, index) => [
         planningUnitId,
-        new Map(structureResults[index].entities
-          .filter((entity) => entity.entityType === 'planningActivity')
-          .map((activity) => [activity.id, activity])),
+        structureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
+      ]))
+      const activitiesByApplicationKey = new Map(applicationRecords.map((record, index) => [
+        `${record.planningUnit.id}:${record.application.id}`,
+        new Map(applyPlanningActivityOverrides(
+          baseActivitiesByUnitId.get(record.planningUnit.id) || [],
+          overrideResults[index].entities,
+        ).map((activity) => [activity.id, activity])),
       ]))
       const bundles = sessionRecords.map((record, index) => {
         const entities = detailResults[index].entities
-        const activityById = activitiesByUnitId.get(record.planningUnit.id) || new Map()
+        const activityById = activitiesByApplicationKey.get(
+          `${record.planningUnit.id}:${record.application.id}`,
+        ) || new Map()
         return {
           ...record,
           items: entities
@@ -744,10 +762,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const planningUnit = structureResult.entities.find((item) => item.entityType === 'planningUnit')
     if (!planningUnit) throw new Error('No s’ha pogut obrir aquesta UP.')
     const phases = structureResult.entities.filter((item) => item.entityType === 'planningPhase')
-    const activities = orderActivitiesForScheduling(
-      phases,
-      structureResult.entities.filter((item) => item.entityType === 'planningActivity'),
-    )
+    const baseActivities = structureResult.entities.filter((item) => item.entityType === 'planningActivity')
     const applications = applicationResult.entities
       .filter((item) => item.classId === classId)
       .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
@@ -760,6 +775,17 @@ export function useAgendaWorkspace(user, classes = []) {
       planningUnitVersion: planningUnit.versionNumber,
       status: 'draft',
     })
+    const overrideResult = applications[0]
+      ? await repository.loadScope(
+          `application:${application.id}:overrides`,
+          () => loadPlanningActivityOverrides(planningUnitId, application.id),
+          { completeSnapshot: true },
+        )
+      : { entities: [] }
+    const activities = orderActivitiesForScheduling(
+      phases,
+      applyPlanningActivityOverrides(baseActivities, overrideResult.entities),
+    )
     let existingSessions = []
     let existingSessionBundles = []
     if (applications[0]) {

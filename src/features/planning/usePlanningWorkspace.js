@@ -4,6 +4,7 @@ import {
   loadOwnedPlanningUnits,
   loadPlanningAccessGrants,
   loadPlanningAcademicYears,
+  loadPlanningActivityOverrides,
   loadPlanningApplications,
   loadPlanningSessionDetail,
   loadPlanningSessions,
@@ -19,13 +20,18 @@ import {
   copyPlanningUnitStructureToAcademicYear,
   createAccessGrant,
   createAcademicYear,
+  createGroupActivityOverride,
   createGroupApplication,
   createPlanningActivity,
   createPlanningPhase,
   createPlanningUnit,
   createTemporalUnit,
 } from '../../domain/planning/model'
-import { getPlanningUnitsForClass } from '../../domain/planning/classPlanning'
+import {
+  applyPlanningActivityOverrides,
+  getPlanningActivityOverrideSnapshot,
+  getPlanningUnitsForClass,
+} from '../../domain/planning/classPlanning'
 import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 
@@ -73,6 +79,8 @@ export function usePlanningWorkspace(user, activeClassId = '') {
   const [accessGrants, setAccessGrants] = useState([])
   const [phases, setPhases] = useState([])
   const [activities, setActivities] = useState([])
+  const [activityOverrides, setActivityOverrides] = useState([])
+  const [activityOverridesLoading, setActivityOverridesLoading] = useState(false)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activePlanningUnitId, setActivePlanningUnitId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -106,6 +114,15 @@ export function usePlanningWorkspace(user, activeClassId = '') {
   const canReadActiveApplications = activeRole === 'owner'
     || activeRole === 'directionReader'
     || activeRole === 'planningAgendaEditor'
+  const activeApplication = applications.find((application) => (
+    application.planningUnitId === activePlanningUnitId
+    && application.classId === activeClassId
+    && application.status !== 'archived'
+  )) || null
+  const effectiveActivities = useMemo(
+    () => applyPlanningActivityOverrides(activities, activityOverrides),
+    [activities, activityOverrides],
+  )
 
   const refreshSync = useCallback(async (options = {}) => {
     if (!repository) return EMPTY_SYNC
@@ -308,6 +325,31 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquesta UP.'))
     return () => { cancelled = true }
   }, [activePlanningUnitId, repository, user?.uid])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!repository || !activePlanningUnitId || !activeApplication?.id) {
+      queueMicrotask(() => {
+        if (cancelled) return
+        setActivityOverrides([])
+        setActivityOverridesLoading(false)
+      })
+      return () => { cancelled = true }
+    }
+    queueMicrotask(() => !cancelled && setActivityOverridesLoading(true))
+    repository.loadScope(
+      `application:${activeApplication.id}:overrides`,
+      () => loadPlanningActivityOverrides(activePlanningUnitId, activeApplication.id),
+      { completeSnapshot: true },
+    ).then((result) => {
+      if (cancelled) return
+      setActivityOverrides(result.entities)
+      if (result.error) setError('La programació del grup mostra la còpia local perquè Firebase no ha respost.')
+    }).catch((loadError) => {
+      if (!cancelled) setError(loadError.message || 'No s’han pogut carregar els canvis propis d’aquest grup.')
+    }).finally(() => !cancelled && setActivityOverridesLoading(false))
+    return () => { cancelled = true }
+  }, [activeApplication?.id, activePlanningUnitId, repository])
 
   useEffect(() => {
     let cancelled = false
@@ -649,6 +691,110 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     return result
   }, [activities, persist])
 
+  const saveGroupActivitySnapshots = useCallback(async (nextEffectiveActivities, activityIds, hiddenIds = []) => {
+    if (!activeApplication || !activePlanningUnit) {
+      throw new Error('No s’ha trobat la connexió d’aquesta classe amb la UP.')
+    }
+    const now = new Date().toISOString()
+    const hidden = new Set(hiddenIds)
+    const nextOverrides = activityIds.map((activityId) => {
+      const activity = nextEffectiveActivities.find((item) => item.id === activityId)
+        || effectiveActivities.find((item) => item.id === activityId)
+        || activities.find((item) => item.id === activityId)
+      if (!activity) throw new Error("No s'ha trobat l'activitat que es vol adaptar")
+      return createGroupActivityOverride({
+        activityId,
+        applicationId: activeApplication.id,
+        changeScope: 'groupOnly',
+        changes: getPlanningActivityOverrideSnapshot(activity, { hidden: hidden.has(activityId) }),
+        ownerUid: activePlanningUnit.ownerUid,
+      }, { now })
+    })
+    await persist(nextOverrides.map((entity) => ({
+      entity,
+      context: { applicationId: activeApplication.id, planningUnitId: activePlanningUnit.id },
+    })))
+    setActivityOverrides((items) => [...items, ...nextOverrides])
+    return nextOverrides
+  }, [activeApplication, activePlanningUnit, activities, effectiveActivities, persist])
+
+  const saveActivityForActiveClass = useCallback(async (values, current = null) => {
+    const now = new Date().toISOString()
+    if (!activeApplication || !activePlanningUnit) {
+      throw new Error('No s’ha trobat la connexió d’aquesta classe amb la UP.')
+    }
+    if (!current) {
+      // Una activitat nova existeix a la UP base, però queda amagada a les
+      // altres classes que ja hi estan connectades. Així només apareix al grup
+      // que el docent ha triat sense crear una segona programació paral·lela.
+      const activity = createPlanningActivity({
+        ...values,
+        order: effectiveActivities.filter((item) => item.phaseId === values.phaseId).length,
+        ownerUid: activePlanningUnit.ownerUid,
+        planningUnitId: activePlanningUnit.id,
+        updatedAt: now,
+      }, { now })
+      const otherApplications = applications.filter((application) => (
+        application.planningUnitId === activePlanningUnit.id
+        && application.id !== activeApplication.id
+        && application.status !== 'archived'
+      ))
+      const hiddenOverrides = otherApplications.map((application) => createGroupActivityOverride({
+        activityId: activity.id,
+        applicationId: application.id,
+        changeScope: 'groupOnly',
+        changes: getPlanningActivityOverrideSnapshot(activity, { hidden: true }),
+        ownerUid: activePlanningUnit.ownerUid,
+      }, { now }))
+      await persist([
+        activity,
+        ...hiddenOverrides.map((entity) => ({
+          entity,
+          context: { applicationId: entity.applicationId, planningUnitId: activePlanningUnit.id },
+        })),
+      ])
+      setActivities((items) => sortByOrder([...items, activity]))
+      return activity
+    }
+
+    const staged = createPlanningActivity({
+      ...current,
+      ...values,
+      order: current.order,
+      ownerUid: activePlanningUnit.ownerUid,
+      planningUnitId: activePlanningUnit.id,
+      updatedAt: now,
+    }, { now })
+    let nextEffectiveActivities = replaceById(effectiveActivities, staged)
+    let changedActivityIds = [staged.id]
+    if (values.phaseId !== current.phaseId) {
+      const moved = movePlanningActivityInSequence(
+        replaceById(effectiveActivities, { ...staged, phaseId: current.phaseId }),
+        { activityId: staged.id, targetPhaseId: values.phaseId },
+        { now },
+      )
+      nextEffectiveActivities = moved.activities
+      changedActivityIds = [...new Set(moved.changedActivities.map((activity) => activity.id))]
+    }
+    await saveGroupActivitySnapshots(nextEffectiveActivities, changedActivityIds)
+    return nextEffectiveActivities.find((activity) => activity.id === staged.id)
+  }, [activeApplication, activePlanningUnit, applications, effectiveActivities, persist, saveGroupActivitySnapshots])
+
+  const moveActivityForActiveClass = useCallback(async (move) => {
+    const result = movePlanningActivityInSequence(effectiveActivities, move, { now: new Date().toISOString() })
+    if (result.changedActivities.length === 0) return result
+    await saveGroupActivitySnapshots(
+      result.activities,
+      [...new Set(result.changedActivities.map((activity) => activity.id))],
+    )
+    return result
+  }, [effectiveActivities, saveGroupActivitySnapshots])
+
+  const removeActivityForActiveClass = useCallback(async (activity) => {
+    await saveGroupActivitySnapshots(effectiveActivities, [activity.id], [activity.id])
+    return activity
+  }, [effectiveActivities, saveGroupActivitySnapshots])
+
   const loadTemporalUnitsForYear = useCallback(async (academicYearId) => {
     if (!repository || !user?.uid || !academicYearId) return []
     const result = await repository.loadScope(
@@ -883,7 +1029,8 @@ export function usePlanningWorkspace(user, activeClassId = '') {
   return {
     accessGrants,
     academicYears,
-    activities,
+    activities: effectiveActivities,
+    activityOverrides,
     activeAcademicYear,
     activeAcademicYearId,
     activePlanningUnit,
@@ -907,7 +1054,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     importPlanningBundle,
     importPlanningTable,
     isOnline,
-    loading: loading || sharedLoading || applicationsLoading,
+    loading: loading || sharedLoading || applicationsLoading || activityOverridesLoading,
     loadHistoricalUnits,
     loadHistoricalUnitStructure,
     loadTemporalUnitsForYear,
@@ -916,8 +1063,11 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     ownedPlanningUnits: planningUnits,
     planningUnits: allPlanningUnits,
     moveActivity,
+    moveActivityForActiveClass,
     removeActivity,
+    removeActivityForActiveClass,
     saveActivity,
+    saveActivityForActiveClass,
     saveAccessGrant,
     savePhase,
     saveTemporalUnit,

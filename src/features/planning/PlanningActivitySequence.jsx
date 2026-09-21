@@ -46,14 +46,22 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
       data-activity-id={activity.id}
       data-phase-id={activity.phaseId}
       onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => { event.preventDefault(); event.stopPropagation(); onDrop(activity.phaseId, activity.id) }}
+      onDrop={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onDrop(activity.phaseId, activity.id, event.dataTransfer.getData('text/plain'))
+      }}
     >
       <button
         aria-label={`Reordenar ${activity.title}. Arrossega o prem Alt i fletxa amunt o avall`}
         className="planning-drag-handle"
         draggable
         onDragEnd={onDragEnd}
-        onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; onDragStart(activity.id) }}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = 'move'
+          event.dataTransfer.setData('text/plain', activity.id)
+          onDragStart(activity.id)
+        }}
         onKeyDown={(event) => {
           if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return
           event.preventDefault()
@@ -84,6 +92,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
           {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
           {activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador' : 'indicadors'}</span>}
           {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
+          {activity.groupOverride && <span className="planning-group-override-mark">Adaptada a aquest grup</span>}
           {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
         </small>
       </button>
@@ -116,9 +125,9 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
   const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
-  const drop = async (targetPhaseId, targetActivityId = null) => {
-    if (!dragId) return
-    const activityId = dragId
+  const drop = async (targetPhaseId, targetActivityId = null, transferredActivityId = '') => {
+    const activityId = transferredActivityId || dragId
+    if (!activityId) return
     setDragId('')
     await onMove({ activityId, targetActivityId, targetPhaseId })
   }
@@ -180,7 +189,7 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
                 className={`planning-activity-dropzone ${phaseActivities.length === 0 ? 'empty' : ''}`}
                 data-phase-id={phase.id}
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => { event.preventDefault(); drop(phase.id) }}
+                onDrop={(event) => { event.preventDefault(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}
               >
                 {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
                   <ActivityRow
@@ -199,7 +208,7 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
                     sessionDuration={sessionDuration}
                   />
                 ))}
-                {phaseActivities.length > 0 && <div className="planning-drop-at-end" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); drop(phase.id) }}>Deixa anar aquí per posar-lo al final</div>}
+                {phaseActivities.length > 0 && <div className="planning-drop-at-end" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}>Deixa anar aquí per posar-lo al final</div>}
               </div>
             </section>
           )

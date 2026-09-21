@@ -1,5 +1,6 @@
 export * from './constants.js'
 export * from './classroom.js'
+export * from './classPlanning.js'
 export * from './documents.js'
 export * from './ids.js'
 export * from './model.js'

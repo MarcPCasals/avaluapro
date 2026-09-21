@@ -314,6 +314,13 @@ export async function loadPlanningApplications(planningUnitId, classId, maxItems
   return mapSnapshot(await getDocs(query(collection(unitReference, 'applications'), ...constraints)))
 }
 
+export async function loadPlanningActivityOverrides(planningUnitId, applicationId) {
+  return mapSnapshot(await getDocs(collection(
+    planningApplicationRef(planningUnitId, applicationId),
+    'activityOverrides',
+  )))
+}
+
 export async function loadPlanningSessions({
   applicationId,
   from,

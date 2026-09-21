@@ -29,6 +29,7 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createGroupActivityOverride,
   createPlanningActivity,
   createPlanningPhase,
   createPlanningPrivateNote,
@@ -152,6 +153,20 @@ function sessionData(overrides = {}) {
       calendarEventId: null,
       startsAt: '2026-09-22T09:30:00+02:00',
       durationMinutes: 60,
+    }, { now: NOW }),
+    ...overrides,
+  }
+}
+
+function activityOverrideData(overrides = {}) {
+  return {
+    ...createGroupActivityOverride({
+      id: 'plan-override-one',
+      ownerUid: OWNER.uid,
+      applicationId: APP_ONE,
+      activityId: 'plan-activity-one',
+      changeScope: 'groupOnly',
+      changes: { order: 2, title: 'Escolta adaptada a 1rD' },
     }, { now: NOW }),
     ...overrides,
   }
@@ -403,6 +418,32 @@ describe('Planificació compartida', () => {
       plannedMinutes: 55,
       updatedAt: NOW,
     }))
+  })
+
+  test('les excepcions d’activitat queden dins del grup autoritzat', async () => {
+    const ownerDb = authDb(OWNER)
+    const overrideRef = doc(
+      ownerDb,
+      'planningUnits', UP_ID,
+      'applications', APP_ONE,
+      'activityOverrides', 'plan-override-one',
+    )
+    await assertSucceeds(setDoc(overrideRef, activityOverrideData()))
+    const agendaDb = authDb(AGENDA_EDITOR)
+    const agendaOverrides = collection(
+      agendaDb,
+      'planningUnits', UP_ID,
+      'applications', APP_ONE,
+      'activityOverrides',
+    )
+    const snapshot = await assertSucceeds(getDocs(agendaOverrides))
+    assert.equal(snapshot.size, 1)
+    await assertFails(getDocs(collection(
+      authDb(THIRD),
+      'planningUnits', UP_ID,
+      'applications', APP_ONE,
+      'activityOverrides',
+    )))
   })
 
   test('la cua local-first permet al col·laborador desar la sessió del grup concedit', async () => {
