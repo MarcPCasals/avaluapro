@@ -96,6 +96,24 @@ test('la preparació de materials queda separada dels recordatoris generals', ()
   assert.deepEqual(planningSummary.items.map((item) => item.title), ['Imprimir: fitxa'])
 })
 
+test('una absència sense activitats pot tenir el recordatori buit sense bloquejar l’aplicació', () => {
+  const summary = getPendingReminderSummary({
+    agendaNotes: [{
+      id: 'recovery-without-activities',
+      type: 'activityRecovery',
+      studentId: 'student-1',
+      reminder: null,
+      recovery: { activities: [], kind: 'absence', status: 'none' },
+    }],
+    students: [{ id: 'student-1', name: 'Valeria' }],
+    taskRecords: [{ id: 'record-without-reminder', reminder: null }],
+    tasks: [{ id: 'task-without-reminder', reminder: null }],
+  })
+
+  assert.equal(summary.count, 0)
+  assert.deepEqual(summary.items, [])
+})
+
 test('el calendari rep només els recordatoris generals i de l’agenda', () => {
   const calendarItems = getPersonalCalendarReminders([
     { id: 'general-1', kind: 'general' },

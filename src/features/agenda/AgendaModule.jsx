@@ -439,10 +439,10 @@ export default function AgendaModule() {
       ...reminderSummary.items,
       ...tutoringCalendarReminders,
     ]
-      .filter((item) => item.reminder.date <= horizon)
+      .filter((item) => item?.reminder?.date && item.reminder.date <= horizon)
       .sort((left, right) =>
-        `${left.reminder.date}T${left.reminder.time || '00:00'}`.localeCompare(
-          `${right.reminder.date}T${right.reminder.time || '00:00'}`,
+        `${left.reminder?.date || ''}T${left.reminder?.time || '00:00'}`.localeCompare(
+          `${right.reminder?.date || ''}T${right.reminder?.time || '00:00'}`,
         ),
       )
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])

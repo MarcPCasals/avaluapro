@@ -1,5 +1,7 @@
 export function reminderDateTime(reminder = {}) {
-  if (!reminder.date) return null
+  // Les recuperacions sense activitats conserven `reminder: null`. És un
+  // registre vàlid: no ha de generar cap avís ni impedir que l'app s'obri.
+  if (!reminder?.date) return null
   return new Date(`${reminder.date}T${reminder.time || '00:00'}`)
 }
 
@@ -9,7 +11,7 @@ export function getLocalToday() {
 }
 
 function isPendingReminder(reminder = {}) {
-  return Boolean(reminder.date && !reminder.dismissedAt)
+  return Boolean(reminder?.date && !reminder.dismissedAt)
 }
 
 function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }) {

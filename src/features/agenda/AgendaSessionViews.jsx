@@ -180,7 +180,7 @@ export function AgendaTodayView({
             <ul className="agenda-reminder-list">
               {reminders.map((item) => (
                 <li className={item.kind === 'tutoring' ? 'shared-tutoring' : ''} key={item.id}>
-                  <span>{item.reminder.date.slice(8, 10)}</span>
+                  <span>{item.reminder?.date?.slice(8, 10) || '—'}</span>
                   {item.kind === 'tutoring' ? (
                     <button onClick={() => onOpenCoordination(item)} type="button">
                       <strong>{item.title}</strong>
@@ -219,8 +219,8 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
       </header>
       <div className="agenda-week-columns">{days.map((dateKey) => {
         const dayBundles = bundles.filter((bundle) => sessionDate(bundle) === dateKey)
-        const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
-        const dayPersonalReminders = personalReminders.filter((item) => item.reminder.date === dateKey)
+        const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder?.date === dateKey)
+        const dayPersonalReminders = personalReminders.filter((item) => item.reminder?.date === dateKey)
         const dayTimetable = timetableOccurrences.filter((item) => item.date === dateKey)
         const dayEvents = getCalendarEventsForDate(calendarEvents, dateKey)
         const dayItems = [
@@ -314,8 +314,8 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
               const noClassEvent = getNoClassCalendarEvent(calendarEvents, dateKey, '')
               const classCount = weekOccurrences.filter((item) => item.date === dateKey).length
                 + weekBundles.filter((bundle) => sessionDate(bundle) === dateKey).length
-              const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder.date === dateKey)
-              const dayPersonalReminders = personalReminders.filter((item) => item.reminder.date === dateKey)
+              const dayCoordinationReminders = coordinationReminders.filter((item) => item.reminder?.date === dateKey)
+              const dayPersonalReminders = personalReminders.filter((item) => item.reminder?.date === dateKey)
               const reminderCount = dayCoordinationReminders.length + dayPersonalReminders.length
               const dateIsEditable = (!academicYear?.startsOn || dateKey >= academicYear.startsOn)
                 && (!academicYear?.endsOn || dateKey <= academicYear.endsOn)

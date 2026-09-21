@@ -128,7 +128,7 @@ function shouldShowAgendaWarning(student, redPointCount, blackPointCount) {
 }
 
 function formatReminderDateTime(reminder = {}) {
-  if (!reminder.date) return 'Sense data'
+  if (!reminder?.date) return 'Sense data'
   const date = new Date(`${reminder.date}T${reminder.time || '00:00'}`).toLocaleDateString('ca-ES')
   return reminder.time ? `${date} · ${reminder.time}` : date
 }
@@ -798,7 +798,7 @@ export function TrackingView() {
   const visibleTasks = showPastTasks ? tasks : tasks.filter((task) => task.date >= today)
   const now = new Date()
   const isReminderDue = (reminder = {}) => {
-    if (!reminder.date) return false
+    if (!reminder?.date) return false
     if (reminder.dismissedAt) return false
     if (reminder.snoozeUntil && new Date(reminder.snoozeUntil) > now) return false
     const dueAt = new Date(`${reminder.date}T${reminder.time || '00:00'}`)

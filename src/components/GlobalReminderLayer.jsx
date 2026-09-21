@@ -8,7 +8,7 @@ import {
 } from '../lib/tutoringCoordination'
 
 function reminderDateTime(reminder = {}) {
-  if (!reminder.date) return null
+  if (!reminder?.date) return null
   return new Date(`${reminder.date}T${reminder.time || '00:00'}`)
 }
 
@@ -112,8 +112,8 @@ export function GlobalReminderLayer() {
     const now = new Date(tick)
     const isDue = (reminder = {}) => {
       const dueAt = reminderDateTime(reminder)
-      if (!dueAt || reminder.dismissedAt) return false
-      if (reminder.snoozeUntil && new Date(reminder.snoozeUntil) > now) return false
+      if (!dueAt || reminder?.dismissedAt) return false
+      if (reminder?.snoozeUntil && new Date(reminder.snoozeUntil) > now) return false
       return dueAt <= now
     }
 
