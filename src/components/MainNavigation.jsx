@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   BarChart3,
   BookOpenText,
-  Brain,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
@@ -29,7 +28,6 @@ const coreModes = [
 
 const insights = [
   { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3 },
-  { id: 'aiBriefing', label: 'Briefing IA', icon: Brain },
 ]
 
 function getUrgentProfiles(state) {

@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Bell,
   BookOpen,
+  CalendarClock,
   CheckCircle2,
   Clock3,
   Clipboard,
@@ -24,6 +25,7 @@ import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { NewTaskModal } from './NewTaskModal'
+import { loadNextClassSessions } from './loadNextClassSessions'
 
 const statusButtons = [
   { id: 'DONE', label: 'Fet', icon: CheckCircle2 },
@@ -448,23 +450,35 @@ function RedPointsModal({ missingTasks, onClose, student }) {
   )
 }
 
-function EditableTaskDate({ task, onChangeDate }) {
+function EditableTaskDate({ nextSession, task, onChangeDate }) {
   const [isEditing, setIsEditing] = useState(false)
   const formattedDate = new Date(task.date).toLocaleDateString('ca-ES', { day: '2-digit', month: 'short' })
 
   if (isEditing) {
     return (
-      <input
-        autoFocus
-        className="task-date-input"
-        onBlur={() => setIsEditing(false)}
-        onChange={async (event) => {
-          await onChangeDate(task.id, event.target.value)
-          setIsEditing(false)
-        }}
-        type="date"
-        value={task.date}
-      />
+      <div className="task-date-editor">
+        <input
+          autoFocus
+          className="task-date-input"
+          onBlur={() => setIsEditing(false)}
+          onChange={async (event) => {
+            await onChangeDate(task.id, event.target.value)
+            setIsEditing(false)
+          }}
+          type="date"
+          value={task.date}
+        />
+        {nextSession && <button
+          aria-label="Posar la data de la propera sessió"
+          onClick={async () => {
+            await onChangeDate(task.id, nextSession.date)
+            setIsEditing(false)
+          }}
+          onMouseDown={(event) => event.preventDefault()}
+          title={`Proper sessió: ${nextSession.date} · ${nextSession.startsAt.slice(11, 16)}`}
+          type="button"
+        ><CalendarClock size={13} />Proper sessió</button>}
+      </div>
     )
   }
 
@@ -694,6 +708,7 @@ function ConfirmDeleteTaskModal({ task, onClose, onConfirm }) {
 export function TrackingView() {
   const { students, tasks, taskRecords, behaviorEvents, agendaNotes } = useTrackingModel()
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const user = useAvaluaproStore((state) => state.cloud.user)
   const updateTaskRecord = useAvaluaproStore((state) => state.updateTaskRecord)
   const addBehaviorEvent = useAvaluaproStore((state) => state.addBehaviorEvent)
   const addAgendaNote = useAvaluaproStore((state) => state.addAgendaNote)
@@ -720,7 +735,17 @@ export function TrackingView() {
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const [redDetailStudentId, setRedDetailStudentId] = useState(null)
   const [studentSearch, setStudentSearch] = useState('')
+  const [nextClassSession, setNextClassSession] = useState(null)
   const tableWrapRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.uid || !activeClassId) return undefined
+    loadNextClassSessions(user, [activeClassId])
+      .then((result) => { if (!cancelled) setNextClassSession(result[activeClassId] || null) })
+      .catch(() => { if (!cancelled) setNextClassSession(null) })
+    return () => { cancelled = true }
+  }, [activeClassId, user])
   const interventionInsights = useMemo(
     () => buildTrackingInterventions(students, taskRecords, tasks, behaviorEvents),
     [students, taskRecords, tasks, behaviorEvents],
@@ -1317,7 +1342,7 @@ export function TrackingView() {
                 <th className="task-header" key={task.id}>
                   <EditableTaskTitle task={task} onChangeTitle={(taskId, title) => updateTask(taskId, { title })} />
                   <TaskCompletionSummary students={filteredStudents} task={task} taskRecords={taskRecords} />
-                  <EditableTaskDate task={task} onChangeDate={(taskId, date) => updateTask(taskId, { date })} />
+                  <EditableTaskDate nextSession={nextClassSession} task={task} onChangeDate={(taskId, date) => updateTask(taskId, { date })} />
                   <button
                     className="task-header-action done-all"
                     data-tour={taskIndex === 0 ? 'task-done-all' : undefined}

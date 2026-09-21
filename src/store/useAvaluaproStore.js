@@ -239,7 +239,9 @@ function getInitialUi(dataset) {
     activeSemesterId: timelineSelection.activeSemesterId,
     activeUtId: timelineSelection.activeUtId,
     activeMode: preferences.activeMode || 'evaluation',
-    activeInsight: preferences.activeInsight || 'dashboard',
+    // Les preferències antigues poden conservar l'identificador del Briefing IA,
+    // retirat de l'aplicació. En aquest cas tornem directament al panell global.
+    activeInsight: preferences.activeInsight === 'aiBriefing' ? 'dashboard' : preferences.activeInsight || 'dashboard',
     activeTutoringPanel: preferences.activeTutoringPanel || 'evaluation',
   }
 }

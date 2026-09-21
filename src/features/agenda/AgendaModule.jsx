@@ -13,6 +13,7 @@ import {
 import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getAgendaDefaultWeekStart } from '../../lib/agendaCalendar'
+import { buildTimetableClassroomBundle, findNextTimetableOccurrence } from '../../lib/agendaToday'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
@@ -608,6 +609,46 @@ export default function AgendaModule() {
       workspace.setError(error.message || 'No s’ha pogut obrir Mode aula.')
     }
   }
+  const openTimetableClassroom = (occurrence) => {
+    const classItem = agendaClasses.find((item) => item.id === occurrence.slot.classId)
+    const bundle = buildTimetableClassroomBundle(occurrence, classItem, user.uid)
+    setActiveBundle(bundle)
+    setDialog(null)
+    setView('classroom')
+  }
+  const updateClassroomSession = async (bundle, changes) => {
+    if (!bundle.standalone) return workspace.saveSessionClassroomState(bundle, changes)
+    const session = { ...bundle.session, ...changes, updatedAt: new Date().toISOString() }
+    setActiveBundle((current) => current?.session.id === session.id ? { ...current, session } : current)
+    return session
+  }
+  const closeClassroom = async (bundle) => {
+    if (!bundle.standalone) return workspace.closeClassroomSession(bundle)
+    const now = new Date().toISOString()
+    return {
+      results: bundle.results,
+      session: {
+        ...bundle.session,
+        classroomClosedAt: now,
+        status: 'held',
+        updatedAt: now,
+      },
+    }
+  }
+  const findNextClassroomSession = async (bundle) => {
+    if (!bundle.standalone) return workspace.findNextClassroomSession(bundle)
+    const sessionDate = String(bundle.session.startsAt).slice(0, 10)
+    const startMinutes = Number(String(bundle.session.startsAt).slice(11, 13)) * 60
+      + Number(String(bundle.session.startsAt).slice(14, 16))
+      + Number(bundle.session.durationMinutes || 0)
+    const afterTime = `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
+    const occurrence = findNextTimetableOccurrence(
+      workspace.slots.filter((slot) => slot.classId === bundle.session.classId),
+      sessionDate,
+      afterTime,
+    )
+    return occurrence ? buildTimetableClassroomBundle(occurrence, classes.find((item) => item.id === bundle.session.classId), user.uid).session : null
+  }
   const exitClassroom = () => {
     setDialog(null)
     setActiveBundle(null)
@@ -697,7 +738,7 @@ export default function AgendaModule() {
         bundle={activeBundle}
         classes={agendaClasses}
         key={`${activeBundle.session.id}:${classroomRevision}`}
-        onCloseSession={workspace.closeClassroomSession}
+        onCloseSession={closeClassroom}
         onCancelRecovery={(bundle, studentId, kind) => cancelClassroomRecovery({
           kind,
           sessionId: bundle.session.id,
@@ -707,12 +748,12 @@ export default function AgendaModule() {
         onActivateEvidence={activateClassroomEvidence}
         onAddBehavior={addBehaviorEvent}
         onExit={exitClassroom}
-        onFindNextSession={workspace.findNextClassroomSession}
+        onFindNextSession={findNextClassroomSession}
         onSaveRecovery={registerClassroomRecovery}
         onSaveResult={workspace.saveActivityResult}
-        onSavePrivateNote={workspace.saveClassroomPrivateNote}
+        onSavePrivateNote={activeBundle.standalone ? async () => null : workspace.saveClassroomPrivateNote}
         onToggleAbsence={toggleStudentAbsence}
-        onUpdateSession={workspace.saveSessionClassroomState}
+        onUpdateSession={updateClassroomSession}
         students={students}
         taskRecords={taskRecords}
         tasks={tasks}
@@ -755,8 +796,8 @@ export default function AgendaModule() {
         <section className="agenda-large-empty"><span><CalendarDays size={29} /></span><h2>Primer crea el curs a Programació</h2><p>L’Agenda utilitza les mateixes dates del curs acadèmic per evitar informació duplicada.</p></section>
       ) : (
         <main className="agenda-main">
-          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={openCalendar} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
-          {view === 'week' && calendarMode === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenReminders={() => setDialog('reminders')} onOpenSession={openSession} onOpenTimetable={() => setView('timetable')} onReload={reloadCurrentWeek} onShowMonth={openMonth} personalReminders={personalCalendarReminders} slots={workspace.slots} timetable={workspace.activeTimetable} weekStart={weekStart} />}
+          {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={openCalendar} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} onOpenTimetableClassroom={openTimetableClassroom} reminders={upcomingReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
+          {view === 'week' && calendarMode === 'week' && <AgendaWeekView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenReminders={() => setDialog('reminders')} onOpenSession={openSession} onOpenTimetableClassroom={openTimetableClassroom} onReload={reloadCurrentWeek} onShowMonth={openMonth} personalReminders={personalCalendarReminders} slots={workspace.slots} timetable={workspace.activeTimetable} weekStart={weekStart} />}
           {view === 'week' && calendarMode === 'month' && <AgendaMonthView academicYear={workspace.activeAcademicYear} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} coordinationReminders={tutoringCalendarReminders} monthKey={monthKey} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onDeleteEvent={removeEvent} onEditEvent={openCalendarEvent} onMoveMonth={moveMonth} onOpenCoordination={openCoordinationReminder} onOpenReminders={() => setDialog('reminders')} onSelectWeek={selectCalendarWeek} onShowWeek={() => selectCalendarWeek(startOfWeek(monthKey))} personalReminders={personalCalendarReminders} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'timeline' && <AgendaTimelineView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onOpenSession={openSession} onSchedule={hasOwnCalendar ? () => setDialog('scheduling') : null} selectedClassId={activeClassId} />}
           {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}

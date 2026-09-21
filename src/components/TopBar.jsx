@@ -204,7 +204,6 @@ export function TopBar() {
   const activeBadgeTypes = [
     pendingTeacherPackages > 0 ? 'notes' : '',
     pendingTutoringShares > 0 ? 'tutoria' : '',
-    pendingReminderCount > 0 ? 'recordatoris' : '',
   ].filter(Boolean)
   const dataMenuBadgeColor = activeBadgeTypes.length > 1
       ? 'red'
@@ -212,10 +211,8 @@ export function TopBar() {
         ? 'orange'
         : activeBadgeTypes[0] === 'tutoria'
           ? 'blue'
-          : activeBadgeTypes[0] === 'recordatoris'
-            ? 'yellow'
-            : 'gray'
-  const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares + pendingReminderCount
+          : 'gray'
+  const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares
   const ownEmail = String(cloud.user?.email || '').trim().toLowerCase()
   const announcementsReadAt = timestampToMillis(internalMessageState.announcementsReadAt)
   const unreadInternalMessageCount = cloud.user ? internalMessages.filter(
@@ -411,6 +408,21 @@ export function TopBar() {
             </span>
           )}
         </button>
+        <button
+          aria-label={pendingReminderCount > 0
+            ? `Recordatoris: ${pendingReminderCount} pendent${pendingReminderCount === 1 ? '' : 's'}`
+            : 'Recordatoris'}
+          className={`icon-button top-reminders-button ${pendingReminderCount > 0 ? 'has-reminders' : ''}`}
+          data-tour="reminders-button"
+          onClick={() => setShowReminders(true)}
+          title={pendingReminderCount > 0
+            ? `${pendingReminderCount} recordatori${pendingReminderCount === 1 ? '' : 's'} pendent${pendingReminderCount === 1 ? '' : 's'}`
+            : 'Recordatoris'}
+          type="button"
+        >
+          <Bell size={23} />
+          {pendingReminderCount > 0 && <span>{pendingReminderCount > 99 ? '99+' : pendingReminderCount}</span>}
+        </button>
         <span className="top-divider" />
         {cloud.user && (
           <div className={`top-sync-status ${syncIndicator.className}`} data-tour="sync-status">
@@ -491,19 +503,6 @@ export function TopBar() {
                 <BarChart3 size={18} />
                 Perfil docent
               </button>
-              <button
-                onClick={() => {
-                  setShowReminders(true)
-                  setShowDataMenu(false)
-                }}
-                type="button"
-              >
-                <Bell size={18} />
-                <span className="top-menu-button-label">Recordatoris</span>
-                <em className={`top-menu-badge ${pendingReminderCount > 0 ? 'active yellow' : ''}`}>
-                  {pendingReminderCount}
-                </em>
-              </button>
               <span className="top-menu-separator" />
               <button
                 data-tour="data-safety-button"
@@ -571,6 +570,19 @@ export function TopBar() {
                   {pendingTutoringShares}
                 </em>
               </button>
+              <span className="top-menu-separator" />
+              <button
+                className="top-menu-reset"
+                data-tour="reset-button"
+                onClick={() => {
+                  setShowDataMenu(false)
+                  handleResetToSeed()
+                }}
+                type="button"
+              >
+                <Trash2 size={18} />
+                Reiniciar el curs
+              </button>
             </div>
           )}
         </div>
@@ -587,10 +599,6 @@ export function TopBar() {
         </button>
         <button className="icon-button disabled" data-tour="redo-button" title="Refer, propera iteració" type="button">
           <RotateCw size={22} />
-        </button>
-        <span className="top-divider" />
-        <button className="icon-button red-action" data-tour="reset-button" onClick={handleResetToSeed} title="Reiniciar dades demo" type="button">
-          <Trash2 size={22} />
         </button>
       </div>
       {showSettings && (

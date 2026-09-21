@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../src/lib/agendaToday.js'
+import { buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -51,4 +51,19 @@ test('la setmana no mostra franges fora de la vigencia de l horari', () => {
   })
 
   assert.equal(occurrences.length, 0)
+})
+
+test('una classe de l horari pot obrir Mode aula sense cap UP', () => {
+  const occurrence = {
+    date: '2026-09-23',
+    startsAt: '2026-09-23T11:00:00',
+    slot: slots[2],
+  }
+  const bundle = buildTimetableClassroomBundle(occurrence, { id: '1d', name: '1r D' }, 'teacher-1')
+
+  assert.equal(bundle.standalone, true)
+  assert.equal(bundle.session.classId, '1d')
+  assert.equal(bundle.session.startsAt, occurrence.startsAt)
+  assert.equal(bundle.items.length, 0)
+  assert.equal(bundle.planningUnit.code, 'Horari')
 })

@@ -266,9 +266,9 @@ const ownDataTourSteps = [
     placement: 'left',
   },
   {
-    target: 'reset-button',
+    target: 'data-menu',
     title: '11. Reiniciar el curs',
-    text: 'La brossa serveix per tornar a començar. És una acció delicada: abans de fer-la, convé tenir una còpia de seguretat.',
+    text: 'Dins de Dades i Compte pots reiniciar el curs. És una acció delicada: abans de fer-la, convé tenir una còpia de seguretat.',
     mode: 'evaluation',
     placement: 'left',
   },

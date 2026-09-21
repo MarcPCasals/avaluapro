@@ -115,6 +115,7 @@ export function AgendaTodayView({
   onAdjust,
   onOpenCalendar,
   onOpenClassroom,
+  onOpenTimetableClassroom,
   onOpenCoordination,
   onOpenScheduling,
   onOpenTimetable,
@@ -160,7 +161,10 @@ export function AgendaTodayView({
               <span className="agenda-session-status timetable">Horari</span>
             </header>
             <div className="agenda-timetable-placeholder"><CalendarRange size={19} /><div><strong>Encara no té activitats calendaritzades</strong><p>Pots preparar la UP o consultar l’horari, però la pròxima classe sempre queda visible.</p></div></div>
-            <div className="agenda-session-actions">{onOpenTimetable && <button className="secondary-action compact" onClick={onOpenTimetable} type="button"><CalendarRange size={15} />Veure l’horari</button>}</div>
+            <div className="agenda-session-actions">
+              {onOpenTimetableClassroom && <button className="primary-action compact" onClick={() => onOpenTimetableClassroom(nextTimetableOccurrence)} type="button"><Clock3 size={15} />Obrir Mode aula</button>}
+              {onOpenTimetable && <button className="secondary-action compact" onClick={onOpenTimetable} type="button"><CalendarRange size={15} />Veure l’horari</button>}
+            </div>
           </div>
         ) : selectedBundle ? <SessionDetail bundle={selectedBundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} /> : <div className="agenda-today-empty"><Clock3 size={30} /><strong>No hi ha cap pròxima sessió calendaritzada</strong><p>Pots preparar una nova seqüència o revisar l’horari i les excepcions abans de continuar.</p>{(onOpenScheduling || onOpenTimetable) && <div className="agenda-today-actions">{onOpenScheduling && <button className="primary-action" onClick={onOpenScheduling} type="button"><Plus size={17} />Calendaritzar una UP</button>}{onOpenTimetable && <button className="secondary-action" onClick={onOpenTimetable} type="button"><CalendarRange size={17} />Veure l’horari</button>}</div>}</div>}
       </section>
@@ -200,7 +204,7 @@ export function AgendaTodayView({
   )
 }
 
-export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenReminders, onOpenSession, onOpenTimetable, onReload, onShowMonth, personalReminders, slots, timetable, weekStart }) {
+export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenReminders, onOpenSession, onOpenTimetableClassroom, onReload, onShowMonth, personalReminders, slots, timetable, weekStart }) {
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
   const timetableOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
   return (
@@ -257,7 +261,7 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
                 slot.space,
               ].filter(Boolean).join(' · ')
               const blockingEvent = getNoClassCalendarEvent(calendarEvents, dateKey, slot.classId)
-              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'} ${blockingEvent ? 'calendar-blocked' : ''}`} key={item.occurrence.id} onClick={onOpenTimetable} type="button"><span>{blockingEvent ? <Moon size={12} /> : <CalendarRange size={12} />}{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{blockingEvent ? `${blockingEvent.title} · la classe no es fa` : slotDetails}</small><em>{blockingEvent ? 'No lectiu' : 'Horari · sense programació'}</em></button>
+              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'} ${blockingEvent ? 'calendar-blocked' : ''}`} disabled={Boolean(blockingEvent)} key={item.occurrence.id} onClick={() => onOpenTimetableClassroom(item.occurrence)} type="button"><span>{blockingEvent ? <Moon size={12} /> : <CalendarRange size={12} />}{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{blockingEvent ? `${blockingEvent.title} · la classe no es fa` : slotDetails}</small><em>{blockingEvent ? 'No lectiu' : 'Obrir Mode aula'}</em></button>
             })}
             </div>
           </section>

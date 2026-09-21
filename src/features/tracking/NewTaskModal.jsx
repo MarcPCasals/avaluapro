@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
-import { ClipboardCheck } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarClock, ClipboardCheck, Loader2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { loadNextClassSessions } from './loadNextClassSessions'
 
 export function NewTaskModal({ onClose }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [extraClassDates, setExtraClassDates] = useState({})
+  const [nextSessions, setNextSessions] = useState({})
+  const [loadingNextSessions, setLoadingNextSessions] = useState(false)
   const state = useAvaluaproStore()
   const addTasksToClasses = useAvaluaproStore((store) => store.addTasksToClasses)
   const currentClass = state.classes.find((item) => item.id === state.ui.activeClassId)
@@ -29,6 +32,22 @@ export function NewTaskModal({ onClose }) {
       ),
     [state.tasks, state.ui.activeClassId, state.ui.activeUtId],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    if (!state.cloud.user?.uid) return undefined
+    queueMicrotask(() => { if (!cancelled) setLoadingNextSessions(true) })
+    loadNextClassSessions(state.cloud.user, state.classes.map((item) => item.id))
+      .then((result) => { if (!cancelled) setNextSessions(result) })
+      .catch(() => { if (!cancelled) setNextSessions({}) })
+      .finally(() => { if (!cancelled) setLoadingNextSessions(false) })
+    return () => { cancelled = true }
+  }, [state.cloud.user, state.classes])
+
+  const formatNextSession = (candidate) => candidate
+    ? new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'short', weekday: 'short' })
+        .format(new Date(`${candidate.date}T12:00:00`)) + ` · ${candidate.startsAt.slice(11, 16)}`
+    : ''
 
   const handleSave = async () => {
     const entries = [
@@ -80,6 +99,18 @@ export function NewTaskModal({ onClose }) {
           Data
           <input onChange={(event) => setDate(event.target.value)} type="date" value={date} />
         </label>
+        <div className="task-next-session-choice">
+          <button
+            className="secondary-action compact"
+            disabled={loadingNextSessions || !nextSessions[state.ui.activeClassId]}
+            onClick={() => setDate(nextSessions[state.ui.activeClassId].date)}
+            type="button"
+          >
+            {loadingNextSessions ? <Loader2 className="spin" size={15} /> : <CalendarClock size={15} />}
+            Per la propera sessió
+          </button>
+          <span>{loadingNextSessions ? 'Consultant l’horari…' : nextSessions[state.ui.activeClassId] ? formatNextSession(nextSessions[state.ui.activeClassId]) : 'No s’ha trobat cap sessió posterior a l’horari.'}</span>
+        </div>
         {targetClassOptions.length > 0 && (
           <div className="task-target-list">
             <strong>Afegir també a altres classes</strong>
@@ -118,6 +149,20 @@ export function NewTaskModal({ onClose }) {
                   type="date"
                   value={extraClassDates[classItem.id]?.date || date}
                 />
+                {Object.prototype.hasOwnProperty.call(extraClassDates, classItem.id) && nextSessions[classItem.id] && (
+                  <button
+                    className="task-target-next-session"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      setExtraClassDates((current) => ({
+                        ...current,
+                        [classItem.id]: { ...current[classItem.id], date: nextSessions[classItem.id].date },
+                      }))
+                    }}
+                    title={`Proper sessió: ${formatNextSession(nextSessions[classItem.id])}`}
+                    type="button"
+                  ><CalendarClock size={14} />Proper sessió</button>
+                )}
               </label>
             ))}
           </div>

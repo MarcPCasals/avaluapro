@@ -42,6 +42,46 @@ export function findNextTimetableOccurrence(slots = [], today, nowTime = '00:00'
 }
 
 /**
+ * Crea el context mínim de Mode aula per a una classe que existeix a l'horari
+ * però encara no està vinculada a cap UP. L'assistència, el comportament i les
+ * tasques continuen utilitzant els registres generals d'AvaluaPro.
+ */
+export function buildTimetableClassroomBundle(occurrence, classItem = {}, ownerUid = '') {
+  const slot = occurrence.slot
+  const stableId = `timetable_${occurrence.date}_${slot.id}`
+  return {
+    standalone: true,
+    application: {
+      id: `timetable_${slot.classId}`,
+      classId: slot.classId,
+      classLabel: classItem.name || slot.subject || 'Classe',
+    },
+    items: [],
+    planningUnit: {
+      id: '',
+      code: 'Horari',
+      ownerUid,
+      title: slot.subject || classItem.name || 'Classe',
+    },
+    privateNotes: [],
+    results: [],
+    session: {
+      attendanceConfirmedAt: '',
+      classroomOpenedAt: new Date().toISOString(),
+      classId: slot.classId,
+      durationMinutes: Number(slot.durationMinutes || 60),
+      id: stableId,
+      ownerUid,
+      startsAt: occurrence.startsAt,
+      status: 'planned',
+      subgroupId: slot.subgroupId || null,
+      timetableSlotId: slot.id,
+      timetableVersionId: slot.timetableVersionId || null,
+    },
+  }
+}
+
+/**
  * Converteix les franges recurrents de l'horari en entrades visibles de la
  * setmana. Les franges que ja tenen una sessió de Programació es descarten
  * perquè la sessió completa ocuparà el seu lloc i no s'ha de duplicar.

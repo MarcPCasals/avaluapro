@@ -36,3 +36,19 @@ export function buildClassroomTaskActivation({ tasks = [], taskRecords = [] }, i
     }))
   return { isNewTask: !existingTask, records, task }
 }
+
+/**
+ * Reuneix les tasques que cal poder revisar durant una classe. Una tasca entra
+ * al panell si neix d'una evidència de la sessió o si la seva data d'entrega
+ * coincideix amb el dia de la classe. La clau per id evita duplicats quan es
+ * compleixen les dues condicions alhora.
+ */
+export function getClassroomSessionTasks({ classId, date, evidenceKeys = [], tasks = [] }) {
+  const evidenceKeySet = new Set(evidenceKeys)
+  const matching = tasks.filter((task) => task.classId === classId && (
+    (task.evidenceKey && evidenceKeySet.has(task.evidenceKey))
+    || (task.date && task.date === date)
+  ))
+  return [...new Map(matching.map((task) => [task.id, task])).values()]
+    .sort((left, right) => (left.order || 0) - (right.order || 0) || left.title.localeCompare(right.title, 'ca'))
+}

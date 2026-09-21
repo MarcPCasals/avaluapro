@@ -18,7 +18,6 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
-import { AiTeacherBriefingView } from '../ai/AiTeacherBriefingView'
 import {
   buildStudentProfiles,
   buildTrackingInterventions,
@@ -2791,10 +2790,6 @@ export function AnalyticsView() {
       if (window.__avaluaproSetDashboardScope) delete window.__avaluaproSetDashboardScope
     }
   }, [])
-
-  if (state.ui.activeInsight === 'aiBriefing') {
-    return <AiTeacherBriefingView />
-  }
 
   const { activeClassId, activeUtId } = state.ui
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
