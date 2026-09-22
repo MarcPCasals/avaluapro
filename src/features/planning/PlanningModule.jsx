@@ -238,27 +238,38 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
         </div>
       </header>
       {unit.copiedFrom && <div className="planning-version-origin"><Copy size={15} /><span>Versió creada a partir d’una UP de {sourceYearLabel || 'un curs anterior'}. L’original es conserva intacte.</span></div>}
-      <div className="planning-editor-section">
-        <div className="planning-section-title">
-          <span>01</span>
-          <div><h3>Identificació</h3><p>La informació que situa la UP dins del curs.</p></div>
+      <details className="planning-basics-disclosure">
+        <summary>
+          <div className="planning-section-title">
+            <span>01–02</span>
+            <div><h3>Informació inicial de la UP</h3><p>Identificació, repte, producte i llengua de vehiculació.</p></div>
+          </div>
+          <ChevronDown size={18} />
+        </summary>
+        <div className="planning-basics-content">
+          <section className="planning-editor-section">
+            <div className="planning-section-title">
+              <span>01</span>
+              <div><h3>Identificació</h3><p>La informació que situa la UP dins del curs.</p></div>
+            </div>
+            <div className="planning-form-grid three">
+              <label>Codi<input required value={values.code || ''} onChange={(event) => update('code', event.target.value)} /></label>
+              <label>Nivell<input required value={values.level || ''} onChange={(event) => update('level', event.target.value)} /></label>
+              <label>Unitat temporal<input readOnly value={temporalUnit?.label || 'Sense UT'} /></label>
+            </div>
+            <label>Títol de la UP<input required value={values.title || ''} onChange={(event) => update('title', event.target.value)} /></label>
+          </section>
+          <section className="planning-editor-section">
+            <div className="planning-section-title">
+              <span>02</span>
+              <div><h3>Punt de partida</h3><p>Defineix el repte i el producte que donarà sentit a la seqüència.</p></div>
+            </div>
+            <label>Situació o pregunta complexa<textarea rows="4" value={values.complexSituation || ''} onChange={(event) => update('complexSituation', event.target.value)} /></label>
+            <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
+            <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
+          </section>
         </div>
-        <div className="planning-form-grid three">
-          <label>Codi<input required value={values.code || ''} onChange={(event) => update('code', event.target.value)} /></label>
-          <label>Nivell<input required value={values.level || ''} onChange={(event) => update('level', event.target.value)} /></label>
-          <label>Unitat temporal<input readOnly value={temporalUnit?.label || 'Sense UT'} /></label>
-        </div>
-        <label>Títol de la UP<input required value={values.title || ''} onChange={(event) => update('title', event.target.value)} /></label>
-      </div>
-      <div className="planning-editor-section">
-        <div className="planning-section-title">
-          <span>02</span>
-          <div><h3>Punt de partida</h3><p>Defineix el repte i el producte que donarà sentit a la seqüència.</p></div>
-        </div>
-        <label>Situació o pregunta complexa<textarea rows="4" value={values.complexSituation || ''} onChange={(event) => update('complexSituation', event.target.value)} /></label>
-        <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
-        <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
-      </div>
+      </details>
       <PlanningActivitySequence
         activities={activities}
         onAdd={onAddActivity}
@@ -432,11 +443,6 @@ export default function PlanningModule() {
           <button className="secondary-action compact" onClick={() => setDialog('year')} type="button"><Plus size={16} />Nou curs</button>
           {workspace.activeAcademicYear && <button className="secondary-action compact" onClick={() => setShowUtManager((value) => !value)} type="button"><CalendarRange size={16} />Dates de les UT</button>}
           {workspace.activePlanningUnit && (
-            <button className="secondary-action compact" onClick={openAgendaReflow} type="button">
-              <CalendarClock size={16} />Actualitzar Agenda
-            </button>
-          )}
-          {workspace.activePlanningUnit && (
             <button className="secondary-action compact planning-reminders-trigger" onClick={() => setDialog('reminders')} type="button">
               <Bell size={16} />Recordatoris
               {planningReminderSummary.count > 0 && <span>{planningReminderSummary.count}</span>}
@@ -550,6 +556,12 @@ export default function PlanningModule() {
             {showSummary ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
+      )}
+
+      {workspace.activePlanningUnit && (
+        <button className="planning-agenda-floating" onClick={openAgendaReflow} title="Actualitzar les sessions futures de l’Agenda" type="button">
+          <CalendarClock size={18} /><span>Actualitzar Agenda</span>
+        </button>
       )}
 
       {dialog === 'year' && <AcademicYearDialog onClose={() => setDialog(null)} onSave={workspace.createYear} />}

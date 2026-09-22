@@ -1,9 +1,9 @@
 import {
   ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
-  ExternalLink, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, Trash2,
+  ExternalLink, History, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { getClassroomPromptState } from '../../domain/planning'
+import { getClassroomPromptState, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   getCalendarEventsForDate,
@@ -62,6 +62,12 @@ function sessionDate(bundle) {
 
 function sessionTime(bundle) {
   return String(bundle.session.startsAt).slice(11, 16)
+}
+
+function sessionHasPassed(bundle, now, today) {
+  const startsAt = new Date(bundle.session.startsAt).getTime()
+  const endsAt = startsAt + (Number(bundle.session.durationMinutes) || 0) * 60_000
+  return Number.isFinite(endsAt) ? endsAt < now : sessionDate(bundle) < today
 }
 
 function classNameFor(classes, classId) {
@@ -342,19 +348,35 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
   )
 }
 
-export function AgendaTimelineView({ bundles, calendarEvents = [], classes, loading, onOpenSession, onSchedule, selectedClassId }) {
+function TimelineRows({ calendarEvents, groups, onOpenSession }) {
+  return <div className="agenda-timeline-list">{groups.flatMap((group) => group.bundles.map((bundle) => {
+    const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId)
+    return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}{group.isParallel ? ' · mateixa sessió de mig grup' : ''}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
+  }))}</div>
+}
+
+export function AgendaTimelineView({ bundles, calendarEvents = [], classes, loading, onOpenSession, onSchedule, selectedClassId, today = new Date().toISOString().slice(0, 10) }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = globalThis.setInterval(() => setNow(Date.now()), 60_000)
+    return () => globalThis.clearInterval(timer)
+  }, [])
   const classBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
+  const logicalGroups = groupParallelSessionBundles(classBundles)
+    .map((group, index) => ({ ...group, sequence: index + 1 }))
+  const archivedGroups = logicalGroups.filter((group) => group.bundles.every((bundle) => sessionHasPassed(bundle, now, today)))
+  const upcomingGroups = logicalGroups.filter((group) => !group.bundles.every((bundle) => sessionHasPassed(bundle, now, today)))
   const selectedClass = classes.find((item) => item.id === selectedClassId)
   return (
     <section className="agenda-timeline-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{loading && <Loader2 className="spin" size={16} />}</div><p>Totes les sessions del curs, de la primera a l’última.</p></div>
+        <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{loading && <Loader2 className="spin" size={16} />}</div><p>Primer veus les sessions pendents; les anteriors queden plegades a l’històric.</p></div>
         {onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}
       </header>
-      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-list">{classBundles.map((bundle, index) => {
-        const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId)
-        return <button className={blockingEvent ? 'calendar-blocked' : ''} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{index + 1}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : bundle.items.map((item) => item.title).join(' · ') || 'Sessió sense activitats'}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
-      })}</div>}
+      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-sections">
+        {upcomingGroups.length > 0 ? <TimelineRows calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}
+        {archivedGroups.length > 0 && <details className="agenda-timeline-archive"><summary><span><History size={16} />Sessions anteriors</span><small>{archivedGroups.length} {archivedGroups.length === 1 ? 'sessió arxivada' : 'sessions arxivades'}</small><ChevronDown size={16} /></summary><TimelineRows calendarEvents={calendarEvents} groups={archivedGroups} onOpenSession={onOpenSession} /></details>}
+      </div>}
     </section>
   )
 }

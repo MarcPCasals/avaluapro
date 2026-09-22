@@ -24,6 +24,24 @@ function firstFuturePlannedDate(setup, today, fallback) {
     ?.startsAt.slice(0, 10) || fallback
 }
 
+function groupPreviewSessions(sessions = []) {
+  const groups = []
+  const byLogicalSession = new Map()
+  for (const bundle of sessions) {
+    const key = bundle.logicalSessionIndex == null
+      ? `physical:${bundle.session.id}`
+      : `logical:${bundle.logicalSessionIndex}`
+    let group = byLogicalSession.get(key)
+    if (!group) {
+      group = []
+      byLogicalSession.set(key, group)
+      groups.push(group)
+    }
+    group.push(bundle)
+  }
+  return groups
+}
+
 export function AgendaSchedulingDialog({
   academicYear,
   classes,
@@ -54,6 +72,10 @@ export function AgendaSchedulingDialog({
     !setup.scheduledSourceActivityIds.includes(activity.id)) || []
   const selectedClass = classes.find((item) => item.id === values.classId)
   const selectedUnit = availableUnits.find((item) => item.id === values.planningUnitId)
+  const minimumStartDate = academicYear?.startsOn && academicYear.startsOn > today
+    ? academicYear.startsOn
+    : today
+  const previewSessionGroups = groupPreviewSessions(preview?.sessions)
 
   const resetProposal = (changes) => {
     setValues((current) => ({ ...current, ...changes }))
@@ -150,7 +172,7 @@ export function AgendaSchedulingDialog({
             <label>Programació<select disabled={Boolean(setup)} value={values.planningUnitId} onChange={(event) => resetProposal({ planningUnitId: event.target.value })}>{availableUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.title}</option>)}</select></label>
             <label>Grup<select disabled={Boolean(setup)} value={values.classId} onChange={(event) => resetProposal({ classId: event.target.value })}><option value="">Selecciona un grup</option>{classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}</select></label>
           </div>
-          <label>Començar a partir de<input min={academicYear?.startsOn} max={academicYear?.endsOn} type="date" value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }} /></label>
+          <label>Començar a partir de<input min={minimumStartDate} max={academicYear?.endsOn} type="date" value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }} /></label>
           <fieldset className="agenda-schedule-modes">
             <legend>Com vols avançar?</legend>
             <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Tria ara només les pròximes activitats.</small></span></label>
@@ -181,11 +203,15 @@ export function AgendaSchedulingDialog({
             <div className="agenda-preview-placeholder"><CalendarCheck2 size={32} /><strong>La previsualització apareixerà aquí</strong><p>Veuràs cada data, els fragments d’activitat i els dies que s’han saltat abans de desar res.</p>{setup && (values.mode === 'smart' || remainingActivities.length > 0) && <button className="secondary-action" disabled={selectedActivityIds.length === 0} onClick={buildPreview} type="button"><Sparkles size={16} />{values.mode === 'smart' ? 'Calcular l’efecte dominó' : 'Previsualitzar proposta'}</button>}</div>
           ) : (
             <div className="agenda-preview-result">
-              <header><div><span>Proposta</span><h3>{preview.sessions.length} {preview.sessions.length === 1 ? 'sessió afectada' : 'sessions afectades'}</h3></div><button onClick={() => setPreview(null)} type="button">Modificar</button></header>
-              <div className="agenda-preview-summary"><span><CalendarCheck2 size={15} />{preview.scheduledActivityIds.length} activitats</span><span><Clock3 size={15} />{preview.scheduledMinutes} min</span><span><Layers3 size={15} />{preview.skippedDates.length} dates saltades</span></div>
+              <header><div><span>Proposta</span><h3>{preview.logicalSessionCount ?? preview.sessions.length} {(preview.logicalSessionCount ?? preview.sessions.length) === 1 ? 'sessió de la UP' : 'sessions de la UP'}</h3></div><button onClick={() => setPreview(null)} type="button">Modificar</button></header>
+              <div className="agenda-preview-summary"><span><CalendarCheck2 size={15} />{preview.scheduledActivityIds.length} activitats</span><span><Clock3 size={15} />{preview.scheduledMinutes} min</span><span><Layers3 size={15} />{preview.skippedDates.length} dates saltades</span>{preview.physicalSessionCount > preview.logicalSessionCount && <span><Layers3 size={15} />{preview.physicalSessionCount} franges reals amb mitjos grups</span>}</div>
               {preview.kind === 'reflow' && <div className="agenda-reflow-summary"><Sparkles size={18} /><div><strong>Reorganització en cadena</strong><p>{preview.replacedItemCount} fragments previstos es substituiran · {preview.lockedSessionCount} sessions impartides o amb dades quedaran intactes.</p></div></div>}
               {preview.skippedDates.length > 0 && <div className="agenda-skipped-dates"><strong>Calendari respectat</strong><p>{preview.skippedDates.map((item) => `${formatDate(item.date)} · ${item.titles.join(', ')}`).join(' · ')}</p></div>}
-              <div className="agenda-proposed-sessions">{preview.sessions.map((bundle) => <article key={bundle.session.id}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? (preview.kind === 'reflow' ? ' · reorganitzada' : ' · ja creada') : ''}</small></div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small></li>)}</ol></article>)}</div>
+              <div className="agenda-proposed-sessions">{previewSessionGroups.map((group) => {
+                const bundle = group[0]
+                const isParallel = group.length > 1
+                return <article className={isParallel ? 'parallel' : ''} key={group.map((item) => item.session.id).join(':')}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{isParallel ? 'Mitjos grups' : bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{!isParallel && bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{!isParallel && bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? (preview.kind === 'reflow' ? ' · reorganitzada' : ' · ja creada') : ''}</small>{isParallel && <div className="agenda-parallel-slots">{group.map((item) => <span key={item.session.id}>{item.candidate.startsAt.slice(11, 16)} · {item.candidate.subgroupId}{item.candidate.space ? ` · ${item.candidate.space}` : ''}</span>)}</div>}</div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}{isParallel ? ' · es duplica als dos mitjos grups' : ''}</small></li>)}</ol></article>
+              })}</div>
               {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning"><AlertTriangle size={18} /><div><strong>Falten sessions a l’horari</strong><p>{preview.unscheduled.map((item) => `${item.title}${item.remainingMinutes ? ` (${item.remainingMinutes} min pendents)` : ''}`).join(' · ')}</p></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
             </div>
           )}

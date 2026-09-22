@@ -33,6 +33,7 @@ import {
   getActivityActualComparisons,
   getClassroomPromptState,
   getClassroomEvidenceItems,
+  groupParallelSessionBundles,
   getClassroomStudents,
   getClassroomTrackingUtId,
   getClassroomTimerState,
@@ -757,11 +758,20 @@ test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar 
   })
 
   assert.equal(result.sessions.length, 3)
+  assert.equal(result.logicalSessionCount, 2)
+  assert.equal(result.physicalSessionCount, 3)
   assert.deepEqual(result.sessions.map((bundle) => bundle.items[0].plannedMinutes), [55, 55, 25])
   assert.deepEqual(result.sessions.map((bundle) => bundle.items[0].segmentIndex), [1, 1, 2])
+  assert.deepEqual(result.sessions.map((bundle) => bundle.logicalSessionIndex), [1, 1, 2])
+  assert.deepEqual(result.sessions.map((bundle) => bundle.parallelSubgroupCount), [2, 2, 0])
   assert.ok(result.sessions.every((bundle) => bundle.items[0].segmentCount === 2))
   assert.equal(result.scheduledMinutes, 80)
   assert.equal(result.sessions[0].candidate.space, 'Lab 2')
+
+  const logicalGroups = groupParallelSessionBundles(result.sessions)
+  assert.equal(logicalGroups.length, 2)
+  assert.equal(logicalGroups[0].isParallel, true)
+  assert.deepEqual(logicalGroups[0].bundles.map((bundle) => bundle.session.subgroupId), ['Grup B', 'Grup A'])
 
   const progress = summarizeAssignedActivityProgress(result.sessions)
   assert.equal(progress.assignedMinutesByActivityId.experiment, 80)

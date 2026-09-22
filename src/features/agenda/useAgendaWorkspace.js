@@ -862,6 +862,9 @@ export function useAgendaWorkspace(user, classes = []) {
 
   const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
+    // Una reorganització mai no pot reescriure una sessió d'un dia anterior.
+    // Les sessions passades formen l'històric i es conserven intactes.
+    const effectiveStartDate = startDate < today ? today : startDate
     const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
       date: String(session.startsAt).slice(0, 10),
       calendarEventId: session.calendarEventId,
@@ -871,7 +874,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
-      from: startDate,
+      from: effectiveStartDate,
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
       timetables: setup.timetables,
@@ -883,11 +886,11 @@ export function useAgendaWorkspace(user, classes = []) {
         application: setup.application,
         candidates: temporalProposal.candidates,
         existingSessionBundles: setup.existingSessionBundles,
-        fromDate: startDate,
+        fromDate: effectiveStartDate,
         options: { now: new Date().toISOString() },
       })
       const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date
-        || String(distribution.removedSessions.at(-1)?.startsAt || startDate).slice(0, 10)
+        || String(distribution.removedSessions.at(-1)?.startsAt || effectiveStartDate).slice(0, 10)
       return {
         ...distribution,
         ...temporalProposal,
@@ -908,18 +911,18 @@ export function useAgendaWorkspace(user, classes = []) {
       application: setup.application,
       candidates: temporalProposal.candidates,
       existingSessionBundles: setup.existingSessionBundles.filter((bundle) =>
-        String(bundle.session.startsAt).slice(0, 10) >= startDate),
+        String(bundle.session.startsAt).slice(0, 10) >= effectiveStartDate),
       options: { now: new Date().toISOString() },
       scheduledSourceActivityIds: setup.scheduledSourceActivityIds,
     })
-    const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date || startDate
+    const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date || effectiveStartDate
     return {
       ...distribution,
       ...temporalProposal,
       skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
       setup,
     }
-  }, [activeAcademicYear])
+  }, [activeAcademicYear, today])
 
   const confirmSchedulingPreview = useCallback(async (preview) => {
     if (!preview?.setup?.planningUnit?.id || preview.unscheduled.length > 0) {
@@ -959,13 +962,20 @@ export function useAgendaWorkspace(user, classes = []) {
       await synchronize()
       return {
         application,
+        logicalSessionCount: preview.logicalSessionCount ?? preview.sessions.length,
+        physicalSessionCount: preview.sessions.length,
         reflowed: true,
         replacedItemCount: preview.replacedItemCount,
         sessionCount: preview.sessions.length,
       }
     }
     await persist(entries)
-    return { application, sessionCount: preview.sessions.length }
+    return {
+      application,
+      logicalSessionCount: preview.logicalSessionCount ?? preview.sessions.length,
+      physicalSessionCount: preview.sessions.length,
+      sessionCount: preview.sessions.length,
+    }
   }, [persist, refreshSync, repository, synchronize])
 
   /**

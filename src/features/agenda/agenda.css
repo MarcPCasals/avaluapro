@@ -269,10 +269,13 @@
 .agenda-skipped-dates p { margin: 2px 0 0; color: #94a3b8; font-size: 8px; font-weight: 750; line-height: 1.4; }
 .agenda-proposed-sessions { max-height: 330px; display: grid; gap: 7px; overflow: auto; padding-right: 3px; }
 .agenda-proposed-sessions article { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px; }
+.agenda-proposed-sessions article.parallel { border-color: #c4b5fd; background: #faf5ff; }
 .agenda-proposed-date { display: grid; align-content: start; gap: 1px; border-right: 1px solid #edf0f4; }
 .agenda-proposed-date span { color: #f97316; font-size: 8px; font-weight: 950; text-transform: capitalize; }
 .agenda-proposed-date strong { color: #334155; font-size: 15px; }
 .agenda-proposed-date small { color: #94a3b8; font-size: 7px; font-weight: 750; }
+.agenda-parallel-slots { display: grid; gap: 3px; margin-top: 6px; }
+.agenda-parallel-slots span { width: fit-content; border-radius: 999px; padding: 3px 6px; color: #6d28d9; background: #ede9fe; font-size: 7px; font-weight: 900; text-transform: none; }
 .agenda-proposed-sessions ol { display: grid; gap: 5px; margin: 0; padding-left: 17px; }
 .agenda-proposed-sessions li { color: #8b5cf6; }
 .agenda-proposed-sessions li.existing { color: #cbd5e1; }
@@ -455,6 +458,8 @@
 .agenda-timeline-empty { min-height: 410px; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 30px; color: #8b5cf6; text-align: center; }
 .agenda-timeline-empty strong { color: #334155; }
 .agenda-timeline-empty p { max-width: 420px; margin: 0; color: #94a3b8; font-size: 11px; font-weight: 750; }
+.agenda-timeline-empty.compact { min-height: 180px; }
+.agenda-timeline-sections { display: grid; }
 .agenda-timeline-list { display: grid; padding: 16px 20px 24px; }
 .agenda-timeline-list > button { min-height: 66px; display: grid; grid-template-columns: 28px 16px 142px minmax(220px, 1fr) auto 18px; gap: 10px; align-items: center; position: relative; border: 0; border-bottom: 1px solid #edf0f4; padding: 7px 0; color: #94a3b8; background: white; text-align: left; }
 .agenda-timeline-index { color: #cbd5e1; font-size: 9px; font-weight: 900; text-align: right; }
@@ -463,12 +468,22 @@
 .agenda-timeline-list > button.calendar-blocked .agenda-timeline-dot { width: 15px; height: 15px; display: grid; place-items: center; margin-left: -3px; color: white; background: #64748b; box-shadow: 0 0 0 4px #e2e8f0; }
 .agenda-timeline-list > button.calendar-blocked .agenda-timeline-content small { color: #9f1239; }
 .agenda-timeline-list > button:not(:last-child) .agenda-timeline-dot::after { width: 1px; height: 57px; display: block; position: absolute; top: 38px; margin-left: 4px; background: #e2e8f0; content: ''; }
+.agenda-timeline-list > button.parallel-session { background: #fdfbff; }
+.agenda-timeline-list > button.parallel-session + button.parallel-session { border-top: 1px dashed #ddd6fe; }
 .agenda-timeline-date, .agenda-timeline-content { min-width: 0; display: grid; gap: 1px; }
 .agenda-timeline-date strong { color: #475569; font-size: 9px; text-transform: capitalize; }
 .agenda-timeline-date small, .agenda-timeline-content small { color: #94a3b8; font-size: 8px; font-weight: 750; }
 .agenda-timeline-content > span { color: #8b5cf6; font-size: 7px; font-weight: 950; text-transform: uppercase; }
 .agenda-timeline-content strong { color: #334155; font-size: 11px; }
 .agenda-timeline-content small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-timeline-archive { border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.agenda-timeline-archive > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; gap: 9px; align-items: center; padding: 12px 20px; color: #475569; cursor: pointer; list-style: none; }
+.agenda-timeline-archive > summary::-webkit-details-marker { display: none; }
+.agenda-timeline-archive > summary span { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 900; }
+.agenda-timeline-archive > summary small { color: #94a3b8; font-size: 8px; font-weight: 800; }
+.agenda-timeline-archive > summary > svg { transition: transform .18s ease; }
+.agenda-timeline-archive[open] > summary > svg { transform: rotate(180deg); }
+.agenda-timeline-archive .agenda-timeline-list { border-top: 1px solid #e2e8f0; opacity: .78; background: white; }
 
 .agenda-session-dialog .agenda-session-detail { margin-top: 0; }
 .agenda-adjust-dialog .modal-body { display: grid; gap: 13px; }

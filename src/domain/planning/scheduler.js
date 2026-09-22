@@ -42,6 +42,51 @@ function existingItemsSignature(items = []) {
   ].join(':')).join('|')
 }
 
+function sessionBundleParallelKey(bundle) {
+  const session = bundle?.session
+  if (!session?.subgroupId) return ''
+  return [
+    String(session.startsAt).slice(0, 10),
+    Number(session.durationMinutes) || 0,
+    existingItemsSignature(bundle.items || bundle.existingItems),
+  ].join('__')
+}
+
+/**
+ * Agrupa les franges físiques A/B que comparteixen una mateixa sessió
+ * pedagògica. Les franges es conserven separades per poder passar llista a
+ * cada mig grup, però la cronologia i els recomptes poden tractar-les com una
+ * sola passa de la UP.
+ */
+export function groupParallelSessionBundles(sessionBundles = []) {
+  const buckets = new Map()
+  for (const bundle of sessionBundles) {
+    const key = sessionBundleParallelKey(bundle)
+    if (!key) continue
+    buckets.set(key, [...(buckets.get(key) || []), bundle])
+  }
+  const parallelKeys = new Set([...buckets.entries()]
+    .filter(([, bucket]) => new Set(bucket.map((bundle) => bundle.session.subgroupId)).size > 1)
+    .map(([key]) => key))
+  const groups = []
+  const groupByKey = new Map()
+  for (const bundle of sessionBundles) {
+    const key = sessionBundleParallelKey(bundle)
+    if (!key || !parallelKeys.has(key)) {
+      groups.push({ bundles: [bundle], isParallel: false })
+      continue
+    }
+    let group = groupByKey.get(key)
+    if (!group) {
+      group = { bundles: [], isParallel: true }
+      groupByKey.set(key, group)
+      groups.push(group)
+    }
+    group.bundles.push(bundle)
+  }
+  return groups
+}
+
 function parallelDraftKey(draft) {
   if (!draft?.candidate?.subgroupId) return ''
   return [
@@ -357,6 +402,8 @@ export function buildActivitySessionDistribution({
       return { ...item, segmentCount: segmentCounts.get(item.activity.id), segmentIndex }
     })
   }
+  const scheduledLogicalDrafts = logicalDrafts.filter((draft) => draft.items.length > 0)
+  const logicalSessionIndex = new Map(scheduledLogicalDrafts.map((draft, index) => [draft, index + 1]))
   const sessions = drafts.filter((draft) => (logicalByDraft.get(draft)?.items || []).length > 0).map((draft) => {
     const logical = logicalByDraft.get(draft)
     const logicalItems = logical?.items || []
@@ -392,12 +439,16 @@ export function buildActivitySessionDistribution({
       existingItems: draft.existingItems,
       isExisting: draft.isExisting,
       items,
+      logicalSessionIndex: logicalSessionIndex.get(logical),
+      parallelSubgroupCount: logical?.drafts.filter((item) => item.candidate.subgroupId).length || 0,
       programmableMinutes: getProgrammableMinutes(session.durationMinutes, marginMinutes),
       session,
     }
   })
 
   return {
+    logicalSessionCount: scheduledLogicalDrafts.length,
+    physicalSessionCount: sessions.length,
     scheduledActivityIds: [...new Set(sessions.flatMap((bundle) =>
       bundle.items.map((item) => item.sourceActivityId)))],
     sessions,
