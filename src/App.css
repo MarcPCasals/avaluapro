@@ -594,6 +594,19 @@
   border-radius: 999px;
 }
 
+.tutorial-seating-legend i.group-a,
+.tutorial-seating-legend i.group-b {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 950;
+}
+
 .tutorial-seating-legend i.group-a {
   background: #7c3aed;
 }
@@ -27866,19 +27879,57 @@ button.profile-followup-card:focus-visible {
 }
 
 .tutorial-seat-card.half-a {
-  --seat-accent: #7c3aed;
+  --seat-accent: #94a3b8;
+  --half-group-color: #7c3aed;
+  --half-group-soft: #f3e8ff;
 }
 
 .tutorial-seat-card.half-b {
-  --seat-accent: #16a34a;
+  --seat-accent: #94a3b8;
+  --half-group-color: #16a34a;
+  --half-group-soft: #dcfce7;
 }
 
 .tutorial-seat-card.assigned-group-a:not(.half-a):not(.half-b) {
-  --seat-accent: #7c3aed;
+  --seat-accent: #94a3b8;
+  --half-group-color: #7c3aed;
+  --half-group-soft: #f3e8ff;
 }
 
 .tutorial-seat-card.assigned-group-b:not(.half-a):not(.half-b) {
-  --seat-accent: #16a34a;
+  --seat-accent: #94a3b8;
+  --half-group-color: #16a34a;
+  --half-group-soft: #dcfce7;
+}
+
+.tutorial-seat-half-group-badge {
+  position: absolute;
+  top: -9px;
+  left: 9px;
+  z-index: 4;
+  min-width: 22px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  padding: 0 6px;
+  color: #ffffff;
+  background: var(--half-group-color, #64748b);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.tutorial-seat-half-group-badge.group-a {
+  --half-group-color: #7c3aed;
+}
+
+.tutorial-seat-half-group-badge.group-b {
+  --half-group-color: #16a34a;
 }
 
 .tutorial-seat-card.disabled {
@@ -30959,4 +31010,27 @@ button.profile-followup-card:focus-visible {
   .cloud-backup-list article > .cloud-backup-row-actions > * {
     justify-content: center;
   }
+}
+
+
+/* Exportació JPG segura: només elements aptes per mostrar a l'alumnat */
+.tutorial-seating-export .tutorial-seat-statuses,
+.tutorial-seating-export .tutorial-seat-actions,
+.tutorial-seating-export .tutorial-seating-legend,
+.tutorial-seating-export .tutorial-seat-student-media {
+  display: none !important;
+}
+
+.tutorial-seating-export .tutorial-seat-card {
+  cursor: default !important;
+}
+
+.tutorial-seating-export .tutorial-seat-card.star,
+.tutorial-seating-export .tutorial-seat-card.conflict,
+.tutorial-seating-export .tutorial-seat-card.problem,
+.tutorial-seating-export .tutorial-seat-card.locked,
+.tutorial-seating-export .tutorial-seat-card.selected {
+  outline: none !important;
+  border-color: #d6a96e !important;
+  box-shadow: 0 4px 0 #cbd5e1, 0 6px 9px rgba(15, 23, 42, 0.09) !important;
 }
