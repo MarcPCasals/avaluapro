@@ -760,10 +760,9 @@ async function downloadTutorialSeatingJpeg(filename = `disposicio-aula-${getToda
   })
 
   clone.querySelectorAll('[title]').forEach((element) => element.removeAttribute('title'))
-  clone.querySelectorAll('img').forEach((image) => {
-    image.src = new URL(image.getAttribute('src') || '', window.location.href).href
-    image.removeAttribute('draggable')
-  })
+  // Cap imatge externa pot quedar dins l'SVG temporal: encara que sigui del mateix
+  // domini, el navegador pot considerar el canvas contaminat i bloquejar el JPG.
+  clone.querySelectorAll('img').forEach((image) => image.remove())
   clone.classList.add('tutorial-seating-export')
 
   const width = Math.max(source.scrollWidth, source.clientWidth)
