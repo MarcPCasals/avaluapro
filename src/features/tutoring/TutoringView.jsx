@@ -734,6 +734,99 @@ function formatLongDate(value) {
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
+async function downloadTutorialSeatingJpeg(filename = `disposicio-aula-${getTodaySlug()}.jpg`) {
+  const source = document.querySelector('.tutorial-seating-classroom')
+  if (!source) {
+    window.alert('No s’ha trobat la disposició d’aula per exportar.')
+    return
+  }
+
+  const clone = source.cloneNode(true)
+
+  // L'exportació per imprimir només conté informació segura per mostrar a l'alumnat.
+  clone.querySelectorAll(
+    '.tutorial-seat-statuses, .tutorial-seat-actions, .tutorial-seating-legend, .tutorial-seat-student-media',
+  ).forEach((element) => element.remove())
+
+  clone.querySelectorAll('.tutorial-seat-card').forEach((card) => {
+    ;['star', 'conflict', 'problem', 'locked', 'selected', 'drop-ready'].forEach((className) =>
+      card.classList.remove(className),
+    )
+    card.removeAttribute('aria-pressed')
+    card.removeAttribute('draggable')
+    card.removeAttribute('role')
+    card.removeAttribute('tabindex')
+    card.removeAttribute('title')
+  })
+
+  clone.querySelectorAll('[title]').forEach((element) => element.removeAttribute('title'))
+  clone.querySelectorAll('img').forEach((image) => {
+    image.src = new URL(image.getAttribute('src') || '', window.location.href).href
+    image.removeAttribute('draggable')
+  })
+  clone.classList.add('tutorial-seating-export')
+
+  const width = Math.max(source.scrollWidth, source.clientWidth)
+  const height = Math.max(source.scrollHeight, source.clientHeight)
+  clone.style.width = `${width}px`
+  clone.style.maxWidth = 'none'
+  clone.style.height = 'auto'
+  clone.style.overflow = 'visible'
+
+  const cssText = Array.from(document.styleSheets)
+    .map((sheet) => {
+      try {
+        return Array.from(sheet.cssRules || [])
+          .map((rule) => rule.cssText)
+          .join('\n')
+      } catch {
+        return ''
+      }
+    })
+    .join('\n')
+
+  const serialized = new XMLSerializer().serializeToString(clone)
+  const safeCss = cssText.replace(/]]>/g, ']]]]><![CDATA[>')
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;min-height:${height}px;background:#ffffff;">
+          <style><![CDATA[${safeCss}]]></style>
+          ${serialized}
+        </div>
+      </foreignObject>
+    </svg>
+  `
+
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
+  const image = new window.Image()
+
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = () => reject(new Error('No s’ha pogut generar la imatge de la disposició.'))
+      image.src = svgUrl
+    })
+
+    const scale = Math.min(2, 3200 / Math.max(width, height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(width * scale))
+    canvas.height = Math.max(1, Math.round(height * scale))
+    const context = canvas.getContext('2d')
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.94))
+    if (!blob) throw new Error('No s’ha pogut crear el fitxer JPG.')
+    downloadBlob(blob, filename)
+  } catch (error) {
+    window.alert(error.message)
+  } finally {
+    URL.revokeObjectURL(svgUrl)
+  }
+}
+
 function printTutorialProfile() {
   document.body.classList.add('tutorial-profile-printing')
   const clearPrintClass = () => document.body.classList.remove('tutorial-profile-printing')
@@ -10691,6 +10784,10 @@ export function TutoringView() {
                 </button>
               </div>
               <div className="tutorial-seating-header-actions">
+                <button onClick={() => downloadTutorialSeatingJpeg()} type="button">
+                  <FileDown aria-hidden="true" size={17} />
+                  Descarregar JPG
+                </button>
                 <button className="primary" disabled={Boolean(selectedSeatingPlan)} onClick={handleImproveSeatingPlan} type="button">
                   <TrendingUp aria-hidden="true" size={17} />
                   Millorar
@@ -11708,6 +11805,7 @@ export function TutoringView() {
                     : visibleSeatingPlan.layout.halfGroupSeatIds.B.includes(seat.id)
                       ? 'B'
                       : ''
+                  const visibleHalfGroup = placement ? getSeatingHalfGroupKey(placement.halfGroup) || assignedHalfGroup : assignedHalfGroup
                   return (
                     <div
                       aria-pressed={isSelected}
@@ -11756,6 +11854,15 @@ export function TutoringView() {
                       }
                     >
                       {seat.x === 0 && <span className="tutorial-seat-row-label">{seat.y + 1}</span>}
+                      {seat.enabled && visibleHalfGroup && (
+                        <span
+                          aria-label={`Mig grup ${visibleHalfGroup}`}
+                          className={`tutorial-seat-half-group-badge group-${visibleHalfGroup.toLowerCase()}`}
+                          title={`Mig grup ${visibleHalfGroup}`}
+                        >
+                          {visibleHalfGroup}
+                        </span>
+                      )}
                       {seat.enabled && <Armchair aria-hidden="true" className="tutorial-seat-chair" size={28} />}
                       {!seat.enabled ? (
                         <span className="empty">Espai</span>
@@ -11850,8 +11957,8 @@ export function TutoringView() {
                 </div>
                 <footer className="tutorial-seating-legend">
                   <strong>Llegenda</strong>
-                  <span><i className="group-a" /> Grup A</span>
-                  <span><i className="group-b" /> Grup B</span>
+                  <span><i className="group-a">A</i> Grup A</span>
+                  <span><i className="group-b">B</i> Grup B</span>
                   <span><Star aria-hidden="true" size={16} /> Alumne estrella</span>
                   <span><ShieldAlert aria-hidden="true" size={16} /> Control de proximitat</span>
                   <span><HeartHandshake aria-hidden="true" size={16} /> Necessita suport</span>
