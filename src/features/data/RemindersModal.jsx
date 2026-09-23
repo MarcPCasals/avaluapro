@@ -38,7 +38,7 @@ function formatSessionOption(option) {
   return `${dateLabel} · ${option.time}${subgroup}${planning}`
 }
 
-export function RemindersModal({ onClose, sessionOptions = [] }) {
+export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoading = false }) {
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
   const tasks = useAvaluaproStore((state) => state.tasks)
@@ -240,11 +240,13 @@ export function RemindersModal({ onClose, sessionOptions = [] }) {
           {draft.kind === 'personal' && draft.classId && (
             <label className="reminder-session-picker">
               Sessió de la classe <span>opcional</span>
-              <select onChange={(event) => selectSession(event.target.value)} value={draft.sessionKey}>
+              <select disabled={sessionOptionsLoading} onChange={(event) => selectSession(event.target.value)} value={draft.sessionKey}>
                 <option value="">Sense vincular: només al calendari</option>
                 {availableSessions.map((option) => <option key={option.id} value={option.id}>{formatSessionOption(option)}</option>)}
               </select>
-              <small>{availableSessions.length > 0
+              <small>{sessionOptionsLoading
+                ? 'Carregant les sessions futures de l’horari…'
+                : availableSessions.length > 0
                 ? 'En seleccionar-la, la data i l’hora s’omplen soles i el recordatori es mostra al Mode aula.'
                 : 'No s’han trobat sessions futures d’aquesta classe dins de l’horari carregat.'}</small>
             </label>

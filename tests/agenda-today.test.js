@@ -93,6 +93,47 @@ test('els recordatoris poden triar sessions programades i classes nomes presents
   assert.ok(options.some((option) => option.sessionId === 'timetable_2026-09-28_monday-second'))
 })
 
+test('un recordatori pot vincular una classe de l horari encara que no tingui cap UP', () => {
+  const options = buildReminderSessionOptions({
+    bundles: [],
+    slots: [{
+      id: 'friday-half-group',
+      classId: '1d',
+      weekday: 5,
+      startsAt: '12:00',
+      durationMinutes: 60,
+      subgroupId: 'Grup A',
+      subject: 'Ciències Físiques i de la Natura',
+    }],
+    timetable: { effectiveFrom: '2026-09-01', effectiveTo: null },
+    today: '2026-09-23',
+    weeks: 2,
+  })
+
+  assert.deepEqual(options.map((option) => ({
+    classId: option.classId,
+    date: option.date,
+    sessionId: option.sessionId,
+    subgroupId: option.subgroupId,
+    time: option.time,
+  })), [
+    {
+      classId: '1d',
+      date: '2026-09-25',
+      sessionId: 'timetable_2026-09-25_friday-half-group',
+      subgroupId: 'Grup A',
+      time: '12:00',
+    },
+    {
+      classId: '1d',
+      date: '2026-10-02',
+      sessionId: 'timetable_2026-10-02_friday-half-group',
+      subgroupId: 'Grup A',
+      time: '12:00',
+    },
+  ])
+})
+
 test('els recordatoris no proposen una classe en un dia no lectiu', () => {
   const options = buildReminderSessionOptions({
     calendarEvents: [{ classIds: [], endsOn: '2026-09-23', startsOn: '2026-09-23', type: 'holiday' }],
