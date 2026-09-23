@@ -4717,6 +4717,16 @@ export function TutoringView() {
         .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
     [activeClassId, tutorialSeatingPlans],
   )
+  const latestSavedTutorialSeatingPlan = useMemo(
+    () =>
+      classTutorialSeatingPlans.reduce((latestPlan, plan) => {
+        if (!latestPlan) return plan
+        const latestSavedAt = String(latestPlan.createdAt || latestPlan.updatedAt || '')
+        const planSavedAt = String(plan.createdAt || plan.updatedAt || '')
+        return planSavedAt > latestSavedAt ? plan : latestPlan
+      }, null),
+    [classTutorialSeatingPlans],
+  )
   const savedSociogramPositionsByStudentId = useMemo(
     () =>
       new Map(
@@ -6614,6 +6624,13 @@ export function TutoringView() {
     setSeatingQualityBaseline(null)
   }
 
+  const handleOpenTutorialSeatingTool = () => {
+    setSelectedSeatingPlanId(latestSavedTutorialSeatingPlan?.id || '')
+    setLoadedSeatingPlanId('')
+    setComparisonSeatingPlanId('')
+    setActiveRelationshipTool('seating')
+  }
+
   const handleDuplicateTutorialSeatingPlan = async (plan) => {
     if (!plan) return
     const duplicatedPlan = await saveTutorialSeatingPlan({
@@ -8075,7 +8092,7 @@ export function TutoringView() {
               <strong>Grups cooperatius</strong>
               <span>Proposta automàtica amb rols, notes i relacions.</span>
             </button>
-            <button data-tour="tutoring-tool-seating" onClick={() => setActiveRelationshipTool('seating')} type="button">
+            <button data-tour="tutoring-tool-seating" onClick={handleOpenTutorialSeatingTool} type="button">
               <LayoutGrid size={25} />
               <strong>Disposició d’aula</strong>
               <span>Matriu flexible de taules i cadires.</span>
