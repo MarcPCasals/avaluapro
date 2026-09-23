@@ -760,9 +760,9 @@ async function downloadTutorialSeatingJpeg(filename = `disposicio-aula-${getToda
   })
 
   clone.querySelectorAll('[title]').forEach((element) => element.removeAttribute('title'))
-  // Cap imatge externa pot quedar dins l'SVG temporal: encara que sigui del mateix
-  // domini, el navegador pot considerar el canvas contaminat i bloquejar el JPG.
-  clone.querySelectorAll('img').forEach((image) => image.remove())
+  // Cap recurs gràfic incrustat pot arribar al canvas: l'exportació només conserva
+  // la distribució, els noms, la pissarra, la taula docent i les marques A/B.
+  clone.querySelectorAll('img, svg').forEach((element) => element.remove())
   clone.classList.add('tutorial-seating-export')
 
   const width = Math.max(source.scrollWidth, source.clientWidth)
@@ -772,57 +772,38 @@ async function downloadTutorialSeatingJpeg(filename = `disposicio-aula-${getToda
   clone.style.height = 'auto'
   clone.style.overflow = 'visible'
 
-  const cssText = Array.from(document.styleSheets)
-    .map((sheet) => {
-      try {
-        return Array.from(sheet.cssRules || [])
-          .map((rule) => rule.cssText)
-          .join('\n')
-      } catch {
-        return ''
-      }
-    })
-    .join('\n')
-
-  const serialized = new XMLSerializer().serializeToString(clone)
-  const safeCss = cssText.replace(/]]>/g, ']]]]><![CDATA[>')
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <foreignObject width="100%" height="100%">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;min-height:${height}px;background:#ffffff;">
-          <style><![CDATA[${safeCss}]]></style>
-          ${serialized}
-        </div>
-      </foreignObject>
-    </svg>
-  `
-
-  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
-  const image = new window.Image()
+  const exportHost = document.createElement('div')
+  exportHost.style.position = 'fixed'
+  exportHost.style.left = '-100000px'
+  exportHost.style.top = '0'
+  exportHost.style.width = `${width}px`
+  exportHost.style.background = '#ffffff'
+  exportHost.append(clone)
+  document.body.append(exportHost)
 
   try {
-    await new Promise((resolve, reject) => {
-      image.onload = resolve
-      image.onerror = () => reject(new Error('No s’ha pogut generar la imatge de la disposició.'))
-      image.src = svgUrl
-    })
-
+    const { default: html2canvas } = await import('html2canvas')
     const scale = Math.min(2, 3200 / Math.max(width, height))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(width * scale))
-    canvas.height = Math.max(1, Math.round(height * scale))
-    const context = canvas.getContext('2d')
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const canvas = await html2canvas(clone, {
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      height,
+      imageTimeout: 0,
+      logging: false,
+      scale,
+      useCORS: false,
+      width,
+      windowHeight: height,
+      windowWidth: width,
+    })
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.94))
     if (!blob) throw new Error('No s’ha pogut crear el fitxer JPG.')
     downloadBlob(blob, filename)
   } catch (error) {
-    window.alert(error.message)
+    window.alert(error.message || 'No s’ha pogut crear el fitxer JPG.')
   } finally {
-    URL.revokeObjectURL(svgUrl)
+    exportHost.remove()
   }
 }
 
