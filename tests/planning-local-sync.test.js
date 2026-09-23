@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto'
 import {
   acknowledgePlanningOperation,
   clearPlanningLocalData,
+  deletePlanningEntityLocally,
   loadPlanningConflicts,
   loadPlanningOutbox,
   loadPlanningScope,
@@ -160,6 +161,26 @@ test('una calendarització confirmada conserva aplicació, sessió i vincle amb 
   assert.equal((await loadPlanningScope(uid, `application:${application.id}:sessions`))[0].startsAt, '2026-09-21T09:30:00')
   assert.equal((await loadPlanningScope(uid, `session:${session.id}:detail`))[0].sourceActivityId, 'activity-1')
   assert.equal((await loadPlanningOutbox(uid)).length, 3)
+})
+
+test('treure un fragment programat elimina només aquell element i en conserva la baixa pendent', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-09-23T08:00:00.000Z'
+  const base = {
+    applicationId: 'application-1', ownerUid: uid, sessionId: 'session-1',
+    sourceActivityId: 'activity-1', type: 'activity', title: 'Activitat intel·ligències',
+  }
+  const first = createSessionItem({ ...base, id: 'item-1', order: 0, plannedMinutes: 5 }, { now })
+  const second = createSessionItem({ ...base, id: 'item-2', order: 1, plannedMinutes: 20 }, { now })
+
+  await savePlanningEntityLocally(uid, first, { planningUnitId: 'up-1' })
+  await savePlanningEntityLocally(uid, second, { planningUnitId: 'up-1' })
+  await deletePlanningEntityLocally(uid, first, { planningUnitId: 'up-1' })
+
+  const remaining = await loadPlanningScope(uid, 'session:session-1:detail')
+  assert.deepEqual(remaining.map((item) => item.id), ['item-2'])
+  const pendingDeletion = (await loadPlanningOutbox(uid)).find((operation) => operation.documentId === first.id)
+  assert.equal(pendingDeletion.operation, 'delete')
 })
 
 test('Mode aula conserva offline l’obertura, el temps real i el tancament de la sessió', async () => {

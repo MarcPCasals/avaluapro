@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowRight, CalendarX2, CheckCircle2, Clock3, Edit3, Loader2,
-  RotateCcw,
+  RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
@@ -33,6 +33,7 @@ export function AgendaSessionAdjustDialog({
   onBuildContinuation,
   onClose,
   onConfirmContinuation,
+  onRemoveItem,
   onSaveItem,
   onSaved,
   onStatus,
@@ -46,8 +47,15 @@ export function AgendaSessionAdjustDialog({
   const [scope, setScope] = useState('groupOnly')
   const [continuationMinutes, setContinuationMinutes] = useState(item?.plannedMinutes || 15)
   const [continuationPreview, setContinuationPreview] = useState(null)
+  const [confirmRemoval, setConfirmRemoval] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const itemHasResult = Boolean(item && (bundle.results || []).some((result) => result.sessionItemId === item.id))
+  const canRemoveItem = bundle.session.status === 'planned'
+    && !bundle.session.classroomOpenedAt
+    && !bundle.session.attendanceConfirmedAt
+    && !bundle.session.classroomClosedAt
+    && !itemHasResult
 
   const selectItem = (nextId) => {
     const nextItem = editableItems.find((candidate) => candidate.id === nextId)
@@ -56,6 +64,7 @@ export function AgendaSessionAdjustDialog({
     setPlannedMinutes(nextItem?.plannedMinutes || '')
     setContinuationMinutes(nextItem?.plannedMinutes || 15)
     setContinuationPreview(null)
+    setConfirmRemoval(false)
   }
 
   const execute = async (operation, successMessage) => {
@@ -98,12 +107,22 @@ export function AgendaSessionAdjustDialog({
       </section>}
 
       {action === 'activity' && item && <section className="agenda-adjust-panel" role="tabpanel">
-        <label>Activitat<select value={item.id} onChange={(event) => selectItem(event.target.value)}>{editableItems.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}</select></label>
+        <label>Activitat<select value={item.id} onChange={(event) => selectItem(event.target.value)}>{editableItems.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}{candidate.plannedMinutes ? ` · ${candidate.plannedMinutes} min` : ''}{candidate.segmentCount > 1 ? ` · part ${candidate.segmentIndex}/${candidate.segmentCount}` : ''}</option>)}</select></label>
         <label>Títol<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
         <label>Minuts previstos<input min="1" type="number" value={plannedMinutes} onChange={(event) => setPlannedMinutes(event.target.value)} /></label>
         <fieldset className="agenda-change-scopes"><legend>On vols aplicar el canvi?</legend>{CHANGE_SCOPES.map(([value, label, detail]) => <label className={scope === value ? 'selected' : ''} key={value}><input checked={scope === value} name="change-scope" onChange={() => setScope(value)} type="radio" /><span><strong>{label}</strong><small>{detail}</small></span></label>)}</fieldset>
         <div className="agenda-adjust-preview"><Edit3 size={18} /><div><strong>Previsualització</strong><p>«{item.title}» passarà a «{title}»{plannedMinutes ? ` amb ${plannedMinutes} minuts` : ' sense temps definit'} segons l’abast seleccionat.</p></div></div>
         <button className="primary-action" disabled={busy || !title.trim()} onClick={() => execute(() => onSaveItem(item, { plannedMinutes: plannedMinutes ? Number(plannedMinutes) : null, title: title.trim() }, scope), 'Canvi aplicat amb l’abast seleccionat.')} type="button">{busy && <Loader2 className="spin" size={16} />}Aplicar canvi</button>
+        <div className="agenda-remove-session-item">
+          {!confirmRemoval ? <>
+            <div><strong>Treure aquest fragment de la sessió</strong><p>L’activitat original de la UP i les altres parts programades es conservaran.</p></div>
+            <button className="danger-action compact" disabled={busy || !canRemoveItem} onClick={() => setConfirmRemoval(true)} type="button"><Trash2 size={15} />Treure de la sessió</button>
+          </> : <>
+            <div><strong>Vols treure «{item.title}»?</strong><p>S’eliminaran només {item.plannedMinutes ? `aquests ${item.plannedMinutes} minuts` : 'aquest element'} de la sessió del {dateLabel(bundle.session.startsAt)}.</p></div>
+            <div className="agenda-remove-session-item-actions"><button className="secondary-action compact" disabled={busy} onClick={() => setConfirmRemoval(false)} type="button"><X size={14} />Cancel·lar</button><button className="danger-action compact" disabled={busy} onClick={() => execute(() => onRemoveItem(item), 'Fragment eliminat de la sessió.')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}Confirmar</button></div>
+          </>}
+          {!canRemoveItem && <small>Aquesta activitat ja té dades de classe i es conserva per no perdre l’historial.</small>}
+        </div>
       </section>}
 
       {action === 'continuation' && item && <section className="agenda-adjust-panel" role="tabpanel">

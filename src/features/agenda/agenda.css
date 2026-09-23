@@ -508,6 +508,12 @@
 .agenda-change-scopes span { display: grid; gap: 1px; }
 .agenda-change-scopes strong { color: #334155; font-size: 9px; }
 .agenda-change-scopes small { color: #94a3b8; font-size: 8px; font-weight: 750; }
+.agenda-remove-session-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; border-top: 1px solid #fee2e2; padding-top: 12px; }
+.agenda-remove-session-item > div:first-child { display: grid; gap: 2px; }
+.agenda-remove-session-item strong { color: #7f1d1d; font-size: 10px; }
+.agenda-remove-session-item p { margin: 0; color: #64748b; font-size: 8px; font-weight: 750; line-height: 1.4; }
+.agenda-remove-session-item > small { grid-column: 1 / -1; color: #b45309; font-size: 8px; font-weight: 800; }
+.agenda-remove-session-item-actions { display: flex !important; gap: 6px !important; }
 .agenda-continuation-preview { display: grid; gap: 6px; border: 1px solid #bbf7d0; border-radius: 10px; padding: 10px; background: #f0fdf4; }
 .agenda-continuation-preview header { display: flex; align-items: center; gap: 6px; color: #15803d; }
 .agenda-continuation-preview header strong { font-size: 10px; }
@@ -562,6 +568,8 @@
   .agenda-classroom-prompt { grid-template-columns: 30px minmax(0, 1fr); }
   .agenda-classroom-prompt button { grid-column: 2; justify-self: start; }
   .agenda-timeline-list { min-width: 670px; }
+  .agenda-remove-session-item { grid-template-columns: 1fr; }
+  .agenda-remove-session-item-actions { justify-content: flex-start; }
 }
 
 .agenda-screen :where(button, a, input, select, textarea):focus-visible,

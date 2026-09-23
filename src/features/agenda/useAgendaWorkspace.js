@@ -1029,6 +1029,34 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [persist])
 
   /**
+   * Treu només la còpia programada d'una activitat. La font de la UP no es
+   * modifica i les sessions ja iniciades queden protegides com a historial.
+   */
+  const removeSessionItem = useCallback(async (bundle, item) => {
+    const hasClassroomData = bundle.session.status !== 'planned'
+      || bundle.session.classroomOpenedAt
+      || bundle.session.attendanceConfirmedAt
+      || bundle.session.classroomClosedAt
+      || (bundle.results || []).some((result) => result.sessionItemId === item.id)
+    if (hasClassroomData) {
+      throw new Error('Aquesta activitat ja té dades de classe i no es pot eliminar de l’historial.')
+    }
+    if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
+
+    await repository.remove(item, {
+      applicationId: bundle.application.id,
+      planningUnitId: bundle.planningUnit.id,
+      sessionId: bundle.session.id,
+    })
+    await refreshSync()
+    await synchronize()
+    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
+      ? { ...current, items: current.items.filter((currentItem) => currentItem.id !== item.id) }
+      : current))
+    return item
+  }, [refreshSync, repository, synchronize])
+
+  /**
    * Una continuació no altera el temps ideal de la UP. Construeix fragments
    * nous per al grup i actualitza els comptadors de parts, però espera una
    * confirmació separada abans de desar-los.
@@ -1201,6 +1229,7 @@ export function useAgendaWorkspace(user, classes = []) {
     saveClassroomPrivateNote,
     saveSessionClassroomState,
     saveSessionItemChange,
+    removeSessionItem,
     saveSessionStatus,
     saveSlot,
     saveTimetable,
