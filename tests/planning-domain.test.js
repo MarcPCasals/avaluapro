@@ -935,6 +935,63 @@ test('recuperar una activitat anterior desplaça l’agenda futura sense tocar l
   assert.equal(result.shiftedItemCount, 2)
 })
 
+test('la sessió actual es pot corregir conservant resultats i la descripció d’una altra UP', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-current', classId: 'class-1',
+  }, options(idFactory))
+  const session = createCalendarSession({
+    id: 'session-current', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-18T11:30:00', durationMinutes: 60, timetableSlotId: 'slot-current', status: 'held',
+    classroomOpenedAt: '2026-09-18T11:30:00.000Z', classroomClosedAt: '2026-09-18T11:45:00.000Z',
+  }, options(idFactory))
+  const currentItem = createSessionItem({
+    id: 'item-current', ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+    type: 'activity', title: 'Coca-Cola', order: 0, plannedMinutes: 55,
+    sourceActivityId: 'coca-cola',
+  }, options(idFactory))
+  const currentResult = createActivityResult({
+    id: 'result-current', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: session.id, sessionItemId: currentItem.id, sourceActivityId: currentItem.sourceActivityId,
+    status: 'completed', actualMinutes: 15,
+  }, options(idFactory))
+
+  const result = buildAgendaRecoveryReflow({
+    application,
+    candidates: [{
+      date: '2026-09-21', startsAt: '2026-09-21T08:30:00', durationMinutes: 60,
+      timetableSlotId: 'slot-next',
+    }],
+    existingSessionBundles: [{ items: [currentItem], results: [currentResult], session }],
+    options: {
+      ...options(idFactory),
+      currentDateKey: '2026-09-18',
+      now: '2026-09-18T16:00:00.000Z',
+    },
+    recoveryItem: {
+      plannedMinutes: 55,
+      segmentCount: 3,
+      segmentIndex: 3,
+      sourceActivity: { description: 'Tancar la investigació de les petjades.' },
+      sourceActivityId: 'petjades',
+      sourcePlanningUnitId: 'up-previous',
+      title: 'Petjades Misterioses',
+      type: 'activity',
+    },
+    recoveryMinutes: 55,
+    targetSessionId: session.id,
+  })
+
+  assert.equal(result.correctCurrentSession, true)
+  assert.equal(result.sessions[0].items[0].id, currentItem.id)
+  assert.equal(result.sessions[0].items[0].title, 'Petjades Misterioses')
+  assert.equal(result.sessions[0].items[0].sourcePlanningUnitId, 'up-previous')
+  assert.equal(result.sessions[0].items[0].sourceActivitySnapshot.description, 'Tancar la investigació de les petjades.')
+  assert.equal(result.changedTargetResults[0].id, currentResult.id)
+  assert.equal(result.changedTargetResults[0].sourceActivityId, 'petjades')
+  assert.equal(result.sessions[1].items[0].title, 'Coca-Cola')
+})
+
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {
   const versions = [
     { id: 'old', effectiveFrom: '2026-09-01', effectiveTo: '2026-10-31' },

@@ -1,4 +1,5 @@
 import {
+  createActivityResult,
   createCalendarSession,
   createSessionItem,
 } from './model.js'
@@ -577,24 +578,39 @@ export function buildAgendaRecoveryReflow({
 
   const targetStartsAt = targetBundle.session.startsAt
   const targetDate = String(targetStartsAt).slice(0, 10)
-  const reflowableBundles = applicationBundles.filter((bundle) =>
-    bundle.session.startsAt >= targetStartsAt && canReflowSession(bundle, targetDate))
-  if (!reflowableBundles.some((bundle) => bundle.session.id === targetSessionId)) {
+  const targetCanReflow = canReflowSession(targetBundle, targetDate)
+  const targetEndsAt = new Date(targetStartsAt).getTime()
+    + (Number(targetBundle.session.durationMinutes) || 0) * 60_000
+  const canCorrectCurrentSession = targetBundle.session.status === 'held'
+    && (options.currentDateKey === targetDate
+      || new Date(options.now || new Date().toISOString()).getTime() <= targetEndsAt)
+    && targetBundle.items.length === 1
+  if (!targetCanReflow && !canCorrectCurrentSession) {
     throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
   }
+  const correctCurrentSession = !targetCanReflow && canCorrectCurrentSession
+  const reflowableBundles = applicationBundles.filter((bundle) =>
+    bundle.session.startsAt >= targetStartsAt
+      && canReflowSession(bundle, targetDate)
+      && (!correctCurrentSession || bundle.session.id !== targetSessionId))
 
   // Els mitjos grups paral·lels comparteixen una única seqüència pedagògica.
   // Per això només incorporem una vegada els elements de cada parella A/B.
-  const displacedItems = groupParallelSessionBundles(reflowableBundles)
+  const displacementBundles = correctCurrentSession
+    ? [targetBundle, ...reflowableBundles]
+    : reflowableBundles
+  const displacedItems = groupParallelSessionBundles(displacementBundles)
     .flatMap((group) => [...(group.bundles[0]?.items || [])].sort(compareOrder))
   const activityMeta = new Map()
   const recoveryKey = `agenda-recovery:${recoveryItem.sourceActivityId}`
   activityMeta.set(recoveryKey, {
     sourceActivityId: recoveryItem.sourceActivityId,
+    sourceActivitySnapshot: recoveryItem.sourceActivity || recoveryItem.sourceActivitySnapshot || null,
+    sourcePlanningUnitId: recoveryItem.sourcePlanningUnitId || null,
     title: recoveryItem.title,
     type: recoveryItem.type || 'activity',
   })
-  const activities = [{
+  const activities = correctCurrentSession ? [] : [{
     id: recoveryKey,
     plannedMinutes: minutes,
     title: recoveryItem.title,
@@ -604,6 +620,8 @@ export function buildAgendaRecoveryReflow({
     const key = `agenda-displaced:${item.id || index}`
     activityMeta.set(key, {
       sourceActivityId: item.sourceActivityId || null,
+      sourceActivitySnapshot: item.sourceActivity || item.sourceActivitySnapshot || null,
+      sourcePlanningUnitId: item.sourcePlanningUnitId || null,
       title: item.title,
       type: item.type || 'activity',
     })
@@ -622,20 +640,50 @@ export function buildAgendaRecoveryReflow({
     existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
     options,
   })
-  const provisionalSessions = distribution.sessions.map((bundle) => ({
+  let provisionalSessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
       const meta = activityMeta.get(item.sourceActivityId)
       return createSessionItem({
         ...item,
         sourceActivityId: meta?.sourceActivityId || null,
+        sourceActivitySnapshot: meta?.sourceActivitySnapshot || null,
+        sourcePlanningUnitId: meta?.sourcePlanningUnitId || null,
         title: meta?.title || item.title,
         type: meta?.type || item.type,
       }, options)
     }),
   }))
+  let changedTargetResults = []
+  if (correctCurrentSession) {
+    const originalItem = targetBundle.items[0]
+    const replacementItem = createSessionItem({
+      ...originalItem,
+      plannedMinutes: minutes,
+      sourceActivityId: recoveryItem.sourceActivityId,
+      sourceActivitySnapshot: recoveryItem.sourceActivity || recoveryItem.sourceActivitySnapshot || null,
+      sourcePlanningUnitId: recoveryItem.sourcePlanningUnitId || null,
+      title: recoveryItem.title,
+      type: recoveryItem.type || 'activity',
+    }, options)
+    changedTargetResults = (targetBundle.results || []).map((result) => createActivityResult({
+      ...result,
+      sourceActivityId: recoveryItem.sourceActivityId,
+    }, options))
+    provisionalSessions = [{
+      candidate: {
+        date: targetDate,
+        durationMinutes: targetBundle.session.durationMinutes,
+        startsAt: targetStartsAt,
+      },
+      isExisting: true,
+      items: [replacementItem],
+      session: targetBundle.session,
+    }, ...provisionalSessions]
+  }
 
-  const lockedBundles = applicationBundles.filter((bundle) => !reflowableBundles.includes(bundle))
+  const lockedBundles = applicationBundles.filter((bundle) =>
+    !reflowableBundles.includes(bundle) && bundle.session.id !== targetSessionId)
   const activeLockedBundles = lockedBundles.filter((bundle) =>
     !['cancelled', 'notHeld'].includes(bundle.session.status))
   const segmentOffsetByActivityId = {}
@@ -703,6 +751,8 @@ export function buildAgendaRecoveryReflow({
   return {
     ...distribution,
     changedLockedItems,
+    changedTargetResults,
+    correctCurrentSession,
     kind: 'agenda-recovery',
     recoveryItem,
     recoveryMinutes: minutes,
@@ -711,7 +761,7 @@ export function buildAgendaRecoveryReflow({
       .map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
     replacedItemCount: reflowableBundles.reduce(
-      (total, bundle) => total + (bundle.items || []).length, 0),
+      (total, bundle) => total + (bundle.items || []).length, correctCurrentSession ? 1 : 0),
     sessions,
     shiftedItemCount: displacedItems.length,
     targetBundle,

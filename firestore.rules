@@ -1542,7 +1542,8 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'applicationId', 'createdAt', 'entityType', 'id', 'order', 'ownerUid',
           'plannedMinutes', 'schemaVersion', 'segmentCount', 'segmentIndex',
-          'sessionId', 'sourceActivityId', 'title', 'type', 'updatedAt'
+          'sessionId', 'sourceActivityId', 'sourceActivitySnapshot',
+          'sourcePlanningUnitId', 'title', 'type', 'updatedAt'
         ])
         && request.resource.data.id == itemId
         && request.resource.data.entityType == 'sessionItem'

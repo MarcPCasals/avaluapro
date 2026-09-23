@@ -521,7 +521,12 @@ export function useAgendaWorkspace(user, classes = []) {
           items: entities
             .filter((entity) => entity.entityType === 'sessionItem')
             .sort((left, right) => Number(left.order) - Number(right.order))
-            .map((item) => ({ ...item, sourceActivity: activityById.get(item.sourceActivityId) || null })),
+            .map((item) => ({
+              ...item,
+              sourceActivity: activityById.get(item.sourceActivityId)
+                || item.sourceActivitySnapshot
+                || null,
+            })),
           results: entities.filter((entity) => entity.entityType === 'activityResult'),
         }
       }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
@@ -1041,65 +1046,78 @@ export function useAgendaWorkspace(user, classes = []) {
    */
   const loadAgendaRecoveryOptions = useCallback(async (bundle) => {
     if (!repository || !activeAcademicYear) return []
-    const setup = await loadSchedulingSetup({
-      applicationId: bundle.application.id,
-      classId: bundle.session.classId,
-      planningUnitId: bundle.planningUnit.id,
-    })
-    const activityById = new Map(setup.activities.map((activity) => [activity.id, activity]))
-    const applicationResult = await repository.loadScope(
-      `planningUnit:${bundle.planningUnit.id}:applications:${bundle.session.classId}`,
-      () => loadPlanningApplications(bundle.planningUnit.id, bundle.session.classId, 100),
-      { completeSnapshot: true },
-    )
-    // Una UP es pot haver reconnectat al mateix grup i haver creat una altra
-    // aplicació. L'històric continua sent recuperable encara que aquella
-    // connexió anterior ara estigui arxivada.
-    const applications = applicationResult.entities.filter((application) =>
-      application.classId === bundle.session.classId)
-    const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
-      `application:${application.id}:sessions`,
-      () => loadPlanningSessions({
-        applicationId: application.id,
-        from: `${activeAcademicYear.startsOn}T00:00:00`,
-        maxItems: 500,
-        planningUnitId: bundle.planningUnit.id,
-        to: bundle.session.startsAt,
-      }),
-    )))
-    const previousSessions = sessionResults.flatMap((result, index) => result.entities
-      .filter((session) => session.startsAt < bundle.session.startsAt)
-      .map((session) => ({ application: applications[index], session })))
-      .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-    const detailResults = await Promise.all(previousSessions.map(({ application, session }) =>
-      repository.loadScope(
-        `session:${session.id}:detail`,
-        async () => {
-          const detail = await loadPlanningSessionDetail(
-            bundle.planningUnit.id, application.id, session.id,
-          )
-          return [detail.session, ...detail.items, ...detail.results]
-        },
-        { completeSnapshot: true },
-      )))
     const latestByActivityId = new Map()
-    previousSessions.forEach(({ session }, index) => {
-      if (['cancelled', 'notHeld'].includes(session.status)) return
-        ;detailResults[index].entities
+    const ownedUnits = allPlanningUnits.filter((unit) => unit.ownerUid === user?.uid)
+    const histories = await Promise.all(ownedUnits.map(async (unit) => {
+      const [applicationResult, structureResult] = await Promise.all([
+        repository.loadScope(
+          `planningUnit:${unit.id}:applications:${bundle.session.classId}`,
+          () => loadPlanningApplications(unit.id, bundle.session.classId, 100),
+          { completeSnapshot: true },
+        ),
+        repository.loadScope(
+          `planningUnit:${unit.id}:structure`,
+          async () => {
+            const structure = await loadPlanningUnitStructure(unit.id)
+            return [structure.planningUnit, ...structure.phases, ...structure.activities]
+          },
+          { completeSnapshot: true },
+        ),
+      ])
+      const applications = applicationResult.entities.filter((application) =>
+        application.classId === bundle.session.classId)
+      const activityById = new Map(structureResult.entities
+        .filter((entity) => entity.entityType === 'planningActivity')
+        .map((activity) => [activity.id, activity]))
+      const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
+        `application:${application.id}:sessions`,
+        () => loadPlanningSessions({
+          applicationId: application.id,
+          from: `${activeAcademicYear.startsOn}T00:00:00`,
+          maxItems: 500,
+          planningUnitId: unit.id,
+          to: bundle.session.startsAt,
+        }),
+      )))
+      const previousSessions = sessionResults.flatMap((result, index) => result.entities
+        .filter((session) => session.startsAt < bundle.session.startsAt)
+        .map((session) => ({ application: applications[index], session })))
+        .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+      const detailResults = await Promise.all(previousSessions.map(({ application, session }) =>
+        repository.loadScope(
+          `session:${session.id}:detail`,
+          async () => {
+            const detail = await loadPlanningSessionDetail(unit.id, application.id, session.id)
+            return [detail.session, ...detail.items, ...detail.results]
+          },
+          { completeSnapshot: true },
+        )))
+      return { activityById, detailResults, previousSessions, unit }
+    }))
+    histories.forEach(({ activityById, detailResults, previousSessions, unit }) => {
+      previousSessions.forEach(({ session }, index) => {
+        if (['cancelled', 'notHeld'].includes(session.status)) return
+        detailResults[index].entities
           .filter((entity) => entity.entityType === 'sessionItem')
           .sort((left, right) => Number(left.order) - Number(right.order))
           .forEach((item) => {
             if (!item.sourceActivityId) return
-            latestByActivityId.set(item.sourceActivityId, {
+            const sourceActivity = activityById.get(item.sourceActivityId) || item.sourceActivitySnapshot || null
+            latestByActivityId.set(`${unit.id}:${item.sourceActivityId}`, {
               ...item,
+              id: `${unit.id}:${item.id}`,
               lastStartsAt: session.startsAt,
-              sourceActivity: activityById.get(item.sourceActivityId) || null,
+              sourceActivity,
+              sourceActivitySnapshot: sourceActivity,
+              sourcePlanningUnitId: unit.id,
+              sourcePlanningUnitLabel: [unit.code, unit.title].filter(Boolean).join(' · '),
             })
           })
+      })
     })
     return [...latestByActivityId.values()]
       .sort((left, right) => right.lastStartsAt.localeCompare(left.lastStartsAt))
-  }, [activeAcademicYear, loadSchedulingSetup, repository])
+  }, [activeAcademicYear, allPlanningUnits, repository, user?.uid])
 
   /**
    * Insereix una recuperació abans del contingut previst i calcula l'efecte
@@ -1137,7 +1155,7 @@ export function useAgendaWorkspace(user, classes = []) {
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
       existingSessionBundles: setup.existingSessionBundles,
-      options: { now: new Date().toISOString() },
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
       recoveryItem,
       recoveryMinutes: Number(minutes),
       targetSessionId: targetBundle.session.id,
@@ -1169,6 +1187,16 @@ export function useAgendaWorkspace(user, classes = []) {
       entity: item,
       context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
     }))
+    for (const result of preview.changedTargetResults || []) {
+      entries.push({
+        entity: result,
+        context: {
+          applicationId: result.applicationId,
+          planningUnitId,
+          sessionId: result.sessionId,
+        },
+      })
+    }
     for (const candidate of preview.sessions) {
       if (!candidate.isExisting) {
         entries.push({ entity: candidate.session, context: { planningUnitId } })
@@ -1192,10 +1220,14 @@ export function useAgendaWorkspace(user, classes = []) {
         application: preview.setup.application,
         items: candidate.items.map((item) => ({
           ...item,
-          sourceActivity: activityById.get(item.sourceActivityId) || null,
+          sourceActivity: activityById.get(item.sourceActivityId)
+            || item.sourceActivitySnapshot
+            || null,
         })),
         planningUnit: preview.setup.planningUnit,
-        results: [],
+        results: candidate.session.id === preview.targetBundle.session.id
+          ? (preview.changedTargetResults || preview.targetBundle.results || [])
+          : [],
         session: candidate.session,
       },
     ]))
