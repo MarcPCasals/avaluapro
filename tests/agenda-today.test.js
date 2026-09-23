@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../src/lib/agendaToday.js'
+import { buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -66,4 +66,20 @@ test('una classe de l horari pot obrir Mode aula sense cap UP', () => {
   assert.equal(bundle.session.startsAt, occurrence.startsAt)
   assert.equal(bundle.items.length, 0)
   assert.equal(bundle.planningUnit.code, 'Horari')
+})
+
+test('el calendari conserva el color assignat quan hi ha sessions programades', () => {
+  const result = mergeAgendaClassCatalog({
+    bundles: [{
+      application: { classLabel: '1r D' },
+      session: { classId: '1d' },
+    }],
+    classes: [
+      { color: 'green', id: '1d', name: '1rD' },
+      { color: 'red', id: 'sg', name: 'SG' },
+    ],
+  })
+
+  assert.deepEqual(result.find((item) => item.id === '1d'), { color: 'green', id: '1d', name: '1rD' })
+  assert.equal(result.find((item) => item.id === 'sg').color, 'red')
 })

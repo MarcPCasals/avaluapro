@@ -13,7 +13,7 @@ import {
 import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getAgendaDefaultWeekStart } from '../../lib/agendaCalendar'
-import { buildTimetableClassroomBundle, findNextTimetableOccurrence } from '../../lib/agendaToday'
+import { buildTimetableClassroomBundle, findNextTimetableOccurrence, mergeAgendaClassCatalog } from '../../lib/agendaToday'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
@@ -399,14 +399,11 @@ export default function AgendaModule() {
   const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
   const markTutoringCoordinationRead = useAvaluaproStore((state) => state.markTutoringCoordinationRead)
   const workspace = useAgendaWorkspace(user, classes)
-  const agendaClasses = useMemo(() => Array.from(new Map([
-    ...classes,
-    ...workspace.sharedClasses,
-    ...workspace.sessionBundles.map((bundle) => ({
-      id: bundle.session.classId,
-      name: bundle.application.classLabel || classes.find((item) => item.id === bundle.session.classId)?.name || 'Grup compartit',
-    })),
-  ].map((item) => [item.id, item])).values()), [classes, workspace.sessionBundles, workspace.sharedClasses])
+  const agendaClasses = useMemo(() => mergeAgendaClassCatalog({
+    bundles: workspace.sessionBundles,
+    classes,
+    sharedClasses: workspace.sharedClasses,
+  }), [classes, workspace.sessionBundles, workspace.sharedClasses])
   const hasOwnCalendar = Boolean(workspace.activeAcademicYear)
   const hasAgendaWorkspace = hasOwnCalendar || workspace.sharedPlanningUnits.length > 0 || sharedTutoringSpaces.length > 0
   const materialReminderBundles = workspace.sessionBundles

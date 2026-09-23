@@ -14,6 +14,33 @@ function timeToMinutes(value = '') {
 }
 
 /**
+ * Reuneix les classes pròpies, compartides i inferides de les sessions en un
+ * únic catàleg per a l'Agenda. Les dades configurades de la classe prevalen
+ * sobre els valors de suport de les sessions perquè no es perdi el seu color.
+ */
+export function mergeAgendaClassCatalog({ bundles = [], classes = [], sharedClasses = [] }) {
+  const catalog = new Map()
+  const mergeClass = (classItem) => {
+    if (!classItem?.id) return
+    const current = catalog.get(classItem.id) || {}
+    catalog.set(classItem.id, {
+      ...current,
+      ...classItem,
+      color: classItem.color || current.color || 'blue',
+    })
+  }
+
+  bundles.forEach((bundle) => mergeClass({
+    id: bundle?.session?.classId,
+    name: bundle?.application?.classLabel || 'Grup compartit',
+  }))
+  sharedClasses.forEach(mergeClass)
+  classes.forEach(mergeClass)
+
+  return [...catalog.values()]
+}
+
+/**
  * Busca la pròxima classe de l'horari encara que no tingui una UP
  * calendaritzada. Això evita que la portada quedi buida durant el cap de
  * setmana o entre dues programacions.

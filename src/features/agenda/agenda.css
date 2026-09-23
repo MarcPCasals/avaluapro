@@ -384,20 +384,16 @@
 .agenda-week-columns > section > header small { color: #94a3b8; font-size: 7px; font-weight: 750; }
 .agenda-week-columns > section > div { display: grid; gap: 7px; align-content: start; padding: 8px; }
 .agenda-week-columns > section > div > p { margin: 15px 0; color: #cbd5e1; font-size: 9px; font-weight: 800; text-align: center; }
-.agenda-week-session { display: grid; gap: 2px; border: 1px solid #ddd6fe; border-left: 3px solid #8b5cf6; border-radius: 8px; padding: 8px; color: #6d28d9; background: #faf5ff; text-align: left; }
+.agenda-week-session, .agenda-week-timetable { --week-class-accent: #3b82f6; --week-class-border: #bfdbfe; --week-class-color: #1e40af; --week-class-soft: #eff6ff; display: grid; gap: 2px; border: 1px solid var(--week-class-border); border-left: 3px solid var(--week-class-accent); border-radius: 8px; padding: 8px; color: var(--week-class-color); background: var(--week-class-soft); text-align: left; }
+.agenda-week-session.green, .agenda-week-timetable.green { --week-class-accent: #10b981; --week-class-border: #a7f3d0; --week-class-color: #065f46; --week-class-soft: #ecfdf5; }
+.agenda-week-session.red, .agenda-week-timetable.red { --week-class-accent: #ef4444; --week-class-border: #fecaca; --week-class-color: #991b1b; --week-class-soft: #fff1f2; }
+.agenda-week-session.purple, .agenda-week-timetable.purple { --week-class-accent: #8b5cf6; --week-class-border: #c4b5fd; --week-class-color: #5b21b6; --week-class-soft: #f5f3ff; }
+.agenda-week-session.yellow, .agenda-week-timetable.yellow { --week-class-accent: #f59e0b; --week-class-border: #fde68a; --week-class-color: #92400e; --week-class-soft: #fffbeb; }
+.agenda-week-session.orange, .agenda-week-timetable.orange { --week-class-accent: #f97316; --week-class-border: #fed7aa; --week-class-color: #9a3412; --week-class-soft: #fff7ed; }
 .agenda-week-session.cancelled, .agenda-week-session.notHeld { border-color: #fecaca; border-left-color: #ef4444; color: #991b1b; background: #fff1f2; opacity: .78; }
-.agenda-week-session > span { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 950; }
-.agenda-week-session strong { color: #334155; font-size: 9px; }
-.agenda-week-session small { overflow: hidden; color: #94a3b8; font-size: 7px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.agenda-week-timetable { --week-class-accent: #3b82f6; --week-class-border: #bfdbfe; --week-class-color: #1e40af; --week-class-soft: #eff6ff; display: grid; gap: 2px; border: 1px solid var(--week-class-border); border-left: 3px solid var(--week-class-accent); border-radius: 8px; padding: 8px; color: var(--week-class-color); background: var(--week-class-soft); text-align: left; }
-.agenda-week-timetable.green { --week-class-accent: #10b981; --week-class-border: #a7f3d0; --week-class-color: #065f46; --week-class-soft: #ecfdf5; }
-.agenda-week-timetable.red { --week-class-accent: #ef4444; --week-class-border: #fecaca; --week-class-color: #991b1b; --week-class-soft: #fff1f2; }
-.agenda-week-timetable.purple { --week-class-accent: #8b5cf6; --week-class-border: #c4b5fd; --week-class-color: #5b21b6; --week-class-soft: #f5f3ff; }
-.agenda-week-timetable.yellow { --week-class-accent: #f59e0b; --week-class-border: #fde68a; --week-class-color: #92400e; --week-class-soft: #fffbeb; }
-.agenda-week-timetable.orange { --week-class-accent: #f97316; --week-class-border: #fed7aa; --week-class-color: #9a3412; --week-class-soft: #fff7ed; }
-.agenda-week-timetable > span { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 950; }
-.agenda-week-timetable strong { color: currentColor; font-size: 9px; }
-.agenda-week-timetable small { overflow: hidden; color: #64748b; font-size: 7px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-week-session > span, .agenda-week-timetable > span { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 950; }
+.agenda-week-session strong, .agenda-week-timetable strong { color: currentColor; font-size: 9px; }
+.agenda-week-session small, .agenda-week-timetable small { overflow: hidden; color: #64748b; font-size: 7px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-week-timetable em { width: fit-content; margin-top: 2px; border-radius: 999px; padding: 2px 5px; color: #64748b; background: rgb(255 255 255 / 72%); font-size: 6px; font-style: normal; font-weight: 900; }
 .agenda-week-timetable:hover { filter: saturate(1.1) brightness(.99); }
 .agenda-week-session.calendar-blocked, .agenda-week-timetable.calendar-blocked { --week-class-accent: #64748b; --week-class-border: #cbd5e1; --week-class-color: #475569; --week-class-soft: #f1f5f9; border-color: #cbd5e1; border-left-color: #64748b; color: #475569; background: #f1f5f9; opacity: 1; }
