@@ -17,6 +17,7 @@ import {
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
+import { buildAgendaSessionItemUpdate } from '../../lib/agendaToday'
 import {
   copyTimetableVersionStructure,
   buildActivitySessionDistribution,
@@ -36,7 +37,6 @@ import {
   getSessionCandidateKey,
   moveTimetableSlot,
   orderActivitiesForScheduling,
-  planActivityChange,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
 } from '../../domain/planning'
@@ -979,49 +979,23 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [persist, refreshSync, repository, synchronize])
 
   /**
-   * Aplica l'abast triat pel docent: només la còpia del grup, la UP base o
-   * una proposta pendent. L'element concret de la sessió sempre reflecteix
-   * el canvi que el docent acaba de confirmar.
+   * Ajusta només la còpia de l'activitat que viu en aquesta sessió d'Agenda.
+   * La font de Programació es manté intacta i només es pot editar des del seu
+   * mòdul propi.
    */
-  const saveSessionItemChange = useCallback(async (bundle, item, changes, scope) => {
+  const saveSessionItemChange = useCallback(async (bundle, item, changes) => {
     const now = new Date().toISOString()
-    const normalizedChanges = {
+    const entry = buildAgendaSessionItemUpdate(bundle, item, {
       plannedMinutes: changes.plannedMinutes,
       title: changes.title,
-    }
-    const itemChange = createSessionItem({ ...item, ...normalizedChanges, updatedAt: now }, { now })
-    const entries = [{
-      entity: itemChange,
-      context: {
-        applicationId: bundle.application.id,
-        planningUnitId: bundle.planningUnit.id,
-        sessionId: bundle.session.id,
-      },
-    }]
-    let sourceActivity = item.sourceActivity
-    if (sourceActivity) {
-      const plannedChange = planActivityChange({
-        activity: sourceActivity,
-        application: bundle.application,
-        changes: normalizedChanges,
-        now,
-        scope,
-      })
-      sourceActivity = plannedChange.baseActivity
-      if (plannedChange.baseActivity !== item.sourceActivity) entries.push({ entity: plannedChange.baseActivity })
-      if (plannedChange.groupOverride) {
-        entries.push({
-          entity: plannedChange.groupOverride,
-          context: { applicationId: bundle.application.id, planningUnitId: bundle.planningUnit.id },
-        })
-      }
-    }
-    await persist(entries)
+    }, { now })
+    const itemChange = entry.entity
+    await persist(entry)
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
       ? {
           ...current,
           items: current.items.map((currentItem) => currentItem.id === item.id
-            ? { ...itemChange, sourceActivity }
+            ? { ...itemChange, sourceActivity: item.sourceActivity }
             : currentItem),
         }
       : current))

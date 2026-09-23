@@ -1,3 +1,5 @@
+import { createSessionItem } from '../domain/planning/model.js'
+
 function addDays(dateKey, amount) {
   const date = new Date(`${dateKey}T12:00:00Z`)
   date.setUTCDate(date.getUTCDate() + amount)
@@ -38,6 +40,28 @@ export function mergeAgendaClassCatalog({ bundles = [], classes = [], sharedClas
   classes.forEach(mergeClass)
 
   return [...catalog.values()]
+}
+
+/**
+ * Prepara una edició exclusiva de l'Agenda. El resultat conté una única
+ * entitat de sessió i, per construcció, no pot escriure l'activitat mestra de
+ * la Programació ni crear cap modificació de grup.
+ */
+export function buildAgendaSessionItemUpdate(bundle, item, changes, options = {}) {
+  const now = options.now || new Date().toISOString()
+  return {
+    context: {
+      applicationId: bundle.application.id,
+      planningUnitId: bundle.planningUnit.id,
+      sessionId: bundle.session.id,
+    },
+    entity: createSessionItem({
+      ...item,
+      plannedMinutes: changes.plannedMinutes,
+      title: changes.title,
+      updatedAt: now,
+    }, { now }),
+  }
 }
 
 /**

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -82,4 +82,44 @@ test('el calendari conserva el color assignat quan hi ha sessions programades', 
 
   assert.deepEqual(result.find((item) => item.id === '1d'), { color: 'green', id: '1d', name: '1rD' })
   assert.equal(result.find((item) => item.id === 'sg').color, 'red')
+})
+
+test('un ajust de cronologia crea nomes una edicio de la sessio', () => {
+  const sourceActivity = { id: 'activity-1', plannedMinutes: 60, title: 'Activitat mestra' }
+  const entry = buildAgendaSessionItemUpdate({
+    application: { id: 'application-1' },
+    planningUnit: { id: 'up-1' },
+    session: { id: 'session-1' },
+  }, {
+    applicationId: 'application-1',
+    createdAt: '2026-09-23T08:00:00.000Z',
+    entityType: 'sessionItem',
+    id: 'item-1',
+    order: 0,
+    ownerUid: 'teacher-1',
+    plannedMinutes: 5,
+    schemaVersion: 1,
+    segmentCount: 2,
+    segmentIndex: 2,
+    sessionId: 'session-1',
+    sourceActivity,
+    sourceActivityId: sourceActivity.id,
+    title: sourceActivity.title,
+    type: 'activity',
+    updatedAt: '2026-09-23T08:00:00.000Z',
+  }, {
+    plannedMinutes: 4,
+    title: 'Ajust real de l Agenda',
+  }, { now: '2026-09-23T09:00:00.000Z' })
+
+  assert.equal(entry.entity.entityType, 'sessionItem')
+  assert.equal(entry.entity.plannedMinutes, 4)
+  assert.equal(entry.entity.title, 'Ajust real de l Agenda')
+  assert.equal(entry.entity.sourceActivity, undefined)
+  assert.deepEqual(entry.context, {
+    applicationId: 'application-1',
+    planningUnitId: 'up-1',
+    sessionId: 'session-1',
+  })
+  assert.deepEqual(sourceActivity, { id: 'activity-1', plannedMinutes: 60, title: 'Activitat mestra' })
 })

@@ -7,12 +7,6 @@ import { Modal } from '../../components/Modal'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { AgendaSessionDetail } from './AgendaSessionViews'
 
-const CHANGE_SCOPES = [
-  ['groupOnly', 'Només aquest grup', 'La UP base i els altres grups no canvien.'],
-  ['baseAndGroup', 'UP base i aquest grup', 'El canvi passa a la programació ideal i queda aplicat aquí.'],
-  ['groupAndProposal', 'Aquest grup i proposta', 'Aquí s’aplica ara i queda una proposta pendent per a la UP.'],
-]
-
 function dateLabel(startsAt) {
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'short', weekday: 'short' })
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
@@ -44,7 +38,6 @@ export function AgendaSessionAdjustDialog({
   const item = editableItems.find((candidate) => candidate.id === itemId) || editableItems[0] || null
   const [title, setTitle] = useState(item?.title || '')
   const [plannedMinutes, setPlannedMinutes] = useState(item?.plannedMinutes || '')
-  const [scope, setScope] = useState('groupOnly')
   const [continuationMinutes, setContinuationMinutes] = useState(item?.plannedMinutes || 15)
   const [continuationPreview, setContinuationPreview] = useState(null)
   const [confirmRemoval, setConfirmRemoval] = useState(false)
@@ -110,9 +103,8 @@ export function AgendaSessionAdjustDialog({
         <label>Activitat<select value={item.id} onChange={(event) => selectItem(event.target.value)}>{editableItems.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}{candidate.plannedMinutes ? ` · ${candidate.plannedMinutes} min` : ''}{candidate.segmentCount > 1 ? ` · part ${candidate.segmentIndex}/${candidate.segmentCount}` : ''}</option>)}</select></label>
         <label>Títol<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
         <label>Minuts previstos<input min="1" type="number" value={plannedMinutes} onChange={(event) => setPlannedMinutes(event.target.value)} /></label>
-        <fieldset className="agenda-change-scopes"><legend>On vols aplicar el canvi?</legend>{CHANGE_SCOPES.map(([value, label, detail]) => <label className={scope === value ? 'selected' : ''} key={value}><input checked={scope === value} name="change-scope" onChange={() => setScope(value)} type="radio" /><span><strong>{label}</strong><small>{detail}</small></span></label>)}</fieldset>
-        <div className="agenda-adjust-preview"><Edit3 size={18} /><div><strong>Previsualització</strong><p>«{item.title}» passarà a «{title}»{plannedMinutes ? ` amb ${plannedMinutes} minuts` : ' sense temps definit'} segons l’abast seleccionat.</p></div></div>
-        <button className="primary-action" disabled={busy || !title.trim()} onClick={() => execute(() => onSaveItem(item, { plannedMinutes: plannedMinutes ? Number(plannedMinutes) : null, title: title.trim() }, scope), 'Canvi aplicat amb l’abast seleccionat.')} type="button">{busy && <Loader2 className="spin" size={16} />}Aplicar canvi</button>
+        <div className="agenda-adjust-preview ready"><CheckCircle2 size={18} /><div><strong>Canvi només a l’Agenda</strong><p>«{item.title}» passarà a «{title}»{plannedMinutes ? ` amb ${plannedMinutes} minuts` : ' sense temps definit'} en aquesta sessió. La Programació no es modificarà.</p></div></div>
+        <button className="primary-action" disabled={busy || !title.trim()} onClick={() => execute(() => onSaveItem(item, { plannedMinutes: plannedMinutes ? Number(plannedMinutes) : null, title: title.trim() }), 'Canvi desat només a l’Agenda.')} type="button">{busy && <Loader2 className="spin" size={16} />}Desar canvi a l’Agenda</button>
         <div className="agenda-remove-session-item">
           {!confirmRemoval ? <>
             <div><strong>Treure aquest fragment de la sessió</strong><p>L’activitat original de la UP i les altres parts programades es conservaran.</p></div>
