@@ -21,7 +21,7 @@ import {
   Trash2,
   UsersRound,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from './Modal'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { COLLECTIONS } from '../data/seedData'
@@ -29,7 +29,6 @@ import { ClassSettingsModal } from '../features/classes/ClassSettingsModal'
 import { NewClassModal } from '../features/classes/NewClassModal'
 import { DataSafetyModal } from '../features/data/DataSafetyModal'
 import { DataTreatmentModal } from '../features/data/DataTreatmentModal'
-import { RemindersModal } from '../features/data/RemindersModal'
 import { TeacherGradePackageModal } from '../features/data/TeacherGradePackageModal'
 import { TutoringShareModal } from '../features/data/TutoringShareModal'
 import { FeedbackModal } from '../features/help/FeedbackModal'
@@ -44,6 +43,10 @@ import {
   subscribeInternalMessageState,
 } from '../lib/firebase'
 import { getPendingReminderSummary } from '../lib/reminders'
+
+const AgendaRemindersModal = lazy(() =>
+  import('../features/agenda/AgendaRemindersModal').then((module) => ({ default: module.AgendaRemindersModal })),
+)
 
 const colorClass = {
   blue: 'class-dot blue',
@@ -640,7 +643,15 @@ export function TopBar() {
       {showProfile && <TeacherProfileModal onClose={() => setShowProfile(false)} />}
       {showTeacherPackages && <TeacherGradePackageModal onClose={() => setShowTeacherPackages(false)} />}
       {showTutoringShare && <TutoringShareModal onClose={() => setShowTutoringShare(false)} />}
-      {showReminders && <RemindersModal onClose={() => setShowReminders(false)} />}
+      {showReminders && (
+        <Suspense fallback={(
+          <Modal onClose={() => setShowReminders(false)} size="lg" title="Recordatoris">
+            <div className="module-loading" role="status"><Loader2 size={24} />Carregant l’horari…</div>
+          </Modal>
+        )}>
+          <AgendaRemindersModal onClose={() => setShowReminders(false)} />
+        </Suspense>
+      )}
       {showResetConfirm && (
         <Modal onClose={() => setShowResetConfirm(false)} size="lg" title="Reiniciar el curs">
           <div className="reset-course-modal">
