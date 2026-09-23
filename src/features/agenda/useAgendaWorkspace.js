@@ -1079,9 +1079,11 @@ export function useAgendaWorkspace(user, classes = []) {
       ])
       const applications = applicationResult.entities.filter((application) =>
         application.classId === bundle.session.classId)
-      const activityById = new Map(structureResult.entities
+      const phases = structureResult.entities
+        .filter((entity) => entity.entityType === 'planningPhase')
+      const activities = structureResult.entities
         .filter((entity) => entity.entityType === 'planningActivity')
-        .map((activity) => [activity.id, activity]))
+      const activityById = new Map(activities.map((activity) => [activity.id, activity]))
       const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
         `application:${application.id}:sessions`,
         () => loadPlanningSessions({
@@ -1105,9 +1107,15 @@ export function useAgendaWorkspace(user, classes = []) {
           },
           { completeSnapshot: true },
         )))
-      return { activityById, detailResults, previousSessions, unit }
+      return {
+        activityById,
+        detailResults,
+        orderedActivities: orderActivitiesForScheduling(phases, activities),
+        previousSessions,
+        unit,
+      }
     }))
-    histories.forEach(({ activityById, detailResults, previousSessions, unit }) => {
+    histories.forEach(({ activityById, detailResults, orderedActivities, previousSessions, unit }) => {
       previousSessions.forEach(({ session }, index) => {
         if (['cancelled', 'notHeld'].includes(session.status)) return
         detailResults[index].entities
@@ -1126,9 +1134,55 @@ export function useAgendaWorkspace(user, classes = []) {
             })
           })
       })
+      // Si una replanificació antiga ja va retirar les sessions de la
+      // cronologia, l'activitat mestra continua existint a la UP. Oferim les
+      // activitats anteriors a la que consta avui, començant per la més
+      // propera, perquè es puguin recuperar sense alterar la Programació.
+      if (unit.id === bundle.planningUnit.id) {
+        const currentActivityIds = new Set((bundle.items || [])
+          .map((item) => item.sourceActivityId)
+          .filter(Boolean))
+        const currentIndex = orderedActivities.findIndex((activity) =>
+          currentActivityIds.has(activity.id))
+        const programmableMinutes = Math.max(1, Number(bundle.session.durationMinutes) - 5)
+        const precedingActivities = currentIndex > 0
+          ? orderedActivities.slice(0, currentIndex).reverse()
+          : []
+        precedingActivities.forEach((activity, fallbackRank) => {
+          const activityKey = `${unit.id}:${activity.id}`
+          if (latestByActivityId.has(activityKey)) return
+          const totalSegments = activity.plannedMinutes
+            ? Math.max(1, Math.ceil(Number(activity.plannedMinutes) / programmableMinutes))
+            : 1
+          latestByActivityId.set(activityKey, {
+            id: `${unit.id}:activity:${activity.id}`,
+            fallbackRank,
+            isProgrammingFallback: true,
+            lastStartsAt: '',
+            plannedMinutes: activity.plannedMinutes
+              ? Math.min(Number(activity.plannedMinutes), programmableMinutes)
+              : programmableMinutes,
+            segmentCount: totalSegments,
+            segmentIndex: Math.max(0, totalSegments - 1),
+            sourceActivity: activity,
+            sourceActivityId: activity.id,
+            sourcePlanningUnitId: unit.id,
+            sourcePlanningUnitLabel: [unit.code, unit.title].filter(Boolean).join(' · '),
+            title: activity.title,
+            type: activity.type || 'activity',
+          })
+        })
+      }
     })
     return [...latestByActivityId.values()]
-      .sort((left, right) => right.lastStartsAt.localeCompare(left.lastStartsAt))
+      .sort((left, right) => {
+        if (left.lastStartsAt && right.lastStartsAt) {
+          return right.lastStartsAt.localeCompare(left.lastStartsAt)
+        }
+        if (left.lastStartsAt) return -1
+        if (right.lastStartsAt) return 1
+        return Number(left.fallbackRank) - Number(right.fallbackRank)
+      })
   }, [activeAcademicYear, allPlanningUnits, repository, user?.uid])
 
   /**
