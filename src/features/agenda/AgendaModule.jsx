@@ -433,11 +433,12 @@ export default function AgendaModule() {
     () => buildReminderSessionOptions({
       bundles: workspace.sessionBundles,
       calendarEvents: workspace.calendarEvents,
+      classes: agendaClasses,
       slots: workspace.slots,
       timetable: workspace.activeTimetable,
       today: workspace.today,
     }),
-    [workspace.activeTimetable, workspace.calendarEvents, workspace.sessionBundles, workspace.slots, workspace.today],
+    [agendaClasses, workspace.activeTimetable, workspace.calendarEvents, workspace.sessionBundles, workspace.slots, workspace.today],
   )
   const upcomingReminders = useMemo(() => {
     const horizon = addDateDays(workspace.today, 3)

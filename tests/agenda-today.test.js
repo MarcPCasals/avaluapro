@@ -134,6 +134,32 @@ test('un recordatori pot vincular una classe de l horari encara que no tingui ca
   ])
 })
 
+test('Tutoria veu la franja horaria que comparteix amb el grup de tutoria', () => {
+  const options = buildReminderSessionOptions({
+    bundles: [],
+    classes: [
+      { id: '1c', name: '1rC' },
+      { id: 'tutoria', name: 'Tutoria' },
+    ],
+    slots: [{
+      classId: '1c',
+      durationMinutes: 60,
+      id: 'wednesday-tutoring',
+      startsAt: '13:00',
+      subject: 'Tutoria',
+      weekday: 3,
+    }],
+    timetable: { effectiveFrom: '2026-09-01', effectiveTo: null },
+    today: '2026-09-23',
+    weeks: 1,
+  })
+
+  const tutoringOption = options.find((option) => option.classId === 'tutoria')
+  assert.equal(tutoringOption.date, '2026-09-23')
+  assert.equal(tutoringOption.time, '13:00')
+  assert.equal(tutoringOption.sessionId, 'timetable_2026-09-23_wednesday-tutoring')
+})
+
 test('els recordatoris no proposen una classe en un dia no lectiu', () => {
   const options = buildReminderSessionOptions({
     calendarEvents: [{ classIds: [], endsOn: '2026-09-23', startsOn: '2026-09-23', type: 'holiday' }],

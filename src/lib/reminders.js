@@ -177,7 +177,6 @@ export function getSessionPersonalReminders(agendaNotes = [], session = {}) {
   return agendaNotes
     .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type))
     .filter((note) => isPendingReminder(note.reminder))
-    .filter((note) => note.classId === session.classId)
     .filter((note) => {
       if (note.sessionId && note.sessionId === session.id) return true
       return Boolean(

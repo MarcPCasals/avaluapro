@@ -53,6 +53,26 @@ test('el vincle sobreviu quan una franja de l horari rep una sessio programada',
   assert.equal(result.length, 1)
 })
 
+test('un recordatori de Tutoria apareix al Mode aula del grup que comparteix la franja', () => {
+  const result = getSessionPersonalReminders([
+    {
+      ...baseReminder,
+      classId: 'tutoria',
+      reminder: { date: '2026-09-23', dismissedAt: '', text: 'Portar autorització', time: '13:00' },
+      sessionId: 'timetable_2026-09-23_wednesday-tutoring',
+      timetableSlotId: 'wednesday-tutoring',
+    },
+  ], {
+    classId: '1c',
+    id: 'timetable_2026-09-23_wednesday-tutoring',
+    startsAt: '2026-09-23T13:00:00',
+    timetableSlotId: 'wednesday-tutoring',
+  })
+
+  assert.equal(result.length, 1)
+  assert.equal(result[0].reminder.text, 'Portar autorització')
+})
+
 test('els recordatoris completats deixen de sortir al Mode aula', () => {
   const result = getSessionPersonalReminders([
     {

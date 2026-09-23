@@ -16,6 +16,31 @@ function timeToMinutes(value = '') {
   return Number.isFinite(hours) && Number.isFinite(minutes) ? (hours * 60) + minutes : 0
 }
 
+function normalizedScheduleLabel(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase()
+}
+
+/**
+ * Una franja pot pertànyer al grup d'alumnes (1rC) i alhora representar una
+ * classe pròpia de la barra superior (Tutoria). El nom de l'assignatura permet
+ * oferir la mateixa franja als dos contextos sense duplicar l'horari.
+ */
+function reminderClassIdsForSlot(slot = {}, classes = []) {
+  const canonicalClassId = String(slot.classId || '')
+  const subjectLabel = normalizedScheduleLabel(slot.subject)
+  const aliases = subjectLabel
+    ? classes
+      .filter((classItem) => String(classItem?.id || '') !== canonicalClassId)
+      .filter((classItem) => normalizedScheduleLabel(classItem?.name) === subjectLabel)
+      .map((classItem) => String(classItem.id))
+    : []
+  return [...new Set([canonicalClassId, ...aliases].filter(Boolean))]
+}
+
 /**
  * Reuneix les classes pròpies, compartides i inferides de les sessions en un
  * únic catàleg per a l'Agenda. Les dades configurades de la classe prevalen
@@ -177,6 +202,7 @@ export function getWeekTimetableOccurrences({ bundles = [], slots = [], timetabl
 export function buildReminderSessionOptions({
   bundles = [],
   calendarEvents = [],
+  classes = [],
   slots = [],
   timetable = null,
   today,
@@ -192,20 +218,21 @@ export function buildReminderSessionOptions({
         && !['cancelled', 'notHeld'].includes(session.status)
         && !getNoClassCalendarEvent(calendarEvents, date, session.classId)
     })
-    .map((bundle) => {
+    .flatMap((bundle) => {
       const session = bundle.session
-      return {
-        classId: session.classId,
+      const slot = slots.find((candidate) => candidate.id === session.timetableSlotId)
+      return reminderClassIdsForSlot(slot || { classId: session.classId }, classes).map((classId) => ({
+        classId,
         date: String(session.startsAt).slice(0, 10),
         durationMinutes: Number(session.durationMinutes || 60),
-        id: `session:${session.id}`,
+        id: `session:${session.id}${classId === session.classId ? '' : `:class:${classId}`}`,
         planningLabel: [bundle.planningUnit?.code, bundle.planningUnit?.title].filter(Boolean).join(' · '),
         sessionId: session.id,
         startsAt: session.startsAt,
         subgroupId: session.subgroupId || '',
         time: String(session.startsAt).slice(11, 16),
         timetableSlotId: session.timetableSlotId || '',
-      }
+      }))
     })
 
   const startDate = new Date(`${today}T12:00:00Z`)
@@ -223,18 +250,18 @@ export function buildReminderSessionOptions({
         occurrence.slot.classId,
       ))
       .forEach((occurrence) => {
-        options.push({
-          classId: occurrence.slot.classId,
+        reminderClassIdsForSlot(occurrence.slot, classes).forEach((classId) => options.push({
+          classId,
           date: occurrence.date,
           durationMinutes: Number(occurrence.slot.durationMinutes || 60),
-          id: `session:${occurrence.id}`,
+          id: `session:${occurrence.id}${classId === occurrence.slot.classId ? '' : `:class:${classId}`}`,
           planningLabel: occurrence.slot.subject || '',
           sessionId: occurrence.id,
           startsAt: occurrence.startsAt,
           subgroupId: occurrence.slot.subgroupId || '',
           time: occurrence.slot.startsAt,
           timetableSlotId: occurrence.slot.id,
-        })
+        }))
       })
   }
 
