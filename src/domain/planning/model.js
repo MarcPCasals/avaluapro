@@ -591,17 +591,6 @@ export function createCalendarSession(input, options = {}) {
 export function createSessionItem(input, options = {}) {
   const type = enumValue(input.type, SESSION_ITEM_TYPES, "tipus d'element de sessió")
   const sourceActivityId = optionalText(input.sourceActivityId)
-  const snapshot = input.sourceActivitySnapshot && typeof input.sourceActivitySnapshot === 'object'
-    ? {
-        description: optionalText(input.sourceActivitySnapshot.description),
-        studentMaterials: Array.isArray(input.sourceActivitySnapshot.studentMaterials)
-          ? input.sourceActivitySnapshot.studentMaterials
-          : [],
-        teacherMaterials: Array.isArray(input.sourceActivitySnapshot.teacherMaterials)
-          ? input.sourceActivitySnapshot.teacherMaterials
-          : [],
-      }
-    : null
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.SESSION_ITEM, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
@@ -609,8 +598,6 @@ export function createSessionItem(input, options = {}) {
     sessionId: requiredText(input.sessionId, 'sessió'),
     type,
     sourceActivityId,
-    sourceActivitySnapshot: sourceActivityId ? snapshot : null,
-    sourcePlanningUnitId: sourceActivityId ? optionalText(input.sourcePlanningUnitId) : null,
     title: requiredText(input.title, "títol de l'element"),
     order: normalizedOrder(input.order),
     plannedMinutes: optionalMinutes(input.plannedMinutes, 'temps previst'),

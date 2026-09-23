@@ -483,7 +483,17 @@ export function useAgendaWorkspace(user, classes = []) {
           { completeSnapshot: true },
         )))
       const unitIds = [...new Set(sessionRecords.map((record) => record.planningUnit.id))]
-      const structureResults = await Promise.all(unitIds.map((planningUnitId) => repository.loadScope(
+      // Una sessió pot recuperar una activitat d'una UP anterior. Carreguem
+      // també les estructures pròpies arxivades perquè la descripció i els
+      // materials es resolguin des de la seva font, sense duplicar-los dins
+      // del document de l'Agenda.
+      const sourceUnitIds = [...new Set([
+        ...unitIds,
+        ...allPlanningUnits
+          .filter((unit) => unit.ownerUid === user?.uid)
+          .map((unit) => unit.id),
+      ])]
+      const structureResults = await Promise.all(sourceUnitIds.map((planningUnitId) => repository.loadScope(
         `planningUnit:${planningUnitId}:structure`,
         async () => {
           const structure = await loadPlanningUnitStructure(planningUnitId)
@@ -500,10 +510,13 @@ export function useAgendaWorkspace(user, classes = []) {
         () => loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
         { completeSnapshot: true },
       )))
-      const baseActivitiesByUnitId = new Map(unitIds.map((planningUnitId, index) => [
+      const baseActivitiesByUnitId = new Map(sourceUnitIds.map((planningUnitId, index) => [
         planningUnitId,
         structureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
       ]))
+      const sourceActivityById = new Map([...baseActivitiesByUnitId.values()]
+        .flat()
+        .map((activity) => [activity.id, activity]))
       const activitiesByApplicationKey = new Map(applicationRecords.map((record, index) => [
         `${record.planningUnit.id}:${record.application.id}`,
         new Map(applyPlanningActivityOverrides(
@@ -524,7 +537,7 @@ export function useAgendaWorkspace(user, classes = []) {
             .map((item) => ({
               ...item,
               sourceActivity: activityById.get(item.sourceActivityId)
-                || item.sourceActivitySnapshot
+                || sourceActivityById.get(item.sourceActivityId)
                 || null,
             })),
           results: entities.filter((entity) => entity.entityType === 'activityResult'),
@@ -1102,13 +1115,12 @@ export function useAgendaWorkspace(user, classes = []) {
           .sort((left, right) => Number(left.order) - Number(right.order))
           .forEach((item) => {
             if (!item.sourceActivityId) return
-            const sourceActivity = activityById.get(item.sourceActivityId) || item.sourceActivitySnapshot || null
+            const sourceActivity = activityById.get(item.sourceActivityId) || null
             latestByActivityId.set(`${unit.id}:${item.sourceActivityId}`, {
               ...item,
               id: `${unit.id}:${item.id}`,
               lastStartsAt: session.startsAt,
               sourceActivity,
-              sourceActivitySnapshot: sourceActivity,
               sourcePlanningUnitId: unit.id,
               sourcePlanningUnitLabel: [unit.code, unit.title].filter(Boolean).join(' · '),
             })
@@ -1221,7 +1233,9 @@ export function useAgendaWorkspace(user, classes = []) {
         items: candidate.items.map((item) => ({
           ...item,
           sourceActivity: activityById.get(item.sourceActivityId)
-            || item.sourceActivitySnapshot
+            || (item.sourceActivityId === preview.recoveryItem.sourceActivityId
+              ? preview.recoveryItem.sourceActivity
+              : null)
             || null,
         })),
         planningUnit: preview.setup.planningUnit,
