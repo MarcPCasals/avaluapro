@@ -4,6 +4,7 @@ import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
   applyImprovementProposals,
+  buildAgendaRecoveryReflow,
   buildActivityImprovementProposals,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
@@ -869,6 +870,69 @@ test('afegir una activitat al mig reorganitza totes les sessions futures en cade
   assert.equal(result.replacedItemCount, 2)
   assert.deepEqual(result.removedSessions, [])
   assert.deepEqual(result.unscheduled, [])
+})
+
+test('recuperar una activitat anterior desplaça l’agenda futura sense tocar la UP', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const makeBundle = (id, startsAt, activityId, title, status = 'planned') => {
+    const session = createCalendarSession({
+      id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+      startsAt, durationMinutes: 60, timetableSlotId: `slot-${id}`, status,
+    }, options(idFactory))
+    return {
+      items: [createSessionItem({
+        ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+        type: 'activity', title, order: 0, plannedMinutes: 55,
+        sourceActivityId: activityId, segmentIndex: activityId === 'petjades' ? 3 : 1,
+        segmentCount: activityId === 'petjades' ? 3 : 1,
+      }, options(idFactory))],
+      results: [],
+      session,
+    }
+  }
+  const past = makeBundle(
+    'session-past', '2026-09-21T08:30:00', 'petjades', 'Petjades Misterioses', 'held',
+  )
+  const today = makeBundle(
+    'session-today', '2026-09-23T11:00:00', 'coca-cola', 'Activitat Coca-Cola',
+  )
+  const friday = makeBundle(
+    'session-friday', '2026-09-25T08:30:00', 'esmorzar', 'Esmorzar científic',
+  )
+  const originalTodayItem = structuredClone(today.items[0])
+
+  const result = buildAgendaRecoveryReflow({
+    application,
+    candidates: [{
+      date: '2026-09-28', startsAt: '2026-09-28T08:30:00', durationMinutes: 60,
+      timetableSlotId: 'slot-next',
+    }],
+    existingSessionBundles: [past, today, friday],
+    options: options(idFactory),
+    recoveryItem: past.items[0],
+    recoveryMinutes: 55,
+    targetSessionId: today.session.id,
+  })
+
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => item.title)), [
+    ['Petjades Misterioses'],
+    ['Activitat Coca-Cola'],
+    ['Esmorzar científic'],
+  ])
+  assert.deepEqual(result.sessions.map((bundle) => bundle.session.startsAt), [
+    '2026-09-23T11:00:00',
+    '2026-09-25T08:30:00',
+    '2026-09-28T08:30:00',
+  ])
+  assert.equal(result.changedLockedItems[0].segmentCount, 4)
+  assert.equal(result.sessions[0].items[0].segmentIndex, 4)
+  assert.equal(result.sessions[0].items[0].segmentCount, 4)
+  assert.deepEqual(today.items[0], originalTodayItem)
+  assert.equal(result.kind, 'agenda-recovery')
+  assert.equal(result.shiftedItemCount, 2)
 })
 
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {

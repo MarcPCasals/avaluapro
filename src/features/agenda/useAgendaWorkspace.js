@@ -20,6 +20,7 @@ import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/plan
 import { buildAgendaSessionItemUpdate } from '../../lib/agendaToday'
 import {
   copyTimetableVersionStructure,
+  buildAgendaRecoveryReflow,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
@@ -750,7 +751,7 @@ export function useAgendaWorkspace(user, classes = []) {
    * les sessions ja creades. La finestra de proposta pot així detectar què ja
    * està assignat sense mantenir obertes totes aquestes dades a l'Agenda.
    */
-  const loadSchedulingSetup = useCallback(async ({ classId, planningUnitId }) => {
+  const loadSchedulingSetup = useCallback(async ({ applicationId = '', classId, planningUnitId }) => {
     if (!repository || !activeAcademicYear || !planningUnitId || !classId) {
       throw new Error('Cal seleccionar una UP i un grup.')
     }
@@ -780,7 +781,10 @@ export function useAgendaWorkspace(user, classes = []) {
     const applications = applicationResult.entities
       .filter((item) => item.classId === classId)
       .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
-    const application = applications[0] || createGroupApplication({
+    const savedApplication = applicationId
+      ? applications.find((item) => item.id === applicationId)
+      : applications[0]
+    const application = savedApplication || createGroupApplication({
       academicYearId: activeAcademicYear.id,
       classId,
       classLabel: classes.find((item) => item.id === classId)?.name || '',
@@ -789,7 +793,7 @@ export function useAgendaWorkspace(user, classes = []) {
       planningUnitVersion: planningUnit.versionNumber,
       status: 'draft',
     })
-    const overrideResult = applications[0]
+    const overrideResult = savedApplication
       ? await repository.loadScope(
           `application:${application.id}:overrides`,
           () => loadPlanningActivityOverrides(planningUnitId, application.id),
@@ -802,7 +806,7 @@ export function useAgendaWorkspace(user, classes = []) {
     )
     let existingSessions = []
     let existingSessionBundles = []
-    if (applications[0]) {
+    if (savedApplication) {
       const sessionResult = await repository.loadScope(
         `application:${application.id}:sessions`,
         () => loadPlanningSessions({
@@ -851,7 +855,7 @@ export function useAgendaWorkspace(user, classes = []) {
       calendarEvents,
       existingSessions,
       existingSessionBundles,
-      isNewApplication: !applications[0],
+      isNewApplication: !savedApplication,
       planningUnit,
       remainingMinutesByActivityId,
       scheduledSourceActivityIds,
@@ -1031,6 +1035,197 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [refreshSync, repository, synchronize])
 
   /**
+   * Ofereix les activitats ja treballades abans de la sessió actual. Es pren
+   * l'últim fragment de cada activitat perquè el docent pugui reprendre-la
+   * sense haver d'editar la UP ni conèixer-ne l'identificador intern.
+   */
+  const loadAgendaRecoveryOptions = useCallback(async (bundle) => {
+    if (!repository || !activeAcademicYear) return []
+    const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id,
+      classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const activityById = new Map(setup.activities.map((activity) => [activity.id, activity]))
+    const applicationResult = await repository.loadScope(
+      `planningUnit:${bundle.planningUnit.id}:applications:${bundle.session.classId}`,
+      () => loadPlanningApplications(bundle.planningUnit.id, bundle.session.classId, 100),
+      { completeSnapshot: true },
+    )
+    // Una UP es pot haver reconnectat al mateix grup i haver creat una altra
+    // aplicació. L'històric continua sent recuperable encara que aquella
+    // connexió anterior ara estigui arxivada.
+    const applications = applicationResult.entities.filter((application) =>
+      application.classId === bundle.session.classId)
+    const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
+      `application:${application.id}:sessions`,
+      () => loadPlanningSessions({
+        applicationId: application.id,
+        from: `${activeAcademicYear.startsOn}T00:00:00`,
+        maxItems: 500,
+        planningUnitId: bundle.planningUnit.id,
+        to: bundle.session.startsAt,
+      }),
+    )))
+    const previousSessions = sessionResults.flatMap((result, index) => result.entities
+      .filter((session) => session.startsAt < bundle.session.startsAt)
+      .map((session) => ({ application: applications[index], session })))
+      .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+    const detailResults = await Promise.all(previousSessions.map(({ application, session }) =>
+      repository.loadScope(
+        `session:${session.id}:detail`,
+        async () => {
+          const detail = await loadPlanningSessionDetail(
+            bundle.planningUnit.id, application.id, session.id,
+          )
+          return [detail.session, ...detail.items, ...detail.results]
+        },
+        { completeSnapshot: true },
+      )))
+    const latestByActivityId = new Map()
+    previousSessions.forEach(({ session }, index) => {
+      if (['cancelled', 'notHeld'].includes(session.status)) return
+        ;detailResults[index].entities
+          .filter((entity) => entity.entityType === 'sessionItem')
+          .sort((left, right) => Number(left.order) - Number(right.order))
+          .forEach((item) => {
+            if (!item.sourceActivityId) return
+            latestByActivityId.set(item.sourceActivityId, {
+              ...item,
+              lastStartsAt: session.startsAt,
+              sourceActivity: activityById.get(item.sourceActivityId) || null,
+            })
+          })
+    })
+    return [...latestByActivityId.values()]
+      .sort((left, right) => right.lastStartsAt.localeCompare(left.lastStartsAt))
+  }, [activeAcademicYear, loadSchedulingSetup, repository])
+
+  /**
+   * Insereix una recuperació abans del contingut previst i calcula l'efecte
+   * dominó complet en memòria. Encara no s'escriu res fins que el docent veu
+   * la proposta i la confirma.
+   */
+  const buildAgendaRecoveryPreview = useCallback(async (bundle, recoveryItem, minutes) => {
+    if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu per reajustar l’Agenda.')
+    const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id,
+      classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const targetBundle = setup.existingSessionBundles.find((candidate) =>
+      candidate.session.id === bundle.session.id)
+    if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
+
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId,
+      date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt,
+      timetableSlotId: session.timetableSlotId,
+    }))
+    const temporalProposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents,
+      classId: setup.application.classId,
+      from: String(targetBundle.session.startsAt).slice(0, 10),
+      occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId,
+      timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const preview = buildAgendaRecoveryReflow({
+      application: setup.application,
+      candidates: temporalProposal.candidates.filter((candidate) =>
+        candidate.startsAt > targetBundle.session.startsAt),
+      existingSessionBundles: setup.existingSessionBundles,
+      options: { now: new Date().toISOString() },
+      recoveryItem,
+      recoveryMinutes: Number(minutes),
+      targetSessionId: targetBundle.session.id,
+    })
+    if (preview.unscheduled.length > 0) {
+      throw new Error('No hi ha prou sessions disponibles per desplaçar totes les activitats posteriors.')
+    }
+    return { ...preview, setup }
+  }, [activeAcademicYear, loadSchedulingSetup])
+
+  /** Desa el reajustament confirmat només dins de l'Agenda del grup. */
+  const confirmAgendaRecoveryPreview = useCallback(async (preview) => {
+    if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
+    const planningUnitId = preview.setup.planningUnit.id
+    for (const item of preview.removedItems) {
+      await repository.remove(item, {
+        applicationId: preview.setup.application.id,
+        planningUnitId,
+        sessionId: item.sessionId,
+      })
+    }
+    for (const session of preview.removedSessions) {
+      await repository.remove(session, {
+        applicationId: preview.setup.application.id,
+        planningUnitId,
+      })
+    }
+    const entries = preview.changedLockedItems.map((item) => ({
+      entity: item,
+      context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
+    }))
+    for (const candidate of preview.sessions) {
+      if (!candidate.isExisting) {
+        entries.push({ entity: candidate.session, context: { planningUnitId } })
+      }
+      for (const item of candidate.items) {
+        entries.push({
+          entity: item,
+          context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
+        })
+      }
+    }
+    for (const entry of entries) await repository.save(entry.entity, entry.context)
+    await refreshSync()
+    await synchronize()
+
+    const activityById = new Map(preview.setup.activities.map((activity) => [activity.id, activity]))
+    const changedById = new Map(preview.changedLockedItems.map((item) => [item.id, item]))
+    const replacementBySessionId = new Map(preview.sessions.map((candidate) => [
+      candidate.session.id,
+      {
+        application: preview.setup.application,
+        items: candidate.items.map((item) => ({
+          ...item,
+          sourceActivity: activityById.get(item.sourceActivityId) || null,
+        })),
+        planningUnit: preview.setup.planningUnit,
+        results: [],
+        session: candidate.session,
+      },
+    ]))
+    const removedSessionIds = new Set(preview.removedSessions.map((session) => session.id))
+    setSessionBundles((currentBundles) => {
+      const next = currentBundles
+        .filter((current) => !removedSessionIds.has(current.session.id))
+        .map((current) => {
+          const replacement = replacementBySessionId.get(current.session.id)
+          if (replacement) return replacement
+          return {
+            ...current,
+            items: current.items.map((item) => changedById.has(item.id)
+              ? { ...changedById.get(item.id), sourceActivity: item.sourceActivity }
+              : item),
+          }
+        })
+      const knownIds = new Set(next.map((current) => current.session.id))
+      for (const replacement of replacementBySessionId.values()) {
+        if (!knownIds.has(replacement.session.id)) next.push(replacement)
+      }
+      return next.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+    })
+    return {
+      ...preview,
+      sessionCount: preview.sessions.length,
+    }
+  }, [refreshSync, repository, synchronize])
+
+  /**
    * Una continuació no altera el temps ideal de la UP. Construeix fragments
    * nous per al grup i actualitza els comptadors de parts, però espera una
    * confirmació separada abans de desar-los.
@@ -1040,6 +1235,7 @@ export function useAgendaWorkspace(user, classes = []) {
       throw new Error('Cal seleccionar una activitat i indicar els minuts de continuació.')
     }
     const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id,
       classId: bundle.session.classId,
       planningUnitId: bundle.planningUnit.id,
     })
@@ -1180,7 +1376,9 @@ export function useAgendaWorkspace(user, classes = []) {
     activeTimetableId,
     calendarEvents,
     buildSchedulingPreview,
+    buildAgendaRecoveryPreview,
     buildContinuationPreview,
+    confirmAgendaRecoveryPreview,
     confirmContinuationPreview,
     confirmSchedulingPreview,
     closeClassroomSession,
@@ -1191,6 +1389,7 @@ export function useAgendaWorkspace(user, classes = []) {
     isOnline,
     loading: loading || sharedLoading,
     loadSchedulingSetup,
+    loadAgendaRecoveryOptions,
     loadClassroomPrivateNotes,
     loadSessionRange,
     loadTodaySessions,

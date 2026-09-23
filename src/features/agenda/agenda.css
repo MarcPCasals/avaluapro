@@ -483,7 +483,7 @@
 
 .agenda-session-dialog .agenda-session-detail { margin-top: 0; }
 .agenda-adjust-dialog .modal-body { display: grid; gap: 13px; }
-.agenda-adjust-tabs { display: flex; gap: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.agenda-adjust-tabs { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
 .agenda-adjust-tabs button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; padding: 7px 9px; color: #64748b; background: #f8fafc; font-size: 9px; font-weight: 900; }
 .agenda-adjust-tabs button.active { color: #6d28d9; background: #f5f3ff; }
 .agenda-adjust-tabs button:disabled { opacity: .4; }

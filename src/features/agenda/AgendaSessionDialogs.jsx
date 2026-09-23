@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowRight, CalendarX2, CheckCircle2, Clock3, Edit3, Loader2,
-  RotateCcw, Trash2, X,
+  History, RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
@@ -24,9 +24,12 @@ export function AgendaSessionAdjustDialog({
   bundle,
   initialAction = 'session',
   initialItemId = '',
+  onBuildRecovery,
   onBuildContinuation,
   onClose,
+  onConfirmRecovery,
   onConfirmContinuation,
+  onLoadRecoveryOptions,
   onRemoveItem,
   onSaveItem,
   onSaved,
@@ -40,6 +43,11 @@ export function AgendaSessionAdjustDialog({
   const [plannedMinutes, setPlannedMinutes] = useState(item?.plannedMinutes || '')
   const [continuationMinutes, setContinuationMinutes] = useState(item?.plannedMinutes || 15)
   const [continuationPreview, setContinuationPreview] = useState(null)
+  const [recoveryOptions, setRecoveryOptions] = useState([])
+  const [recoveryItemId, setRecoveryItemId] = useState('')
+  const [recoveryMinutes, setRecoveryMinutes] = useState(15)
+  const [recoveryPreview, setRecoveryPreview] = useState(null)
+  const [recoveryLoading, setRecoveryLoading] = useState(false)
   const [confirmRemoval, setConfirmRemoval] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -49,6 +57,9 @@ export function AgendaSessionAdjustDialog({
     && !bundle.session.attendanceConfirmedAt
     && !bundle.session.classroomClosedAt
     && !itemHasResult
+  const recoveryItem = recoveryOptions.find((candidate) => candidate.id === recoveryItemId)
+    || recoveryOptions[0]
+    || null
 
   const selectItem = (nextId) => {
     const nextItem = editableItems.find((candidate) => candidate.id === nextId)
@@ -85,12 +96,49 @@ export function AgendaSessionAdjustDialog({
       setBusy(false)
     }
   }
+  const selectRecoveryItem = (nextId) => {
+    const nextItem = recoveryOptions.find((candidate) => candidate.id === nextId)
+    setRecoveryItemId(nextId)
+    setRecoveryMinutes(nextItem?.plannedMinutes || 15)
+    setRecoveryPreview(null)
+  }
+  const openRecovery = async () => {
+    setAction('recovery')
+    if (recoveryOptions.length > 0 || recoveryLoading || !onLoadRecoveryOptions) return
+    setRecoveryLoading(true)
+    setError('')
+    try {
+      const options = await onLoadRecoveryOptions(bundle)
+      setRecoveryOptions(options)
+      const first = options[0]
+      if (first) {
+        setRecoveryItemId(first.id)
+        setRecoveryMinutes(first.plannedMinutes || 15)
+      }
+    } catch (loadError) {
+      setError(loadError.message || 'No s’han pogut carregar les activitats anteriors.')
+    } finally {
+      setRecoveryLoading(false)
+    }
+  }
+  const previewRecovery = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      setRecoveryPreview(await onBuildRecovery(bundle, recoveryItem, Number(recoveryMinutes)))
+    } catch (previewError) {
+      setError(previewError.message || 'No s’ha pogut preparar el reajustament.')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-adjust-dialog" size="lg" title="Reajustar la sessió">
       <nav aria-label="Tipus de reajustament" className="agenda-adjust-tabs" role="tablist">
         <button aria-selected={action === 'session'} className={action === 'session' ? 'active' : ''} onClick={() => setAction('session')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'session' ? 0 : -1} type="button"><CalendarX2 size={15} />Sessió</button>
         <button aria-selected={action === 'activity'} className={action === 'activity' ? 'active' : ''} disabled={editableItems.length === 0} onClick={() => setAction('activity')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'activity' ? 0 : -1} type="button"><Edit3 size={15} />Activitat</button>
         <button aria-selected={action === 'continuation'} className={action === 'continuation' ? 'active' : ''} disabled={editableItems.length === 0} onClick={() => setAction('continuation')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'continuation' ? 0 : -1} type="button"><ArrowRight size={15} />Continuació</button>
+        <button aria-selected={action === 'recovery'} className={action === 'recovery' ? 'active' : ''} onClick={openRecovery} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'recovery' ? 0 : -1} type="button"><History size={15} />Recuperar anterior</button>
       </nav>
 
       {action === 'session' && <section className="agenda-adjust-panel" role="tabpanel">
@@ -122,6 +170,15 @@ export function AgendaSessionAdjustDialog({
         <label>Minuts que cal continuar<input min="1" type="number" value={continuationMinutes} onChange={(event) => { setContinuationMinutes(event.target.value); setContinuationPreview(null) }} /></label>
         {!continuationPreview ? <div className="agenda-adjust-preview"><Clock3 size={18} /><div><strong>Primer revisarem on encaixa</strong><p>Agenda aprofitarà els minuts lliures de la següent sessió i només crearà una data nova si cal.</p></div></div> : <div className="agenda-continuation-preview"><header><CheckCircle2 size={17} /><strong>{continuationPreview.sessions.length} sessions afectades</strong></header>{continuationPreview.sessions.map((candidate) => <div key={candidate.session.id}><span>{dateLabel(candidate.session.startsAt)} · {String(candidate.session.startsAt).slice(11, 16)}</span><strong>{candidate.items.reduce((total, current) => total + (current.plannedMinutes || 0), 0)} min</strong><small>{candidate.isExisting ? 'Aprofita una sessió prevista' : 'Crea una sessió nova'}</small></div>)}</div>}
         {continuationPreview ? <button className="primary-action" disabled={busy} onClick={() => execute(() => onConfirmContinuation(continuationPreview), 'Continuació afegida a les pròximes sessions.')} type="button">{busy && <Loader2 className="spin" size={16} />}Confirmar continuació</button> : <button className="secondary-action" disabled={busy || Number(continuationMinutes) <= 0} onClick={previewContinuation} type="button">{busy ? <Loader2 className="spin" size={16} /> : <ArrowRight size={16} />}Previsualitzar continuació</button>}
+      </section>}
+
+      {action === 'recovery' && <section className="agenda-adjust-panel" role="tabpanel">
+        {recoveryLoading ? <div className="agenda-adjust-preview"><Loader2 className="spin" size={18} /><div><strong>Carregant la cronologia anterior</strong><p>Busquem les activitats d’aquesta UP que ja havies començat amb el grup.</p></div></div> : recoveryItem ? <>
+          <label>Activitat anterior<select value={recoveryItem.id} onChange={(event) => selectRecoveryItem(event.target.value)}>{recoveryOptions.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title} · {dateLabel(candidate.lastStartsAt)}{candidate.plannedMinutes ? ` · ${candidate.plannedMinutes} min` : ''}</option>)}</select></label>
+          <label>Minuts que hi dedicaràs ara<input min="1" type="number" value={recoveryMinutes} onChange={(event) => { setRecoveryMinutes(event.target.value); setRecoveryPreview(null) }} /></label>
+          {!recoveryPreview ? <div className="agenda-adjust-preview"><History size={18} /><div><strong>Es posarà abans del que hi havia previst</strong><p>«{recoveryItem.title}» obrirà aquesta sessió. Si ja estava plena, les activitats actuals avançaran automàticament a les sessions següents. La Programació no canviarà.</p></div></div> : <div className="agenda-continuation-preview"><header><CheckCircle2 size={17} /><strong>{recoveryPreview.sessions.length} sessions reajustades</strong></header>{recoveryPreview.sessions.map((candidate) => <div key={candidate.session.id}><span>{dateLabel(candidate.session.startsAt)} · {String(candidate.session.startsAt).slice(11, 16)}</span><strong>{candidate.items.map((current) => current.title).join(' · ')}</strong><small>{candidate.isExisting ? 'Reutilitza la sessió prevista' : 'Crea la sessió que absorbeix l’efecte dominó'}</small></div>)}</div>}
+          {recoveryPreview ? <button className="primary-action" disabled={busy} onClick={() => execute(() => onConfirmRecovery(recoveryPreview), 'Activitat anterior recuperada i cronologia reajustada només a l’Agenda.')} type="button">{busy && <Loader2 className="spin" size={16} />}Confirmar reajustament</button> : <button className="secondary-action" disabled={busy || Number(recoveryMinutes) <= 0} onClick={previewRecovery} type="button">{busy ? <Loader2 className="spin" size={16} /> : <History size={16} />}Previsualitzar l’efecte dominó</button>}
+        </> : <div className="agenda-adjust-preview warning"><AlertTriangle size={18} /><div><strong>No hi ha cap activitat anterior disponible</strong><p>Aquesta opció apareixerà quan la classe tingui almenys una activitat prèvia d’aquesta mateixa UP.</p></div></div>}
       </section>}
 
       {error && <p className="agenda-inline-error" role="alert">{error}</p>}
