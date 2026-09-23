@@ -1,4 +1,5 @@
 import { createSessionItem } from '../domain/planning/model.js'
+import { getNoClassCalendarEvent } from './agendaCalendar.js'
 
 function addDays(dateKey, amount) {
   const date = new Date(`${dateKey}T12:00:00Z`)
@@ -166,4 +167,78 @@ export function getWeekTimetableOccurrences({ bundles = [], slots = [], timetabl
     })
     .filter(Boolean)
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+}
+
+/**
+ * Construeix les opcions reals que es poden vincular a un recordatori.
+ * Combina les sessions ja calendaritzades amb les franges recurrents de
+ * l'horari que encara no tenen UP, sense duplicar-les ni oferir dies no lectius.
+ */
+export function buildReminderSessionOptions({
+  bundles = [],
+  calendarEvents = [],
+  slots = [],
+  timetable = null,
+  today,
+  weeks = 6,
+}) {
+  if (!today) return []
+
+  const options = bundles
+    .filter((bundle) => {
+      const session = bundle?.session || {}
+      const date = String(session.startsAt || '').slice(0, 10)
+      return date >= today
+        && !['cancelled', 'notHeld'].includes(session.status)
+        && !getNoClassCalendarEvent(calendarEvents, date, session.classId)
+    })
+    .map((bundle) => {
+      const session = bundle.session
+      return {
+        classId: session.classId,
+        date: String(session.startsAt).slice(0, 10),
+        durationMinutes: Number(session.durationMinutes || 60),
+        id: `session:${session.id}`,
+        planningLabel: [bundle.planningUnit?.code, bundle.planningUnit?.title].filter(Boolean).join(' · '),
+        sessionId: session.id,
+        startsAt: session.startsAt,
+        subgroupId: session.subgroupId || '',
+        time: String(session.startsAt).slice(11, 16),
+        timetableSlotId: session.timetableSlotId || '',
+      }
+    })
+
+  const startDate = new Date(`${today}T12:00:00Z`)
+  const weekday = startDate.getUTCDay() || 7
+  startDate.setUTCDate(startDate.getUTCDate() - weekday + 1)
+  const firstWeek = startDate.toISOString().slice(0, 10)
+
+  for (let offset = 0; offset < weeks; offset += 1) {
+    const weekStart = addDays(firstWeek, offset * 7)
+    getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
+      .filter((occurrence) => occurrence.date >= today)
+      .filter((occurrence) => !getNoClassCalendarEvent(
+        calendarEvents,
+        occurrence.date,
+        occurrence.slot.classId,
+      ))
+      .forEach((occurrence) => {
+        options.push({
+          classId: occurrence.slot.classId,
+          date: occurrence.date,
+          durationMinutes: Number(occurrence.slot.durationMinutes || 60),
+          id: `session:${occurrence.id}`,
+          planningLabel: occurrence.slot.subject || '',
+          sessionId: occurrence.id,
+          startsAt: occurrence.startsAt,
+          subgroupId: occurrence.slot.subgroupId || '',
+          time: occurrence.slot.startsAt,
+          timetableSlotId: occurrence.slot.id,
+        })
+      })
+  }
+
+  return options
+    .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+    .filter((option, index, items) => items.findIndex((item) => item.id === option.id) === index)
 }

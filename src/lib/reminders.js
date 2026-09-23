@@ -164,3 +164,28 @@ export function getPendingReminderSummary({ agendaNotes = [], classes = [], stud
 export function getPersonalCalendarReminders(items = []) {
   return items.filter((item) => ['agenda', 'general'].includes(item.kind))
 }
+
+/**
+ * Retorna només els recordatoris personals vinculats explícitament a la sessió
+ * que s'ha obert. La coincidència per franja manté l'enllaç si una classe de
+ * l'horari acaba rebent una sessió calendaritzada de Programació.
+ */
+export function getSessionPersonalReminders(agendaNotes = [], session = {}) {
+  const sessionDate = String(session.startsAt || '').slice(0, 10)
+  const sessionTime = String(session.startsAt || '').slice(11, 16)
+
+  return agendaNotes
+    .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type))
+    .filter((note) => isPendingReminder(note.reminder))
+    .filter((note) => note.classId === session.classId)
+    .filter((note) => {
+      if (note.sessionId && note.sessionId === session.id) return true
+      return Boolean(
+        note.timetableSlotId
+        && note.timetableSlotId === session.timetableSlotId
+        && note.reminder?.date === sessionDate
+        && (!note.reminder?.time || note.reminder.time === sessionTime),
+      )
+    })
+    .sort((left, right) => String(left.createdAt || '').localeCompare(String(right.createdAt || '')))
+}

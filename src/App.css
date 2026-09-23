@@ -13703,6 +13703,46 @@ button.tutorial-record-pill {
   font-weight: 950;
 }
 
+.reminder-kind-switch {
+  display: inline-flex;
+  justify-self: start;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 4px;
+  background: white;
+}
+
+.reminder-kind-switch button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 12px;
+  color: #64748b;
+  background: transparent;
+  font-weight: 900;
+}
+
+.reminder-kind-switch button.active {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.reminder-kind-switch button.active.tutoring {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.reminder-kind-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .reminder-list header {
   justify-content: space-between;
 }
@@ -13749,6 +13789,52 @@ button.tutorial-record-pill {
   resize: vertical;
 }
 
+.reminder-session-picker {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.reminder-session-picker > span {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #6d28d9;
+  background: #ede9fe;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.reminder-session-picker select {
+  grid-column: 1 / -1;
+  width: 100%;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  padding: 10px;
+  color: #312e81;
+  background: #faf5ff;
+  font-weight: 850;
+}
+
+.reminder-session-picker small {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-weight: 750;
+}
+
+.reminder-form-error {
+  margin: 0;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #991b1b;
+  background: #fef2f2;
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .reminder-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -13774,6 +13860,18 @@ button.tutorial-record-pill {
 .reminder-row.record {
   border-color: #bfdbfe;
   background: #eff6ff;
+}
+
+.reminder-row.tutoring {
+  border-color: #ddd6fe;
+  color: #7c3aed;
+  background: #faf5ff;
+}
+
+@media (max-width: 720px) {
+  .reminder-form-grid { grid-template-columns: 1fr; }
+  .reminder-kind-switch { width: 100%; }
+  .reminder-kind-switch button { flex: 1; justify-content: center; }
 }
 
 .reminder-row > div {

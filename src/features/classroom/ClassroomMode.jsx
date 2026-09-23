@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock3,
+  AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, Loader2, Mail, MessageSquarePlus,
   Pause, PencilLine, Play, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
   Users, UserX, X,
@@ -14,6 +14,7 @@ import {
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
+import { getSessionPersonalReminders } from '../../lib/reminders'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   buildRecoveryEmail,
@@ -288,6 +289,7 @@ export function ClassroomMode({
   const sessionTaskRecords = taskRecords.filter((record) => sessionTasks.some((task) => task.id === record.taskId))
   const pendingTaskRecords = sessionTaskRecords.filter((record) => record.recoveryPending || ['LATE', 'MISSING'].includes(record.status))
   const sessionRecoveryNotes = agendaNotes.filter((note) => note.type === 'activityRecovery' && note.sessionId === currentBundle.session.id)
+  const sessionPersonalReminders = getSessionPersonalReminders(agendaNotes, currentBundle.session)
   const departedStudents = visibleStudents.filter((student) => sessionRecoveryNotes.some((note) =>
     note.studentId === student.id && note.recovery?.kind === 'earlyDeparture'))
   const attendanceIssueIds = new Set([...absentStudents, ...departedStudents].map((student) => student.id))
@@ -298,6 +300,7 @@ export function ClassroomMode({
   const reminderCount = sessionTaskRecords.filter((record) => record.reminder && !record.reminder.dismissedAt).length
     + sessionTasks.filter((task) => task.reminder && !task.reminder.dismissedAt).length
     + sessionRecoveryNotes.filter((note) => note.reminder && !note.reminder.dismissedAt).length
+    + sessionPersonalReminders.length
   const existingPrivateNote = currentBundle.privateNotes?.[0]?.text || ''
   const reflectionResult = [...currentBundle.results].reverse().find((result) => result.pedagogicalReflection)
   const existingReflection = reflectionResult?.pedagogicalReflection || ''
@@ -537,6 +540,13 @@ export function ClassroomMode({
 
       <main className={`classroom-workspace ${sidePanel ? 'attendance-visible' : ''}`}>
         <section className="classroom-chronology" aria-label="Cronologia de la classe">
+          {sessionPersonalReminders.length > 0 && <section className="classroom-session-reminders" aria-label="Recordatoris d’aquesta sessió">
+            <Bell size={19} />
+            <div>
+              <strong>{sessionPersonalReminders.length === 1 ? 'Recordatori d’aquesta sessió' : 'Recordatoris d’aquesta sessió'}</strong>
+              {sessionPersonalReminders.map((note) => <p key={note.id}>{note.reminder?.text || note.text}</p>)}
+            </div>
+          </section>}
           <div className="classroom-sequence-before">
             {currentBundle.items.slice(0, currentIndex).map((item, index) => <ClassroomTimelineItem active={false} item={item} key={item.id} onSelect={() => selectItem(index)} position={`Feta · ${index + 1}`} result={currentBundle.results.find((result) => result.sessionItemId === item.id)} />)}
           </div>

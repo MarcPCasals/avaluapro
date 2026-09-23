@@ -1,0 +1,70 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { getSessionPersonalReminders } from '../src/lib/reminders.js'
+
+const baseReminder = {
+  classId: '1d',
+  id: 'reminder-1',
+  reminder: {
+    date: '2026-09-23',
+    dismissedAt: '',
+    text: 'Portar gots de plàstic',
+    time: '11:00',
+  },
+  text: 'Portar gots de plàstic',
+  type: 'generalReminder',
+}
+
+test('Mode aula mostra un recordatori vinculat directament a la sessio', () => {
+  const result = getSessionPersonalReminders([
+    { ...baseReminder, sessionId: 'session-1' },
+  ], {
+    classId: '1d',
+    id: 'session-1',
+    startsAt: '2026-09-23T11:00:00',
+  })
+
+  assert.equal(result.length, 1)
+  assert.equal(result[0].text, 'Portar gots de plàstic')
+})
+
+test('Mode aula no mostra un recordatori vinculat a una altra sessio', () => {
+  const result = getSessionPersonalReminders([
+    { ...baseReminder, sessionId: 'session-2' },
+  ], {
+    classId: '1d',
+    id: 'session-1',
+    startsAt: '2026-09-23T11:00:00',
+  })
+
+  assert.equal(result.length, 0)
+})
+
+test('el vincle sobreviu quan una franja de l horari rep una sessio programada', () => {
+  const result = getSessionPersonalReminders([
+    { ...baseReminder, sessionId: 'timetable_2026-09-23_wednesday', timetableSlotId: 'wednesday' },
+  ], {
+    classId: '1d',
+    id: 'new-programmed-session',
+    startsAt: '2026-09-23T11:00:00',
+    timetableSlotId: 'wednesday',
+  })
+
+  assert.equal(result.length, 1)
+})
+
+test('els recordatoris completats deixen de sortir al Mode aula', () => {
+  const result = getSessionPersonalReminders([
+    {
+      ...baseReminder,
+      reminder: { ...baseReminder.reminder, dismissedAt: '2026-09-23T12:00:00.000Z' },
+      sessionId: 'session-1',
+    },
+  ], {
+    classId: '1d',
+    id: 'session-1',
+    startsAt: '2026-09-23T11:00:00',
+  })
+
+  assert.equal(result.length, 0)
+})

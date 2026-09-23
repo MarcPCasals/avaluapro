@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionItemUpdate, buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -66,6 +66,43 @@ test('una classe de l horari pot obrir Mode aula sense cap UP', () => {
   assert.equal(bundle.session.startsAt, occurrence.startsAt)
   assert.equal(bundle.items.length, 0)
   assert.equal(bundle.planningUnit.code, 'Horari')
+})
+
+test('els recordatoris poden triar sessions programades i classes nomes presents a l horari', () => {
+  const options = buildReminderSessionOptions({
+    bundles: [{
+      planningUnit: { code: 'UP 1.1', title: 'La fórmula secreta' },
+      session: {
+        classId: '1d',
+        durationMinutes: 60,
+        id: 'planned-session',
+        startsAt: '2026-09-23T11:00:00',
+        status: 'planned',
+        timetableSlotId: 'wednesday',
+      },
+    }],
+    slots,
+    timetable: { effectiveFrom: '2026-09-01', effectiveTo: null },
+    today: '2026-09-23',
+    weeks: 2,
+  })
+
+  assert.equal(options[0].sessionId, 'planned-session')
+  assert.equal(options[0].planningLabel, 'UP 1.1 · La fórmula secreta')
+  assert.equal(options.filter((option) => option.startsAt === '2026-09-23T11:00:00').length, 1)
+  assert.ok(options.some((option) => option.sessionId === 'timetable_2026-09-28_monday-second'))
+})
+
+test('els recordatoris no proposen una classe en un dia no lectiu', () => {
+  const options = buildReminderSessionOptions({
+    calendarEvents: [{ classIds: [], endsOn: '2026-09-23', startsOn: '2026-09-23', type: 'holiday' }],
+    slots,
+    timetable: { effectiveFrom: '2026-09-01', effectiveTo: null },
+    today: '2026-09-23',
+    weeks: 1,
+  })
+
+  assert.equal(options.some((option) => option.date === '2026-09-23'), false)
 })
 
 test('el calendari conserva el color assignat quan hi ha sessions programades', () => {

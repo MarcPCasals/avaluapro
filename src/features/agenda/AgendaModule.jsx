@@ -13,7 +13,7 @@ import {
 import { CLASS_COLORS } from '../../data/classColors'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getAgendaDefaultWeekStart } from '../../lib/agendaCalendar'
-import { buildTimetableClassroomBundle, findNextTimetableOccurrence, mergeAgendaClassCatalog } from '../../lib/agendaToday'
+import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, mergeAgendaClassCatalog } from '../../lib/agendaToday'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
@@ -428,6 +428,17 @@ export default function AgendaModule() {
     () => getPersonalCalendarReminders(reminderSummary.items),
     [reminderSummary.items],
   )
+  const reminderButtonCount = reminderSummary.count + tutoringCalendarReminders.length
+  const reminderSessionOptions = useMemo(
+    () => buildReminderSessionOptions({
+      bundles: workspace.sessionBundles,
+      calendarEvents: workspace.calendarEvents,
+      slots: workspace.slots,
+      timetable: workspace.activeTimetable,
+      today: workspace.today,
+    }),
+    [workspace.activeTimetable, workspace.calendarEvents, workspace.sessionBundles, workspace.slots, workspace.today],
+  )
   const upcomingReminders = useMemo(() => {
     const horizon = addDateDays(workspace.today, 3)
     // Els pendents vençuts no desapareixen d'Avui: es mantenen al radar fins
@@ -771,7 +782,7 @@ export default function AgendaModule() {
           <button className="secondary-action compact agenda-reminders-trigger" onClick={() => setDialog('reminders')} type="button">
             <Bell size={15} />
             Recordatoris
-            {reminderSummary.count > 0 && <span aria-label={`${reminderSummary.count} recordatoris pendents`}>{reminderSummary.count}</span>}
+            {reminderButtonCount > 0 && <span aria-label={`${reminderButtonCount} recordatoris pendents`}>{reminderButtonCount}</span>}
           </button>
           {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
           <button aria-label="Sincronitzar Agenda" className="agenda-refresh" onClick={() => workspace.synchronize()} title="Sincronitzar ara" type="button"><RotateCcw size={15} /></button>
@@ -807,7 +818,7 @@ export default function AgendaModule() {
       {dialog === 'timetable' && <TimetableDialog academicYear={workspace.activeAcademicYear} currentTimetable={workspace.activeTimetable} initialValue={editingTimetable} onClose={() => setDialog(null)} onSave={(values, current) => current ? workspace.saveTimetable(current, values) : workspace.createTimetable(values)} />}
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
-      {dialog === 'reminders' && <RemindersModal onClose={() => setDialog(null)} />}
+      {dialog === 'reminders' && <RemindersModal onClose={() => setDialog(null)} sessionOptions={reminderSessionOptions} />}
       {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { const sessionCount = result.logicalSessionCount ?? result.sessionCount; setScheduleNotice(result.reflowed ? `${sessionCount} ${sessionCount === 1 ? 'sessió futura reorganitzada' : 'sessions futures reorganitzades'} amb l’efecte dominó.` : `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`); reloadActiveView() }} planningUnits={workspace.ownedPlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}

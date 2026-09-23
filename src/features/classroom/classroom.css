@@ -57,6 +57,10 @@
 .classroom-adaptation-reminder strong { color: #5b21b6; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .classroom-adaptation-reminder p { display: grid; gap: 1px; margin: 0; color: #475569; font-size: 10px; font-weight: 800; }
 .classroom-adaptation-reminder small { color: #8b5cf6; font-size: 8px; font-weight: 800; }
+.classroom-session-reminders { max-width: 760px; display: flex; gap: 11px; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 0 12px 12px 0; padding: 12px 14px; color: #b45309; background: #fffbeb; }
+.classroom-session-reminders > div { min-width: 0; display: grid; gap: 5px; }
+.classroom-session-reminders strong { color: #92400e; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.classroom-session-reminders p { margin: 0; color: #1e293b; font-size: 13px; font-weight: 850; line-height: 1.4; }
 
 .classroom-timer { max-width: 640px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 18px; align-items: center; border-top: 1px solid #eceff3; border-bottom: 1px solid #eceff3; padding: 15px 0; }
 .classroom-timer > span { color: #94a3b8; font-size: 9px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
