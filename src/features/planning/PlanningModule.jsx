@@ -424,7 +424,7 @@ export default function PlanningModule() {
   }
 
   return (
-    <section className="planning-screen">
+    <section className="planning-screen" data-app-module="planning">
       <header className="planning-topbar">
         <div className="planning-title-lockup">
           <span><BookOpenText size={23} /></span>
