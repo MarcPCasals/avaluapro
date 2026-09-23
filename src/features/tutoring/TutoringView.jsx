@@ -734,76 +734,137 @@ function formatLongDate(value) {
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
-async function downloadTutorialSeatingJpeg(filename = `disposicio-aula-${getTodaySlug()}.jpg`) {
-  const source = document.querySelector('.tutorial-seating-classroom')
-  if (!source) {
+function drawSeatingExportRoundedRect(context, x, y, width, height, radius) {
+  const cleanRadius = Math.min(radius, width / 2, height / 2)
+  context.beginPath()
+  context.moveTo(x + cleanRadius, y)
+  context.arcTo(x + width, y, x + width, y + height, cleanRadius)
+  context.arcTo(x + width, y + height, x, y + height, cleanRadius)
+  context.arcTo(x, y + height, x, y, cleanRadius)
+  context.arcTo(x, y, x + width, y, cleanRadius)
+  context.closePath()
+}
+
+async function downloadTutorialSeatingJpeg(
+  plan,
+  className = '',
+  filename = `disposicio-aula-${getTodaySlug()}.jpg`,
+) {
+  if (!plan?.layout || !Array.isArray(plan.seats) || !Array.isArray(plan.placements)) {
     window.alert('No s’ha trobat la disposició d’aula per exportar.')
     return
   }
 
-  const clone = source.cloneNode(true)
+  const columns = Math.max(1, Number(plan.columns || plan.layout.columns || 1))
+  const rows = Math.max(1, Number(plan.rows || plan.layout.rows || 1))
+  const margin = 52
+  const boardHeight = 116
+  const seatWidth = 154
+  const seatHeight = 92
+  const seatGap = 18
+  const blockGap = 26
+  const blockStarts = getSeatingBlockStartColumns(plan.layout).slice(1)
+  const width = margin * 2 + columns * seatWidth + Math.max(0, columns - 1) * seatGap + blockStarts.length * blockGap
+  const height = margin * 2 + boardHeight + rows * seatHeight + Math.max(0, rows - 1) * seatGap
+  const scale = Math.min(2, 3200 / Math.max(width, height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(width * scale))
+  canvas.height = Math.max(1, Math.round(height * scale))
+  const context = canvas.getContext('2d')
+  if (!context) {
+    window.alert('No s’ha pogut preparar el fitxer JPG.')
+    return
+  }
 
-  // L'exportació per imprimir només conté informació segura per mostrar a l'alumnat.
-  clone.querySelectorAll(
-    '.tutorial-seat-statuses, .tutorial-seat-actions, .tutorial-seating-legend, .tutorial-seat-student-media',
-  ).forEach((element) => element.remove())
+  context.scale(scale, scale)
+  context.fillStyle = '#ffffff'
+  context.fillRect(0, 0, width, height)
 
-  clone.querySelectorAll('.tutorial-seat-card').forEach((card) => {
-    ;['star', 'conflict', 'problem', 'locked', 'selected', 'drop-ready'].forEach((className) =>
-      card.classList.remove(className),
-    )
-    card.removeAttribute('aria-pressed')
-    card.removeAttribute('draggable')
-    card.removeAttribute('role')
-    card.removeAttribute('tabindex')
-    card.removeAttribute('title')
-  })
+  context.fillStyle = '#172033'
+  context.font = '800 22px system-ui, sans-serif'
+  context.textAlign = 'left'
+  context.fillText(className ? `Disposició d’aula · ${className}` : 'Disposició d’aula', margin, margin - 14)
 
-  clone.querySelectorAll('[title]').forEach((element) => element.removeAttribute('title'))
-  // Cap recurs gràfic incrustat pot arribar al canvas: l'exportació només conserva
-  // la distribució, els noms, la pissarra, la taula docent i les marques A/B.
-  clone.querySelectorAll('img, svg').forEach((element) => element.remove())
-  clone.classList.add('tutorial-seating-export')
+  const boardY = margin + 10
+  context.strokeStyle = '#334155'
+  context.lineWidth = 4
+  context.beginPath()
+  context.moveTo(margin + 170, boardY + 28)
+  context.lineTo(width - margin - 170, boardY + 28)
+  context.stroke()
+  context.fillStyle = '#334155'
+  context.font = '800 15px system-ui, sans-serif'
+  context.textAlign = 'center'
+  context.fillText('PISSARRA', width / 2, boardY + 18)
 
-  const width = Math.max(source.scrollWidth, source.clientWidth)
-  const height = Math.max(source.scrollHeight, source.clientHeight)
-  clone.style.width = `${width}px`
-  clone.style.maxWidth = 'none'
-  clone.style.height = 'auto'
-  clone.style.overflow = 'visible'
+  const teacherDeskWidth = 132
+  const teacherDeskX = plan.layout.teacherDeskSide === 'right' ? width - margin - teacherDeskWidth : margin
+  drawSeatingExportRoundedRect(context, teacherDeskX, boardY + 48, teacherDeskWidth, 42, 9)
+  context.fillStyle = '#f1f5f9'
+  context.fill()
+  context.strokeStyle = '#94a3b8'
+  context.lineWidth = 2
+  context.stroke()
+  context.fillStyle = '#334155'
+  context.font = '700 13px system-ui, sans-serif'
+  context.fillText('Taula docent', teacherDeskX + teacherDeskWidth / 2, boardY + 74)
 
-  const exportHost = document.createElement('div')
-  exportHost.style.position = 'fixed'
-  exportHost.style.left = '-100000px'
-  exportHost.style.top = '0'
-  exportHost.style.width = `${width}px`
-  exportHost.style.background = '#ffffff'
-  exportHost.append(clone)
-  document.body.append(exportHost)
+  const placementsBySeatId = new Map(plan.placements.map((placement) => [placement.seat?.id, placement]))
+  const groupASeatIds = new Set(plan.layout.halfGroupSeatIds?.A || [])
+  const groupBSeatIds = new Set(plan.layout.halfGroupSeatIds?.B || [])
+  const gridTop = margin + boardHeight
 
-  try {
-    const { default: html2canvas } = await import('html2canvas')
-    const scale = Math.min(2, 3200 / Math.max(width, height))
-    const canvas = await html2canvas(clone, {
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      height,
-      imageTimeout: 0,
-      logging: false,
-      scale,
-      useCORS: false,
-      width,
-      windowHeight: height,
-      windowWidth: width,
+  plan.seats
+    .filter((seat) => seat.enabled)
+    .forEach((seat) => {
+      const extraGap = blockStarts.filter((startColumn) => seat.x >= startColumn).length * blockGap
+      const x = margin + seat.x * (seatWidth + seatGap) + extraGap
+      const y = gridTop + seat.y * (seatHeight + seatGap)
+      const placement = placementsBySeatId.get(seat.id)
+      const halfGroup = placement
+        ? getSeatingHalfGroupKey(placement.halfGroup) || (groupASeatIds.has(seat.id) ? 'A' : groupBSeatIds.has(seat.id) ? 'B' : '')
+        : groupASeatIds.has(seat.id)
+          ? 'A'
+          : groupBSeatIds.has(seat.id)
+            ? 'B'
+            : ''
+
+      drawSeatingExportRoundedRect(context, x, y, seatWidth, seatHeight, 12)
+      context.fillStyle = placement ? '#fffaf2' : '#f8fafc'
+      context.fill()
+      context.strokeStyle = placement ? '#d6a96e' : '#cbd5e1'
+      context.lineWidth = 2
+      context.stroke()
+
+      if (halfGroup) {
+        context.beginPath()
+        context.arc(x + 21, y + 21, 13, 0, Math.PI * 2)
+        context.fillStyle = halfGroup === 'A' ? '#7c3aed' : '#16a34a'
+        context.fill()
+        context.fillStyle = '#ffffff'
+        context.font = '900 12px system-ui, sans-serif'
+        context.textAlign = 'center'
+        context.fillText(halfGroup, x + 21, y + 25)
+      }
+
+      context.fillStyle = placement ? '#172033' : '#94a3b8'
+      context.font = placement ? '800 15px system-ui, sans-serif' : '700 13px system-ui, sans-serif'
+      context.textAlign = 'center'
+      const label = placement ? getSeatingShortName(placement.student.student.name) : 'Taula lliure'
+      const maxTextWidth = seatWidth - 24
+      let fittedLabel = label
+      while (fittedLabel.length > 4 && context.measureText(fittedLabel).width > maxTextWidth) {
+        fittedLabel = `${fittedLabel.slice(0, -2).trim()}…`
+      }
+      context.fillText(fittedLabel, x + seatWidth / 2, y + seatHeight / 2 + 6)
     })
 
+  try {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.94))
     if (!blob) throw new Error('No s’ha pogut crear el fitxer JPG.')
     downloadBlob(blob, filename)
   } catch (error) {
     window.alert(error.message || 'No s’ha pogut crear el fitxer JPG.')
-  } finally {
-    exportHost.remove()
   }
 }
 
@@ -10781,7 +10842,7 @@ export function TutoringView() {
                 </button>
               </div>
               <div className="tutorial-seating-header-actions">
-                <button onClick={() => downloadTutorialSeatingJpeg()} type="button">
+                <button onClick={() => downloadTutorialSeatingJpeg(visibleSeatingPlan, activeClass?.name)} type="button">
                   <FileDown aria-hidden="true" size={17} />
                   Descarregar JPG
                 </button>
