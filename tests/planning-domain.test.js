@@ -536,6 +536,31 @@ test('una versió nova de l’horari copia les franges amb identitats noves', ()
   assert.equal(sourceSlot.timetableVersionId, sourceVersion.id)
 })
 
+test('una versió nova conserva el vincle de programació compartida amb els identificadors nous', () => {
+  const idFactory = sequenceIdFactory()
+  const sourceVersion = createTimetableVersion({
+    ownerUid: 'teacher-1', academicYearId: 'year-1', label: 'Horari base', effectiveFrom: '2026-09-01',
+  }, options(idFactory))
+  const groupA = createTimetableSlot({
+    ownerUid: 'teacher-1', timetableVersionId: sourceVersion.id, classId: 'class-1',
+    weekday: 5, startsAt: '15:00', durationMinutes: 60, subject: 'Ciències', subgroupId: 'Grup A',
+  }, options(idFactory))
+  const groupB = createTimetableSlot({
+    ownerUid: 'teacher-1', timetableVersionId: sourceVersion.id, classId: 'class-1',
+    weekday: 5, startsAt: '16:00', durationMinutes: 60, subject: 'Ciències', subgroupId: 'Grup B',
+    sharedProgrammingSlotId: groupA.id,
+  }, options(idFactory))
+
+  const copied = copyTimetableVersionStructure(
+    { timetableVersion: sourceVersion, slots: [groupA, groupB] },
+    { label: 'Horari nou', effectiveFrom: '2026-10-05' },
+    options(idFactory),
+  )
+
+  assert.equal(copied.slots[1].sharedProgrammingSlotId, copied.slots[0].id)
+  assert.notEqual(copied.slots[1].sharedProgrammingSlotId, groupA.id)
+})
+
 test('moure una franja conserva la identitat i no modifica una sessió ja creada', () => {
   const slot = createTimetableSlot({
     id: 'plan-slot-stable',
@@ -805,6 +830,36 @@ test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar 
   const progress = summarizeAssignedActivityProgress(result.sessions)
   assert.equal(progress.assignedMinutesByActivityId.experiment, 80)
   assert.equal(progress.assignedSourceActivityIds.has('experiment'), true)
+})
+
+test('dues franges vinculades comparteixen programació encara que la detecció automàtica no sigui possible', () => {
+  const timetable = { id: 'timetable-1', effectiveFrom: '2026-09-01', effectiveTo: null }
+  const candidates = buildTimetableSessionCandidates({
+    classId: 'class-1',
+    from: '2026-09-25',
+    to: '2026-09-25',
+    timetables: [timetable],
+    slotsByTimetableId: {
+      [timetable.id]: [
+        { id: 'slot-a', classId: 'class-1', weekday: 5, startsAt: '15:00', durationMinutes: 60, subject: 'Ciències' },
+        { id: 'slot-b', classId: 'class-1', weekday: 5, startsAt: '16:00', durationMinutes: 60, subject: 'Ciències', sharedProgrammingSlotId: 'slot-a' },
+      ],
+    },
+  }).candidates
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options())
+  const result = buildActivitySessionDistribution({
+    activities: [{ id: 'activity-1', title: 'Experiment', type: 'activity', plannedMinutes: 55 }],
+    application,
+    candidates,
+    options: options(sequenceIdFactory()),
+  })
+
+  assert.equal(result.logicalSessionCount, 1)
+  assert.equal(result.physicalSessionCount, 2)
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items[0].sourceActivityId), ['activity-1', 'activity-1'])
+  assert.equal(result.sessions[0].session.parallelProgrammingKey, result.sessions[1].session.parallelProgrammingKey)
 })
 
 test('la previsualització avisa si el calendari no té prou sessions i no perd la resta', () => {

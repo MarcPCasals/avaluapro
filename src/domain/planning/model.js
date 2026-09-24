@@ -518,6 +518,7 @@ export function createTimetableSlot(input, options = {}) {
     subject: requiredText(input.subject, 'assignatura'),
     space: optionalText(input.space),
     subgroupId: optionalText(input.subgroupId),
+    sharedProgrammingSlotId: optionalText(input.sharedProgrammingSlotId),
   }
 }
 
@@ -545,9 +546,17 @@ export function copyTimetableVersionStructure(
     id: undefined,
     createdAt: undefined,
     updatedAt: undefined,
+    sharedProgrammingSlotId: null,
     timetableVersionId: nextVersion.id,
   }, options))
-  return { timetableVersion: nextVersion, slots: nextSlots }
+  const copiedSlotIdBySourceId = new Map(slots.map((slot, index) => [slot.id, nextSlots[index].id]))
+  return {
+    timetableVersion: nextVersion,
+    slots: nextSlots.map((slot, index) => ({
+      ...slot,
+      sharedProgrammingSlotId: copiedSlotIdBySourceId.get(slots[index].sharedProgrammingSlotId) || null,
+    })),
+  }
 }
 
 export function createCalendarEvent(input, options = {}) {
@@ -589,6 +598,7 @@ export function createCalendarSession(input, options = {}) {
     startsAt: isoDateTime(input.startsAt, "data i hora d'inici"),
     durationMinutes: positiveMinutes(input.durationMinutes, 'durada de la sessió'),
     subgroupId: optionalText(input.subgroupId),
+    parallelProgrammingKey: optionalText(input.parallelProgrammingKey),
     status: enumValue(input.status || 'planned', SESSION_STATUSES, 'estat de la sessió'),
     classroomOpenedAt: input.classroomOpenedAt ? isoDateTime(input.classroomOpenedAt, "obertura de Mode aula") : null,
     attendanceConfirmedAt: input.attendanceConfirmedAt ? isoDateTime(input.attendanceConfirmedAt, "confirmació de l'assistència") : null,

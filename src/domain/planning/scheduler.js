@@ -50,10 +50,11 @@ function existingItemsSignature(items = []) {
 
 function sessionBundleParallelKey(bundle) {
   const session = bundle?.session
-  if (!session?.subgroupId) return ''
+  if (!session?.subgroupId && !session?.parallelProgrammingKey) return ''
   return [
     String(session.startsAt).slice(0, 10),
     Number(session.durationMinutes) || 0,
+    session.parallelProgrammingKey || 'automatic-half-groups',
     existingItemsSignature(bundle.items || bundle.existingItems),
   ].join('__')
 }
@@ -72,7 +73,10 @@ export function groupParallelSessionBundles(sessionBundles = []) {
     buckets.set(key, [...(buckets.get(key) || []), bundle])
   }
   const parallelKeys = new Set([...buckets.entries()]
-    .filter(([, bucket]) => new Set(bucket.map((bundle) => bundle.session.subgroupId)).size > 1)
+    .filter(([, bucket]) => bucket.length > 1 && (
+      bucket.some((bundle) => bundle.session.parallelProgrammingKey)
+      || new Set(bucket.map((bundle) => bundle.session.subgroupId)).size > 1
+    ))
     .map(([key]) => key))
   const groups = []
   const groupByKey = new Map()
@@ -94,10 +98,11 @@ export function groupParallelSessionBundles(sessionBundles = []) {
 }
 
 function parallelDraftKey(draft) {
-  if (!draft?.candidate?.subgroupId) return ''
+  if (!draft?.candidate?.subgroupId && !draft?.candidate?.parallelProgrammingKey) return ''
   return [
     draft.candidate.date,
     Number(draft.candidate.durationMinutes) || 0,
+    draft.candidate.parallelProgrammingKey || 'automatic-half-groups',
     existingItemsSignature(draft.existingItems),
   ].join('__')
 }
@@ -116,7 +121,10 @@ function buildLogicalDrafts(drafts) {
     parallelBuckets.set(key, [...(parallelBuckets.get(key) || []), draft])
   }
   const validParallelKeys = new Set([...parallelBuckets.entries()]
-    .filter(([, bucket]) => new Set(bucket.map((draft) => draft.candidate.subgroupId)).size > 1)
+    .filter(([, bucket]) => bucket.length > 1 && (
+      bucket.some((draft) => draft.candidate.parallelProgrammingKey)
+      || new Set(bucket.map((draft) => draft.candidate.subgroupId)).size > 1
+    ))
     .map(([key]) => key))
   const logicalByParallelKey = new Map()
   const logicalDrafts = []
@@ -226,6 +234,19 @@ export function buildTimetableSessionCandidates({
   const occupied = new Set(occupiedCandidateKeys)
   const candidates = []
   const skippedDates = []
+  const programmingLinksByTimetableId = new Map()
+  for (const [timetableId, timetableSlots] of Object.entries(slotsByTimetableId)) {
+    const links = new Map()
+    for (const slot of timetableSlots) {
+      if (!slot.sharedProgrammingSlotId) continue
+      const source = timetableSlots.find((item) => item.id === slot.sharedProgrammingSlotId)
+      if (!source) continue
+      const key = [slot.id, source.id].sort().join(':')
+      links.set(slot.id, key)
+      links.set(source.id, key)
+    }
+    programmingLinksByTimetableId.set(timetableId, links)
+  }
   let dateKey = from
   let guard = 0
 
@@ -266,6 +287,7 @@ export function buildTimetableSessionCandidates({
           space: slot.space || '',
           startsAt: `${dateKey}T${slot.startsAt}:00`,
           subgroupId: slot.subgroupId || null,
+          parallelProgrammingKey: programmingLinksByTimetableId.get(timetable.id)?.get(slot.id) || null,
           subject: slot.subject || '',
           timetableSlotId: slot.id,
           timetableVersionId: timetable.id,
@@ -339,6 +361,7 @@ export function buildActivitySessionDistribution({
           durationMinutes: bundle.session.durationMinutes,
           startsAt: bundle.session.startsAt,
           subgroupId: bundle.session.subgroupId,
+          parallelProgrammingKey: bundle.session.parallelProgrammingKey,
           timetableSlotId: bundle.session.timetableSlotId,
         },
         existingItems: bundle.items || [],
@@ -431,6 +454,7 @@ export function buildActivitySessionDistribution({
         ownerUid: application.ownerUid,
         startsAt: draft.candidate.startsAt,
         subgroupId: draft.candidate.subgroupId,
+        parallelProgrammingKey: draft.candidate.parallelProgrammingKey,
         timetableSlotId: draft.candidate.timetableSlotId,
       },
       options,

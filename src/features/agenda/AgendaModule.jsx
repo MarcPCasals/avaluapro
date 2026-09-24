@@ -211,6 +211,7 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
   const [dragId, setDragId] = useState('')
   const [busyKey, setBusyKey] = useState('')
   const classById = useMemo(() => new Map(classes.map((item) => [item.id, item])), [classes])
+  const slotById = useMemo(() => new Map(slots.map((item) => [item.id, item])), [slots])
   const visibleSlots = useMemo(() => splitTimetableSlots(slots), [slots])
   const selectedClass = classById.get(selectedClassId) || null
   const drop = async (weekday, startsAt) => {
@@ -260,6 +261,7 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
   }
   const slotCard = (slot, late = false) => {
     const classItem = classById.get(slot.classId)
+    const sharedProgrammingSlot = slotById.get(slot.sharedProgrammingSlotId)
     return (
       <article
         className={`${late ? 'agenda-late-slot-card' : 'agenda-slot-card'} ${classItem?.color || 'purple'} ${dragId === slot.id ? 'dragging' : ''}`}
@@ -299,8 +301,8 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
           {late && <small>{WEEKDAYS.find(([weekday]) => weekday === Number(slot.weekday))?.[1]} · {slot.startsAt}</small>}
           <strong>{classItem?.name || 'Grup'}</strong>
           <span>{slot.subject}</span>
-          {!late && <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}</small>}
-          {late && (slot.subgroupId || slot.space) && <small>{[slot.subgroupId, slot.space].filter(Boolean).join(' · ')}</small>}
+          {!late && <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}{sharedProgrammingSlot ? ` · ↔ ${sharedProgrammingSlot.startsAt}` : ''}</small>}
+          {late && (slot.subgroupId || slot.space || sharedProgrammingSlot) && <small>{[slot.subgroupId, slot.space, sharedProgrammingSlot ? `↔ ${sharedProgrammingSlot.startsAt}` : ''].filter(Boolean).join(' · ')}</small>}
         </button>
         <button aria-label={`Canviar la durada de ${classItem?.name || slot.subject}`} className="agenda-slot-duration" disabled={busyKey === `duration-${slot.id}`} onClick={() => resize(slot)} title="Clica per canviar entre 1 h, 1:30 h i 2 h" type="button">{busyKey === `duration-${slot.id}` ? <Loader2 className="spin" size={13} /> : compactDurationLabel(slot.durationMinutes)}</button>
         <button aria-label={`Eliminar ${classItem?.name || slot.subject}`} className="agenda-slot-delete" onClick={() => onDelete(slot)} type="button"><Trash2 size={14} /></button>

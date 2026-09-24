@@ -111,9 +111,15 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
     startsAt: initialValue?.startsAt || initialPosition?.startsAt || '08:00',
     subject: initialValue?.subject || firstClass?.subject || '',
     subgroupId: initialValue?.subgroupId || '',
+    sharedProgrammingSlotId: initialValue?.sharedProgrammingSlotId || '',
     weekday: initialValue?.weekday || initialPosition?.weekday || 1,
   }))
   const selectedClass = classes.find((item) => item.id === values.classId) || null
+  const shareableSlots = slots.filter((slot) =>
+    slot.id !== initialValue?.id
+      && slot.classId === values.classId
+      && Number(slot.weekday) === Number(values.weekday)
+      && Number(slot.durationMinutes) === Number(values.durationMinutes))
   const save = () => {
     const candidate = { ...initialValue, ...values, durationMinutes: Number(values.durationMinutes) }
     const conflicts = findTimetableSlotConflicts(slots, candidate)
@@ -127,23 +133,25 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
       classId,
       subject: nextClass?.subject || current.subject,
       subgroupId: '',
+      sharedProgrammingSlotId: '',
     }))
   }
   return (
     <AgendaDialog onClose={onClose} onSubmit={save} submitLabel={initialValue ? 'Desar franja' : 'Afegir franja'} title={initialValue ? 'Editar franja' : 'Nova franja lectiva'}>
       <div className="agenda-form-row">
-        <label>Dia<select value={values.weekday} onChange={(event) => setValues({ ...values, weekday: Number(event.target.value) })}>{WEEKDAYS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Dia<select value={values.weekday} onChange={(event) => setValues({ ...values, sharedProgrammingSlotId: '', weekday: Number(event.target.value) })}>{WEEKDAYS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Hora d’inici<input required step="900" type="time" value={values.startsAt} onChange={(event) => setValues({ ...values, startsAt: event.target.value })} /></label>
       </div>
       <div className="agenda-form-row">
         <label>Grup<select required value={values.classId} onChange={(event) => selectClass(event.target.value)}><option value="">Selecciona un grup</option>{classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}</select></label>
-        <label>Durada<select value={values.durationMinutes} onChange={(event) => setValues({ ...values, durationMinutes: Number(event.target.value) })}><option value="60">60 min · 55 programables</option><option value="90">90 min · 85 programables</option><option value="120">120 min · 115 programables</option></select></label>
+        <label>Durada<select value={values.durationMinutes} onChange={(event) => setValues({ ...values, durationMinutes: Number(event.target.value), sharedProgrammingSlotId: '' })}><option value="60">60 min · 55 programables</option><option value="90">90 min · 85 programables</option><option value="120">120 min · 115 programables</option></select></label>
       </div>
       <label>Assignatura<input required value={values.subject} onChange={(event) => setValues({ ...values, subject: event.target.value })} /></label>
       <div className="agenda-form-row">
         <label>Mig grup<select value={values.subgroupId} onChange={(event) => setValues({ ...values, subgroupId: event.target.value })}><option value="">Grup sencer</option>{(selectedClass?.halfGroups || []).map((group) => <option key={group} value={group}>{group}</option>)}</select></label>
         <label>Aula <span>(opcional)</span><input value={values.space} onChange={(event) => setValues({ ...values, space: event.target.value })} /></label>
       </div>
+      {shareableSlots.length > 0 && <label>Programació compartida <span>(opcional)</span><select value={values.sharedProgrammingSlotId} onChange={(event) => setValues({ ...values, sharedProgrammingSlotId: event.target.value })}><option value="">Aquesta franja avança de manera independent</option>{shareableSlots.map((slot) => <option key={slot.id} value={slot.id}>Repeteix la sessió de les {slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}</option>)}</select></label>}
     </AgendaDialog>
   )
 }
