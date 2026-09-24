@@ -1496,42 +1496,47 @@
 }
 
 .contextual-help-button {
-  width: 27px;
-  height: 27px;
+  width: 22px;
+  height: 22px;
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid #dbe4ef;
-  border-radius: 999px;
+  border: 0;
   padding: 0;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 3px 9px rgba(15, 23, 42, 0.09);
+  color: #94a3b8;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  opacity: 0.55;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.contextual-help-letter {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .contextual-help-button:hover,
 .contextual-help-button:focus-visible {
-  transform: translateY(-1px);
-  border-color: #f97316;
   color: #ea580c;
-  box-shadow: 0 7px 16px rgba(15, 23, 42, 0.14);
-  outline: none;
+  opacity: 1;
+}
+
+.contextual-help-button:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: 2px;
 }
 
 .contextual-tab-help {
   width: 22px;
   height: 22px;
   position: absolute;
-  top: -7px;
-  right: -6px;
+  top: -4px;
+  right: -1px;
   z-index: 4;
-}
-
-.contextual-tab-help svg {
-  width: 13px;
-  height: 13px;
 }
 
 .contextual-tab.has-contextual-badge .contextual-tab-help {
