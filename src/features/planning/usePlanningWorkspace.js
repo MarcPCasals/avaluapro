@@ -64,12 +64,18 @@ function comparableLabel(value) {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim()
 }
 
+const EMPTY_PLANNING_USER = Object.freeze({ email: '', uid: '' })
+
 /**
  * Manté el primer flux vertical de Programació fora del component visual. Tota
  * escriptura passa pel repositori local-first i la interfície només rep l'estat
  * final de la cua, sense confondre el desament local amb la confirmació remota.
  */
-export function usePlanningWorkspace(user, activeClassId = '', options = {}) {
+export function usePlanningWorkspace(currentUser, activeClassId = '', options = {}) {
+  // Firebase resol la sessió de manera asíncrona. El hook s'ha d'executar en
+  // tots els renders, també durant el breu estat inicial en què encara no hi
+  // ha usuari, perquè React mantingui sempre el mateix ordre de hooks.
+  const user = currentUser || EMPTY_PLANNING_USER
   const tutoringSpaceId = String(options.tutoringSpaceId || '').trim()
   const [academicYears, setAcademicYears] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
