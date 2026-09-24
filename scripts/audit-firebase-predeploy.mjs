@@ -129,9 +129,10 @@ async function auditSurveys(token) {
     const fields = Object.fromEntries(
       Object.entries(document.fields || {}).map(([key, value]) => [key, decodeFirestoreValue(value)]),
     )
-    const [tokens, responses] = await Promise.all([
+    const [tokens, responses, publicForm] = await Promise.all([
       listDocuments(`sociometricSurveys/${encodeURIComponent(id)}/accessTokens`, token),
       listDocuments(`sociometricSurveys/${encodeURIComponent(id)}/responses`, token),
+      getDocument(`sociometricSurveys/${encodeURIComponent(id)}/public/form`, token),
     ])
     const privateDocument = fields.ownerUid
       ? await getDocument(
@@ -152,6 +153,7 @@ async function auditSurveys(token) {
       status: fields.status || '',
       createdAt: fields.createdAt || '',
       hasExpiry: Number(fields.expiresAtEpochMs) > 0,
+      hasSharedPublicForm: Boolean(publicForm),
       tokenCount: tokens.length,
       actualResponseCount: responses.length,
       declaredResponseCount: Number(fields.responseCount) || 0,
@@ -194,7 +196,9 @@ const [{ content: deployedRules, release }, localRules, surveys, tutoringSpaces]
 ])
 
 const activeLegacySurveys = surveys.filter(
-  (survey) => survey.status === 'active' && (!survey.hasExpiry || survey.tokenCount === 0),
+  (survey) =>
+    survey.status === 'active' &&
+    (!survey.hasExpiry || (survey.tokenCount === 0 && !survey.hasSharedPublicForm)),
 )
 const unsyncedResponses = surveys.filter(
   (survey) => survey.actualResponseCount > survey.declaredResponseCount,
