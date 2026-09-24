@@ -16,6 +16,34 @@ function timeToMinutes(value = '') {
   return Number.isFinite(hours) && Number.isFinite(minutes) ? (hours * 60) + minutes : 0
 }
 
+/**
+ * Calcula l'estat temporal de les classes visibles a la setmana. Les sessions
+ * en curs tenen prioritat; si no n'hi ha cap, es ressalta la primera franja
+ * futura. Les sessions simultànies comparteixen el mateix focus.
+ */
+export function getAgendaWeekTemporalState(entries = [], now = new Date(), enableFocus = true) {
+  const nowMs = new Date(now).getTime()
+  const normalized = entries.map((entry) => {
+    const startsAtMs = new Date(entry.startsAt || '').getTime()
+    const endsAtMs = startsAtMs + Number(entry.durationMinutes || 0) * 60_000
+    return { ...entry, endsAtMs, startsAtMs }
+  }).filter((entry) => entry.id && Number.isFinite(entry.startsAtMs) && Number.isFinite(entry.endsAtMs))
+
+  const current = normalized
+    .filter((entry) => entry.startsAtMs <= nowMs && entry.endsAtMs > nowMs)
+    .sort((left, right) => left.startsAtMs - right.startsAtMs)
+  const next = normalized
+    .filter((entry) => entry.startsAtMs > nowMs)
+    .sort((left, right) => left.startsAtMs - right.startsAtMs)
+  const focusedStartsAtMs = enableFocus ? (current[0]?.startsAtMs ?? next[0]?.startsAtMs ?? null) : null
+
+  return Object.fromEntries(normalized.map((entry) => [entry.id, {
+    isCurrent: entry.startsAtMs <= nowMs && entry.endsAtMs > nowMs,
+    isFocused: focusedStartsAtMs !== null && entry.startsAtMs === focusedStartsAtMs,
+    isPast: entry.endsAtMs <= nowMs,
+  }]))
+}
+
 function normalizedScheduleLabel(value = '') {
   return String(value)
     .normalize('NFD')

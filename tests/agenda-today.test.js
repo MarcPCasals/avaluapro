@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -17,6 +17,38 @@ test('el cap de setmana mostra la primera classe de dilluns', () => {
 test('durant el dia ignora les franges que ja han acabat', () => {
   const next = findNextTimetableOccurrence(slots, '2026-09-21', '09:31')
   assert.equal(next.slot.id, 'monday-second')
+})
+
+test('la setmana apaga les classes passades i ressalta la que esta en curs', () => {
+  const state = getAgendaWeekTemporalState([
+    { id: 'past', startsAt: '2026-09-24T09:30:00', durationMinutes: 60 },
+    { id: 'current', startsAt: '2026-09-24T11:00:00', durationMinutes: 90 },
+    { id: 'future', startsAt: '2026-09-24T15:00:00', durationMinutes: 60 },
+  ], new Date('2026-09-24T12:17:00'))
+
+  assert.deepEqual(state.past, { isCurrent: false, isFocused: false, isPast: true })
+  assert.deepEqual(state.current, { isCurrent: true, isFocused: true, isPast: false })
+  assert.deepEqual(state.future, { isCurrent: false, isFocused: false, isPast: false })
+})
+
+test('si no hi ha cap classe en curs ressalta la propera i no un recordatori', () => {
+  const state = getAgendaWeekTemporalState([
+    { id: 'past', startsAt: '2026-09-24T11:00:00', durationMinutes: 60 },
+    { id: 'next', startsAt: '2026-09-24T15:00:00', durationMinutes: 60 },
+    { id: 'later', startsAt: '2026-09-24T16:00:00', durationMinutes: 60 },
+  ], new Date('2026-09-24T12:17:00'))
+
+  assert.equal(state.past.isPast, true)
+  assert.equal(state.next.isFocused, true)
+  assert.equal(state.later.isFocused, false)
+})
+
+test('una setmana que no conte avui conserva els colors sense marcar una propera classe', () => {
+  const state = getAgendaWeekTemporalState([
+    { id: 'future', startsAt: '2026-10-01T09:00:00', durationMinutes: 60 },
+  ], new Date('2026-09-24T12:17:00'), false)
+
+  assert.deepEqual(state.future, { isCurrent: false, isFocused: false, isPast: false })
 })
 
 test('la setmana mostra les classes de l horari que encara no tenen programacio', () => {

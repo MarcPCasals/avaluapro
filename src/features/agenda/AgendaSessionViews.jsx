@@ -12,7 +12,7 @@ import {
   isNoClassCalendarEvent,
   startOfCalendarWeek,
 } from '../../lib/agendaCalendar'
-import { findNextTimetableOccurrence, getWeekTimetableOccurrences } from '../../lib/agendaToday'
+import { findNextTimetableOccurrence, getAgendaWeekTemporalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
@@ -62,6 +62,13 @@ function sessionDate(bundle) {
 
 function sessionTime(bundle) {
   return String(bundle.session.startsAt).slice(11, 16)
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function sessionHasPassed(bundle, now, today) {
@@ -211,8 +218,34 @@ export function AgendaTodayView({
 }
 
 export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationReminders, loading, onAddEvent, onMoveWeek, onOpenCoordination, onOpenReminders, onOpenSession, onOpenTimetableClassroom, onReload, onShowMonth, personalReminders, slots, timetable, weekStart }) {
+  const [now, setNow] = useState(() => new Date())
   const days = Array.from({ length: 5 }, (_, index) => addDays(weekStart, index))
   const timetableOccurrences = getWeekTimetableOccurrences({ bundles, slots, timetable, weekStart })
+  const today = localDateKey(now)
+  const weekContainsToday = days.includes(today)
+  const temporalEntries = [
+    ...bundles
+      .filter((bundle) => days.includes(sessionDate(bundle)))
+      .filter((bundle) => !['cancelled', 'notHeld'].includes(bundle.session.status))
+      .filter((bundle) => !getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId))
+      .map((bundle) => ({
+        durationMinutes: bundle.session.durationMinutes,
+        id: `session:${bundle.session.id}`,
+        startsAt: bundle.session.startsAt,
+      })),
+    ...timetableOccurrences
+      .filter((occurrence) => !getNoClassCalendarEvent(calendarEvents, occurrence.date, occurrence.slot.classId))
+      .map((occurrence) => ({
+        durationMinutes: occurrence.slot.durationMinutes,
+        id: `timetable:${occurrence.id}`,
+        startsAt: occurrence.startsAt,
+      })),
+  ]
+  const temporalState = getAgendaWeekTemporalState(temporalEntries, now, weekContainsToday)
+  useEffect(() => {
+    const interval = globalThis.setInterval(() => setNow(new Date()), 30000)
+    return () => globalThis.clearInterval(interval)
+  }, [])
   return (
     <section className="agenda-week-view">
       <header className="agenda-view-toolbar">
@@ -237,7 +270,7 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
         ].sort((left, right) => left.time.localeCompare(right.time))
         const totalClasses = dayBundles.length + dayTimetable.length
         return (
-          <section key={dateKey}>
+          <section className={dateKey === today ? 'is-today' : ''} key={dateKey}>
             <header>
               <span>{formatDate(dateKey, { weekday: true })}</span>
               <strong>{dateKey.slice(8, 10)}</strong>
@@ -251,7 +284,8 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
                 const blockingEvent = getNoClassCalendarEvent(calendarEvents, dateKey, item.bundle.session.classId)
                 const stoppedStatus = ['cancelled', 'notHeld'].includes(item.bundle.session.status)
                 const stopReason = blockingEvent?.title || (stoppedStatus ? STATUS_LABELS[item.bundle.session.status] : '')
-                return <button className={`agenda-week-session ${classItem?.color || 'blue'} ${item.bundle.session.status} ${stopReason ? 'calendar-blocked' : ''}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{stopReason && <Moon size={12} />}{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{stopReason ? `${stopReason} · la sessió no es fa` : `${item.bundle.planningUnit.code} · ${item.bundle.items.length} activitats`}</small></button>
+                const timeState = temporalState[`session:${item.bundle.session.id}`] || {}
+                return <button aria-current={timeState.isCurrent ? 'time' : undefined} className={`agenda-week-session ${classItem?.color || 'blue'} ${item.bundle.session.status} ${stopReason ? 'calendar-blocked' : ''} ${timeState.isPast ? 'is-past' : ''} ${timeState.isFocused ? 'is-focused' : ''}`} key={item.bundle.session.id} onClick={() => onOpenSession(item.bundle)} type="button"><span>{stopReason && <Moon size={12} />}{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{stopReason ? `${stopReason} · la sessió no es fa` : `${item.bundle.planningUnit.code} · ${item.bundle.items.length} activitats`}</small>{timeState.isFocused && <i className="agenda-week-focus-label">{timeState.isCurrent ? 'Ara' : 'Següent'}</i>}</button>
               }
               if (item.kind === 'coordination-reminder') {
                 return <button className="agenda-week-reminder" key={item.reminder.id} onClick={() => onOpenCoordination(item.reminder)} type="button"><span><AgendaDoubleBell size={11} />{item.time}</span><strong>{item.reminder.title}</strong><small>{item.reminder.classLabel} · Cotutoria compartida</small></button>
@@ -268,7 +302,8 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
                 slot.space,
               ].filter(Boolean).join(' · ')
               const blockingEvent = getNoClassCalendarEvent(calendarEvents, dateKey, slot.classId)
-              return <button className={`agenda-week-timetable ${classItem?.color || 'blue'} ${blockingEvent ? 'calendar-blocked' : ''}`} disabled={Boolean(blockingEvent)} key={item.occurrence.id} onClick={() => onOpenTimetableClassroom(item.occurrence)} type="button"><span>{blockingEvent ? <Moon size={12} /> : <CalendarRange size={12} />}{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{blockingEvent ? `${blockingEvent.title} · la classe no es fa` : slotDetails}</small><em>{blockingEvent ? 'No lectiu' : 'Obrir Mode aula'}</em></button>
+              const timeState = temporalState[`timetable:${item.occurrence.id}`] || {}
+              return <button aria-current={timeState.isCurrent ? 'time' : undefined} className={`agenda-week-timetable ${classItem?.color || 'blue'} ${blockingEvent ? 'calendar-blocked' : ''} ${timeState.isPast ? 'is-past' : ''} ${timeState.isFocused ? 'is-focused' : ''}`} disabled={Boolean(blockingEvent)} key={item.occurrence.id} onClick={() => onOpenTimetableClassroom(item.occurrence)} type="button"><span>{blockingEvent ? <Moon size={12} /> : <CalendarRange size={12} />}{item.time}</span><strong>{classItem?.name || slot.subject || 'Classe'}</strong><small>{blockingEvent ? `${blockingEvent.title} · la classe no es fa` : slotDetails}</small><em>{blockingEvent ? 'No lectiu' : 'Obrir Mode aula'}</em>{timeState.isFocused && <i className="agenda-week-focus-label">{timeState.isCurrent ? 'Ara' : 'Següent'}</i>}</button>
             })}
             </div>
           </section>
