@@ -5,6 +5,7 @@ import {
   FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Users, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { ContextualHelp } from '../../components/ContextualHelp'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
@@ -157,7 +158,7 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
     <section className="planning-improvement-section">
       <div className="planning-section-title">
         <span>05</span>
-        <div><h3>Millora per al curs següent</h3><p>Les dades reals de l’Agenda generaran propostes revisables; mai modificaran la UP soles.</p></div>
+        <div className="contextual-section-title"><h3>Millora per al curs següent</h3><ContextualHelp title="Millora per al curs següent">Les dades reals de l’Agenda generen propostes revisables per al curs següent. Cap proposta modifica la UP fins que l’acceptes.</ContextualHelp></div>
       </div>
       {pending.length === 0 ? (
         <div className="planning-improvement-empty"><Lightbulb size={18} /><p>Encara no hi ha propostes pendents. Apareixeran quan es revisin activitats des de l’Agenda.</p></div>
@@ -243,7 +244,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
         <summary>
           <div className="planning-section-title">
             <span>01–02</span>
-            <div><h3>Informació inicial de la UP</h3><p>Identificació, repte, producte i llengua de vehiculació.</p></div>
+            <div className="contextual-section-title"><h3>Informació inicial de la UP</h3><ContextualHelp title="Informació inicial de la UP">Reuneix la identificació de la unitat, el repte, el producte final i la llengua de vehiculació.</ContextualHelp></div>
           </div>
           <ChevronDown size={18} />
         </summary>
@@ -251,7 +252,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
           <section className="planning-editor-section">
             <div className="planning-section-title">
               <span>01</span>
-              <div><h3>Identificació</h3><p>La informació que situa la UP dins del curs.</p></div>
+              <div className="contextual-section-title"><h3>Identificació</h3><ContextualHelp title="Identificació de la UP">Situa la unitat dins del curs amb el codi, el títol, la durada i les dades generals necessàries.</ContextualHelp></div>
             </div>
             <div className="planning-form-grid three">
               <label>Codi<input required value={values.code || ''} onChange={(event) => update('code', event.target.value)} /></label>
@@ -263,7 +264,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
           <section className="planning-editor-section">
             <div className="planning-section-title">
               <span>02</span>
-              <div><h3>Punt de partida</h3><p>Defineix el repte i el producte que donarà sentit a la seqüència.</p></div>
+              <div className="contextual-section-title"><h3>Punt de partida</h3><ContextualHelp title="Punt de partida">Defineix el repte i el producte que donaran sentit a la seqüència d’activitats.</ContextualHelp></div>
             </div>
             <label>Situació o pregunta complexa<textarea rows="4" value={values.complexSituation || ''} onChange={(event) => update('complexSituation', event.target.value)} /></label>
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>

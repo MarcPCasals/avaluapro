@@ -49,6 +49,7 @@ import {
   X,
 } from 'lucide-react'
 import { EducandEmailInput } from '../../components/EducandEmailInput'
+import { ContextualHelp, ContextualTab } from '../../components/ContextualHelp'
 import { Modal } from '../../components/Modal'
 import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
@@ -107,6 +108,16 @@ const TUTORING_CHANGE_LABELS = {
   tutorialSociogramLayouts: 'sociograma',
   tutorialSociometricMoments: 'moments sociomètrics',
   tutorialStudentRoles: 'rols',
+}
+
+const TUTORING_PANEL_HELP = {
+  coordination: 'Espai privat compartit amb el cotutor per conversar, deixar avisos urgents i preparar recordatoris comuns.',
+  evaluation: 'Resumeix la situació acadèmica del grup de tutoria i permet incorporar notes d’altres docents per orientar el seguiment.',
+  tracking: 'Centralitza entrevistes, acords, anotacions, absències i actuacions tutorials de cada alumne.',
+  relationships: 'Analitza les relacions del grup amb sociogrames i facilita la creació de grups cooperatius i disposicions d’aula.',
+  'student-data': 'Consulta antecedents, dades personals necessàries i informació aportada per l’alumnat o les famílies.',
+  profile: 'Genera i consulta informes tutorials individuals a partir de les dades recollides durant el curs.',
+  'tutorial-planning': 'Planifica les sessions específiques de tutoria amb les mateixes eines de programació, agenda i activitats.',
 }
 const TUTORING_CHANGE_COLLECTIONS = new Set(['classes', ...Object.keys(TUTORING_CHANGE_LABELS)])
 import {
@@ -7040,8 +7051,10 @@ export function TutoringView() {
             <GraduationCap size={17} />
             Mode tutoria
           </span>
-          <h1>{activeClass?.name || 'Tutoria'}</h1>
-          <p>Visió global del grup: aprenentatge, seguiment i informació tutorial de cada alumne.</p>
+          <div className="contextual-section-title">
+            <h1>{activeClass?.name || 'Tutoria'}</h1>
+            <ContextualHelp title="Mode tutoria">Visió global del grup que connecta aprenentatge, seguiment, relacions i informació tutorial de cada alumne.</ContextualHelp>
+          </div>
         </div>
         <aside className="tutoring-hero-share-panel">
           <div className="tutoring-hero-linked-count">
@@ -7123,63 +7136,77 @@ export function TutoringView() {
       </header>
 
       <div className="tutoring-panel-tabs" aria-label="Vistes de tutoria" data-tour="tutoring-panel-tabs">
-        <button
+        <ContextualTab
           className={`coordination-tab ${activePanel === 'coordination' ? 'active' : ''}`}
+          help={TUTORING_PANEL_HELP.coordination}
+          helpTitle="Coordinació"
           onClick={() => setActivePanel('coordination')}
           type="button"
         >
           <MessageCircle size={17} />
           Coordinació
           {coordinationUnreadCount > 0 && <span className="tutoring-panel-badge">{coordinationUnreadCount}</span>}
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'evaluation' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP.evaluation}
+          helpTitle="Avaluació tutorial"
           onClick={() => setActivePanel('evaluation')}
           type="button"
         >
           <BookOpenCheck size={17} />
           Avaluació tutorial
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'tracking' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP.tracking}
+          helpTitle="Seguiment tutorial"
           onClick={() => setActivePanel('tracking')}
           type="button"
         >
           <ClipboardList size={17} />
           Seguiment tutorial
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'relationships' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP.relationships}
+          helpTitle="Relacions i grups"
           onClick={() => setActivePanel('relationships')}
           type="button"
         >
           <Network size={17} />
           Relacions i grups
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'student-data' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP['student-data']}
+          helpTitle="Dades de l’alumnat"
           onClick={() => setActivePanel('student-data')}
           type="button"
         >
           <UsersRound size={17} />
           Dades de l’alumnat
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'profile' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP.profile}
+          helpTitle="Informes tutorials"
           onClick={() => setActivePanel('profile')}
           type="button"
         >
           <UsersRound size={17} />
           Informes tutorials
-        </button>
-        <button
+        </ContextualTab>
+        <ContextualTab
           className={activePanel === 'tutorial-planning' ? 'active' : ''}
+          help={TUTORING_PANEL_HELP['tutorial-planning']}
+          helpTitle="Classe de tutoria"
           onClick={() => setActivePanel('tutorial-planning')}
           type="button"
         >
           <BookOpenText size={17} />
           Classe de tutoria
-        </button>
+        </ContextualTab>
       </div>
 
       {activePanel === 'coordination' && (
@@ -7195,10 +7222,10 @@ export function TutoringView() {
                   <BarChart3 size={17} />
                   Diagnòstic tutorial del grup
                 </span>
-                <h2>Visió de tutor</h2>
-                <p>
-                  Lectura global del grup combinant competències de totes les assignatures i registres tutorials.
-                </p>
+                <div className="contextual-section-title">
+                  <h2>Visió de tutor</h2>
+                  <ContextualHelp title="Visió de tutor">Lectura global del grup que combina competències de totes les assignatures amb els registres tutorials.</ContextualHelp>
+                </div>
               </div>
               <button className="secondary-action compact" onClick={() => setActivePanel('profile')} type="button">
                 Veure informes
@@ -7419,11 +7446,10 @@ export function TutoringView() {
                 {selectedSubjectArea?.name || 'Àrea'}
               </span>
               <div>
-                <h2>{selectedSubject || 'Assignatura'}</h2>
-                <p>
-                  Posa o revisa la nota de cada competència. Si aquesta classe està vinculada amb una assignatura
-                  que ja té notes a Avaluapro, les competències apareixen carregades automàticament.
-                </p>
+                <div className="contextual-section-title">
+                  <h2>{selectedSubject || 'Assignatura'}</h2>
+                  <ContextualHelp title="Avaluació tutorial per assignatura">Posa o revisa la nota de cada competència. Si la tutoria està vinculada amb una assignatura que ja té notes a Avaluapro, les competències es carreguen automàticament.</ContextualHelp>
+                </div>
                 {isSelectedSubjectLinked && (
                   <div className="tutorial-linked-note">
                     <CheckCircle2 size={16} />
@@ -7592,8 +7618,10 @@ export function TutoringView() {
           <header className="tutorial-registry-header">
             <div>
               <span className="section-kicker"><ClipboardList size={17} /> Quadern de tutoria</span>
-              <h2>Registre tutorial de l’alumnat</h2>
-              <p>Informacions importants, contactes, orientacions i acords, sempre vinculats a cada alumne.</p>
+              <div className="contextual-section-title">
+                <h2>Registre tutorial de l’alumnat</h2>
+                <ContextualHelp title="Registre tutorial de l’alumnat">Reuneix informacions importants, contactes, orientacions i acords, sempre vinculats a l’alumne corresponent.</ContextualHelp>
+              </div>
             </div>
             {activeClass?.sharedTutoringSpaceId && (
               <span className="tutorial-registry-shared"><UsersRound size={15} /> Compartit amb els cotutors</span>
@@ -8098,10 +8126,10 @@ export function TutoringView() {
                 <Network size={17} />
                 Relacions del grup
               </span>
-              <h2>Sociograma inicial</h2>
-              <p>
-                Registra afinitats, parelles que funcionen bé i incompatibilitats abans de generar grups cooperatius.
-              </p>
+              <div className="contextual-section-title">
+                <h2>Sociograma inicial</h2>
+                <ContextualHelp title="Sociograma inicial">Registra afinitats, parelles que funcionen bé i incompatibilitats abans de generar grups cooperatius o una disposició d’aula.</ContextualHelp>
+              </div>
             </div>
             <div className="tutorial-relationship-summary">
               <article className="green">
@@ -8133,31 +8161,26 @@ export function TutoringView() {
           </section>
 
           <section className="tutorial-tool-launch-grid" data-tour="tutoring-relationship-tools">
-            <button data-tour="tutoring-tool-sociogram" onClick={() => setActiveRelationshipTool('sociogram')} type="button">
+            <ContextualTab data-tour="tutoring-tool-sociogram" help="Obre un mapa visual estable de les relacions reals del grup i permet enfocar cada alumne." helpTitle="Sociograma" onClick={() => setActiveRelationshipTool('sociogram')} type="button">
               <Network size={25} />
               <strong>Sociograma</strong>
-              <span>Mapa visual de relacions reals del grup.</span>
-            </button>
-            <button data-tour="tutoring-tool-survey" onClick={() => setActiveRelationshipTool('survey')} type="button">
+            </ContextualTab>
+            <ContextualTab data-tour="tutoring-tool-survey" help="Crea enllaços per recollir respostes de l’alumnat i permet afegir observacions docents." helpTitle="Qüestionari sociomètric" onClick={() => setActiveRelationshipTool('survey')} type="button">
               <ClipboardList size={25} />
               <strong>Qüestionari sociomètric</strong>
-              <span>Enllaços per a l’alumnat i observacions docents.</span>
-            </button>
-            <button data-tour="tutoring-tool-groups" onClick={() => setActiveRelationshipTool('groups')} type="button">
+            </ContextualTab>
+            <ContextualTab data-tour="tutoring-tool-groups" help="Genera propostes de grups tenint en compte rols, notes, relacions i restriccions que pots ajustar manualment." helpTitle="Grups cooperatius" onClick={() => setActiveRelationshipTool('groups')} type="button">
               <UsersRound size={25} />
               <strong>Grups cooperatius</strong>
-              <span>Proposta automàtica amb rols, notes i relacions.</span>
-            </button>
-            <button data-tour="tutoring-tool-seating" onClick={handleOpenTutorialSeatingTool} type="button">
+            </ContextualTab>
+            <ContextualTab data-tour="tutoring-tool-seating" help="Organitza l’alumnat en una matriu flexible de taules i cadires, amb restriccions, historial i exportació." helpTitle="Disposició d’aula" onClick={handleOpenTutorialSeatingTool} type="button">
               <LayoutGrid size={25} />
               <strong>Disposició d’aula</strong>
-              <span>Matriu flexible de taules i cadires.</span>
-            </button>
-            <button data-tour="tutoring-tool-reports" onClick={() => setActiveRelationshipTool('reports')} type="button">
+            </ContextualTab>
+            <ContextualTab data-tour="tutoring-tool-reports" help="Converteix les dades del sociograma en lectures docents, prioritats, comparacions i propostes d’actuació." helpTitle="Informes sociomètrics" onClick={() => setActiveRelationshipTool('reports')} type="button">
               <FileText size={25} />
               <strong>Informes sociomètrics</strong>
-              <span>Converteix el sociograma en lectura docent, prioritats i accions.</span>
-            </button>
+            </ContextualTab>
           </section>
 
           <section
@@ -8171,12 +8194,10 @@ export function TutoringView() {
                   <ClipboardList size={17} />
                   Qüestionari sociomètric
                 </span>
-                <h2>Crear qüestionari per al grup</h2>
-                <p>
-                  Flux recomanat: crea un enllaç propi d’Avaluapro, envia’l als alumnes i recull les respostes sense
-                  Google Forms ni fulls de càlcul. En aquesta mateixa pantalla també pots registrar observacions
-                  docents puntuals.
-                </p>
+                <div className="contextual-section-title">
+                  <h2>Crear qüestionari per al grup</h2>
+                  <ContextualHelp title="Qüestionari sociomètric">Crea un enllaç propi d’Avaluapro, envia’l a l’alumnat i recull les respostes sense formularis ni fulls externs. També hi pots afegir observacions docents puntuals.</ContextualHelp>
+                </div>
               </div>
               <div className="sociometric-import-actions">
                 <button
@@ -8513,11 +8534,10 @@ export function TutoringView() {
                   <FileText size={17} />
                   Informes sociomètrics
                 </span>
-                <h2>Generador d’informes</h2>
-                <p>
-                  Tria el tipus d’informe, activa les seccions que necessites i desa la vista com a PDF des del diàleg
-                  d’impressió del navegador.
-                </p>
+                <div className="contextual-section-title">
+                  <h2>Generador d’informes</h2>
+                  <ContextualHelp title="Generador d’informes sociomètrics">Tria el tipus d’informe, activa les seccions necessàries i desa la vista com a PDF des del diàleg d’impressió del navegador.</ContextualHelp>
+                </div>
               </div>
               <div className="sociometric-import-actions">
                 <button
@@ -9510,11 +9530,10 @@ export function TutoringView() {
                   <Network size={17} />
                   Sociograma visual
                 </span>
-                <h2>Mapa de relacions</h2>
-                <p>
-                  Mapa radial estable: els casos més integrats queden cap al centre i els alumnes aïllats o rebutjats
-                  cap a l’exterior. Clica un alumne per enfocar les seves relacions.
-                </p>
+                <div className="contextual-section-title">
+                  <h2>Mapa de relacions</h2>
+                  <ContextualHelp title="Mapa de relacions">En aquest mapa radial, els casos més integrats queden cap al centre i l’alumnat aïllat o rebutjat cap a l’exterior. Clica un alumne per enfocar-ne les relacions.</ContextualHelp>
+                </div>
               </div>
               <div className="tutorial-sociogram-actions">
                 <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">

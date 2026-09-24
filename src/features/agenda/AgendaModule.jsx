@@ -11,6 +11,7 @@ import {
   isClassroomEvidenceDue,
 } from '../../domain/planning'
 import { CLASS_COLORS } from '../../data/classColors'
+import { ContextualTab } from '../../components/ContextualHelp'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getAgendaDefaultWeekStart } from '../../lib/agendaCalendar'
 import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, mergeAgendaClassCatalog } from '../../lib/agendaToday'
@@ -47,6 +48,13 @@ const WEEKDAYS = [
   [4, 'Dijous', 'Dj.'],
   [5, 'Divendres', 'Dv.'],
 ]
+
+const AGENDA_VIEW_HELP = {
+  today: 'Mostra la pròxima sessió, les classes d’avui, els recordatoris i els canvis lectius immediats. Des d’aquí pots entrar directament al Mode aula.',
+  week: 'Reuneix en una graella les classes de l’horari, les sessions programades, els recordatoris i les excepcions del calendari.',
+  timeline: 'Ordena cronològicament totes les sessions del grup i permet consultar o reajustar què s’ha fet i què queda previst.',
+  timetable: 'Defineix les franges habituals de cada grup i conserva versions de l’horari perquè els canvis no reescriguin el passat.',
+}
 
 function consumeAgendaSchedulingRequest() {
   const planningUnitId = globalThis.sessionStorage?.getItem('avaluapro:open-agenda-scheduling') || ''
@@ -798,10 +806,10 @@ export default function AgendaModule() {
       </header>
 
       <nav aria-label="Vistes d’Agenda" className="agenda-view-tabs">
-        <button className={view === 'today' ? 'active' : ''} onClick={openToday} type="button"><CalendarDays size={17} />Avui</button>
-        <button className={view === 'week' ? 'active' : ''} onClick={openCalendar} type="button"><Clock3 size={17} />Calendari</button>
-        <button className={view === 'timeline' ? 'active' : ''} onClick={openTimeline} type="button"><ListChecks size={17} />Cronologia</button>
-        <button className={view === 'timetable' ? 'active' : ''} onClick={() => { setView('timetable'); if (!hasOwnCalendar) setDialog('academic-year') }} type="button"><LayoutGrid size={17} />Horari</button>
+        <ContextualTab className={view === 'today' ? 'active' : ''} help={AGENDA_VIEW_HELP.today} helpTitle="Avui" onClick={openToday} type="button"><CalendarDays size={17} />Avui</ContextualTab>
+        <ContextualTab className={view === 'week' ? 'active' : ''} help={AGENDA_VIEW_HELP.week} helpTitle="Calendari" onClick={openCalendar} type="button"><Clock3 size={17} />Calendari</ContextualTab>
+        <ContextualTab className={view === 'timeline' ? 'active' : ''} help={AGENDA_VIEW_HELP.timeline} helpTitle="Cronologia" onClick={openTimeline} type="button"><ListChecks size={17} />Cronologia</ContextualTab>
+        <ContextualTab className={view === 'timetable' ? 'active' : ''} help={AGENDA_VIEW_HELP.timetable} helpTitle="Horari" onClick={() => { setView('timetable'); if (!hasOwnCalendar) setDialog('academic-year') }} type="button"><LayoutGrid size={17} />Horari</ContextualTab>
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}

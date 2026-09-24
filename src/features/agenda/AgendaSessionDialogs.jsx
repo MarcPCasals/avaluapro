@@ -4,6 +4,7 @@ import {
   History, RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { ContextualTab } from '../../components/ContextualHelp'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { AgendaSessionDetail } from './AgendaSessionViews'
@@ -132,10 +133,10 @@ export function AgendaSessionAdjustDialog({
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-adjust-dialog" size="lg" title="Reajustar la sessió">
       <nav aria-label="Tipus de reajustament" className="agenda-adjust-tabs" role="tablist">
-        <button aria-selected={action === 'session'} className={action === 'session' ? 'active' : ''} onClick={() => setAction('session')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'session' ? 0 : -1} type="button"><CalendarX2 size={15} />Sessió</button>
-        <button aria-selected={action === 'activity'} className={action === 'activity' ? 'active' : ''} disabled={editableItems.length === 0} onClick={() => setAction('activity')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'activity' ? 0 : -1} type="button"><Edit3 size={15} />Activitat</button>
-        <button aria-selected={action === 'continuation'} className={action === 'continuation' ? 'active' : ''} disabled={editableItems.length === 0} onClick={() => setAction('continuation')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'continuation' ? 0 : -1} type="button"><ArrowRight size={15} />Continuació</button>
-        <button aria-selected={action === 'recovery'} className={action === 'recovery' ? 'active' : ''} onClick={openRecovery} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'recovery' ? 0 : -1} type="button"><History size={15} />Recuperar anterior</button>
+        <ContextualTab aria-selected={action === 'session'} className={action === 'session' ? 'active' : ''} help="Anul·la o restaura tota la sessió. La cronologia es conserva i les activitats no fetes poden tornar a quedar pendents." helpTitle="Reajustar la sessió" onClick={() => setAction('session')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'session' ? 0 : -1} type="button"><CalendarX2 size={15} />Sessió</ContextualTab>
+        <ContextualTab aria-selected={action === 'activity'} className={action === 'activity' ? 'active' : ''} disabled={editableItems.length === 0} help="Canvia el títol o els minuts d’un fragment només en aquesta sessió, o retira un fragment futur sense modificar l’activitat original de la UP." helpTitle="Reajustar una activitat" onClick={() => setAction('activity')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'activity' ? 0 : -1} type="button"><Edit3 size={15} />Activitat</ContextualTab>
+        <ContextualTab aria-selected={action === 'continuation'} className={action === 'continuation' ? 'active' : ''} disabled={editableItems.length === 0} help="Afegeix minuts d’una activitat a les sessions següents i previsualitza l’efecte abans de confirmar-lo." helpTitle="Continuar una activitat" onClick={() => setAction('continuation')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'continuation' ? 0 : -1} type="button"><ArrowRight size={15} />Continuació</ContextualTab>
+        <ContextualTab aria-selected={action === 'recovery'} className={action === 'recovery' ? 'active' : ''} help="Recupera una activitat anterior del grup i reorganitza la part futura de l’Agenda sense canviar la programació base." helpTitle="Recuperar una activitat anterior" onClick={openRecovery} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'recovery' ? 0 : -1} type="button"><History size={15} />Recuperar anterior</ContextualTab>
       </nav>
 
       {action === 'session' && <section className="agenda-adjust-panel" role="tabpanel">

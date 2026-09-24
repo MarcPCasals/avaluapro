@@ -11,24 +11,28 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { Modal } from './Modal'
+import { ContextualTab } from './ContextualHelp'
 import { buildStudentProfiles, hasMinimumTrackingActivities } from '../lib/analytics'
 import { getUnreadTutoringCoordinationItems } from '../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 
 const optionalModes = [
-  { id: 'agenda', label: 'Agenda', icon: CalendarDays, optional: true },
-  { id: 'planning', label: 'Programació', icon: BookOpenText, optional: true },
+  { id: 'agenda', label: 'Agenda', icon: CalendarDays, optional: true, help: 'Organitza l’horari, les sessions i la cronologia real de classe. També permet obrir el Mode aula i reajustar activitats sense modificar la programació original.' },
+  { id: 'planning', label: 'Programació', icon: BookOpenText, optional: true, help: 'Crea i ordena les unitats de programació, connecta-les amb grups i prepara les activitats que després es distribueixen a l’Agenda.' },
 ]
 
 const coreModes = [
-  { id: 'evaluation', label: 'Avaluació', icon: TableProperties },
-  { id: 'tracking', label: 'Seguiment', icon: ClipboardCheck },
-  { id: 'students', label: 'Alumnes', icon: UsersRound },
+  { id: 'evaluation', label: 'Avaluació', icon: TableProperties, help: 'Registra evidències per criteris i competències, consulta l’evolució de cada alumne i obtén la lectura global de la UT activa.' },
+  { id: 'tracking', label: 'Seguiment', icon: ClipboardCheck, help: 'Controla tasques fetes, incompletes o no fetes, incidències i anotacions quotidianes de l’alumnat.' },
+  { id: 'students', label: 'Alumnes', icon: UsersRound, help: 'Consulta la visió integrada de cada alumne i accedeix a les seves dades, antecedents, perfil, tutoria i registres relacionats.' },
 ]
 
 const insights = [
-  { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3 },
+  { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3, help: 'Creua rendiment, constància, absències i comportament per detectar prioritats docents i patrons del grup.' },
 ]
+
+const tutoringHelp = 'Reuneix l’avaluació tutorial, el seguiment, les relacions del grup, els informes, la coordinació amb el cotutor i la planificació de les classes de tutoria.'
+const urgentHelp = 'Mostra els alumnes que acumulen senyals rellevants de rendiment, constància o comportament perquè puguis prioritzar-ne la revisió.'
 
 function getUrgentProfiles(state) {
   const { activeClassId, activeUtId } = state.ui
@@ -143,15 +147,17 @@ export function MainNavigation({ optionalModulesEnabled = false }) {
         {modes.map((mode) => {
           const Icon = mode.icon
           return (
-            <button
+            <ContextualTab
               className={`mode-tab ${mode.optional ? `optional ${mode.id}` : ''} ${activeMode === mode.id ? 'active' : ''}`}
+              help={mode.help}
+              helpTitle={mode.label}
               key={mode.id}
               onClick={() => setActiveMode(mode.id)}
               type="button"
             >
               <Icon size={18} />
               {mode.label}
-            </button>
+            </ContextualTab>
           )
         })}
       </div>
@@ -159,8 +165,10 @@ export function MainNavigation({ optionalModulesEnabled = false }) {
         {insights.map((insight) => {
           const Icon = insight.icon
           return (
-            <button
+            <ContextualTab
               className={`insight-tab ${activeMode === 'analytics' && activeInsight === insight.id ? 'active' : ''}`}
+              help={insight.help}
+              helpTitle={insight.label}
               key={insight.id}
               onClick={() => {
                 setActiveInsight(insight.id)
@@ -170,33 +178,38 @@ export function MainNavigation({ optionalModulesEnabled = false }) {
             >
               <Icon size={18} />
               {insight.label}
-            </button>
+            </ContextualTab>
           )
         })}
         {hasTutoringMode && (
-          <button
+          <ContextualTab
             className={`insight-tab tutoring-tab ${activeMode === 'tutoring' ? 'active' : ''} ${
               tutoringUnreadCount > 0 ? 'has-coordination-items' : ''
             }`}
             data-tour="tutoring-mode-button"
+            help={tutoringHelp}
+            helpTitle="Mode tutoria"
             onClick={handleOpenTutoring}
             type="button"
+            wrapperClassName="has-contextual-badge"
           >
             <GraduationCap size={18} />
             Mode tutoria
             {tutoringUnreadCount > 0 && <span className="tutoring-mode-badge">{tutoringUnreadCount}</span>}
-          </button>
+          </ContextualTab>
         )}
-        <button
+        <ContextualTab
           className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
           data-tour="urgent-button"
+          help={urgentHelp}
+          helpTitle="Urgent"
           onClick={() => setShowUrgent(true)}
           type="button"
         >
           <AlertTriangle size={18} />
           Urgent
           <span>{urgentProfiles.length}</span>
-        </button>
+        </ContextualTab>
       </div>
       {showUrgent && <UrgentModal profiles={urgentProfiles} onClose={() => setShowUrgent(false)} />}
     </div>

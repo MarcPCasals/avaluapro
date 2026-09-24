@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
+import { ContextualTab } from '../../components/ContextualHelp'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
@@ -257,16 +258,16 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <span><small>{ROLE_LABELS[role] || 'Programació compartida'}</small><strong>{unit.code} · {unit.title}</strong></span>
         </div>
         <nav aria-label="Contingut compartit" role="tablist">
-          <button aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
+          <ContextualTab aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} help="Mostra l’estructura, el currículum i la seqüència completa de la programació compartida." helpTitle="Programació compartida" onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
             Programació
-          </button>
-          <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button">
+          </ContextualTab>
+          <ContextualTab aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} help="Presenta la mateixa UP amb format documental per facilitar-ne la lectura i la revisió." helpTitle="Document de la UP" onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button">
             <FileText size={13} />Document
-          </button>
+          </ContextualTab>
           {loadApplications && (
-            <button aria-selected={tab === 'applications'} className={tab === 'applications' ? 'active' : ''} onClick={openApplications} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'applications' ? 0 : -1} type="button">
+            <ContextualTab aria-selected={tab === 'applications'} className={tab === 'applications' ? 'active' : ''} help="Consulta com s’ha aplicat aquesta programació a les classes, amb sessions i resultats reals, sense modificar la UP." helpTitle="Aplicació real" onClick={openApplications} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'applications' ? 0 : -1} type="button">
               Aplicació real
-            </button>
+            </ContextualTab>
           )}
         </nav>
       </header>

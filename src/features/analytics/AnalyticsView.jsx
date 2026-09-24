@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { ContextualHelp, ContextualTab } from '../../components/ContextualHelp'
 import {
   buildStudentProfiles,
   buildTrackingInterventions,
@@ -235,15 +236,16 @@ function DashboardScopeTabs({ activeScope, onChange }) {
   return (
     <section className="dashboard-scope-tabs" aria-label="Filtrar estadístiques globals" data-tour="stats-scope-tabs">
       {dashboardScopes.map((scope) => (
-        <button
+        <ContextualTab
           className={activeScope === scope.id ? 'active' : ''}
+          help={scope.description}
+          helpTitle={scope.label}
           key={scope.id}
           onClick={() => onChange(scope.id)}
           type="button"
         >
           <strong>{scope.label}</strong>
-          <span>{scope.description}</span>
-        </button>
+        </ContextualTab>
       ))}
     </section>
   )
@@ -2408,8 +2410,12 @@ function UtStatsView({
       <div className="analytics-hero executive ut-hero">
         <div>
           <Target size={30} />
-          <h2>Estadístiques UT · {activeUt?.name || 'UT activa'}</h2>
-          <p>Lectura operativa de la unitat: criteris, competències, tasques i alumnes que necessiten reforç.</p>
+          <div className="contextual-section-title">
+            <h2>Estadístiques UT · {activeUt?.name || 'UT activa'}</h2>
+            <ContextualHelp title="Estadístiques de la UT">
+              Lectura operativa de la unitat activa: criteris, competències, tasques i alumnat que pot necessitar reforç.
+            </ContextualHelp>
+          </div>
         </div>
         <MetricCard
           className="highlight"
@@ -2883,8 +2889,10 @@ export function AnalyticsView() {
       <div className="analytics-hero executive">
         <div>
           <Icon size={30} />
-          <h2>{currentInsight.title}</h2>
-          <p>{currentInsight.description}</p>
+          <div className="contextual-section-title">
+            <h2>{currentInsight.title}</h2>
+            <ContextualHelp title={currentInsight.title}>{currentInsight.description}</ContextualHelp>
+          </div>
         </div>
         <MetricCard
           className="highlight"

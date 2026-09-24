@@ -3,6 +3,7 @@ import {
   ExternalLink, History, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { ContextualHelp } from '../../components/ContextualHelp'
 import { getClassroomPromptState, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
@@ -249,7 +250,7 @@ export function AgendaWeekView({ bundles, calendarEvents, classes, coordinationR
   return (
     <section className="agenda-week-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Setmana lectiva</span><h2>{formatDate(days[0])} – {formatDate(days[4])}</h2><p>Classes de l’horari, sessions programades i recordatoris.</p></div>
+        <div><span className="agenda-view-kicker">Setmana lectiva</span><div className="contextual-section-title"><h2>{formatDate(days[0])} – {formatDate(days[4])}</h2><ContextualHelp title="Calendari setmanal">Mostra conjuntament les classes de l’horari, les sessions programades, els recordatoris i els canvis lectius de la setmana.</ContextualHelp></div></div>
         <div className="agenda-calendar-toolbar-actions">
           <div aria-label="Vista del calendari" className="agenda-calendar-view-switch" role="group"><button className="active" type="button">Setmana</button><button onClick={onShowMonth} type="button">Mes</button></div>
           {onAddEvent && <button className="secondary-action compact agenda-mark-calendar" onClick={() => onAddEvent({ endsOn: weekStart, startsOn: weekStart, type: 'holiday' })} type="button"><Moon size={14} />Marcar festiu o canvi</button>}
@@ -331,7 +332,7 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
   return (
     <section className="agenda-month-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Calendari mensual</span><h2>{formatMonth(monthKey)}</h2><p>Setmanes lectives, vacances, festius i canvis de jornada.</p></div>
+        <div><span className="agenda-view-kicker">Calendari mensual</span><div className="contextual-section-title"><h2>{formatMonth(monthKey)}</h2><ContextualHelp title="Calendari mensual">Resumeix les setmanes lectives, les vacances, els festius i els canvis de jornada del mes.</ContextualHelp></div></div>
         <div className="agenda-calendar-toolbar-actions">
           <div aria-label="Vista del calendari" className="agenda-calendar-view-switch" role="group"><button onClick={onShowWeek} type="button">Setmana</button><button className="active" type="button">Mes</button></div>
           {onAddEvent && <button className="primary-action compact" onClick={() => onAddEvent({ endsOn: firstEditableDate, startsOn: firstEditableDate, type: 'holiday' })} type="button"><CalendarPlus size={15} />Marcar dia o període</button>}
@@ -406,7 +407,7 @@ export function AgendaTimelineView({ bundles, calendarEvents = [], classes, load
   return (
     <section className="agenda-timeline-view">
       <header className="agenda-view-toolbar">
-        <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{loading && <Loader2 className="spin" size={16} />}</div><p>Primer veus les sessions pendents; les anteriors queden plegades a l’històric.</p></div>
+        <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{selectedClass && <ContextualHelp title="Cronologia del grup">Primer es mostren les sessions pendents; les sessions anteriors es conserven plegades dins l’històric.</ContextualHelp>}{loading && <Loader2 className="spin" size={16} />}</div></div>
         {onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}
       </header>
       {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-sections">

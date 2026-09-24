@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
+import { ContextualHelp } from '../../components/ContextualHelp'
 import { DIAGNOSIS_OPTIONS, getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildStudentProfiles } from '../../lib/analytics'
 import { formatAbsenceDateTime, formatAbsenceHours, getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
@@ -393,10 +394,12 @@ export function StudentOverviewView() {
       <header className="student-overview-header">
         <div>
           <span><ClipboardList size={17} /> Vista integrada</span>
-          <h1>Tota la informació de l’alumnat</h1>
-          <p>
-            Cada bloc mostra la dada original. Quan l’edites aquí, també queda actualitzada a la seva pantalla d’origen.
-          </p>
+          <div className="contextual-section-title">
+            <h1>Tota la informació de l’alumnat</h1>
+            <ContextualHelp title="Vista integrada de l’alumnat">
+              Cada bloc mostra la dada original. Quan l’edites aquí, també queda actualitzada a la seva pantalla d’origen; no es crea una còpia paral·lela.
+            </ContextualHelp>
+          </div>
         </div>
         <div className="student-overview-header-summary">
           <strong>{activeClass?.name || 'Classe actual'}</strong>

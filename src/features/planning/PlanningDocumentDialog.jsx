@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ClipboardPaste, FileJson, FileText, Import, Loader2, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { ContextualTab } from '../../components/ContextualHelp'
 import { parsePlanningDocumentExport, parsePlanningTableText } from '../../domain/planning/documents'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
@@ -103,9 +104,9 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
   return (
     <Modal onClose={onClose} panelClassName="planning-document-dialog" size="xl" title="Document i importacions">
       <nav aria-label="Eines documentals" className="planning-document-tabs" role="tablist">
-        {unit && <button aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button"><FileText size={16} />Vista documental</button>}
-        <button aria-selected={tab === 'import'} className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'import' ? 0 : -1} type="button"><Import size={16} />Importar una UP</button>
-        {unit && <button aria-selected={tab === 'table'} className={tab === 'table' ? 'active' : ''} onClick={() => setTab('table')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'table' ? 0 : -1} type="button"><ClipboardPaste size={16} />Enganxar taula</button>}
+        {unit && <ContextualTab aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} help="Presenta tota la UP en un format continu i llegible, preparat per revisar o exportar." helpTitle="Vista documental" onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button"><FileText size={16} />Vista documental</ContextualTab>}
+        <ContextualTab aria-selected={tab === 'import'} className={tab === 'import' ? 'active' : ''} help="Crea una UP nova a partir d’un document Word o d’una còpia JSON. No substitueix cap unitat existent." helpTitle="Importar una UP" onClick={() => setTab('import')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'import' ? 0 : -1} type="button"><Import size={16} />Importar una UP</ContextualTab>
+        {unit && <ContextualTab aria-selected={tab === 'table'} className={tab === 'table' ? 'active' : ''} help="Afegeix activitats a la UP oberta enganxant una taula copiada d’Excel o Numbers i revisant-ne abans la previsualització." helpTitle="Enganxar una taula" onClick={() => setTab('table')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'table' ? 0 : -1} type="button"><ClipboardPaste size={16} />Enganxar taula</ContextualTab>}
       </nav>
       {tab === 'document' && unit && <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>}
       {tab === 'import' && (

@@ -3,6 +3,7 @@ import {
   ArrowRight, BookOpenText, Clock3, ExternalLink, History, Layers3, Menu, Pencil,
   Plus, Trash2,
 } from 'lucide-react'
+import { ContextualHelp } from '../../components/ContextualHelp'
 import {
   getPlanningTotals,
   getProgrammableMinutes,
@@ -164,7 +165,7 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
       <div className="planning-sequence-heading">
         <div className="planning-section-title">
           <span>03</span>
-          <div><h3>Seqüència d’activitats</h3><p>Activitats, indicacions i transicions en l’ordre de treball.</p></div>
+          <div className="contextual-section-title"><h3>Seqüència d’activitats</h3><ContextualHelp title="Seqüència d’activitats">Ordena les activitats, indicacions i transicions tal com es treballaran. La temporització servirà després per distribuir-les a l’Agenda.</ContextualHelp></div>
         </div>
         <div className="planning-budget-summary">
           <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}>

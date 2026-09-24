@@ -38,9 +38,9 @@
 .agenda-refresh { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 8px; color: #64748b; background: white; }
 
 .agenda-view-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e5e7eb; padding: 7px 22px 0; overflow-x: auto; background: white; }
-.agenda-view-tabs button { min-height: 40px; display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; border: 0; border-bottom: 2px solid transparent; padding: 8px 13px; color: #64748b; background: transparent; font-size: 12px; font-weight: 900; }
-.agenda-view-tabs button.active { border-bottom-color: #f97316; color: #c2410c; }
-.agenda-view-tabs button:disabled { opacity: .42; }
+.agenda-view-tabs > .contextual-tab > button:first-child { min-height: 40px; display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; border: 0; border-bottom: 2px solid transparent; padding: 8px 13px; color: #64748b; background: transparent; font-size: 12px; font-weight: 900; }
+.agenda-view-tabs > .contextual-tab > button:first-child.active { border-bottom-color: #f97316; color: #c2410c; }
+.agenda-view-tabs > .contextual-tab > button:first-child:disabled { opacity: .42; }
 .agenda-main { padding: 18px 22px 28px; }
 .agenda-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 22px 0; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; color: #991b1b; background: #fff1f2; font-size: 12px; font-weight: 800; }
 .agenda-error button { border: 0; color: inherit; background: transparent; font-weight: 900; }
@@ -489,9 +489,9 @@
 .agenda-session-dialog .agenda-session-detail { margin-top: 0; }
 .agenda-adjust-dialog .modal-body { display: grid; gap: 13px; }
 .agenda-adjust-tabs { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
-.agenda-adjust-tabs button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; padding: 7px 9px; color: #64748b; background: #f8fafc; font-size: 9px; font-weight: 900; }
-.agenda-adjust-tabs button.active { color: #6d28d9; background: #f5f3ff; }
-.agenda-adjust-tabs button:disabled { opacity: .4; }
+.agenda-adjust-tabs > .contextual-tab > button:first-child { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; padding: 7px 9px; color: #64748b; background: #f8fafc; font-size: 9px; font-weight: 900; }
+.agenda-adjust-tabs > .contextual-tab > button:first-child.active { color: #6d28d9; background: #f5f3ff; }
+.agenda-adjust-tabs > .contextual-tab > button:first-child:disabled { opacity: .4; }
 .agenda-adjust-panel { display: grid; gap: 12px; }
 .agenda-adjust-panel > label { display: grid; gap: 5px; color: #475569; font-size: 10px; font-weight: 900; }
 .agenda-adjust-panel input, .agenda-adjust-panel select { width: 100%; border: 1px solid #d8dee8; border-radius: 8px; padding: 9px 10px; color: #334155; background: white; font: inherit; font-weight: 750; }

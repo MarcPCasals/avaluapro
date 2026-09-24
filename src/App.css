@@ -1485,6 +1485,90 @@
   background: white;
 }
 
+.contextual-tab {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.contextual-tab > button:first-child {
+  width: 100%;
+}
+
+.contextual-help-button {
+  width: 27px;
+  height: 27px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #dbe4ef;
+  border-radius: 999px;
+  padding: 0;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 3px 9px rgba(15, 23, 42, 0.09);
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.contextual-help-button:hover,
+.contextual-help-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: #f97316;
+  color: #ea580c;
+  box-shadow: 0 7px 16px rgba(15, 23, 42, 0.14);
+  outline: none;
+}
+
+.contextual-tab-help {
+  width: 22px;
+  height: 22px;
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  z-index: 4;
+}
+
+.contextual-tab-help svg {
+  width: 13px;
+  height: 13px;
+}
+
+.contextual-tab.has-contextual-badge .contextual-tab-help {
+  right: 18px;
+}
+
+.contextual-help-content {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  color: #334155;
+}
+
+.contextual-help-content > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+.contextual-help-content p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.6;
+}
+
+.contextual-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .mode-tabs,
 .insight-tabs,
 .semester-tabs,
@@ -1923,7 +2007,7 @@
   padding-bottom: 10px;
 }
 
-.tutoring-panel-tabs button {
+.tutoring-panel-tabs > .contextual-tab > button:first-child {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1935,7 +2019,7 @@
   font-weight: 950;
 }
 
-.tutoring-panel-tabs button.active {
+.tutoring-panel-tabs > .contextual-tab > button:first-child.active {
   color: #047857;
   border-color: #a7f3d0;
   background: #ecfdf5;
@@ -3289,7 +3373,7 @@ button.tutorial-record-pill {
   gap: 14px;
 }
 
-.tutorial-tool-launch-grid button {
+.tutorial-tool-launch-grid > .contextual-tab > button:first-child {
   display: grid;
   gap: 10px;
   min-height: 150px;
@@ -3303,25 +3387,21 @@ button.tutorial-record-pill {
   cursor: pointer;
 }
 
-.tutorial-tool-launch-grid button:hover {
+.tutorial-tool-launch-grid > .contextual-tab > button:first-child:hover {
   border-color: #93c5fd;
   transform: translateY(-1px);
 }
 
-.tutorial-tool-launch-grid svg {
+.tutorial-tool-launch-grid > .contextual-tab > button:first-child > svg {
   color: #2563eb;
 }
 
-.tutorial-tool-launch-grid strong {
+.tutorial-tool-launch-grid > .contextual-tab > button:first-child strong {
   font-size: 20px;
   font-weight: 950;
 }
 
-.tutorial-tool-launch-grid span {
-  color: #64748b;
-  font-weight: 850;
-  line-height: 1.35;
-}
+.tutorial-tool-launch-grid > .contextual-tab { min-width: 0; }
 
 .relationship-tool-panel {
   display: none !important;
@@ -14411,7 +14491,7 @@ button.tutorial-record-pill {
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
-.dashboard-scope-tabs button {
+.dashboard-scope-tabs > .contextual-tab > button:first-child {
   min-height: 48px;
   display: grid;
   gap: 4px;
@@ -14424,27 +14504,20 @@ button.tutorial-record-pill {
   cursor: pointer;
 }
 
-.dashboard-scope-tabs button:hover,
-.dashboard-scope-tabs button.active {
+.dashboard-scope-tabs > .contextual-tab > button:first-child:hover,
+.dashboard-scope-tabs > .contextual-tab > button:first-child.active {
   border-color: #f97316;
   color: #9a3412;
   background: #fff7ed;
 }
 
-.dashboard-scope-tabs strong {
+.dashboard-scope-tabs > .contextual-tab > button:first-child strong {
   color: #1f2937;
   font-size: 13px;
   font-weight: 950;
 }
 
-.dashboard-scope-tabs span {
-  overflow: hidden;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.dashboard-scope-tabs > .contextual-tab { min-width: 0; }
 
 .empty-data-notice {
   display: flex;
@@ -26659,7 +26732,7 @@ button.profile-followup-card:focus-visible {
     gap: 10px;
   }
 
-  .tutorial-tool-launch-grid button {
+  .tutorial-tool-launch-grid > .contextual-tab > button:first-child {
     min-height: 122px;
     padding: 14px;
   }

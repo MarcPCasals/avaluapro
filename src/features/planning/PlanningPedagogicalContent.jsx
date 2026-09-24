@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import { CheckCircle2, Plus, X } from 'lucide-react'
+import { ContextualHelp } from '../../components/ContextualHelp'
 import { createId } from '../../lib/ids'
 import { normalizeResourceSections } from '../../domain/planning/documents'
 
@@ -129,7 +130,7 @@ export function PlanningPedagogicalContent({ catalog, onChange, values }) {
     <section className="planning-editor-section planning-pedagogical-section">
       <div className="planning-section-title">
         <span>04</span>
-        <div><h3>Contingut pedagògic</h3><p>El currículum i els recursos que direcció consultarà a la UP.</p></div>
+        <div className="contextual-section-title"><h3>Contingut pedagògic</h3><ContextualHelp title="Contingut pedagògic">Recull el currículum, les orientacions i els recursos de la unitat que podran consultar els docents i, quan correspongui, direcció.</ContextualHelp></div>
       </div>
       <details open>
         <summary>Currículum i avaluació</summary>
