@@ -577,16 +577,17 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [allPlanningUnits, repository, user?.uid, userEmail])
 
   /**
-   * La portada d'Agenda necessita les sessions d'avui i prou futur per poder
-   * mostrar la pròxima classe real. Sis setmanes cobreixen també els períodes
-   * habituals de vacances sense carregar els detalls de tot el curs.
+   * La portada d'Agenda només obre el tram necessari per a avui i la setmana
+   * següent. El calendari mensual, la cronologia i el selector de recordatoris
+   * amplien el rang sota demanda; així entrar a Agenda no descarrega sis
+   * setmanes de descripcions, resultats i materials.
    */
   const loadTodaySessions = useCallback(() => {
     const fromDate = new Date(`${today}T12:00:00Z`)
     const weekday = fromDate.getUTCDay() || 7
     fromDate.setUTCDate(fromDate.getUTCDate() - weekday + 1)
-    const toDate = new Date(`${today}T12:00:00Z`)
-    toDate.setUTCDate(toDate.getUTCDate() + 42)
+    const toDate = new Date(fromDate)
+    toDate.setUTCDate(toDate.getUTCDate() + 13)
     return loadSessionRange({
       from: fromDate.toISOString().slice(0, 10),
       to: toDate.toISOString().slice(0, 10),

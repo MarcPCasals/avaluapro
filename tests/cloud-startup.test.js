@@ -5,6 +5,12 @@ import {
   getCloudWorkspacePreferences,
   shouldCreateDailyCloudBackup,
 } from '../src/lib/cloudStartup.js'
+import {
+  CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT,
+  buildCloudWorkspaceManifestFields,
+  canUseCloudWorkspaceManifest,
+  getCloudWorkspaceRevision,
+} from '../src/lib/cloudWorkspaceManifest.js'
 
 test('un navegador nou baixa les dades quan Firebase ja té un espai de treball', () => {
   assert.equal(
@@ -122,4 +128,50 @@ test('una còpia manual anterior al primer canvi no anul·la la còpia automàti
     }),
     true,
   )
+})
+
+test('la via ràpida només accepta una revisió completa del protocol actual', () => {
+  const remoteMeta = {
+    ...buildCloudWorkspaceManifestFields({ revision: 'revision-1' }),
+  }
+  const localManifest = {
+    uid: 'teacher-1',
+    workspaceRevision: 'revision-1',
+    datasetFingerprint: 'fingerprint-1',
+  }
+
+  assert.equal(getCloudWorkspaceRevision(remoteMeta), 'revision-1')
+  assert.equal(canUseCloudWorkspaceManifest({
+    uid: 'teacher-1',
+    remoteMeta,
+    localManifest,
+    localFingerprint: 'fingerprint-1',
+    localWorkspaceExists: true,
+    now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime(),
+  }), true)
+})
+
+test('una versió antiga, una cua pendent o una còpia local diferent obliguen a comprovar-ho tot', () => {
+  const validMeta = buildCloudWorkspaceManifestFields({ revision: 'revision-1' })
+  const base = {
+    uid: 'teacher-1',
+    remoteMeta: validMeta,
+    localManifest: {
+      uid: 'teacher-1',
+      workspaceRevision: 'revision-1',
+      datasetFingerprint: 'fingerprint-1',
+    },
+    localFingerprint: 'fingerprint-1',
+    localWorkspaceExists: true,
+    now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime(),
+  }
+
+  assert.equal(canUseCloudWorkspaceManifest({ ...base, remoteMeta: { ...validMeta, version: 2 } }), false)
+  assert.equal(canUseCloudWorkspaceManifest({ ...base, pendingOperationCount: 1 }), false)
+  assert.equal(canUseCloudWorkspaceManifest({ ...base, localFingerprint: 'fingerprint-2' }), false)
+  assert.equal(canUseCloudWorkspaceManifest({ ...base, localWorkspaceIsDemo: true }), false)
+  assert.equal(canUseCloudWorkspaceManifest({
+    ...base,
+    now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime() - 1,
+  }), false)
 })

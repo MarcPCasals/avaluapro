@@ -159,7 +159,7 @@ export function AgendaTodayView({
     bundle.session.status === 'planned' && bundle.session.startsAt >= `${today}T${nowTime}`) || null
   const [selectedSessionId, setSelectedSessionId] = useState('')
   const selectedBundle = bundles.find((bundle) => bundle.session.id === selectedSessionId) || automaticBundle
-  const nextTimetableOccurrence = findNextTimetableOccurrence(slots, today, nowTime)
+  const nextTimetableOccurrence = findNextTimetableOccurrence(slots, today, nowTime, calendarEvents)
   const showTimetableFallback = !selectedSessionId
     && !currentBundle
     && nextTimetableOccurrence

@@ -4,11 +4,13 @@ import 'fake-indexeddb/auto'
 import {
   acknowledgeCloudSyncQueue,
   clearCloudSyncQueue,
+  loadCloudWorkspaceManifest,
   loadCloudSyncQueue,
   loadDataset,
   recordCloudSyncQueueFailure,
   saveCollections,
   saveCollectionsWithCloudQueue,
+  saveCloudWorkspaceManifest,
   saveReconciledDatasetWithCloudQueue,
 } from '../src/db/indexedDb.js'
 import { getSafeCloudSyncError } from '../src/lib/cloudSyncQueue.js'
@@ -176,4 +178,33 @@ test('un error conserva l’operació i només desa un codi segur', async () => 
   assert.equal(pendingEntry.attempts, 1)
   assert.equal(pendingEntry.lastError, 'firestore/unavailable')
   assert.equal(getSafeCloudSyncError(new Error('Alumne Exemple no s’ha pogut desar')), 'cloud-sync-error')
+})
+
+test('una edició local invalida la revisió verificada del mateix compte', async () => {
+  await saveCollections({ students: [{ id: 'student-1', name: 'Inicial' }] }, ['students'])
+  await saveCloudWorkspaceManifest('teacher-1', {
+    workspaceRevision: 'revision-1',
+    datasetFingerprint: 'fingerprint-1',
+  })
+
+  await saveCollectionsWithCloudQueue(
+    { students: [{ id: 'student-1', name: 'Canvi local' }] },
+    ['students'],
+    'teacher-1',
+  )
+
+  assert.equal(await loadCloudWorkspaceManifest('teacher-1'), null)
+})
+
+test('una escriptura local idèntica conserva la revisió verificada', async () => {
+  const students = [{ id: 'student-1', name: 'Sense canvis' }]
+  await saveCollections({ students }, ['students'])
+  await saveCloudWorkspaceManifest('teacher-1', {
+    workspaceRevision: 'revision-1',
+    datasetFingerprint: 'fingerprint-1',
+  })
+
+  await saveCollectionsWithCloudQueue({ students }, ['students'], 'teacher-1')
+
+  assert.equal((await loadCloudWorkspaceManifest('teacher-1')).workspaceRevision, 'revision-1')
 })

@@ -19,6 +19,19 @@ test('durant el dia ignora les franges que ja han acabat', () => {
   assert.equal(next.slot.id, 'monday-second')
 })
 
+test('salta festius i vacances sense carregar sessions programades llunyanes', () => {
+  const next = findNextTimetableOccurrence(slots, '2026-12-21', '09:00', [{
+    id: 'christmas',
+    classIds: [],
+    startsOn: '2026-12-21',
+    endsOn: '2027-01-10',
+    type: 'nonTeaching',
+  }])
+
+  assert.equal(next.date, '2027-01-11')
+  assert.equal(next.slot.id, 'monday-first')
+})
+
 test('la setmana apaga les classes passades i ressalta la que esta en curs', () => {
   const state = getAgendaWeekTemporalState([
     { id: 'past', startsAt: '2026-09-24T09:30:00', durationMinutes: 60 },

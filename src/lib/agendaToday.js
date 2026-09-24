@@ -149,15 +149,16 @@ export function getAgendaSessionItemRemovalState(bundle, item, options = {}) {
  * calendaritzada. Això evita que la portada quedi buida durant el cap de
  * setmana o entre dues programacions.
  */
-export function findNextTimetableOccurrence(slots = [], today, nowTime = '00:00') {
+export function findNextTimetableOccurrence(slots = [], today, nowTime = '00:00', calendarEvents = []) {
   const orderedSlots = [...slots].sort((left, right) =>
     Number(left.weekday) - Number(right.weekday)
       || String(left.startsAt || '').localeCompare(String(right.startsAt || '')))
-  for (let offset = 0; offset < 14; offset += 1) {
+  for (let offset = 0; offset < 60; offset += 1) {
     const date = addDays(today, offset)
     const weekday = weekdayFromDate(date)
     const candidates = orderedSlots.filter((slot) => Number(slot.weekday) === weekday)
     for (const slot of candidates) {
+      if (getNoClassCalendarEvent(calendarEvents, date, slot.classId, { timetableSlotId: slot.id })) continue
       if (offset === 0) {
         const endMinutes = timeToMinutes(slot.startsAt) + Number(slot.durationMinutes || 0)
         if (endMinutes <= timeToMinutes(nowTime)) continue

@@ -678,6 +678,7 @@ export default function AgendaModule() {
       workspace.slots.filter((slot) => slot.classId === bundle.session.classId),
       sessionDate,
       afterTime,
+      workspace.calendarEvents,
     )
     return occurrence ? buildTimetableClassroomBundle(occurrence, classes.find((item) => item.id === bundle.session.classId), user.uid).session : null
   }

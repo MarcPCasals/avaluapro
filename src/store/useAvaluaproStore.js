@@ -3,7 +3,9 @@ import { createId } from '../lib/ids'
 import {
   acknowledgeTutoringCoordinationOperation,
   acknowledgeCloudSyncQueue,
+  clearCloudWorkspaceManifest,
   clearCloudSyncQueue,
+  loadCloudWorkspaceManifest,
   loadCloudSyncQueue,
   loadDataset,
   loadTutoringCoordinationCache,
@@ -14,6 +16,7 @@ import {
   resetDatabase,
   saveCollections,
   saveCollectionsWithCloudQueue,
+  saveCloudWorkspaceManifest,
   saveDataset,
   saveReconciledDatasetWithCloudQueue,
 } from '../db/indexedDb'
@@ -47,6 +50,7 @@ import {
   leaveTutoringSpace,
   loadCloudBackup,
   loadCloudWorkspace,
+  loadCloudWorkspaceMeta,
   loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
@@ -88,6 +92,10 @@ import {
 import { compareCloudConflictDatasets } from '../lib/cloudConflictComparison'
 import { reconcileCloudDatasets } from '../lib/cloudReconciliation'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
+import {
+  canUseCloudWorkspaceManifest,
+  getCloudWorkspaceRevision,
+} from '../lib/cloudWorkspaceManifest'
 import {
   getCloudStartupAction,
   getCloudWorkspacePreferences,
@@ -990,6 +998,7 @@ async function applyCloudWorkspace(set, get, uid, workspace) {
       retryAvailableAt: '',
     },
   }))
+  await cacheVerifiedCloudWorkspace(uid, dataset, workspace.meta)
   return true
 }
 
@@ -1063,6 +1072,24 @@ function cloudWorkspacesMatch(localDataset, remoteDataset) {
   )
 }
 
+async function getCloudWorkspaceFingerprint(dataset) {
+  return getCloudDocumentsFingerprint(getComparableCloudWorkspace(normalizeDataset(dataset)))
+}
+
+async function cacheVerifiedCloudWorkspace(uid, dataset, remoteMeta) {
+  const workspaceRevision = getCloudWorkspaceRevision(remoteMeta)
+  if (!workspaceRevision) {
+    await clearCloudWorkspaceManifest(uid)
+    return false
+  }
+
+  await saveCloudWorkspaceManifest(uid, {
+    workspaceRevision,
+    datasetFingerprint: await getCloudWorkspaceFingerprint(dataset),
+  })
+  return true
+}
+
 async function synchronizeAfterSignIn(set, get, uid) {
   if (!uid || get().cloud.user?.uid !== uid) return
   if (cloudStartupPromise && cloudStartupUid === uid) return cloudStartupPromise
@@ -1081,10 +1108,41 @@ async function synchronizeAfterSignIn(set, get, uid) {
         set((current) => ({
           cloud: { ...current.cloud, status: 'syncing', error: '', errorKind: '' },
         }))
-        const workspace = await loadCloudWorkspace(uid)
+        const knownMeta = await loadCloudWorkspaceMeta(uid)
         if (get().cloud.user?.uid !== uid) return
 
         const localDataset = getDatasetFromState(get())
+        const localManifest = await loadCloudWorkspaceManifest(uid)
+        const remoteRevision = getCloudWorkspaceRevision(knownMeta.meta)
+        const localFingerprint = localManifest && remoteRevision
+          ? await getCloudWorkspaceFingerprint(localDataset)
+          : ''
+        if (canUseCloudWorkspaceManifest({
+          uid,
+          remoteMeta: knownMeta.meta,
+          localManifest,
+          localFingerprint,
+          localWorkspaceExists: localDataset.classes.length > 0,
+          localWorkspaceIsDemo: get().onboarding.demoMode,
+          pendingOperationCount: (await loadCloudSyncQueue(uid)).length,
+        })) {
+          set((current) => ({
+            cloud: {
+              ...current.cloud,
+              status: 'synced',
+              error: '',
+              errorKind: '',
+              lastSyncedAt: new Date().toISOString(),
+              lastSyncStats: { startup: 'manifest' },
+              pendingCollections: [],
+              pendingOperationCount: 0,
+            },
+          }))
+          return
+        }
+
+        const workspace = await loadCloudWorkspace(uid, { knownMeta })
+        if (get().cloud.user?.uid !== uid) return
         const action = getCloudStartupAction({
           cloudWorkspaceExists: workspace.exists,
           localWorkspaceExists: localDataset.classes.length > 0,
@@ -1103,6 +1161,7 @@ async function synchronizeAfterSignIn(set, get, uid) {
           return
         }
         if (action === 'already-synced') {
+          await cacheVerifiedCloudWorkspace(uid, localDataset, workspace.meta)
           set((current) => ({
             cloud: {
               ...current.cloud,
@@ -1850,6 +1909,7 @@ export const useAvaluaproStore = create((set, get) => ({
       cloudSyncBlockedUntil = 0
       cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
       await clearPlanningLocalData(signedInUid)
+      await clearCloudWorkspaceManifest(signedInUid)
       await signOutFromGoogle()
       set((state) => ({
         cloud: {
@@ -1926,6 +1986,12 @@ export const useAvaluaproStore = create((set, get) => ({
       if (remainingOperations.length > 0) {
         scheduleCloudSync(set, get, getPendingCollectionNames(remainingOperations), remainingOperations.length)
       } else {
+        if (syncStats.workspaceRevision) {
+          await saveCloudWorkspaceManifest(state.cloud.user.uid, {
+            workspaceRevision: syncStats.workspaceRevision,
+            datasetFingerprint: await getCloudWorkspaceFingerprint(getDatasetFromState(get())),
+          })
+        }
         await get().maybeCreateDailyCloudBackup({ triggeredByConfirmedChange: true })
       }
       return syncStats
@@ -2218,6 +2284,7 @@ export const useAvaluaproStore = create((set, get) => ({
           pendingOperationCount: 0,
         },
       }))
+      await cacheVerifiedCloudWorkspace(state.cloud.user.uid, dataset, workspace.meta)
     } catch (error) {
       set((current) => ({
         cloud: {

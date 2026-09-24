@@ -53,6 +53,10 @@ import {
   isFirestoreQuotaError,
   isFirestoreSpecialValue,
 } from './cloudSyncDiff'
+import {
+  buildCloudWorkspaceManifestFields,
+  createCloudWorkspaceRevision,
+} from './cloudWorkspaceManifest'
 
 export const SHARED_TUTORING_COLLECTIONS = [
   'students',
@@ -1109,6 +1113,25 @@ export async function saveCloudCollections(uid, dataset, collectionsToSave = COL
   })
   const userWritten = await setDocumentIfChanged(getUserDocRef(uid), userValue)
   const collectionStats = []
+  const metaReference = getMetaDocRef(uid)
+  const commonMetaValue = cleanForFirestore({
+    app: 'avaluapro-v2',
+    profile: meta.profile || {},
+    preferences: meta.preferences || {},
+    collections: COLLECTIONS,
+  })
+
+  // Una substitució completa dura diversos lots. Marcar-la primer com a
+  // incompleta impedeix que una altra pestanya accepti una revisió antiga si
+  // el navegador es tanca o la xarxa falla a mig procés.
+  await setDoc(
+    metaReference,
+    cleanForFirestore({
+      ...commonMetaValue,
+      ...buildCloudWorkspaceManifestFields({ state: 'updating' }),
+    }),
+    { merge: true },
+  )
 
   for (const collectionName of collectionsToSave) {
     const rows =
@@ -1127,20 +1150,21 @@ export async function saveCloudCollections(uid, dataset, collectionsToSave = COL
     }),
     { read: 0, written: 0, deleted: 0, skipped: 0 },
   )
-  const hasRowChanges = totals.written + totals.deleted > 0
-  const metaValue = cleanForFirestore({
-    app: 'avaluapro-v2',
-    version: 2,
-    profile: meta.profile || {},
-    preferences: meta.preferences || {},
-    collections: COLLECTIONS,
-  })
-  const metaWritten = hasRowChanges ? await setDocumentIfChanged(getMetaDocRef(uid), metaValue) : false
+  const workspaceRevision = createCloudWorkspaceRevision()
+  await setDoc(
+    metaReference,
+    cleanForFirestore({
+      ...commonMetaValue,
+      ...buildCloudWorkspaceManifestFields({ revision: workspaceRevision }),
+    }),
+    { merge: true },
+  )
 
   return {
     collections: collectionStats,
     totals,
-    metadataWrites: Number(userWritten) + Number(metaWritten),
+    metadataWrites: Number(userWritten) + 2,
+    workspaceRevision,
   }
 }
 
@@ -1187,6 +1211,16 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
   })
 
   const successfulOperationIds = []
+  const metaReference = getMetaDocRef(uid)
+  const commonMetaValue = cleanForFirestore({
+    app: 'avaluapro-v2',
+    profile: meta.profile || {},
+    preferences: meta.preferences || {},
+    collections: COLLECTIONS,
+  })
+  let workspaceRevision = ''
+  let metadataWrites = 0
+  let metadataError = ''
   const buildOperationError = (error, failedOperationIds) => {
     const operationError = new Error(error?.message || 'No s’han pogut sincronitzar algunes dades.', { cause: error })
     operationError.code = error?.code || ''
@@ -1194,16 +1228,26 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
     operationError.failedOperationIds = failedOperationIds
     return operationError
   }
-  for (let index = 0; index < firestoreOperations.length; index += 450) {
-    const operationBatch = firestoreOperations.slice(index, index + 450)
+  for (let index = 0; index < firestoreOperations.length; index += 449) {
+    const operationBatch = firestoreOperations.slice(index, index + 449)
+    const batchRevision = createCloudWorkspaceRevision()
+    const readyMetaValue = cleanForFirestore({
+      ...commonMetaValue,
+      ...buildCloudWorkspaceManifestFields({ revision: batchRevision }),
+    })
     const batch = writeBatch(db)
     operationBatch.forEach((operation) => {
       if (operation.type === 'delete') batch.delete(operation.reference)
       else batch.set(operation.reference, operation.value)
     })
+    // La dada i la revisió es publiquen en el mateix lot. Una revisió visible
+    // sempre descriu, com a mínim, totes les escriptures que han arribat abans.
+    batch.set(metaReference, readyMetaValue, { merge: true })
     try {
       await batch.commit()
       successfulOperationIds.push(...operationBatch.map((operation) => operation.id))
+      workspaceRevision = batchRevision
+      metadataWrites += 1
     } catch (error) {
       const code = String(error?.code || '').toLowerCase()
       const transientError =
@@ -1212,6 +1256,23 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
           .some((value) => code.includes(value))
       if (transientError) {
         throw buildOperationError(error, operationBatch.map((operation) => operation.id))
+      }
+
+      // Si Firestore rebutja el lot per un document concret, la recuperació
+      // individual queda protegida per un estat incomplet. No es torna a
+      // activar la via ràpida fins que tots els documents han acabat bé.
+      try {
+        await setDoc(
+          metaReference,
+          cleanForFirestore({
+            ...commonMetaValue,
+            ...buildCloudWorkspaceManifestFields({ state: 'updating' }),
+          }),
+          { merge: true },
+        )
+        metadataWrites += 1
+      } catch (metadataWriteError) {
+        throw buildOperationError(metadataWriteError, operationBatch.map((operation) => operation.id))
       }
 
       const failedOperationIds = []
@@ -1227,22 +1288,15 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
       if (failedOperationIds.length > 0) {
         throw buildOperationError(error, failedOperationIds)
       }
-    }
-  }
 
-  const metaValue = cleanForFirestore({
-    app: 'avaluapro-v2',
-    version: 2,
-    profile: meta.profile || {},
-    preferences: meta.preferences || {},
-    collections: COLLECTIONS,
-  })
-  let metaWritten = false
-  let metadataError = ''
-  try {
-    metaWritten = await setDocumentIfChanged(getMetaDocRef(uid), metaValue)
-  } catch (error) {
-    metadataError = String(error?.code || error?.name || 'metadata-sync-error')
+      try {
+        await setDoc(metaReference, readyMetaValue, { merge: true })
+        workspaceRevision = batchRevision
+        metadataWrites += 1
+      } catch (metadataWriteError) {
+        metadataError = String(metadataWriteError?.code || metadataWriteError?.name || 'metadata-sync-error')
+      }
+    }
   }
   const collections = Array.from(statsByCollection.values())
   const totals = collections.reduce(
@@ -1258,16 +1312,27 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
   return {
     collections,
     totals,
-    metadataWrites: Number(userWritten) + Number(metaWritten),
+    metadataWrites: Number(userWritten) + metadataWrites,
     metadataError,
+    workspaceRevision,
   }
 }
 
-export async function loadCloudWorkspace(uid) {
+export async function loadCloudWorkspaceMeta(uid) {
+  if (!uid) throw new Error('Cal iniciar sessió amb Google abans de carregar dades del núvol.')
+  const metaSnapshot = await getDocFromServer(getMetaDocRef(uid))
+  recordFirestoreLookup('startup.workspace.meta')
+  return {
+    exists: metaSnapshot.exists(),
+    meta: metaSnapshot.exists() ? metaSnapshot.data() : null,
+  }
+}
+
+export async function loadCloudWorkspace(uid, { knownMeta = null } = {}) {
   if (!uid) throw new Error('Cal iniciar sessió amb Google abans de carregar dades del núvol.')
 
-  const [metaSnapshot, entries] = await Promise.all([
-    getDocFromServer(getMetaDocRef(uid)),
+  const [metaEntry, entries] = await Promise.all([
+    knownMeta ? Promise.resolve(knownMeta) : loadCloudWorkspaceMeta(uid),
     Promise.all(
       COLLECTIONS.map(async (collectionName) => {
         const snapshot = await getDocsFromServer(getCollectionRef(uid, collectionName))
@@ -1279,7 +1344,6 @@ export async function loadCloudWorkspace(uid) {
       }),
     ),
   ])
-  recordFirestoreLookup('startup.workspace.meta')
 
   const dataset = entries.reduce(
     (nextDataset, [collectionName, rows]) => ({ ...nextDataset, [collectionName]: rows }),
@@ -1288,8 +1352,8 @@ export async function loadCloudWorkspace(uid) {
 
   return {
     dataset,
-    exists: metaSnapshot.exists() || entries.some(([, rows]) => rows.length > 0),
-    meta: metaSnapshot.exists() ? metaSnapshot.data() : null,
+    exists: metaEntry.exists || entries.some(([, rows]) => rows.length > 0),
+    meta: metaEntry.meta,
   }
 }
 

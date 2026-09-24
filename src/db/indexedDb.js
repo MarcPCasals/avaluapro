@@ -6,9 +6,10 @@ import {
 } from '../lib/cloudSyncQueue.js'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 15
+const DB_VERSION = 16
 const TUTORING_COORDINATION_CACHE_STORE = 'tutoringCoordinationCache'
 const TUTORING_COORDINATION_OUTBOX_STORE = 'tutoringCoordinationOutbox'
+const CLOUD_WORKSPACE_MANIFEST_STORE = 'cloudWorkspaceManifests'
 
 const INDEXES = {
   students: ['classId'],
@@ -87,6 +88,7 @@ function openDatabase() {
       if (!coordinationOutboxStore.indexNames.contains('uid')) {
         coordinationOutboxStore.createIndex('uid', 'uid', { unique: false })
       }
+      ensureCustomStore(db, CLOUD_WORKSPACE_MANIFEST_STORE, 'uid')
     }
 
     request.onsuccess = () => resolve(request.result)
@@ -169,8 +171,12 @@ export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
   try {
     db = await openDatabase()
     await new Promise((resolve, reject) => {
-      const transaction = db.transaction([...new Set([...collections, CLOUD_SYNC_QUEUE_STORE])], 'readwrite')
+      const transaction = db.transaction(
+        [...new Set([...collections, CLOUD_SYNC_QUEUE_STORE, CLOUD_WORKSPACE_MANIFEST_STORE])],
+        'readwrite',
+      )
       const queueStore = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      const manifestStore = transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE)
 
       collections.forEach((collection) => {
         const store = transaction.objectStore(collection)
@@ -186,6 +192,7 @@ export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
           store.clear()
           nextRows.forEach((row) => store.put(row))
           changes.forEach((change) => queueStore.put(change))
+          if (changes.length > 0) manifestStore.delete(uid)
         }
         readRequest.onerror = () => transaction.abort()
       })
@@ -213,8 +220,12 @@ export async function saveReconciledDatasetWithCloudQueue(dataset, remoteDataset
   try {
     db = await openDatabase()
     await new Promise((resolve, reject) => {
-      const transaction = db.transaction([...COLLECTIONS, CLOUD_SYNC_QUEUE_STORE], 'readwrite')
+      const transaction = db.transaction(
+        [...COLLECTIONS, CLOUD_SYNC_QUEUE_STORE, CLOUD_WORKSPACE_MANIFEST_STORE],
+        'readwrite',
+      )
       const queueStore = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
+      transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE).delete(uid)
 
       COLLECTIONS.forEach((collection) => {
         const nextRows = dataset[collection] || []
@@ -315,6 +326,60 @@ export async function clearCloudSyncQueue(uid) {
       const transaction = db.transaction(CLOUD_SYNC_QUEUE_STORE, 'readwrite')
       const store = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
       entries.forEach((entry) => store.delete(entry.id))
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function loadCloudWorkspaceManifest(uid) {
+  if (!uid) return null
+  const db = await openDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(CLOUD_WORKSPACE_MANIFEST_STORE, 'readonly')
+        .objectStore(CLOUD_WORKSPACE_MANIFEST_STORE)
+        .get(uid)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function saveCloudWorkspaceManifest(uid, manifest = {}) {
+  if (!uid || !manifest.workspaceRevision || !manifest.datasetFingerprint) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_WORKSPACE_MANIFEST_STORE, 'readwrite')
+      transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE).put({
+        uid,
+        workspaceRevision: manifest.workspaceRevision,
+        datasetFingerprint: manifest.datasetFingerprint,
+        verifiedAt: manifest.verifiedAt || new Date().toISOString(),
+      })
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function clearCloudWorkspaceManifest(uid) {
+  if (!uid) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_WORKSPACE_MANIFEST_STORE, 'readwrite')
+      transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE).delete(uid)
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(transaction.error)
       transaction.onabort = () => reject(transaction.error)
@@ -447,6 +512,9 @@ export async function acknowledgeTutoringCoordinationOperation(operationId, revi
 
 export async function resetDatabase() {
   const db = await openDatabase()
-  await Promise.all(COLLECTIONS.map((collection) => replaceStore(db, collection, [])))
+  await Promise.all([
+    ...COLLECTIONS.map((collection) => replaceStore(db, collection, [])),
+    replaceStore(db, CLOUD_WORKSPACE_MANIFEST_STORE, []),
+  ])
   db.close()
 }
