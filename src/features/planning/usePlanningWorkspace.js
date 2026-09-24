@@ -1107,7 +1107,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       const detailResults = await Promise.all(sessions.map((session) => repository.loadScope(
         `session:${session.id}:detail`,
         async () => {
-          const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id)
+          const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id, { session })
           return [detail.session, ...detail.items, ...detail.results]
         },
         { completeSnapshot: true },

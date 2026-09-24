@@ -416,7 +416,10 @@ export default function AgendaModule() {
   }), [classes, workspace.sessionBundles, workspace.sharedClasses])
   const hasOwnCalendar = Boolean(workspace.activeAcademicYear)
   const hasAgendaWorkspace = hasOwnCalendar || workspace.sharedPlanningUnits.length > 0 || sharedTutoringSpaces.length > 0
-  const materialReminderBundles = workspace.sessionBundles
+  const materialReminderBundles = useMemo(
+    () => workspace.sessionBundles.filter((bundle) => bundle.detailsLoaded !== false),
+    [workspace.sessionBundles],
+  )
   const setWorkspaceError = workspace.setError
   const loadSessionRange = workspace.loadSessionRange
   const academicYearStartsOn = workspace.activeAcademicYear?.startsOn
@@ -494,6 +497,7 @@ export default function AgendaModule() {
     loadSessionRange({
       classId: activeClassId,
       from: academicYearStartsOn || addDateDays(agendaToday, -180),
+      includeDetails: false,
       to: academicYearEndsOn || addDateDays(agendaToday, 365),
     }).catch((error) => {
       if (!cancelled) setWorkspaceError(error.message || 'No s’ha pogut carregar la cronologia.')
@@ -549,13 +553,13 @@ export default function AgendaModule() {
     const to = workspace.activeAcademicYear?.endsOn && workspace.activeAcademicYear.endsOn < requestedEnd
       ? workspace.activeAcademicYear.endsOn
       : requestedEnd
-    workspace.loadSessionRange({ from: workspace.today, to })
+    workspace.loadSessionRange({ from: workspace.today, includeDetails: false, to })
       .catch((error) => workspace.setError(error.message || 'No s’han pogut carregar les sessions dels recordatoris.'))
   }
   const loadWeek = async (nextStart) => {
     setWeekStart(nextStart)
     try {
-      await workspace.loadSessionRange({ from: nextStart, to: addDateDays(nextStart, 4) })
+      await workspace.loadSessionRange({ from: nextStart, includeDetails: false, to: addDateDays(nextStart, 4) })
     } catch (error) {
       workspace.setError(error.message || 'No s’ha pogut carregar la setmana.')
     }
@@ -584,7 +588,7 @@ export default function AgendaModule() {
     setMonthKey(nextMonth)
     setCalendarMode('month')
     setView('week')
-    workspace.loadSessionRange(range)
+    workspace.loadSessionRange({ ...range, includeDetails: false })
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar el mes.'))
   }
   const moveMonth = (amount) => {
@@ -596,7 +600,7 @@ export default function AgendaModule() {
       : requestedMonth > lastCourseMonth ? lastCourseMonth : requestedMonth
     const range = monthSessionRange(nextMonth)
     setMonthKey(nextMonth)
-    workspace.loadSessionRange(range)
+    workspace.loadSessionRange({ ...range, includeDetails: false })
       .catch((error) => workspace.setError(error.message || 'No s’ha pogut carregar el mes.'))
   }
   const selectCalendarWeek = (nextStart) => {
@@ -607,9 +611,16 @@ export default function AgendaModule() {
   const openTimeline = () => {
     setView('timeline')
   }
-  const openSession = (bundle) => {
-    setActiveBundle(bundle)
-    setDialog('session-detail')
+  const openSession = async (bundle) => {
+    try {
+      const detailedBundle = bundle.detailsLoaded === false
+        ? await workspace.loadSessionDetails(bundle)
+        : bundle
+      setActiveBundle(detailedBundle)
+      setDialog('session-detail')
+    } catch (error) {
+      workspace.setError(error.message || 'No s’ha pogut obrir el detall de la sessió.')
+    }
   }
   const adjustSession = (bundle, initialAction = 'session', item = null) => {
     setActiveBundle(bundle)
@@ -617,14 +628,18 @@ export default function AgendaModule() {
     setAdjustItemId(item?.id || '')
     setDialog('session-adjust')
   }
-  const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, to: addDateDays(weekStart, 4) })
+  const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, includeDetails: false, to: addDateDays(weekStart, 4) })
   const reloadActiveView = () => {
     if (view === 'timeline') return workspace.loadSessionRange({
       classId: activeClassId,
       from: workspace.activeAcademicYear?.startsOn || addDateDays(workspace.today, -180),
+      includeDetails: false,
       to: workspace.activeAcademicYear?.endsOn || addDateDays(workspace.today, 365),
     })
-    if (view === 'week' && calendarMode === 'month') return workspace.loadSessionRange(monthSessionRange(monthKey))
+    if (view === 'week' && calendarMode === 'month') return workspace.loadSessionRange({
+      ...monthSessionRange(monthKey),
+      includeDetails: false,
+    })
     if (view === 'week') return reloadCurrentWeek()
     return workspace.loadTodaySessions()
   }

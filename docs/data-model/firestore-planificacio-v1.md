@@ -73,10 +73,12 @@ El servei `planningFirestore.js` limita cada lectura:
 | `loadPlanningUnitStructure` | Una UP, les seves fases i activitats |
 | `loadPlanningApplications` | Aplicacions d'una UP i grup opcional |
 | `loadPlanningSessions` | Sessions d'una aplicació entre dues dates |
-| `loadPlanningSessionDetail` | Una sessió, els seus elements i resultats |
+| `loadPlanningSessionDetail` | Elements i resultats d'una sessió; reutilitza l'encapçalament si ja s'ha consultat |
 | `loadPlanningPrivateNotes` | Notes del propietari per UP o sessió |
 
 Els límits de resultats formen part de cada consulta. Els històrics no es carreguen durant l'arrencada general.
+
+Els elements de sessió nous conserven `sourcePlanningUnitId` quan provenen d'una activitat. Aquest vincle no duplica el contingut pedagògic: permet recuperar descripcions i materials de la UP exacta quan s'obre el detall, sense consultar totes les UP pròpies i arxivades.
 
 ## Índexs
 

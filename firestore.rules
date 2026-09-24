@@ -1586,7 +1586,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'applicationId', 'createdAt', 'entityType', 'id', 'order', 'ownerUid',
           'plannedMinutes', 'schemaVersion', 'segmentCount', 'segmentIndex',
-          'sessionId', 'sourceActivityId', 'title', 'type', 'updatedAt'
+          'sessionId', 'sourceActivityId', 'sourcePlanningUnitId', 'title', 'type', 'updatedAt'
         ])
         && request.resource.data.id == itemId
         && request.resource.data.entityType == 'sessionItem'
@@ -1595,6 +1595,9 @@ service cloud.firestore {
         && request.resource.data.applicationId == applicationId
         && request.resource.data.sessionId == sessionId
         && request.resource.data.type in ['activity', 'indication', 'transition']
+        && (!('sourcePlanningUnitId' in request.resource.data)
+          || request.resource.data.sourcePlanningUnitId == null
+          || request.resource.data.sourcePlanningUnitId is string)
         && request.resource.data.order is number
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string;

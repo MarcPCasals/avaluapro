@@ -363,16 +363,21 @@ export async function loadPlanningSessions({
   return mapSnapshot(snapshot)
 }
 
-export async function loadPlanningSessionDetail(planningUnitId, applicationId, sessionId) {
+export async function loadPlanningSessionDetail(planningUnitId, applicationId, sessionId, options = {}) {
   const sessionReference = planningSessionRef(planningUnitId, applicationId, sessionId)
+  const knownSession = options.session?.id === sessionId ? options.session : null
   const [sessionSnapshot, itemsSnapshot, resultsSnapshot] = await Promise.all([
-    readPlanningDocument('sessionDetail.session', sessionReference),
+    knownSession ? Promise.resolve(null) : readPlanningDocument('sessionDetail.session', sessionReference),
     readPlanningQuery('sessionDetail.items', query(collection(sessionReference, 'items'), orderBy('order', 'asc'))),
     readPlanningQuery('sessionDetail.results', collection(sessionReference, 'results')),
   ])
-  if (!sessionSnapshot.exists()) throw new Error("No s'ha trobat aquesta sessió")
+  if (!knownSession && !sessionSnapshot.exists()) throw new Error("No s'ha trobat aquesta sessió")
   return {
-    session: { id: sessionSnapshot.id, ...sessionSnapshot.data() },
+    // Les llistes d'Agenda ja han llegit el document de sessió. Reutilitzar-lo
+    // evita una segona lectura per sessió sense alterar l'abast local dels seus
+    // elements i resultats. Els consumidors que no el tenen conserven el camí
+    // compatible que el consulta directament.
+    session: knownSession || { id: sessionSnapshot.id, ...sessionSnapshot.data() },
     items: mapSnapshot(itemsSnapshot),
     results: mapSnapshot(resultsSnapshot),
   }

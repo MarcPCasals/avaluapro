@@ -616,6 +616,7 @@ export function createSessionItem(input, options = {}) {
     sessionId: requiredText(input.sessionId, 'sessió'),
     type,
     sourceActivityId,
+    sourcePlanningUnitId: sourceActivityId ? optionalText(input.sourcePlanningUnitId) : null,
     title: requiredText(input.title, "títol de l'element"),
     order: normalizedOrder(input.order),
     plannedMinutes: optionalMinutes(input.plannedMinutes, 'temps previst'),

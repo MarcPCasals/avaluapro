@@ -450,7 +450,7 @@ export function useAgendaWorkspace(user, classes = []) {
    * sota cada UP, per això primer es resolen aquestes relacions i després es
    * carreguen les sessions i els seus elements concrets.
    */
-  const loadSessionRange = useCallback(async ({ classId = '', from, to }) => {
+  const loadSessionRange = useCallback(async ({ classId = '', from, includeDetails = true, to }) => {
     if (!repository || !from || !to) return []
     setSessionsLoading(true)
     try {
@@ -499,25 +499,45 @@ export function useAgendaWorkspace(user, classes = []) {
         .filter((session) => String(session.startsAt).slice(0, 10) >= from && String(session.startsAt).slice(0, 10) <= to)
         .filter((session) => !classId || session.classId === classId)
         .map((session) => ({ ...applications[index], session })))
+      if (!includeDetails) {
+        // Calendari, cronologia i selectors només necessiten l'encapçalament de
+        // sessió. Recuperem els títols que ja existeixin a IndexedDB, però no
+        // fem cap consulta remota d'elements, resultats, descripcions o materials.
+        const cachedDetails = await Promise.all(sessionRecords.map(({ session }) =>
+          repository.loadScope(`session:${session.id}:detail`)))
+        const bundles = sessionRecords.map((record, index) => ({
+          ...record,
+          detailsLoaded: false,
+          items: cachedDetails[index].entities
+            .filter((entity) => entity.entityType === 'sessionItem')
+            .sort((left, right) => Number(left.order) - Number(right.order))
+            .map((item) => ({ ...item, sourceActivity: null })),
+          results: cachedDetails[index].entities
+            .filter((entity) => entity.entityType === 'activityResult'),
+        })).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+        setSessionBundles(bundles)
+        return bundles
+      }
       const detailResults = await Promise.all(sessionRecords.map(({ application, planningUnit, session }) =>
         repository.loadScope(
           `session:${session.id}:detail`,
           async () => {
-            const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id)
+            const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id, { session })
             return [detail.session, ...detail.items, ...detail.results]
           },
           { completeSnapshot: true },
         )))
       const unitIds = [...new Set(sessionRecords.map((record) => record.planningUnit.id))]
-      // Una sessió pot recuperar una activitat d'una UP anterior. Carreguem
-      // també les estructures pròpies arxivades perquè la descripció i els
-      // materials es resolguin des de la seva font, sense duplicar-los dins
-      // del document de l'Agenda.
+      const declaredSourceUnitIds = detailResults.flatMap((result) => result.entities
+        .filter((entity) => entity.entityType === 'sessionItem')
+        .map((item) => item.sourcePlanningUnitId)
+        .filter(Boolean))
+      // Els elements nous indiquen la UP font. Això permet carregar només les
+      // estructures realment utilitzades, incloses les recuperacions d'una UP
+      // anterior, en lloc de rellegir totes les UP pròpies i arxivades.
       const sourceUnitIds = [...new Set([
         ...unitIds,
-        ...allPlanningUnits
-          .filter((unit) => unit.ownerUid === user?.uid)
-          .map((unit) => unit.id),
+        ...declaredSourceUnitIds,
       ])]
       const structureResults = await Promise.all(sourceUnitIds.map((planningUnitId) => repository.loadScope(
         `planningUnit:${planningUnitId}:structure`,
@@ -527,6 +547,14 @@ export function useAgendaWorkspace(user, classes = []) {
         },
         { completeSnapshot: true },
       )))
+      // Les recuperacions creades abans de guardar sourcePlanningUnitId poden
+      // aprofitar estructures ja presents a la còpia local, sense generar
+      // lectures remotes addicionals.
+      const legacySourceUnitIds = allPlanningUnits
+        .filter((unit) => unit.ownerUid === user?.uid && !sourceUnitIds.includes(unit.id))
+        .map((unit) => unit.id)
+      const legacyStructureResults = await Promise.all(legacySourceUnitIds.map((planningUnitId) =>
+        repository.loadScope(`planningUnit:${planningUnitId}:structure`)))
       const applicationRecords = Array.from(new Map(sessionRecords.map((record) => [
         `${record.planningUnit.id}:${record.application.id}`,
         record,
@@ -536,10 +564,16 @@ export function useAgendaWorkspace(user, classes = []) {
         () => loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
         { completeSnapshot: true },
       )))
-      const baseActivitiesByUnitId = new Map(sourceUnitIds.map((planningUnitId, index) => [
-        planningUnitId,
-        structureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
-      ]))
+      const baseActivitiesByUnitId = new Map([
+        ...sourceUnitIds.map((planningUnitId, index) => [
+          planningUnitId,
+          structureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
+        ]),
+        ...legacySourceUnitIds.map((planningUnitId, index) => [
+          planningUnitId,
+          legacyStructureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
+        ]),
+      ])
       const sourceActivityById = new Map([...baseActivitiesByUnitId.values()]
         .flat()
         .map((activity) => [activity.id, activity]))
@@ -557,6 +591,7 @@ export function useAgendaWorkspace(user, classes = []) {
         ) || new Map()
         return {
           ...record,
+          detailsLoaded: true,
           items: entities
             .filter((entity) => entity.entityType === 'sessionItem')
             .sort((left, right) => Number(left.order) - Number(right.order))
@@ -577,6 +612,92 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [allPlanningUnits, repository, user?.uid, userEmail])
 
   /**
+   * Completa una única sessió quan el docent l'obre des del calendari o la
+   * cronologia. Les vistes de navegació no necessiten mantenir carregats els
+   * resultats, les descripcions i els materials de tot el curs.
+   */
+  const loadSessionDetails = useCallback(async (bundle) => {
+    if (!repository || !bundle?.session?.id) return bundle
+    setSessionsLoading(true)
+    try {
+      const detailResult = await repository.loadScope(
+        `session:${bundle.session.id}:detail`,
+        async () => {
+          const detail = await loadPlanningSessionDetail(
+            bundle.planningUnit.id,
+            bundle.application.id,
+            bundle.session.id,
+            { session: bundle.session },
+          )
+          return [detail.session, ...detail.items, ...detail.results]
+        },
+        { completeSnapshot: true },
+      )
+      if (detailResult.error && detailResult.entities.length === 0) {
+        throw detailResult.error
+      }
+      const rawItems = detailResult.entities
+        .filter((entity) => entity.entityType === 'sessionItem')
+        .sort((left, right) => Number(left.order) - Number(right.order))
+      const declaredSourceUnitIds = rawItems.map((item) => item.sourcePlanningUnitId).filter(Boolean)
+      const sourceUnitIds = [...new Set([bundle.planningUnit.id, ...declaredSourceUnitIds])]
+      const [structureResults, overrideResult] = await Promise.all([
+        Promise.all(sourceUnitIds.map((planningUnitId) => repository.loadScope(
+          `planningUnit:${planningUnitId}:structure`,
+          async () => {
+            const structure = await loadPlanningUnitStructure(planningUnitId)
+            return [structure.planningUnit, ...structure.phases, ...structure.activities]
+          },
+          { completeSnapshot: true },
+        ))),
+        repository.loadScope(
+          `application:${bundle.application.id}:overrides`,
+          () => loadPlanningActivityOverrides(bundle.planningUnit.id, bundle.application.id),
+          { completeSnapshot: true },
+        ),
+      ])
+      const legacySourceUnitIds = allPlanningUnits
+        .filter((unit) => unit.ownerUid === user?.uid && !sourceUnitIds.includes(unit.id))
+        .map((unit) => unit.id)
+      const legacyStructures = await Promise.all(legacySourceUnitIds.map((planningUnitId) =>
+        repository.loadScope(`planningUnit:${planningUnitId}:structure`)))
+      const baseActivitiesByUnitId = new Map([
+        ...sourceUnitIds.map((planningUnitId, index) => [
+          planningUnitId,
+          structureResults[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
+        ]),
+        ...legacySourceUnitIds.map((planningUnitId, index) => [
+          planningUnitId,
+          legacyStructures[index].entities.filter((entity) => entity.entityType === 'planningActivity'),
+        ]),
+      ])
+      const sourceActivityById = new Map([...baseActivitiesByUnitId.values()]
+        .flat()
+        .map((activity) => [activity.id, activity]))
+      const currentActivityById = new Map(applyPlanningActivityOverrides(
+        baseActivitiesByUnitId.get(bundle.planningUnit.id) || [],
+        overrideResult.entities,
+      ).map((activity) => [activity.id, activity]))
+      const detailedBundle = {
+        ...bundle,
+        detailsLoaded: true,
+        items: rawItems.map((item) => ({
+          ...item,
+          sourceActivity: currentActivityById.get(item.sourceActivityId)
+            || sourceActivityById.get(item.sourceActivityId)
+            || null,
+        })),
+        results: detailResult.entities.filter((entity) => entity.entityType === 'activityResult'),
+      }
+      setSessionBundles((bundles) => bundles.map((current) =>
+        current.session.id === detailedBundle.session.id ? detailedBundle : current))
+      return detailedBundle
+    } finally {
+      setSessionsLoading(false)
+    }
+  }, [allPlanningUnits, repository, user?.uid])
+
+  /**
    * La portada d'Agenda només obre el tram necessari per a avui i la setmana
    * següent. El calendari mensual, la cronologia i el selector de recordatoris
    * amplien el rang sota demanda; així entrar a Agenda no descarrega sis
@@ -590,6 +711,7 @@ export function useAgendaWorkspace(user, classes = []) {
     toDate.setUTCDate(toDate.getUTCDate() + 13)
     return loadSessionRange({
       from: fromDate.toISOString().slice(0, 10),
+      includeDetails: true,
       to: toDate.toISOString().slice(0, 10),
     })
   }, [loadSessionRange, today])
@@ -879,7 +1001,7 @@ export function useAgendaWorkspace(user, classes = []) {
       const detailResults = await Promise.all(existingSessions.map((session) => repository.loadScope(
         `session:${session.id}:detail`,
         async () => {
-          const detail = await loadPlanningSessionDetail(planningUnitId, application.id, session.id)
+          const detail = await loadPlanningSessionDetail(planningUnitId, application.id, session.id, { session })
           return [detail.session, ...detail.items, ...detail.results]
         },
         { completeSnapshot: true },
@@ -1126,7 +1248,7 @@ export function useAgendaWorkspace(user, classes = []) {
         repository.loadScope(
           `session:${session.id}:detail`,
           async () => {
-            const detail = await loadPlanningSessionDetail(unit.id, application.id, session.id)
+            const detail = await loadPlanningSessionDetail(unit.id, application.id, session.id, { session })
             return [detail.session, ...detail.items, ...detail.results]
           },
           { completeSnapshot: true },
@@ -1434,6 +1556,7 @@ export function useAgendaWorkspace(user, classes = []) {
       activities: [{
         id: item.sourceActivityId,
         plannedMinutes: Number(minutes),
+        sourcePlanningUnitId: item.sourcePlanningUnitId || bundle.planningUnit.id,
         title: item.title,
         type: item.type,
       }],
@@ -1565,6 +1688,7 @@ export function useAgendaWorkspace(user, classes = []) {
     loadSchedulingSetup,
     loadAgendaRecoveryOptions,
     loadClassroomPrivateNotes,
+    loadSessionDetails,
     loadSessionRange,
     loadTodaySessions,
     moveSlot,

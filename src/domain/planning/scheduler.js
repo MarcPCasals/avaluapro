@@ -469,6 +469,7 @@ export function buildActivitySessionDistribution({
         segmentIndex,
         sessionId: session.id,
         sourceActivityId: activity.id,
+        sourcePlanningUnitId: activity.sourcePlanningUnitId || activity.planningUnitId,
         title: activity.title,
         type: activity.type || 'activity',
       }, options)
@@ -643,6 +644,7 @@ export function buildAgendaRecoveryReflow({
   const recoveryKey = `agenda-recovery:${recoveryItem.sourceActivityId}`
   activityMeta.set(recoveryKey, {
     sourceActivityId: recoveryItem.sourceActivityId,
+    sourcePlanningUnitId: recoveryItem.sourcePlanningUnitId,
     title: recoveryItem.title,
     type: recoveryItem.type || 'activity',
   })
@@ -656,6 +658,7 @@ export function buildAgendaRecoveryReflow({
     const key = `agenda-displaced:${item.id || index}`
     activityMeta.set(key, {
       sourceActivityId: item.sourceActivityId || null,
+      sourcePlanningUnitId: item.sourcePlanningUnitId || null,
       title: item.title,
       type: item.type || 'activity',
     })
@@ -681,6 +684,7 @@ export function buildAgendaRecoveryReflow({
       return createSessionItem({
         ...item,
         sourceActivityId: meta?.sourceActivityId || null,
+        sourcePlanningUnitId: meta?.sourcePlanningUnitId || null,
         title: meta?.title || item.title,
         type: meta?.type || item.type,
       }, options)
@@ -693,6 +697,7 @@ export function buildAgendaRecoveryReflow({
       ...originalItem,
       plannedMinutes: minutes,
       sourceActivityId: recoveryItem.sourceActivityId,
+      sourcePlanningUnitId: recoveryItem.sourcePlanningUnitId,
       title: recoveryItem.title,
       type: recoveryItem.type || 'activity',
     }, options)

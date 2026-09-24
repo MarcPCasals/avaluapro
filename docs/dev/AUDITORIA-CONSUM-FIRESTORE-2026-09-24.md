@@ -2,7 +2,7 @@
 
 Data: 24 de setembre de 2026
 Abast: lectures, escriptures, listeners, arrencada, Agenda, Programació, tutoria compartida, còpies i regles
-Estat: auditoria aprovada; blocs de mesura, reduccions ràpides i manifest incremental aplicats
+Estat: auditoria aprovada; blocs de mesura, reduccions ràpides, manifest incremental i primera capa d’Agenda aplicats
 
 ## 1. Conclusió executiva
 
@@ -294,7 +294,18 @@ El manifest incremental d’arrencada afegeix també:
 
 Agenda ha rebut una primera reducció reversible: la portada «Avui» carrega dues setmanes, en lloc de sis, amb els detalls de les sessions. Les vistes de setmana, mes, cronologia i recordatoris amplien el rang quan el docent les obre. La pròxima classe sense UP es calcula localment des de l’horari fins a seixanta dies i salta festius i vacances, de manera que la reducció no deixa la portada buida.
 
-Encara falta la projecció lleugera de sessions d’Agenda. També queden pendents el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
+La primera capa lleugera d’Agenda reutilitza els documents de sessió existents, sense crear una base paral·lela:
+
+- setmana, mes, cronologia i selector de recordatoris consulten només els encapçalaments de sessió;
+- els elements i resultats que ja existeixen a IndexedDB poden decorar la vista, però no provoquen cap lectura remota;
+- activitats, resultats, descripcions, materials i ajustos es carreguen quan el docent obre una sessió;
+- «Avui» manté el tram curt complet perquè Mode aula continuï preparat;
+- cada detall reutilitza el document de sessió que ja havia retornat el calendari i elimina una lectura duplicada per sessió;
+- els elements nous desen la UP d’origen, de manera que una recuperació només consulta la seva estructura exacta;
+- les recuperacions antigues busquen l’estructura a la còpia local i no obliguen a rellegir totes les UP arxivades;
+- els recordatoris de material només es reconcilien amb sessions que tenen el detall complet, evitant cancel·lacions falses.
+
+Encara queden pendents la paginació de cronologia, la memòria compartida entre Agenda i Programació, el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
 
 ## 9. Capacitat del pla gratuït
 
