@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -226,4 +226,47 @@ test('un ajust de cronologia crea nomes una edicio de la sessio', () => {
     sessionId: 'session-1',
   })
   assert.deepEqual(sourceActivity, { id: 'activity-1', plannedMinutes: 60, title: 'Activitat mestra' })
+})
+
+test('un fragment futur desplacat es pot treure encara que arrossegui un resultat tecnic', () => {
+  const item = { id: 'item-future' }
+  const result = {
+    id: 'result-future',
+    sessionItemId: item.id,
+    status: 'continued',
+  }
+  const state = getAgendaSessionItemRemovalState({
+    results: [result],
+    session: {
+      classroomOpenedAt: '2026-09-24T08:00:00.000Z',
+      startsAt: '2026-09-25T10:00:00.000Z',
+      status: 'planned',
+    },
+  }, item, { now: '2026-09-24T09:00:00.000Z' })
+
+  assert.equal(state.canRemove, true)
+  assert.equal(state.isFutureSession, true)
+  assert.deepEqual(state.linkedResults, [result])
+})
+
+test('una sessio feta o amb assistencia confirmada conserva protegit l historial', () => {
+  const item = { id: 'item-protected' }
+  const heldState = getAgendaSessionItemRemovalState({
+    results: [],
+    session: {
+      startsAt: '2026-09-23T10:00:00.000Z',
+      status: 'held',
+    },
+  }, item, { now: '2026-09-24T09:00:00.000Z' })
+  const attendanceState = getAgendaSessionItemRemovalState({
+    results: [],
+    session: {
+      attendanceConfirmedAt: '2026-09-24T08:00:00.000Z',
+      startsAt: '2026-09-25T10:00:00.000Z',
+      status: 'planned',
+    },
+  }, item, { now: '2026-09-24T09:00:00.000Z' })
+
+  assert.equal(heldState.canRemove, false)
+  assert.equal(attendanceState.canRemove, false)
 })

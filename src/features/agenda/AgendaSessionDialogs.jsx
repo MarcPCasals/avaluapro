@@ -4,6 +4,7 @@ import {
   History, RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { AgendaSessionDetail } from './AgendaSessionViews'
 
@@ -51,12 +52,8 @@ export function AgendaSessionAdjustDialog({
   const [confirmRemoval, setConfirmRemoval] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const itemHasResult = Boolean(item && (bundle.results || []).some((result) => result.sessionItemId === item.id))
-  const canRemoveItem = bundle.session.status === 'planned'
-    && !bundle.session.classroomOpenedAt
-    && !bundle.session.attendanceConfirmedAt
-    && !bundle.session.classroomClosedAt
-    && !itemHasResult
+  const removalState = getAgendaSessionItemRemovalState(bundle, item)
+  const canRemoveItem = removalState.canRemove
   const recoveryItem = recoveryOptions.find((candidate) => candidate.id === recoveryItemId)
     || recoveryOptions[0]
     || null
@@ -161,7 +158,10 @@ export function AgendaSessionAdjustDialog({
             <div><strong>Vols treure «{item.title}»?</strong><p>S’eliminaran només {item.plannedMinutes ? `aquests ${item.plannedMinutes} minuts` : 'aquest element'} de la sessió del {dateLabel(bundle.session.startsAt)}.</p></div>
             <div className="agenda-remove-session-item-actions"><button className="secondary-action compact" disabled={busy} onClick={() => setConfirmRemoval(false)} type="button"><X size={14} />Cancel·lar</button><button className="danger-action compact" disabled={busy} onClick={() => execute(() => onRemoveItem(item), 'Fragment eliminat de la sessió.')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}Confirmar</button></div>
           </>}
-          {!canRemoveItem && <small>Aquesta activitat ja té dades de classe i es conserva per no perdre l’historial.</small>}
+          {canRemoveItem && removalState.linkedResults.length > 0 && (
+            <small>Aquest fragment futur arrossega un registre tècnic del reajustament. També es netejarà, però es conservaran l’activitat original i tot l’historial de les sessions ja fetes.</small>
+          )}
+          {!canRemoveItem && <small>Aquesta sessió ja té dades reals de classe i es conserva per no perdre l’historial.</small>}
         </div>
       </section>}
 

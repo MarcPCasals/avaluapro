@@ -17,7 +17,7 @@ import {
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
-import { buildAgendaSessionItemUpdate } from '../../lib/agendaToday'
+import { buildAgendaSessionItemUpdate, getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import {
   copyTimetableVersionStructure,
   buildAgendaRecoveryReflow,
@@ -1029,16 +1029,19 @@ export function useAgendaWorkspace(user, classes = []) {
    * modifica i les sessions ja iniciades queden protegides com a historial.
    */
   const removeSessionItem = useCallback(async (bundle, item) => {
-    const hasClassroomData = bundle.session.status !== 'planned'
-      || bundle.session.classroomOpenedAt
-      || bundle.session.attendanceConfirmedAt
-      || bundle.session.classroomClosedAt
-      || (bundle.results || []).some((result) => result.sessionItemId === item.id)
-    if (hasClassroomData) {
+    const removalState = getAgendaSessionItemRemovalState(bundle, item)
+    if (!removalState.canRemove) {
       throw new Error('Aquesta activitat ja té dades de classe i no es pot eliminar de l’historial.')
     }
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
 
+    for (const result of removalState.linkedResults) {
+      await repository.remove(result, {
+        applicationId: bundle.application.id,
+        planningUnitId: bundle.planningUnit.id,
+        sessionId: bundle.session.id,
+      })
+    }
     await repository.remove(item, {
       applicationId: bundle.application.id,
       planningUnitId: bundle.planningUnit.id,
@@ -1047,7 +1050,11 @@ export function useAgendaWorkspace(user, classes = []) {
     await refreshSync()
     await synchronize()
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
-      ? { ...current, items: current.items.filter((currentItem) => currentItem.id !== item.id) }
+      ? {
+          ...current,
+          items: current.items.filter((currentItem) => currentItem.id !== item.id),
+          results: current.results.filter((result) => result.sessionItemId !== item.id),
+        }
       : current))
     return item
   }, [refreshSync, repository, synchronize])

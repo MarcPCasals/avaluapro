@@ -91,6 +91,32 @@ export function buildAgendaSessionItemUpdate(bundle, item, changes, options = {}
 }
 
 /**
+ * Decideix si un fragment es pot retirar només de l'Agenda. Els resultats que
+ * apareixen en una sessió futura poden ser registres tècnics del reajustament;
+ * no converteixen per si sols la sessió en historial real. En canvi, una
+ * sessió feta, tancada o amb assistència confirmada continua protegida.
+ */
+export function getAgendaSessionItemRemovalState(bundle, item, options = {}) {
+  const now = new Date(options.now || new Date().toISOString()).getTime()
+  const startsAt = new Date(bundle?.session?.startsAt || '').getTime()
+  const isFutureSession = Number.isFinite(startsAt) && startsAt > now
+  const linkedResults = item
+    ? (bundle?.results || []).filter((result) => result.sessionItemId === item.id)
+    : []
+  const hasProtectedClassroomData = bundle?.session?.status !== 'planned'
+    || Boolean(bundle?.session?.attendanceConfirmedAt)
+    || Boolean(bundle?.session?.classroomClosedAt)
+    || (Boolean(bundle?.session?.classroomOpenedAt) && !isFutureSession)
+
+  return {
+    canRemove: Boolean(item) && !hasProtectedClassroomData,
+    hasProtectedClassroomData,
+    isFutureSession,
+    linkedResults,
+  }
+}
+
+/**
  * Busca la pròxima classe de l'horari encara que no tingui una UP
  * calendaritzada. Això evita que la portada quedi buida durant el cap de
  * setmana o entre dues programacions.
