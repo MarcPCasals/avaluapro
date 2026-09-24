@@ -19,12 +19,18 @@ import {
 } from '../db/indexedDb'
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { clearPlanningLocalData } from '../data/local/planningIndexedDb'
-import { getSubjectOption, getSubjectStructure } from '../data/subjects'
+import {
+  canonicalizeSubjectName,
+  canonicalizeSubjectScopedKey,
+  getSubjectOption,
+  getSubjectStructure,
+} from '../data/subjects'
 import {
   buildTeacherGradePackage,
   getTutorialMarkUpdatesFromTeacherPackage,
   previewTeacherGradePackage,
 } from '../lib/teacherGradePackages'
+import { normalizeTutorialExemptSubjects } from '../lib/tutorialExemptions'
 import {
   SHARED_TUTORING_COLLECTIONS,
   acknowledgeTutoringInvitationUpdate,
@@ -367,6 +373,7 @@ function normalizeDataset(dataset) {
     ...normalizedDataset,
     classes: normalizedDataset.classes.map((classItem) => ({
       ...classItem,
+      subject: canonicalizeSubjectName(classItem.subject),
       tutors: classItem.tutors || '',
       isTutoringGroup: Boolean(classItem.isTutoringGroup || classItem.subject === 'Tutoria'),
       tutorialLinkedClassId: classItem.tutorialLinkedClassId || classItem.id,
@@ -390,6 +397,16 @@ function normalizeDataset(dataset) {
       ...student,
       name: formatStudentNameForDisplay(student.name),
       isSkiStudyStudent: Boolean(student.isSkiStudyStudent),
+      tutorialExemptSubjects: normalizeTutorialExemptSubjects(student.tutorialExemptSubjects),
+      tutorialModifiedCompetencies: Array.isArray(student.tutorialModifiedCompetencies)
+        ? student.tutorialModifiedCompetencies.map(canonicalizeSubjectScopedKey).filter(Boolean)
+        : [],
+    })),
+    tutorialMarks: normalizedDataset.tutorialMarks.map((mark) => ({
+      ...mark,
+      subject: canonicalizeSubjectName(mark.subject),
+      competencyKey: mark.competencyKey ? canonicalizeSubjectScopedKey(mark.competencyKey) : mark.competencyKey,
+      criterionKey: mark.criterionKey ? canonicalizeSubjectScopedKey(mark.criterionKey) : mark.criterionKey,
     })),
     sociometricSurveys: removeExpiredSociometricSurveys(
       normalizedDataset.sociometricSurveys.map(normalizeSociometricSurvey),
@@ -2246,7 +2263,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   setupInitialWorkspace: async ({ subject, classes = [] }) => {
-    const cleanSubject = subject?.trim()
+    const cleanSubject = canonicalizeSubjectName(subject)
     const cleanClasses = classes
       .map((classItem, index) => ({
         name: classItem.name?.trim() || `Classe ${index + 1}`,
@@ -2535,7 +2552,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   addClass: async ({ name, subject, color = 'blue', tutors = '' } = {}) => {
     const id = createId('class')
-    const classSubject = subject || get().profile.defaultSubject
+    const classSubject = canonicalizeSubjectName(subject || get().profile.defaultSubject)
     const timeline = createCourseTimeline(id)
     const subjectStructure = createSubjectStructureForUts({
       classId: id,
@@ -2588,11 +2605,14 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateClass: async (classId, patch) => {
+    const normalizedPatch = Object.prototype.hasOwnProperty.call(patch, 'subject')
+      ? { ...patch, subject: canonicalizeSubjectName(patch.subject) }
+      : patch
     set((state) => {
       const currentClass = state.classes.find((classItem) => classItem.id === classId)
       const subjectChanged =
-        Object.prototype.hasOwnProperty.call(patch, 'subject') && patch.subject !== currentClass?.subject
-      const nextSubject = patch.subject ?? currentClass?.subject
+        Object.prototype.hasOwnProperty.call(normalizedPatch, 'subject') && normalizedPatch.subject !== currentClass?.subject
+      const nextSubject = normalizedPatch.subject ?? currentClass?.subject
       const timeline = subjectChanged ? ensureFixedCourseForClass(state, classId) : null
       const subjectStructure = subjectChanged
         ? ensureSubjectStructureForClass(
@@ -2603,7 +2623,7 @@ export const useAvaluaproStore = create((set, get) => ({
           )
         : null
       const nextIsTutoringGroup =
-        patch.isTutoringGroup ?? Boolean(currentClass?.isTutoringGroup || nextSubject === 'Tutoria')
+        normalizedPatch.isTutoringGroup ?? Boolean(currentClass?.isTutoringGroup || nextSubject === 'Tutoria')
       const shouldLeaveTutoringMode =
         state.ui.activeClassId === classId &&
         state.ui.activeMode === 'tutoring' &&
@@ -2612,7 +2632,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
       return {
         classes: state.classes.map((classItem) =>
-          classItem.id === classId ? { ...classItem, ...patch } : classItem,
+          classItem.id === classId ? { ...classItem, ...normalizedPatch } : classItem,
         ),
         semesters: timeline?.semesters || state.semesters,
         uts: timeline?.uts || state.uts,

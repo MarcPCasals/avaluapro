@@ -51,7 +51,7 @@ import {
 import { EducandEmailInput } from '../../components/EducandEmailInput'
 import { ContextualHelp, ContextualTab } from '../../components/ContextualHelp'
 import { Modal } from '../../components/Modal'
-import { SUBJECT_AREAS, SUBJECT_STRUCTURES } from '../../data/subjects'
+import { canonicalizeSubjectName, getSubjectStructure, SUBJECT_AREAS } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { normalizeEducandEmail } from '../../lib/email'
 import {
@@ -67,6 +67,7 @@ import {
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import {
   getTutorialExemptSubjects,
+  isStudentExemptFromSubject,
   normalizeTutorialExemptSubjects,
   toggleTutorialExemptSubject,
 } from '../../lib/tutorialExemptions'
@@ -913,7 +914,8 @@ function printSociometricReport(extraPrintClass = '') {
 }
 
 function getSubjectArea(subjectName) {
-  return SUBJECT_AREAS.find((area) => area.subjects.includes(subjectName))
+  const canonicalSubject = canonicalizeSubjectName(subjectName)
+  return SUBJECT_AREAS.find((area) => area.subjects.includes(canonicalSubject))
 }
 
 function normalizeCompetencyLabel(value) {
@@ -954,12 +956,12 @@ function getSubjectOptionsForArea(areaFilter) {
     .filter((area) => areaFilter === 'all' || area.id === areaFilter)
     .flatMap((area) =>
       area.subjects
-        .filter((subject) => SUBJECT_STRUCTURES[subject])
+        .filter((subject) => getSubjectStructure(subject))
         .map((subject) => ({
           subject,
           areaId: area.id,
           areaName: area.name,
-          structure: SUBJECT_STRUCTURES[subject],
+          structure: getSubjectStructure(subject),
         })),
     )
 }
@@ -969,14 +971,15 @@ function getAllTutorialSubjectOptions() {
 }
 
 function buildTutorialCompetencies(subject) {
-  const structure = SUBJECT_STRUCTURES[subject] || []
+  const canonicalSubject = canonicalizeSubjectName(subject)
+  const structure = getSubjectStructure(canonicalSubject) || []
   return structure.map((competency, competencyIndex) => ({
     ...competency,
-    key: `${subject}__c${competencyIndex + 1}`,
-    subject,
+    key: `${canonicalSubject}__c${competencyIndex + 1}`,
+    subject: canonicalSubject,
     competencyIndex,
     criteria: competency.criteria.map((criterion, criterionIndex) => ({
-      key: `${subject}__c${competencyIndex + 1}__ca${criterionIndex + 1}`,
+      key: `${canonicalSubject}__c${competencyIndex + 1}__ca${criterionIndex + 1}`,
       name: criterion,
       order: criterionIndex + 1,
     })),
@@ -1081,7 +1084,7 @@ function getTutorialCompetencyGradeSource({
   subject,
   tutorialMarks,
 }) {
-  if (student?.tutorialExemptSubjects?.includes(subject)) {
+  if (isStudentExemptFromSubject(student, subject)) {
     return { source: 'exempt', value: '' }
   }
   if (student?.tutorialModifiedCompetencies?.includes(competency.key)) {
@@ -4820,8 +4823,9 @@ export function TutoringView() {
   const diagnosisSubjectOptions = useMemo(() => getSubjectOptionsForArea(diagnosisAreaFilter), [diagnosisAreaFilter])
   const profileSubjectOptions = useMemo(() => getSubjectOptionsForArea(profileAreaFilter), [profileAreaFilter])
   const bulkImportColumns = useMemo(() => buildTutorialImportColumns(allSubjectOptions), [allSubjectOptions])
-  const autoSubject =
-    linkedClass?.subject && SUBJECT_STRUCTURES[linkedClass.subject] ? linkedClass.subject : subjectOptions[0]?.subject
+  const autoSubject = linkedClass?.subject && getSubjectStructure(linkedClass.subject)
+    ? canonicalizeSubjectName(linkedClass.subject)
+    : subjectOptions[0]?.subject
   const selectedSubject = subjectFilter === 'auto' ? autoSubject : subjectFilter
   const selectedSubjectArea = getSubjectArea(selectedSubject)
   const selectedCompetencies = useMemo(() => buildTutorialCompetencies(selectedSubject), [selectedSubject])
@@ -4830,7 +4834,7 @@ export function TutoringView() {
       classStudents
         .map((student) => ({
           student,
-          subjects: (student.tutorialExemptSubjects || []).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ca')),
+          subjects: getTutorialExemptSubjects(student),
         }))
         .filter((row) => row.subjects.length > 0),
     [classStudents],
@@ -5002,7 +5006,7 @@ export function TutoringView() {
     const entries = subjectOptions.map((item) => {
       const subjectCompetencies = buildTutorialCompetencies(item.subject)
       const eligibleStudents = classStudents.filter(
-        (student) => !student.tutorialExemptSubjects?.includes(item.subject),
+        (student) => !isStudentExemptFromSubject(student, item.subject),
       )
       const total = eligibleStudents.length * subjectCompetencies.length
       const completed = eligibleStudents.reduce(

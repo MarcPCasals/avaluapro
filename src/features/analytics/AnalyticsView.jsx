@@ -33,6 +33,7 @@ import {
   getStudentAbsenceRecords,
 } from '../../lib/attendance'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 
 const insightCopy = {
   dashboard: {
@@ -2798,10 +2799,14 @@ export function AnalyticsView() {
   }, [])
 
   const { activeClassId, activeUtId } = state.ui
+  const activeClass = state.classes.find((classItem) => classItem.id === activeClassId)
   const profiles = buildStudentProfiles(state, activeClassId, activeUtId)
   const crossProfiles = buildStudentProfiles(state, activeClassId)
   const students = state.students
-    .filter((student) => student.classId === activeClassId)
+    .filter(
+      (student) =>
+        student.classId === activeClassId && !isStudentExemptFromSubject(student, activeClass?.subject),
+    )
     .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
   const classUts = getClassUts(state, activeClassId)
   const currentTasks = getCurrentTasks(state, activeClassId, activeUtId)

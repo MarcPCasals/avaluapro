@@ -1,6 +1,12 @@
 import { calculateGrade, getNumericFromGrade } from './grades.js'
+import { isStudentExemptFromSubject } from './tutorialExemptions.js'
 
 export function getStudentEvaluationScore(studentId, state) {
+  const student = state.students.find((item) => item.id === studentId)
+  const studentClass = state.classes?.find((classItem) => classItem.id === student?.classId)
+  if (isStudentExemptFromSubject(student, studentClass?.subject)) {
+    return { grade: '', score: 0, exempt: true }
+  }
   const studentMarks = state.marks.filter((mark) => mark.studentId === studentId)
   const grades = studentMarks.map((mark) => mark.value).filter(Boolean)
   const grade = calculateGrade(grades)
@@ -158,7 +164,10 @@ export function buildTrackingInterventions(students, taskRecords, tasks, behavio
 }
 
 export function buildStudentProfiles(state, classId, utId) {
-  const students = state.students.filter((student) => student.classId === classId)
+  const activeClass = state.classes?.find((classItem) => classItem.id === classId)
+  const students = state.students.filter(
+    (student) => student.classId === classId && !isStudentExemptFromSubject(student, activeClass?.subject),
+  )
   const tasks = state.tasks.filter((task) => task.classId === classId && (!utId || task.utId === utId))
   const behaviorEvents = state.behaviorEvents.filter((event) => event.classId === classId)
 

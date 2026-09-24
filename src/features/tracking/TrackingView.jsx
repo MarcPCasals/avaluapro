@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
+import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
@@ -46,6 +47,9 @@ const TRACKING_TEXT_LIMIT = 500
 function useTrackingModel() {
   const { activeClassId, activeUtId } = useAvaluaproStore((state) => state.ui)
   const allStudents = useAvaluaproStore((state) => state.students)
+  const activeClass = useAvaluaproStore((state) =>
+    state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
+  )
   const allTasks = useAvaluaproStore((state) => state.tasks)
   const taskRecords = useAvaluaproStore((state) => state.taskRecords)
   const allBehaviorEvents = useAvaluaproStore((state) => state.behaviorEvents)
@@ -54,7 +58,10 @@ function useTrackingModel() {
   return useMemo(
     () => ({
       students: allStudents
-        .filter((student) => student.classId === activeClassId)
+        .filter(
+          (student) =>
+            student.classId === activeClassId && !isStudentExemptFromSubject(student, activeClass?.subject),
+        )
         .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true })),
       tasks: allTasks
         .filter((task) => task.classId === activeClassId && task.utId === activeUtId)
@@ -63,7 +70,7 @@ function useTrackingModel() {
       behaviorEvents: allBehaviorEvents.filter((event) => event.classId === activeClassId),
       agendaNotes,
     }),
-    [activeClassId, activeUtId, allStudents, allTasks, taskRecords, allBehaviorEvents, agendaNotes],
+    [activeClass?.subject, activeClassId, activeUtId, allStudents, allTasks, taskRecords, allBehaviorEvents, agendaNotes],
   )
 }
 
@@ -804,12 +811,13 @@ export function TrackingView() {
     const dueAt = new Date(`${reminder.date}T${reminder.time || '00:00'}`)
     return dueAt <= now
   }
+  const eligibleStudentIds = new Set(students.map((student) => student.id))
   const dueReminders = [
     ...tasks
       .filter((task) => isReminderDue(task.reminder))
       .map((task) => ({ id: `task_${task.id}`, kind: 'task', task, text: task.reminder.text, reminder: task.reminder })),
     ...taskRecords
-      .filter((record) => isReminderDue(record.reminder))
+      .filter((record) => eligibleStudentIds.has(record.studentId) && isReminderDue(record.reminder))
       .map((record) => ({
         id: `record_${record.id}`,
         kind: 'record',

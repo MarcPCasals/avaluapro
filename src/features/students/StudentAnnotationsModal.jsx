@@ -352,6 +352,7 @@ function TrackingDetailPanel({ agendaNotes, diaryEntries, detail, missingTasks, 
 
 export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const students = useAvaluaproStore((state) => state.students)
+  const classes = useAvaluaproStore((state) => state.classes)
   const tasks = useAvaluaproStore((state) => state.tasks)
   const taskRecords = useAvaluaproStore((state) => state.taskRecords)
   const competencies = useAvaluaproStore((state) => state.competencies)
@@ -424,10 +425,10 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   }, [activeClassId, semesters, uts])
   const studentProfile = useMemo(
     () =>
-      buildStudentProfiles({ behaviorEvents, marks, students, taskRecords, tasks }, activeClassId).find(
+      buildStudentProfiles({ behaviorEvents, classes, marks, students, taskRecords, tasks }, activeClassId).find(
         (profile) => profile.student.id === studentId,
       ),
-    [activeClassId, behaviorEvents, marks, studentId, students, taskRecords, tasks],
+    [activeClassId, behaviorEvents, classes, marks, studentId, students, taskRecords, tasks],
   )
   const annotationEvolution = useMemo(
     () =>

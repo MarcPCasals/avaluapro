@@ -1,6 +1,7 @@
-import { SUBJECT_STRUCTURES } from '../data/subjects'
+import { canonicalizeSubjectName, getSubjectStructure } from '../data/subjects'
 import { getStudentInterventionInsight, getStudentTrackingStats } from './analytics'
 import { calculateGrade } from './grades'
+import { isStudentExemptFromSubject } from './tutorialExemptions'
 
 export const TEACHER_GRADE_PACKAGE_SCHEMA = 'avaluapro.teacher-grade-package'
 export const TEACHER_GRADE_PACKAGE_VERSION = 1
@@ -185,14 +186,14 @@ export function getLatestEvaluationCompetencyGrade({ classId, competencyName, st
 
 export function buildTeacherGradePackage({ classId, sender = {}, state }) {
   const sourceClass = state.classes.find((classItem) => classItem.id === classId)
-  const subject = sourceClass?.subject
-  const structure = SUBJECT_STRUCTURES[subject] || []
+  const subject = canonicalizeSubjectName(sourceClass?.subject)
+  const structure = getSubjectStructure(subject) || []
   if (!sourceClass || !subject || structure.length === 0) {
     throw new Error('Aquesta classe no té una matèria amb competències configurades per enviar notes.')
   }
 
   const sourceStudents = state.students
-    .filter((student) => student.classId === classId)
+    .filter((student) => student.classId === classId && !isStudentExemptFromSubject(student, subject))
     .sort((a, b) => a.name.localeCompare(b.name, 'ca'))
   const sourceTasks = state.tasks.filter((task) => task.classId === classId)
   const createdAt = new Date().toISOString()

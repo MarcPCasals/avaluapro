@@ -44,6 +44,21 @@ const transversalStructure = [
   },
 ]
 
+export const SUBJECT_ALIASES = {
+  'Educació musical': 'Música',
+}
+
+export function canonicalizeSubjectName(subjectName = '') {
+  const cleanName = String(subjectName || '').trim()
+  return SUBJECT_ALIASES[cleanName] || cleanName
+}
+
+export function canonicalizeSubjectScopedKey(value = '') {
+  const cleanValue = String(value || '').trim()
+  const alias = Object.keys(SUBJECT_ALIASES).find((subjectName) => cleanValue.startsWith(`${subjectName}__`))
+  return alias ? `${SUBJECT_ALIASES[alias]}${cleanValue.slice(alias.length)}` : cleanValue
+}
+
 export const SUBJECT_AREAS = [
   {
     id: 'languages',
@@ -66,7 +81,7 @@ export const SUBJECT_AREAS = [
   {
     id: 'arts',
     name: 'Artística',
-    subjects: ['Visual i Plàstica', 'Educació musical', 'Música'],
+    subjects: ['Visual i Plàstica', 'Música'],
     defaultCompetencyCount: 2,
   },
   {
@@ -172,23 +187,6 @@ export const SUBJECT_STRUCTURES = {
       criteria: ['CA1: Pertinència', 'CA2: Claredat'],
     },
   ],
-  'Educació musical': [
-    {
-      name: 'C1: Crear peces musicals d’estructura simple que combinin diversos elements',
-      color: 'orange',
-      criteria: ['CA1: Coherència', 'CA2: Efectivitat', 'CA3: Adequació'],
-    },
-    {
-      name: 'C2: Interpretar composicions musicals senzilles amb els instruments, la veu o el cos',
-      color: 'green',
-      criteria: ['CA1: Fidelitat', 'CA2: Efectivitat', 'CA3: Singularitat'],
-    },
-    {
-      name: 'C3: Analitzar peces musicals i l’entorn sonor en relació amb les seves característiques, repercussions i usos socials',
-      color: 'purple',
-      criteria: ['CA1: Precisió', 'CA2: Pertinència', 'CA3: Sentit crític'],
-    },
-  ],
   Música: [
     {
       name: 'C1: Crear peces musicals d’estructura simple que combinin diversos elements',
@@ -235,9 +233,10 @@ export const SUBJECT_STRUCTURES = {
 }
 
 export function getSubjectOption(subjectName) {
-  return SUBJECT_OPTIONS.find((subject) => subject.name === subjectName)
+  const canonicalName = canonicalizeSubjectName(subjectName)
+  return SUBJECT_OPTIONS.find((subject) => subject.name === canonicalName)
 }
 
 export function getSubjectStructure(subjectName) {
-  return SUBJECT_STRUCTURES[subjectName] || null
+  return SUBJECT_STRUCTURES[canonicalizeSubjectName(subjectName)] || null
 }

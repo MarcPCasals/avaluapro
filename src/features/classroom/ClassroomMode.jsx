@@ -15,6 +15,7 @@ import {
 import { findAbsenceForSession } from '../../lib/attendance'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
 import { getSessionPersonalReminders } from '../../lib/reminders'
+import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import {
   buildRecoveryEmail,
@@ -269,8 +270,9 @@ export function ClassroomMode({
   const [error, setError] = useState('')
   const classItem = classes.find((item) => item.id === currentBundle.session.classId)
   const visibleStudents = useMemo(
-    () => getClassroomStudents(students, currentBundle.session.classId, currentBundle.session.subgroupId),
-    [currentBundle.session.classId, currentBundle.session.subgroupId, students],
+    () => getClassroomStudents(students, currentBundle.session.classId, currentBundle.session.subgroupId)
+      .filter((student) => !isStudentExemptFromSubject(student, classItem?.subject)),
+    [classItem?.subject, currentBundle.session.classId, currentBundle.session.subgroupId, students],
   )
   const absentStudents = visibleStudents.filter((student) => findAbsenceForSession(
     absenceRecords,

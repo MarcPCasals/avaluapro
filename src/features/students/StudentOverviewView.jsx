@@ -301,12 +301,12 @@ export function StudentOverviewView() {
     () =>
       new Map(
         buildStudentProfiles(
-          { behaviorEvents, marks, students, taskRecords, tasks },
+          { behaviorEvents, classes: activeClass ? [activeClass] : [], marks, students, taskRecords, tasks },
           activeClassId,
           activeUtId,
         ).map((profile) => [profile.student.id, profile]),
       ),
-    [activeClassId, activeUtId, behaviorEvents, marks, students, taskRecords, tasks],
+    [activeClass, activeClassId, activeUtId, behaviorEvents, marks, students, taskRecords, tasks],
   )
 
   const allRows = useMemo(() => {

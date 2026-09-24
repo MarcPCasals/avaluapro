@@ -4,6 +4,7 @@ import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
+import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
@@ -18,6 +19,9 @@ import { SeatingChartsModal } from './SeatingChartsModal'
 function useEvaluationModel() {
   const { activeClassId, activeUtId } = useAvaluaproStore((state) => state.ui)
   const allStudents = useAvaluaproStore((state) => state.students)
+  const activeClass = useAvaluaproStore((state) =>
+    state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
+  )
   const allCompetencies = useAvaluaproStore((state) => state.competencies)
   const allCriteria = useAvaluaproStore((state) => state.criteria)
   const marks = useAvaluaproStore((state) => state.marks)
@@ -25,7 +29,10 @@ function useEvaluationModel() {
 
   return useMemo(() => {
     const students = allStudents
-      .filter((student) => student.classId === activeClassId)
+      .filter(
+        (student) =>
+          student.classId === activeClassId && !isStudentExemptFromSubject(student, activeClass?.subject),
+      )
       .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
     const competencies = allCompetencies
       .filter((competency) => competency.utId === activeUtId && !competency.inactive)
@@ -38,7 +45,7 @@ function useEvaluationModel() {
       })
 
     return { students, competencies, marks, agendaNotes }
-  }, [activeClassId, activeUtId, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
+  }, [activeClass?.subject, activeClassId, activeUtId, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
 }
 
 function getCriterionMark(marks, studentId, criterionId) {

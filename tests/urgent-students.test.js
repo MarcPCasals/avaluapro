@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { getStudentTrackingStats, hasMinimumTrackingActivities } from '../src/lib/analytics.js'
+import { buildStudentProfiles, getStudentTrackingStats, hasMinimumTrackingActivities } from '../src/lib/analytics.js'
 
 const studentId = 'student_1'
 
@@ -38,5 +38,43 @@ describe('minimum sample for urgent consistency alerts', () => {
     assert.equal(tracking.activityCount, 2)
     assert.equal(tracking.hasTrackingData, false)
     assert.equal(hasMinimumTrackingActivities(tracking), false)
+  })
+})
+
+describe('subject exemptions', () => {
+  it('excludes an exempt student from subject statistics and urgent profiles', () => {
+    const state = {
+      behaviorEvents: [{ classId: 'class_1', studentId, type: 'incident' }],
+      classes: [{ id: 'class_1', subject: 'Ciències Físiques i de la Natura' }],
+      marks: [{ studentId, value: 'D' }],
+      students: [{
+        id: studentId,
+        classId: 'class_1',
+        name: 'Alumne exempt',
+        tutorialExemptSubjects: ['Ciències Físiques i de la Natura'],
+      }],
+      taskRecords: [{ studentId, taskId: 'task_1', status: 'MISSING' }],
+      tasks: [task('task_1')],
+    }
+
+    assert.deepEqual(buildStudentProfiles(state, 'class_1', 'ut_1'), [])
+  })
+
+  it('keeps the same student available in a different subject', () => {
+    const state = {
+      behaviorEvents: [],
+      classes: [{ id: 'class_1', subject: 'Matemàtiques' }],
+      marks: [],
+      students: [{
+        id: studentId,
+        classId: 'class_1',
+        name: 'Alumne exempt de ciències',
+        tutorialExemptSubjects: ['Ciències Físiques i de la Natura'],
+      }],
+      taskRecords: [],
+      tasks: [],
+    }
+
+    assert.equal(buildStudentProfiles(state, 'class_1', 'ut_1').length, 1)
   })
 })

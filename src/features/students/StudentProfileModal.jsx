@@ -23,6 +23,7 @@ import {
 } from '../../lib/analytics'
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { imageFileToCompressedDataUrl } from '../../lib/imageFiles'
+import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { SociometricStudentInsightCard } from '../tutoring/SociometricStudentInsightCard'
 import { buildSociometricStudentReportsFromRelations } from '../tutoring/sociometricStudentProfileUtils'
@@ -236,16 +237,17 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     () => state.tutorialRelations.filter((relation) => relation.classId === student?.classId),
     [state.tutorialRelations, student?.classId],
   )
+  const isExemptFromClassSubject = isStudentExemptFromSubject(student, studentClass?.subject)
   const currentEvaluation = student
     ? getStudentEvaluationScore(student.id, state)
     : { grade: '', score: 0 }
-  const currentTracking = student
+  const currentTracking = student && !isExemptFromClassSubject
     ? getStudentTrackingStats(student.id, state.taskRecords, classTasks)
     : { hasTrackingData: false, consistency: 0, total: 0 }
-  const currentRedPointCount = student
+  const currentRedPointCount = student && !isExemptFromClassSubject
     ? getStudentRedPointCount(student, currentTracking)
     : 0
-  const currentIncidents = student
+  const currentIncidents = student && !isExemptFromClassSubject
     ? classBehaviorEvents.filter((event) => event.studentId === student.id && event.type === 'incident').length
     : 0
   const previousGrade = getAntecedentGrade(antecedent)
