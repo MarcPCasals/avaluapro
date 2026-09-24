@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
-  Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
+  Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown,
+  Cloud, CloudOff, Copy, Eye, History, Lightbulb, Loader2,
   FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Users, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -22,13 +22,6 @@ import { getPlanningReminderSummary } from '../../lib/reminders'
 import { getConnectablePlanningUnits, getConnectedClassIds } from '../../domain/planning/classPlanning'
 import { getTutorialCollaboratorEmails, resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
 import './planning.css'
-
-const PHASE_LABELS = {
-  closing: 'Tancament',
-  custom: 'Personalitzada',
-  preparation: 'Preparació',
-  resolution: 'Resolució',
-}
 
 function SyncBadge({ isOnline, sync }) {
   const Icon = !isOnline ? CloudOff : sync.state === 'saving' ? Loader2 : sync.state === 'saved' ? Check : Cloud
@@ -103,41 +96,6 @@ function EmptyPlanning({ className, hasTemporalUnits, onConnectUnit, onCreateUni
   )
 }
 
-function PhaseTree({ activities, editable = true, onAddChild, onAddRoot, onEdit, phases }) {
-  const roots = phases.filter((phase) => !phase.parentPhaseId)
-  const childrenByParent = useMemo(() => phases.reduce((result, phase) => {
-    if (!phase.parentPhaseId) return result
-    return { ...result, [phase.parentPhaseId]: [...(result[phase.parentPhaseId] || []), phase] }
-  }, {}), [phases])
-  const renderPhase = (phase, depth = 0) => {
-    const childPhases = childrenByParent[phase.id] || []
-    const activityCount = activities.filter((activity) => activity.phaseId === phase.id).length
-    return (
-      <li key={phase.id}>
-        <div className="planning-phase-row" style={{ '--phase-depth': depth }}>
-          {childPhases.length > 0 ? <ChevronDown size={14} /> : <CircleDot size={11} />}
-          <button className="planning-phase-name" disabled={!editable} onClick={() => editable && onEdit(phase)} type="button">
-            <strong>{phase.title}</strong>
-            <span>{activityCount} activitats</span>
-          </button>
-          {editable && <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChild(phase.id)} title="Afegir subfase" type="button"><Plus size={14} /></button>}
-          {editable && <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEdit(phase)} title="Editar fase" type="button"><Pencil size={14} /></button>}
-        </div>
-        {childPhases.length > 0 && <ul>{childPhases.map((child) => renderPhase(child, depth + 1))}</ul>}
-      </li>
-    )
-  }
-  return (
-    <div className="planning-outline-block">
-      <div className="planning-outline-heading">
-        <div><FolderTree size={17} /><strong>Fases</strong></div>
-          {editable && <button aria-label="Afegir fase" className="icon-action accent" onClick={onAddRoot} title="Afegir fase" type="button"><Plus size={15} /></button>}
-      </div>
-      <ul className="planning-phase-tree">{roots.map((phase) => renderPhase(phase))}</ul>
-    </div>
-  )
-}
-
 function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   const pending = proposals.filter((proposal) => proposal.status === 'pending')
   const [selectedIds, setSelectedIds] = useState([])
@@ -180,7 +138,7 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
@@ -218,9 +176,12 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
   return (
     <form className="planning-unit-editor" onSubmit={handleSave}>
       <header className="planning-editor-header">
-        <div>
-          <span>{unit.code} · {unit.level}</span>
-          <h2>{unit.title}</h2>
+        <div className="planning-editor-heading-row">
+          <div>
+            <span>{unit.code} · {unit.level}</span>
+            <h2>{unit.title}</h2>
+          </div>
+          <UnitSummary activities={activities} phases={phases} temporalUnit={temporalUnit} unit={unit} />
         </div>
         <div className="planning-editor-actions">
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenDocuments} type="button"><FileText size={16} />Document i imports</button>}
@@ -275,8 +236,11 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
       <PlanningActivitySequence
         activities={activities}
         onAdd={onAddActivity}
+        onAddChildPhase={onAddChildPhase}
+        onAddPhase={onAddPhase}
         onDelete={onDeleteActivity}
         onEdit={onEditActivity}
+        onEditPhase={onEditPhase}
         onMove={onMoveActivity}
         phases={phases}
       />
@@ -291,7 +255,7 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
   const curriculumCount = Object.values(unit.curriculum || {}).reduce((total, items) => total + (items?.length || 0), 0)
   const measureCount = activities.reduce((total, activity) => total + (activity.diversityMeasures?.length || 0), 0)
   return (
-    <aside className="planning-summary-panel">
+    <aside aria-label="Resum de la UP" className="planning-unit-summary">
       <div className="planning-summary-status">
         <span className={`planning-status-dot ${unit.status}`} />
         <div><strong>{unit.status === 'archived' ? 'Arxivada' : unit.status === 'active' ? 'Activa' : 'Esborrany'}</strong><span>Versió {unit.versionNumber}</span></div>
@@ -304,19 +268,6 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
         <div><dt>Currículum</dt><dd>{curriculumCount}</dd></div>
         <div><dt>Mesures</dt><dd>{measureCount}</dd></div>
       </dl>
-      <section>
-        <h3>Estructura actual</h3>
-        {phases.length === 0 ? <p>Encara no hi ha fases.</p> : phases.map((phase) => (
-          <div className="planning-summary-phase" key={phase.id}>
-            <span>{PHASE_LABELS[phase.kind] || 'Fase'}</span>
-            <strong>{phase.title}</strong>
-          </div>
-        ))}
-      </section>
-      <section className="planning-summary-note">
-        <Eye size={16} />
-        <p>Direcció podrà veure aquesta estructura i el contingut pedagògic, però mai les notes personals.</p>
-      </section>
     </aside>
   )
 }
@@ -353,7 +304,6 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
-  const [showSummary, setShowSummary] = useState(true)
   const [editingUt, setEditingUt] = useState(null)
   const [editingPhase, setEditingPhase] = useState(null)
   const [editingActivity, setEditingActivity] = useState(null)
@@ -445,6 +395,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
   }
 
   const visibleUnits = workspace.classPlanningUnits.filter((unit) => showArchived || unit.status !== 'archived')
+  const selectableUnits = workspace.activePlanningUnit && !visibleUnits.some((unit) => unit.id === workspace.activePlanningUnit.id)
+    ? [workspace.activePlanningUnit, ...visibleUnits]
+    : visibleUnits
   const activeTemporalUnit = workspace.temporalUnits.find((item) => item.id === workspace.activePlanningUnit?.temporalUnitId)
   const sourceYearLabel = workspace.academicYears.find((year) => year.id === workspace.activePlanningUnit?.copiedFrom?.academicYearId)?.label
   const handleOpenPhase = (phase = null, parentId = '') => {
@@ -556,29 +509,25 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       ) : workspace.classPlanningUnits.length === 0 ? (
         <EmptyPlanning className={activeClass?.name} hasTemporalUnits={workspace.temporalUnits.length > 0} onConnectUnit={() => setDialog('connect')} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
       ) : (
-        <div className={`planning-workbench ${showSummary ? '' : 'summary-hidden'}`}>
-          <aside className="planning-outline-panel">
-            <div className="planning-outline-heading units-heading">
-              <div><BookOpenText size={17} /><strong>{isTutorialPlanning ? 'UP de tutoria compartides' : `Unitats de ${activeClass?.name || 'la classe'}`}</strong></div>
-              <div className="planning-outline-actions">
-                {!isTutorialPlanning && <button className="icon-action" onClick={() => setDialog('connect')} title="Connectar una programació" type="button"><Link2 size={15} /></button>}
-                <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
-              </div>
-            </div>
-            <div className="planning-unit-list">
-              {visibleUnits.map((unit) => (
-                <button className={unit.id === workspace.activePlanningUnitId ? 'active' : ''} key={unit.id} onClick={() => workspace.setActivePlanningUnitId(unit.id)} type="button">
-                  <span>{unit.code}</span><div><strong>{unit.title}</strong><small>{unit.level}{unit.ownerUid !== user.uid ? ` · ${unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'tutoringCollaborator' ? 'Cotutoria' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningEditor' ? 'Coedició' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningAgendaEditor' ? 'Agenda compartida' : 'Direcció'}` : ''}</small></div><ChevronRight size={15} />
-                </button>
-              ))}
-            </div>
-            <button className="planning-archive-toggle" onClick={() => setShowArchived((value) => !value)} type="button">
-              <Archive size={14} />{showArchived ? 'Amagar arxivades' : 'Mostrar arxivades'}
-            </button>
-            {workspace.activePlanningUnit && <PhaseTree activities={workspace.activities} editable={workspace.canEditActiveUnit} onAddChild={(parentId) => handleOpenPhase(null, parentId)} onAddRoot={() => handleOpenPhase()} onEdit={(phase) => handleOpenPhase(phase)} phases={workspace.phases} />}
-          </aside>
-
+        <div className="planning-workbench">
           <main className="planning-editor-panel">
+            <nav aria-label="Unitats de programació" className="planning-unit-toolbar">
+              <label>
+                <span>Unitat de programació</span>
+                <select aria-label="Unitat de programació" onChange={(event) => workspace.setActivePlanningUnitId(event.target.value)} value={workspace.activePlanningUnitId || ''}>
+                  {selectableUnits.map((unit) => (
+                    <option key={unit.id} value={unit.id}>{unit.code} · {unit.title}{unit.status === 'archived' ? ' · Arxivada' : ''}</option>
+                  ))}
+                </select>
+              </label>
+              <div>
+                {!isTutorialPlanning && <button className="secondary-action compact" onClick={() => setDialog('connect')} type="button"><Link2 size={15} />Connectar</button>}
+                <button className="secondary-action compact" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} type="button"><Plus size={15} />Nova UP</button>
+                <button className={`secondary-action compact ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived((value) => !value)} type="button">
+                  <Archive size={14} />{showArchived ? 'Amagar arxivades' : 'Arxivades'}
+                </button>
+              </div>
+            </nav>
             {workspace.activePlanningUnit && workspace.canEditActiveUnit ? (
               <>
                 {connectedClassLabels.length > 1 && (
@@ -598,6 +547,8 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   canManageUnit={workspace.activeRole === 'owner'}
                   onAcceptImprovements={(proposalIds) => withConnectedConfirmation(() => workspace.acceptImprovementSuggestions(proposalIds))}
                   onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}
+                  onAddChildPhase={(parentId) => handleOpenPhase(null, parentId)}
+                  onAddPhase={() => handleOpenPhase()}
                   onArchive={(unit) => withConnectedConfirmation(() => workspace.archiveUnit(unit))}
                   onDeleteActivity={(activity) => handleActivityAction(() => withConnectedConfirmation(
                     () => workspace.removeActivity(activity),
@@ -605,6 +556,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   ))}
                   onDuplicate={() => setDialog('annualCopy')}
                   onEditActivity={(activity) => handleOpenActivity(activity)}
+                  onEditPhase={(phase) => handleOpenPhase(phase)}
                   onError={(error) => workspace.setError(error.message || 'No s’ha pogut desar la UP.')}
                   onMoveActivity={(move) => handleActivityAction(() => withConnectedConfirmation(
                     () => workspace.moveActivity(move),
@@ -635,11 +587,6 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
               <EmptyPlanning className={activeClass?.name} hasTemporalUnits={workspace.temporalUnits.length > 0} onConnectUnit={() => setDialog('connect')} onCreateUnit={() => setDialog('unit')} onCreateUt={() => setDialog('ut')} />
             )}
           </main>
-
-          {showSummary && workspace.activePlanningUnit && <UnitSummary activities={workspace.activities} phases={workspace.phases} temporalUnit={activeTemporalUnit} unit={workspace.activePlanningUnit} />}
-          <button aria-label={showSummary ? 'Amagar resum' : 'Mostrar resum'} className="planning-summary-toggle" onClick={() => setShowSummary((value) => !value)} title={showSummary ? 'Amagar resum' : 'Mostrar resum'} type="button">
-            {showSummary ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
         </div>
       )}
 

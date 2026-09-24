@@ -111,7 +111,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
   )
 }
 
-export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, onMove, phases }) {
+export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, phases }) {
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const flatPhases = useMemo(() => orderedPhases(phases), [phases])
@@ -167,11 +167,14 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
           <span>03</span>
           <div className="contextual-section-title"><h3>Seqüència d’activitats</h3><ContextualHelp title="Seqüència d’activitats">Ordena les activitats, indicacions i transicions tal com es treballaran. La temporització servirà després per distribuir-les a l’Agenda.</ContextualHelp></div>
         </div>
-        <div className="planning-budget-summary">
-          <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}>
-            <option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option>
-          </select></label>
-          <div><strong>{totals.totalMinutes} min</strong><span>{programmableMinutes} min programables · {approximateSessions || 0} {approximateSessions === 1 ? 'sessió orientativa' : 'sessions orientatives'}</span></div>
+        <div className="planning-sequence-tools">
+          <button className="secondary-action compact" onClick={onAddPhase} type="button"><Plus size={15} />Afegir fase</button>
+          <div className="planning-budget-summary">
+            <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}>
+              <option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option>
+            </select></label>
+            <div><strong>{totals.totalMinutes} min</strong><span>{programmableMinutes} min programables · {approximateSessions || 0} {approximateSessions === 1 ? 'sessió orientativa' : 'sessions orientatives'}</span></div>
+          </div>
         </div>
       </div>
 
@@ -184,7 +187,11 @@ export function PlanningActivitySequence({ activities, onAdd, onDelete, onEdit, 
             <section className={`planning-sequence-phase ${phase.kind}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
               <header>
                 <div><span /><div><strong>{phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
-                <button className="secondary-action compact" onClick={() => onAdd(phase.id)} type="button"><Plus size={15} />Afegir element</button>
+                <div className="planning-sequence-phase-actions">
+                  <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChildPhase(phase.id)} title="Afegir subfase" type="button"><Plus size={15} /></button>
+                  <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEditPhase(phase)} title="Editar fase" type="button"><Pencil size={15} /></button>
+                  <button className="secondary-action compact" onClick={() => onAdd(phase.id)} type="button"><Plus size={15} />Afegir element</button>
+                </div>
               </header>
               <div
                 className={`planning-activity-dropzone ${phaseActivities.length === 0 ? 'empty' : ''}`}

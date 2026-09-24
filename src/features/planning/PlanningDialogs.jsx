@@ -1,8 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Clock3, Copy, History, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
+
+function AutoGrowTextarea({ className = '', value, ...props }) {
+  const textareaRef = useRef(null)
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const nextHeight = Math.max(140, Math.min(textarea.scrollHeight, 440))
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > 440 ? 'auto' : 'hidden'
+  }, [value])
+  return <textarea {...props} className={`planning-autogrow-textarea ${className}`.trim()} ref={textareaRef} value={value} />
+}
 
 function DialogActions({ busy, onClose, submitLabel }) {
   return (
@@ -240,7 +253,7 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
         </select><small className="planning-field-help">Aquest tipus reservarà la icona oficial corresponent quan ens facilitis les imatges originals.</small></label>
       )}
       <label>Títol<input autoFocus required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
-      <label>Descripció<textarea rows="3" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></label>
+      <label>Descripció<AutoGrowTextarea rows="6" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></label>
       <div className="planning-timing-fields">
         <label className="planning-check-label"><input checked={values.hasTiming} onChange={(event) => setValues({ ...values, hasTiming: event.target.checked })} type="checkbox" />Té temporització</label>
         {values.hasTiming && <label>Minuts previstos<input min="1" required type="number" value={values.plannedMinutes} onChange={(event) => setValues({ ...values, plannedMinutes: event.target.value })} /></label>}
