@@ -1,6 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionPersonalReminders } from '../src/lib/reminders.js'
+import { getSessionPersonalReminders, reminderMatchesFocus } from '../src/lib/reminders.js'
+
+test('un acces contextual mostra nomes els recordatoris seleccionats', () => {
+  assert.equal(reminderMatchesFocus('agenda_1', []), true)
+  assert.equal(reminderMatchesFocus('agenda_1', ['agenda_1']), true)
+  assert.equal(reminderMatchesFocus('agenda_2', ['agenda_1']), false)
+  assert.equal(reminderMatchesFocus('coordination_3', ['coordination_3']), true)
+})
 
 const baseReminder = {
   classId: '1d',

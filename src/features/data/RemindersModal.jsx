@@ -1,7 +1,7 @@
 import { Bell, BellRing, CheckCircle2, Clock3, Plus, Skull } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
-import { getLocalToday, getPendingReminderSummary, reminderDateTime } from '../../lib/reminders'
+import { getLocalToday, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function formatReminderDate(reminder = {}) {
@@ -38,7 +38,7 @@ function formatSessionOption(option) {
   return `${dateLabel} · ${option.time}${subgroup}${planning}`
 }
 
-export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoading = false }) {
+export function RemindersModal({ focusedReminderIds = [], onClose, sessionOptions = [], sessionOptionsLoading = false }) {
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
   const tasks = useAvaluaproStore((state) => state.tasks)
@@ -85,6 +85,11 @@ export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoa
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
   )
+  const hasFocusedReminders = focusedReminderIds.length > 0
+  const visibleSummaryItems = summary.items.filter((item) => reminderMatchesFocus(item.id, focusedReminderIds))
+  const visibleCoordinationReminders = openCoordinationReminders.filter((item) =>
+    reminderMatchesFocus(`coordination_${item.id}`, focusedReminderIds))
+  const visibleReminderCount = visibleSummaryItems.length + visibleCoordinationReminders.length
 
   const classBySpaceId = useMemo(
     () => new Map(tutoringClasses.map((classItem) => [classItem.sharedTutoringSpaceId, classItem])),
@@ -191,9 +196,9 @@ export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoa
   }
 
   return (
-    <Modal onClose={onClose} size="lg" title="Recordatoris">
+    <Modal onClose={onClose} size="lg" title={hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori' : 'Recordatoris del dia' : 'Recordatoris'}>
       <div className="reminders-modal">
-        <section className={`reminder-composer ${draft.kind}`}>
+        {!hasFocusedReminders && <section className={`reminder-composer ${draft.kind}`}>
           <header>
             {draft.kind === 'tutoring' ? <BellRing size={18} /> : <Bell size={18} />}
             <strong>Nou recordatori</strong>
@@ -263,18 +268,18 @@ export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoa
             <Plus size={15} />
             {busy ? 'Desant…' : draft.kind === 'tutoring' ? 'Afegir recordatori de cotutoria' : 'Afegir recordatori'}
           </button>
-        </section>
+        </section>}
 
-        <section className="reminder-list">
+        <section className={`reminder-list ${hasFocusedReminders ? 'focused' : ''}`}>
           <header>
-            <strong>Recordatoris pendents</strong>
-            <span>{summary.count + openCoordinationReminders.length}</span>
+            <strong>{hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
+            <span>{hasFocusedReminders ? visibleReminderCount : summary.count + openCoordinationReminders.length}</span>
           </header>
-          {summary.items.length === 0 && openCoordinationReminders.length === 0 ? (
-            <p className="empty-list">No hi ha cap recordatori pendent.</p>
+          {visibleReminderCount === 0 ? (
+            <p className="empty-list">{hasFocusedReminders ? 'Aquest recordatori ja no està pendent.' : 'No hi ha cap recordatori pendent.'}</p>
           ) : (
             <>
-              {summary.items.map((item) => (
+              {visibleSummaryItems.map((item) => (
                 <article className={`reminder-row ${item.kind}`} key={item.id}>
                   {item.kind === 'agenda' ? <Skull size={18} /> : <Clock3 size={18} />}
                   <div>
@@ -289,7 +294,7 @@ export function RemindersModal({ onClose, sessionOptions = [], sessionOptionsLoa
                   </button>
                 </article>
               ))}
-              {openCoordinationReminders.map((item) => (
+              {visibleCoordinationReminders.map((item) => (
                 <article className="reminder-row tutoring" key={`coordination_${item.id}`}>
                   <BellRing size={18} />
                   <div>

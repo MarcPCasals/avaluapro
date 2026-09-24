@@ -967,7 +967,7 @@
 }
 
 .top-reminders-button.has-reminders {
-  color: #facc15;
+  color: #f472b6;
 }
 
 .top-reminders-button > span {
@@ -981,8 +981,8 @@
   border: 2px solid #0f172a;
   border-radius: 999px;
   padding-inline: 3px;
-  color: #78350f;
-  background: #fde68a;
+  color: #831843;
+  background: #fbcfe8;
   font-size: 9px;
   font-weight: 1000;
   line-height: 1;
@@ -13766,8 +13766,8 @@ button.tutorial-record-pill {
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
-  color: #92400e;
-  background: #fde68a;
+  color: #9d174d;
+  background: #fbcfe8;
   font-weight: 950;
 }
 

@@ -14,6 +14,10 @@ function isPendingReminder(reminder = {}) {
   return Boolean(reminder?.date && !reminder.dismissedAt)
 }
 
+export function reminderMatchesFocus(itemId, focusedReminderIds = []) {
+  return focusedReminderIds.length === 0 || focusedReminderIds.includes(itemId)
+}
+
 function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }) {
   const classById = new Map(classes.map((classItem) => [classItem.id, classItem]))
   const studentById = new Map(students.map((student) => [student.id, student]))
