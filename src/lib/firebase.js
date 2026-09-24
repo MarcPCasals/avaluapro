@@ -24,8 +24,11 @@ import {
   getDocs,
   getDocsFromServer,
   getFirestore,
+  initializeFirestore,
   limit,
   orderBy,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   query,
   setDoc,
   where,
@@ -34,6 +37,16 @@ import {
 import { COLLECTIONS } from '../data/seedData'
 import { getSharedRowVersion } from './sharedTutoringRows'
 import { removeExpiredSociometricSurveys } from './sociometricRetention'
+import {
+  FIRESTORE_QUERY_LIMITS,
+  getBoundedFirestoreLimit,
+  getTutoringCollectionsToSync,
+} from './firestoreReadPolicy'
+import {
+  recordFirestoreListenerSnapshot,
+  recordFirestoreLookup,
+  recordFirestoreQuerySnapshot,
+} from './firestoreReadDiagnostics'
 import {
   areCloudDocumentsEqual,
   buildCloudDocumentDiff,
@@ -70,7 +83,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
-const db = getFirestore(app)
+// Al navegador, totes les pestanyes comparteixen la mateixa memòria persistent
+// i l'execució dels listeners. En entorns Node (proves i eines) mantenim la
+// inicialització estàndard, que no depèn d'IndexedDB.
+const db = typeof window === 'undefined'
+  ? getFirestore(app)
+  : initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
 const googleProvider = new GoogleAuthProvider()
 const authReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.warn('No s’ha pogut fixar la persistència local de Firebase Auth.', error)
@@ -314,6 +334,7 @@ async function publishTutoringChangeSignal({ changeCollections = [], spaceId, us
 async function mergeTutoringSpaceCollection(spaceId, collectionName, rows = [], { user, now } = {}) {
   const collectionRef = collection(db, 'tutoringSpaces', spaceId, collectionName)
   const existingSnapshot = await getDocs(collectionRef)
+  recordFirestoreQuerySnapshot(`tutoringSpace.merge.${collectionName}`, existingSnapshot)
   const existingById = new Map(existingSnapshot.docs.map((snapshotDoc) => [snapshotDoc.id, snapshotDoc]))
   const operations = []
   const conflicts = []
@@ -1250,6 +1271,7 @@ export async function loadCloudWorkspace(uid) {
     Promise.all(
       COLLECTIONS.map(async (collectionName) => {
         const snapshot = await getDocsFromServer(getCollectionRef(uid, collectionName))
+        recordFirestoreQuerySnapshot(`startup.workspace.${collectionName}`, snapshot)
         return [
           collectionName,
           snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })),
@@ -1257,6 +1279,7 @@ export async function loadCloudWorkspace(uid) {
       }),
     ),
   ])
+  recordFirestoreLookup('startup.workspace.meta')
 
   const dataset = entries.reduce(
     (nextDataset, [collectionName, rows]) => ({ ...nextDataset, [collectionName]: rows }),
@@ -1396,25 +1419,35 @@ export async function listReceivedTeacherGradePackages(userEmail, maxItems = 20)
   const cleanEmail = String(userEmail || '').trim().toLowerCase()
   if (!cleanEmail) return []
 
-  const packagesQuery = query(getTeacherGradePackageCollectionRef(), where('recipientEmailLower', '==', cleanEmail))
+  const packagesQuery = query(
+    getTeacherGradePackageCollectionRef(),
+    where('recipientEmailLower', '==', cleanEmail),
+    orderBy('createdAt', 'desc'),
+    limit(getBoundedFirestoreLimit(maxItems, FIRESTORE_QUERY_LIMITS.teacherGradePackages)),
+  )
   const snapshot = await getDocs(packagesQuery)
+  recordFirestoreQuerySnapshot('startup.teacherPackages.received', snapshot)
 
   return snapshot.docs
     .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-    .slice(0, maxItems)
 }
 
 export async function listSentTeacherGradePackages(uid, maxItems = 20) {
   if (!uid) return []
 
-  const packagesQuery = query(getTeacherGradePackageCollectionRef(), where('senderUid', '==', uid))
+  const packagesQuery = query(
+    getTeacherGradePackageCollectionRef(),
+    where('senderUid', '==', uid),
+    orderBy('createdAt', 'desc'),
+    limit(getBoundedFirestoreLimit(maxItems, FIRESTORE_QUERY_LIMITS.teacherGradePackages)),
+  )
   const snapshot = await getDocs(packagesQuery)
+  recordFirestoreQuerySnapshot('startup.teacherPackages.sent', snapshot)
 
   return snapshot.docs
     .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-    .slice(0, maxItems)
 }
 
 export async function markTeacherGradePackageImported({ packageId, userEmail }) {
@@ -1447,13 +1480,18 @@ export async function listTutoringSpacesForUser(userEmail, maxItems = 20) {
   const cleanEmail = normalizeEmail(userEmail)
   if (!cleanEmail) return []
 
-  const spacesQuery = query(getTutoringSpaceCollectionRef(), where('memberEmails', 'array-contains', cleanEmail))
+  const spacesQuery = query(
+    getTutoringSpaceCollectionRef(),
+    where('memberEmails', 'array-contains', cleanEmail),
+    orderBy('updatedAt', 'desc'),
+    limit(getBoundedFirestoreLimit(maxItems, FIRESTORE_QUERY_LIMITS.tutoringSpaces)),
+  )
   const snapshot = await getDocs(spacesQuery)
+  recordFirestoreQuerySnapshot('startup.tutoringSpaces', snapshot)
 
   return snapshot.docs
     .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
     .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
-    .slice(0, maxItems)
 }
 
 export async function sendTutoringInvitation({ classItem, recipientEmail, spaceId, user }) {
@@ -1497,19 +1535,31 @@ export async function listReceivedTutoringInvitations(userEmail, maxItems = 20) 
   const cleanEmail = normalizeEmail(userEmail)
   if (!cleanEmail) return []
 
-  const snapshot = await getDocs(getTutoringInvitationCollectionRef(cleanEmail))
+  const snapshot = await getDocs(query(
+    getTutoringInvitationCollectionRef(cleanEmail),
+    where('status', '==', 'pending'),
+    orderBy('updatedAt', 'desc'),
+    limit(getBoundedFirestoreLimit(maxItems, FIRESTORE_QUERY_LIMITS.tutoringInvitations)),
+  ))
+  recordFirestoreQuerySnapshot('startup.tutoringInvitations.received', snapshot)
   return snapshot.docs
     .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
     .filter((invitation) => invitation.status === 'pending')
     .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
-    .slice(0, maxItems)
 }
 
 export async function listSentTutoringInvitationUpdates(userUid, maxItems = 20) {
   if (!userUid) return []
 
   try {
-    const snapshot = await getDocs(getTutoringInvitationOutboxCollectionRef(userUid))
+    const snapshot = await getDocs(query(
+      getTutoringInvitationOutboxCollectionRef(userUid),
+      where('senderSeenAt', '==', ''),
+      where('status', 'in', ['accepted', 'rejected']),
+      orderBy('updatedAt', 'desc'),
+      limit(getBoundedFirestoreLimit(maxItems, FIRESTORE_QUERY_LIMITS.tutoringInvitations)),
+    ))
+    recordFirestoreQuerySnapshot('startup.tutoringInvitations.sent', snapshot)
     return snapshot.docs
       .map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
       .filter((invitation) => ['accepted', 'rejected'].includes(invitation.status) && !invitation.senderSeenAt)
@@ -1518,7 +1568,6 @@ export async function listSentTutoringInvitationUpdates(userUid, maxItems = 20) 
           String(a.respondedAt || a.updatedAt || a.createdAt || ''),
         ),
       )
-      .slice(0, maxItems)
   } catch (error) {
     console.warn('No s’han pogut carregar els avisos de resposta de cotutoria.', error)
     return []
@@ -1822,7 +1871,8 @@ export async function saveTutoringSpace({
 
   const syncResults = []
   try {
-    for (const collectionName of SHARED_TUTORING_COLLECTIONS) {
+    const collectionsToSync = getTutoringCollectionsToSync(changeCollections, SHARED_TUTORING_COLLECTIONS)
+    for (const collectionName of collectionsToSync) {
       syncResults.push(
         await mergeTutoringSpaceCollection(spaceId, collectionName, dataset?.[collectionName] || [], {
           now,
@@ -1919,6 +1969,7 @@ export function subscribeToTutoringCoordinationItems(spaceId, onChange, onError)
   return onSnapshot(
     query(getTutoringCoordinationCollectionRef(spaceId), orderBy('createdAt', 'asc'), limit(300)),
     (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.tutoringCoordination.items', snapshot)
       onChange(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data(), spaceId })))
     },
     onError,
@@ -1930,6 +1981,7 @@ export function subscribeToTutoringCoordinationMemberStates(spaceId, onChange, o
   return onSnapshot(
     getTutoringCoordinationMemberStateCollectionRef(spaceId),
     (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.tutoringCoordination.memberStates', snapshot)
       onChange(snapshot.docs.map((snapshotDoc) => ({ uid: snapshotDoc.id, ...snapshotDoc.data(), spaceId })))
     },
     onError,
@@ -2032,16 +2084,31 @@ export function subscribeInternalMessages(userEmail, callback, onError) {
   }
 
   return onSnapshot(
-    query(collection(db, 'internalMessages'), where('participantEmails', 'array-contains', cleanEmail)),
-    (snapshot) => callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
+    query(
+      collection(db, 'internalMessages'),
+      where('participantEmails', 'array-contains', cleanEmail),
+      orderBy('createdAt', 'desc'),
+      limit(FIRESTORE_QUERY_LIMITS.internalMessages),
+    ),
+    (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.internalMessages', snapshot)
+      callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+    },
     onError,
   )
 }
 
 export function subscribeInternalAnnouncements(callback, onError) {
   return onSnapshot(
-    collection(db, 'internalAnnouncements'),
-    (snapshot) => callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
+    query(
+      collection(db, 'internalAnnouncements'),
+      orderBy('createdAt', 'desc'),
+      limit(FIRESTORE_QUERY_LIMITS.internalAnnouncements),
+    ),
+    (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.internalAnnouncements', snapshot)
+      callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+    },
     onError,
   )
 }
@@ -2054,7 +2121,10 @@ export function subscribeInternalMessageState(userUid, callback, onError) {
 
   return onSnapshot(
     getInternalMessageStateDocRef(userUid),
-    (snapshot) => callback(snapshot.exists() ? snapshot.data() : {}),
+    (snapshot) => {
+      recordFirestoreLookup('listener.internalMessageState')
+      callback(snapshot.exists() ? snapshot.data() : {})
+    },
     onError,
   )
 }

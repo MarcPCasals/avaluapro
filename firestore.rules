@@ -1566,7 +1566,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'applicationId', 'attendanceConfirmedAt', 'calendarEventId', 'classId',
           'classroomClosedAt', 'classroomOpenedAt', 'createdAt', 'durationMinutes',
-          'entityType', 'id', 'ownerUid', 'schemaVersion', 'startsAt', 'status',
+          'entityType', 'id', 'ownerUid', 'parallelProgrammingKey', 'schemaVersion', 'startsAt', 'status',
           'subgroupId', 'timetableSlotId', 'updatedAt'
         ])
         && request.resource.data.id == sessionId

@@ -17,6 +17,10 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { firebaseDb } from '../../lib/firebase.js'
+import {
+  recordFirestoreLookup,
+  recordFirestoreQuerySnapshot,
+} from '../../lib/firestoreReadDiagnostics.js'
 import { applyPlanningCloudOperationToDatabase } from './planningCloudSync.js'
 
 const OWNER_COLLECTIONS = Object.freeze({
@@ -83,6 +87,18 @@ function mapSnapshot(snapshot) {
   return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
 }
 
+async function readPlanningQuery(scope, reference) {
+  const snapshot = await getDocs(reference)
+  recordFirestoreQuerySnapshot(`planning.${scope}`, snapshot)
+  return snapshot
+}
+
+async function readPlanningDocument(scope, reference) {
+  const snapshot = await getDoc(reference)
+  recordFirestoreLookup(`planning.${scope}`)
+  return snapshot
+}
+
 /** Desa configuració privada del curs sense afegir-la a la càrrega global d'AvaluaPro. */
 export async function saveOwnerPlanningEntity(uid, entity) {
   const ownerUid = safeId(uid, 'el docent')
@@ -95,7 +111,7 @@ export async function saveOwnerPlanningEntity(uid, entity) {
 }
 
 export async function loadPlanningAcademicYears(uid, maxItems = 20) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('academicYears', query(
     collection(firebaseDb, 'users', safeId(uid, 'el docent'), OWNER_COLLECTIONS.academicYear),
     orderBy('startsOn', 'desc'),
     limit(maxItems),
@@ -104,7 +120,7 @@ export async function loadPlanningAcademicYears(uid, maxItems = 20) {
 }
 
 export async function loadPlanningTemporalUnits(uid, academicYearId, maxItems = 20) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('temporalUnits', query(
     collection(firebaseDb, 'users', safeId(uid, 'el docent'), OWNER_COLLECTIONS.temporalUnit),
     where('academicYearId', '==', safeId(academicYearId, 'el curs acadèmic')),
     orderBy('order', 'asc'),
@@ -114,7 +130,7 @@ export async function loadPlanningTemporalUnits(uid, academicYearId, maxItems = 
 }
 
 export async function loadPlanningTimetables(uid, academicYearId, maxItems = 20) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('timetables', query(
     collection(firebaseDb, 'users', safeId(uid, 'el docent'), OWNER_COLLECTIONS.timetableVersion),
     where('academicYearId', '==', safeId(academicYearId, 'el curs acadèmic')),
     orderBy('effectiveFrom', 'desc'),
@@ -124,7 +140,7 @@ export async function loadPlanningTimetables(uid, academicYearId, maxItems = 20)
 }
 
 export async function loadPlanningTimetableSlots(uid, timetableVersionId, maxItems = 100) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('timetableSlots', query(
     collection(firebaseDb, 'users', safeId(uid, 'el docent'), OWNER_COLLECTIONS.timetableSlot),
     where('timetableVersionId', '==', safeId(timetableVersionId, "l'horari")),
     orderBy('weekday', 'asc'),
@@ -135,7 +151,7 @@ export async function loadPlanningTimetableSlots(uid, timetableVersionId, maxIte
 }
 
 export async function loadPlanningCalendarEvents(uid, academicYearId, fromDate, toDate, maxItems = 200) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('calendarEvents', query(
     collection(firebaseDb, 'users', safeId(uid, 'el docent'), OWNER_COLLECTIONS.calendarEvent),
     where('academicYearId', '==', safeId(academicYearId, 'el curs acadèmic')),
     where('startsOn', '>=', fromDate),
@@ -254,7 +270,10 @@ export async function revokePlanningAccessGrant(planningUnitId, granteeEmail) {
 }
 
 export async function loadPlanningAccessGrants(planningUnitId) {
-  const snapshot = await getDocs(collection(planningUnitRef(planningUnitId), 'accessGrants'))
+  const snapshot = await readPlanningQuery(
+    'accessGrants',
+    collection(planningUnitRef(planningUnitId), 'accessGrants'),
+  )
   return mapSnapshot(snapshot).sort((left, right) =>
     String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')))
 }
@@ -270,7 +289,7 @@ function planningUnitQueryConstraints({ academicYearId, temporalUnitId, maxItems
 }
 
 export async function loadOwnedPlanningUnits(ownerUid, filters = {}) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('units.owned', query(
     collection(firebaseDb, 'planningUnits'),
     ...planningUnitQueryConstraints({ ...filters, ownerUid }),
   ))
@@ -278,7 +297,7 @@ export async function loadOwnedPlanningUnits(ownerUid, filters = {}) {
 }
 
 export async function loadSharedPlanningUnits(email, filters = {}) {
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('units.shared', query(
     collection(firebaseDb, 'planningUnits'),
     ...planningUnitQueryConstraints({ ...filters, sharedEmail: email }),
   ))
@@ -288,9 +307,12 @@ export async function loadSharedPlanningUnits(email, filters = {}) {
 export async function loadPlanningUnitStructure(planningUnitId) {
   const unitReference = planningUnitRef(planningUnitId)
   const [unitSnapshot, phasesSnapshot, activitiesSnapshot] = await Promise.all([
-    getDoc(unitReference),
-    getDocs(query(collection(unitReference, 'phases'), orderBy('order', 'asc'))),
-    getDocs(query(collection(unitReference, 'activities'), orderBy('order', 'asc'))),
+    readPlanningDocument('unitStructure.unit', unitReference),
+    readPlanningQuery('unitStructure.phases', query(collection(unitReference, 'phases'), orderBy('order', 'asc'))),
+    readPlanningQuery(
+      'unitStructure.activities',
+      query(collection(unitReference, 'activities'), orderBy('order', 'asc')),
+    ),
   ])
   if (!unitSnapshot.exists()) throw new Error("No s'ha trobat aquesta UP")
   return {
@@ -312,14 +334,17 @@ export async function loadPlanningApplications(planningUnitId, classId, maxItems
   if (managerUid) constraints.push(where('managerUid', '==', managerUid))
   if (!classId && !managerUid) constraints.push(orderBy('updatedAt', 'desc'))
   constraints.push(limit(maxItems))
-  return mapSnapshot(await getDocs(query(collection(unitReference, 'applications'), ...constraints)))
+  return mapSnapshot(await readPlanningQuery(
+    'applications',
+    query(collection(unitReference, 'applications'), ...constraints),
+  ))
 }
 
 export async function loadPlanningActivityOverrides(planningUnitId, applicationId) {
-  return mapSnapshot(await getDocs(collection(
-    planningApplicationRef(planningUnitId, applicationId),
+  return mapSnapshot(await readPlanningQuery(
     'activityOverrides',
-  )))
+    collection(planningApplicationRef(planningUnitId, applicationId), 'activityOverrides'),
+  ))
 }
 
 export async function loadPlanningSessions({
@@ -331,7 +356,7 @@ export async function loadPlanningSessions({
 }) {
   const constraints = [where('startsAt', '>=', from), where('startsAt', '<=', to), orderBy('startsAt', 'asc')]
   constraints.push(limit(maxItems))
-  const snapshot = await getDocs(query(
+  const snapshot = await readPlanningQuery('sessions', query(
     collection(planningApplicationRef(planningUnitId, applicationId), 'sessions'),
     ...constraints,
   ))
@@ -341,9 +366,9 @@ export async function loadPlanningSessions({
 export async function loadPlanningSessionDetail(planningUnitId, applicationId, sessionId) {
   const sessionReference = planningSessionRef(planningUnitId, applicationId, sessionId)
   const [sessionSnapshot, itemsSnapshot, resultsSnapshot] = await Promise.all([
-    getDoc(sessionReference),
-    getDocs(query(collection(sessionReference, 'items'), orderBy('order', 'asc'))),
-    getDocs(collection(sessionReference, 'results')),
+    readPlanningDocument('sessionDetail.session', sessionReference),
+    readPlanningQuery('sessionDetail.items', query(collection(sessionReference, 'items'), orderBy('order', 'asc'))),
+    readPlanningQuery('sessionDetail.results', collection(sessionReference, 'results')),
   ])
   if (!sessionSnapshot.exists()) throw new Error("No s'ha trobat aquesta sessió")
   return {
@@ -358,7 +383,10 @@ export async function loadPlanningPrivateNotes(ownerUid, { planningUnitId, sessi
   if (sessionId) constraints.push(where('sessionId', '==', sessionId))
   else if (planningUnitId) constraints.push(where('planningUnitId', '==', planningUnitId))
   constraints.push(orderBy('updatedAt', 'desc'), limit(maxItems))
-  return mapSnapshot(await getDocs(query(collection(firebaseDb, 'planningPrivateNotes'), ...constraints)))
+  return mapSnapshot(await readPlanningQuery(
+    'privateNotes',
+    query(collection(firebaseDb, 'planningPrivateNotes'), ...constraints),
+  ))
 }
 
 export async function deletePlanningPrivateNote(noteId) {
