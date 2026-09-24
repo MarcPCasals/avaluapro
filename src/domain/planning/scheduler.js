@@ -798,6 +798,71 @@ export function buildAgendaRecoveryReflow({
   }
 }
 
+/**
+ * Substitueix un fragment futur de l'Agenda i torna a compactar tota la
+ * cronologia posterior. Així, quan se'n redueix la durada, el contingut de la
+ * sessió següent retrocedeix per omplir els minuts alliberats; si augmenta,
+ * l'efecte dominó continua cap endavant. La UP original no es modifica.
+ */
+export function buildAgendaItemChangeReflow({
+  application,
+  candidates = [],
+  changes = {},
+  existingSessionBundles = [],
+  options = {},
+  targetItemId,
+  targetSessionId,
+}) {
+  const applicationBundles = existingSessionBundles
+    .filter((bundle) => bundle?.session?.applicationId === application?.id)
+    .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+  const targetBundle = applicationBundles.find((bundle) => bundle.session.id === targetSessionId)
+  const targetItemIndex = targetBundle?.items.findIndex((item) => item.id === targetItemId) ?? -1
+  const targetItem = targetItemIndex >= 0 ? targetBundle.items[targetItemIndex] : null
+  if (!targetBundle || !targetItem?.sourceActivityId) {
+    throw new Error('No s’ha trobat el fragment que vols reajustar.')
+  }
+  const minutes = Number(changes.plannedMinutes)
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error('Cal indicar una durada superior a zero minuts.')
+  }
+
+  const targetParallelGroup = groupParallelSessionBundles(applicationBundles)
+    .find((group) => group.bundles.some((bundle) => bundle.session.id === targetSessionId))
+  const removedTargetItems = []
+  const adjustedBundles = applicationBundles.map((bundle) => {
+    if (!targetParallelGroup?.bundles.some((candidate) => candidate.session.id === bundle.session.id)) {
+      return bundle
+    }
+    const counterpart = bundle.items[targetItemIndex]
+    if (!counterpart || counterpart.sourceActivityId !== targetItem.sourceActivityId) return bundle
+    removedTargetItems.push(counterpart)
+    return { ...bundle, items: bundle.items.filter((_, index) => index !== targetItemIndex) }
+  })
+  const replacement = {
+    ...targetItem,
+    plannedMinutes: minutes,
+    segmentIndex: Math.max(0, (Number(targetItem.segmentIndex) || 1) - 1),
+    title: String(changes.title || targetItem.title).trim() || targetItem.title,
+  }
+  const preview = buildAgendaRecoveryReflow({
+    application,
+    candidates,
+    existingSessionBundles: adjustedBundles,
+    options,
+    recoveryItem: replacement,
+    recoveryMinutes: minutes,
+    targetSessionId,
+  })
+  return {
+    ...preview,
+    editedItem: targetItem,
+    kind: 'agenda-item-change',
+    removedItems: [...removedTargetItems, ...preview.removedItems],
+    replacedItemCount: preview.replacedItemCount + removedTargetItems.length,
+  }
+}
+
 export function getSessionCandidateKey(candidate) {
   return candidateKey(candidate)
 }

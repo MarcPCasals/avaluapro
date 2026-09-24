@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
+  buildAgendaItemChangeReflow,
   applyImprovementProposals,
   buildAgendaRecoveryReflow,
   buildActivityImprovementProposals,
@@ -1073,6 +1074,57 @@ test('la sessió actual es pot corregir conservant resultats i la descripció d�
   assert.equal(result.changedTargetResults[0].id, currentResult.id)
   assert.equal(result.changedTargetResults[0].sourceActivityId, 'petjades')
   assert.equal(result.sessions[1].items[0].title, 'Coca-Cola')
+})
+
+test('reduir un fragment omple el buit amb l’activitat següent i compacta la cronologia cap enrere', () => {
+  const application = createGroupApplication({
+    id: 'application-1', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const firstSession = createCalendarSession({
+    id: 'session-1', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-25T11:00:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const secondSession = createCalendarSession({
+    id: 'session-2', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T09:30:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const initial = createSessionItem({
+    id: 'item-initial', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: firstSession.id, sourceActivityId: 'initial', title: 'Coneixements previs',
+    type: 'activity', order: 0, plannedMinutes: 55,
+  }, { now: NOW })
+  const presentation = createSessionItem({
+    id: 'item-presentation', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: secondSession.id, sourceActivityId: 'presentation',
+    title: 'Presentació dels aprenentatges i l’avaluació', type: 'activity', order: 0, plannedMinutes: 15,
+  }, { now: NOW })
+  const situation = createSessionItem({
+    id: 'item-situation', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: secondSession.id, sourceActivityId: 'situation', title: 'Situació competencial',
+    type: 'activity', order: 1, plannedMinutes: 30,
+  }, { now: NOW })
+
+  const result = buildAgendaItemChangeReflow({
+    application,
+    changes: { plannedMinutes: 40 },
+    existingSessionBundles: [
+      { session: firstSession, items: [initial], results: [] },
+      { session: secondSession, items: [presentation, situation], results: [] },
+    ],
+    options: options(sequenceIdFactory()),
+    targetItemId: initial.id,
+    targetSessionId: firstSession.id,
+  })
+
+  assert.deepEqual(result.sessions[0].items.map((item) => [item.title, item.plannedMinutes]), [
+    ['Coneixements previs', 40],
+    ['Presentació dels aprenentatges i l’avaluació', 15],
+  ])
+  assert.deepEqual(result.sessions[1].items.map((item) => [item.title, item.plannedMinutes]), [
+    ['Situació competencial', 30],
+  ])
+  assert.equal(result.unscheduled.length, 0)
 })
 
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {

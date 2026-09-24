@@ -17,9 +17,10 @@ import {
 } from '../../data/cloud/planningFirestore'
 import { createPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
-import { buildAgendaSessionItemUpdate, getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
+import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import {
   copyTimetableVersionStructure,
+  buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
@@ -1038,30 +1039,6 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [persist, refreshSync, repository, synchronize])
 
   /**
-   * Ajusta només la còpia de l'activitat que viu en aquesta sessió d'Agenda.
-   * La font de Programació es manté intacta i només es pot editar des del seu
-   * mòdul propi.
-   */
-  const saveSessionItemChange = useCallback(async (bundle, item, changes) => {
-    const now = new Date().toISOString()
-    const entry = buildAgendaSessionItemUpdate(bundle, item, {
-      plannedMinutes: changes.plannedMinutes,
-      title: changes.title,
-    }, { now })
-    const itemChange = entry.entity
-    await persist(entry)
-    setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
-      ? {
-          ...current,
-          items: current.items.map((currentItem) => currentItem.id === item.id
-            ? { ...itemChange, sourceActivity: item.sourceActivity }
-            : currentItem),
-        }
-      : current))
-    return itemChange
-  }, [persist])
-
-  /**
    * Treu només la còpia programada d'una activitat. La font de la UP no es
    * modifica i les sessions ja iniciades queden protegides com a historial.
    */
@@ -1278,8 +1255,8 @@ export function useAgendaWorkspace(user, classes = []) {
     return { ...preview, setup }
   }, [activeAcademicYear, loadSchedulingSetup])
 
-  /** Desa el reajustament confirmat només dins de l'Agenda del grup. */
-  const confirmAgendaRecoveryPreview = useCallback(async (preview) => {
+  /** Desa qualsevol reajustament en cadena només dins de l'Agenda del grup. */
+  const persistAgendaReflowPreview = useCallback(async (preview) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
     const planningUnitId = preview.setup.planningUnit.id
     for (const item of preview.removedItems) {
@@ -1370,6 +1347,56 @@ export function useAgendaWorkspace(user, classes = []) {
       sessionCount: preview.sessions.length,
     }
   }, [refreshSync, repository, synchronize])
+
+  const confirmAgendaRecoveryPreview = useCallback(
+    (preview) => persistAgendaReflowPreview(preview),
+    [persistAgendaReflowPreview],
+  )
+
+  /**
+   * Canvia un fragment futur i compacta automàticament tota la cronologia
+   * posterior. La font de Programació es manté intacta.
+   */
+  const saveSessionItemChange = useCallback(async (bundle, item, changes) => {
+    if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu per reajustar l’Agenda.')
+    const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id,
+      classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const targetBundle = setup.existingSessionBundles.find((candidate) =>
+      candidate.session.id === bundle.session.id)
+    if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId,
+      date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt,
+      timetableSlotId: session.timetableSlotId,
+    }))
+    const temporalProposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents,
+      classId: setup.application.classId,
+      from: String(targetBundle.session.startsAt).slice(0, 10),
+      occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId,
+      timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const preview = buildAgendaItemChangeReflow({
+      application: setup.application,
+      candidates: temporalProposal.candidates.filter((candidate) =>
+        candidate.startsAt > targetBundle.session.startsAt),
+      changes,
+      existingSessionBundles: setup.existingSessionBundles,
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      targetItemId: item.id,
+      targetSessionId: targetBundle.session.id,
+    })
+    if (preview.unscheduled.length > 0) {
+      throw new Error('No hi ha prou sessions disponibles per reajustar totes les activitats posteriors.')
+    }
+    return persistAgendaReflowPreview({ ...preview, setup })
+  }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
 
   /**
    * Una continuació no altera el temps ideal de la UP. Construeix fragments
