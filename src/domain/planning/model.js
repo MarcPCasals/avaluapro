@@ -572,6 +572,9 @@ export function createCalendarEvent(input, options = {}) {
     startsAt,
     durationMinutes: optionalMinutes(input.durationMinutes, 'durada de la classe extraordinària'),
     subgroupId: optionalText(input.subgroupId),
+    scope: optionalText(input.scope),
+    sessionId: optionalText(input.sessionId),
+    timetableSlotId: optionalText(input.timetableSlotId),
   }
 }
 

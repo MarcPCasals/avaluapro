@@ -270,7 +270,7 @@ export function buildReminderSessionOptions({
       const date = String(session.startsAt || '').slice(0, 10)
       return date >= today
         && !['cancelled', 'notHeld'].includes(session.status)
-        && !getNoClassCalendarEvent(calendarEvents, date, session.classId)
+        && !getNoClassCalendarEvent(calendarEvents, date, session.classId, { sessionId: session.id })
     })
     .flatMap((bundle) => {
       const session = bundle.session
@@ -302,6 +302,7 @@ export function buildReminderSessionOptions({
         calendarEvents,
         occurrence.date,
         occurrence.slot.classId,
+        { timetableSlotId: occurrence.slot.id },
       ))
       .forEach((occurrence) => {
         reminderClassIdsForSlot(occurrence.slot, classes).forEach((classId) => options.push({

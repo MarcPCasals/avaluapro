@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, Copy, Loader2 } from 'lucide-react'
+import { CalendarPlus, Copy, Loader2, Moon } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { findTimetableSlotConflicts } from '../../domain/planning'
 
@@ -156,12 +156,20 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
     durationMinutes: initialValue?.durationMinutes || 60,
     endsOn: initialValue?.endsOn || initialValue?.startsOn || today,
     reason: initialValue?.reason || '',
+    scope: initialValue?.scope || '',
     startsOn: initialValue?.startsOn || today,
     startsAt: initialValue?.startsAt || '08:00',
     subgroupId: initialValue?.subgroupId || '',
+    sessionId: initialValue?.sessionId || '',
+    timetableSlotId: initialValue?.timetableSlotId || '',
     title: initialValue?.title || '',
     type: initialValue?.type || 'holiday',
   }))
+  const targetsOneSession = Boolean(values.sessionId || values.timetableSlotId)
+  const targetsWholeDay = values.scope === 'day'
+  const eventOptions = targetsOneSession
+    ? EVENT_OPTIONS.filter(([value]) => value !== 'extraordinarySession')
+    : EVENT_OPTIONS
   const eventLabel = useMemo(() => EVENT_OPTIONS.find(([value]) => value === values.type)?.[1] || '', [values.type])
   const selectedClass = classes.find((classItem) => classItem.id === values.classIds[0]) || null
   const setType = (type) => setValues((current) => ({
@@ -177,19 +185,19 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
     ? values
     : { ...values, durationMinutes: null, startsAt: null, subgroupId: null }, currentEvent)
   return (
-    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={currentEvent ? 'Desar canvi' : 'Afegir al calendari'} title={currentEvent ? 'Editar el calendari' : 'Marcar un festiu o canvi'}>
-      <div className="agenda-event-intro"><CalendarPlus size={19} /><p>Els festius, les vacances i els canvis de jornada es mostraran al calendari i a les sessions afectades.</p></div>
-      <label>Tipus<select value={values.type} onChange={(event) => setType(event.target.value)}>{EVENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={currentEvent ? 'Desar canvi' : 'Inhabilitar'} title={currentEvent ? 'Editar la inhabilitació' : targetsOneSession ? 'Inhabilitar aquesta sessió' : targetsWholeDay ? 'Inhabilitar tot el dia' : 'Afegir un canvi al calendari'}>
+      <div className="agenda-event-intro">{targetsOneSession || targetsWholeDay ? <Moon size={19} /> : <CalendarPlus size={19} />}<p>{targetsOneSession ? 'Aquest canvi només afecta la sessió seleccionada. La resta de classes del dia continuaran actives.' : targetsWholeDay ? 'Aquest canvi afecta totes les sessions del dia. Pots indicar si és un festiu o un altre motiu.' : 'Els festius, les vacances i els canvis de jornada es mostraran al calendari i a les sessions afectades.'}</p></div>
+      <label>Tipus<select value={values.type} onChange={(event) => setType(event.target.value)}>{eventOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Títol<input autoFocus placeholder={eventLabel} required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
-      <div className="agenda-form-row">
+      {!targetsOneSession && !targetsWholeDay && <div className="agenda-form-row">
         <label>Comença<input min={academicYear?.startsOn} max={academicYear?.endsOn} required type="date" value={values.startsOn} onChange={(event) => setValues({ ...values, startsOn: event.target.value, endsOn: event.target.value > values.endsOn ? event.target.value : values.endsOn })} /></label>
         <label>Acaba<input min={values.startsOn} max={academicYear?.endsOn} required type="date" value={values.endsOn} onChange={(event) => setValues({ ...values, endsOn: event.target.value })} /></label>
-      </div>
-      <fieldset className="agenda-class-picker">
+      </div>}
+      {!targetsOneSession && !targetsWholeDay && <fieldset className="agenda-class-picker">
         <legend>Grups afectats</legend>
         <small>Si no en marques cap, l’excepció s’aplica a tots els grups.</small>
         <div>{classes.map((classItem) => <label key={classItem.id}><input checked={values.classIds.includes(classItem.id)} onChange={(event) => toggleClass(classItem.id, event.target.checked)} type="checkbox" />{classItem.name}</label>)}</div>
-      </fieldset>
+      </fieldset>}
       {values.type === 'extraordinarySession' && <>
         <div className="agenda-form-row">
           <label>Hora d’inici<input required step="900" type="time" value={values.startsAt} onChange={(event) => setValues({ ...values, startsAt: event.target.value })} /></label>

@@ -47,6 +47,21 @@ test('una anul lacio d un altre grup no afecta la sessio seleccionada', () => {
   assert.equal(getNoClassCalendarEvent([event], '2026-09-22', 'class-1'), null)
 })
 
+test('una inhabilitacio de sessio afecta nomes la sessio seleccionada', () => {
+  const event = {
+    classIds: ['class-1'],
+    endsOn: '2026-09-22',
+    id: 'single-session',
+    sessionId: 'session-2',
+    startsOn: '2026-09-22',
+    type: 'cancellation',
+  }
+
+  assert.equal(getNoClassCalendarEvent([event], '2026-09-22', 'class-1'), null)
+  assert.equal(getNoClassCalendarEvent([event], '2026-09-22', 'class-1', { sessionId: 'session-1' }), null)
+  assert.equal(getNoClassCalendarEvent([event], '2026-09-22', 'class-1', { sessionId: 'session-2' })?.id, 'single-session')
+})
+
 test('detecta una setmana completa de vacances de dilluns a divendres', () => {
   assert.equal(calendarEventCoversSchoolWeek({
     endsOn: '2026-12-27',

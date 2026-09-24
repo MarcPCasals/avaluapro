@@ -377,7 +377,7 @@
 .agenda-week-columns > section { min-height: 420px; border-right: 1px solid #edf0f4; }
 .agenda-week-columns > section:last-child { border-right: 0; }
 .agenda-week-columns > section.is-today { background: #fffdfa; box-shadow: inset 0 3px 0 #fdba74; }
-.agenda-week-columns > section > header { display: grid; grid-template-columns: 1fr auto; gap: 1px 7px; border-bottom: 1px solid #edf0f4; padding: 10px; background: #f8fafc; }
+.agenda-week-columns > section > header { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1px 7px; align-items: center; border-bottom: 1px solid #edf0f4; padding: 10px; background: #f8fafc; }
 .agenda-week-columns > section.is-today > header { background: #fff7ed; }
 .agenda-week-columns > section.is-today > header span { color: #c2410c; }
 .agenda-week-columns > section > header span { color: #64748b; font-size: 9px; font-weight: 900; text-transform: capitalize; }
@@ -386,6 +386,12 @@
 .agenda-week-columns > section > div { display: grid; gap: 7px; align-content: start; padding: 8px; }
 .agenda-week-columns > section > div > p { margin: 15px 0; color: #cbd5e1; font-size: 9px; font-weight: 800; text-align: center; }
 .agenda-week-session, .agenda-week-timetable { --week-class-accent: #3b82f6; --week-class-border: #bfdbfe; --week-class-color: #1e40af; --week-class-soft: #eff6ff; display: grid; gap: 2px; border: 1px solid var(--week-class-border); border-left: 3px solid var(--week-class-accent); border-radius: 8px; padding: 8px; color: var(--week-class-color); background: var(--week-class-soft); text-align: left; }
+.agenda-week-session-shell { min-width: 0; position: relative; }
+.agenda-week-session-shell > .agenda-week-session, .agenda-week-session-shell > .agenda-week-timetable { width: 100%; padding-right: 34px; }
+.agenda-week-day-moon, .agenda-week-session-moon { display: grid; place-items: center; border: 1px solid #cbd5e1; border-radius: 50%; color: #64748b; background: rgb(255 255 255 / 88%); }
+.agenda-week-day-moon { width: 28px; height: 28px; grid-column: 3; grid-row: 1 / 3; }
+.agenda-week-session-moon { width: 24px; height: 24px; position: absolute; z-index: 3; top: 7px; right: 7px; }
+.agenda-week-day-moon:hover, .agenda-week-session-moon:hover, .agenda-week-day-moon.active, .agenda-week-session-moon.active { border-color: #f97316; color: #c2410c; background: #ffedd5; }
 .agenda-week-session.green, .agenda-week-timetable.green { --week-class-accent: #10b981; --week-class-border: #a7f3d0; --week-class-color: #065f46; --week-class-soft: #ecfdf5; }
 .agenda-week-session.red, .agenda-week-timetable.red { --week-class-accent: #ef4444; --week-class-border: #fecaca; --week-class-color: #991b1b; --week-class-soft: #fff1f2; }
 .agenda-week-session.purple, .agenda-week-timetable.purple { --week-class-accent: #8b5cf6; --week-class-border: #c4b5fd; --week-class-color: #5b21b6; --week-class-soft: #f5f3ff; }
@@ -402,7 +408,7 @@
 .agenda-week-session.is-past, .agenda-week-timetable.is-past { --week-class-accent: #94a3b8; --week-class-border: #e2e8f0; --week-class-color: #64748b; --week-class-soft: #f8fafc; opacity: .72; }
 .agenda-week-session.is-past small, .agenda-week-timetable.is-past small { color: #94a3b8; }
 .agenda-week-session.is-focused, .agenda-week-timetable.is-focused { position: relative; z-index: 1; border-color: var(--week-class-accent); box-shadow: 0 0 0 2px var(--week-class-border), 0 9px 20px rgb(15 23 42 / 12%); box-shadow: 0 0 0 2px color-mix(in srgb, var(--week-class-accent) 22%, white), 0 9px 20px rgb(15 23 42 / 12%); transform: translateY(-1px); }
-.agenda-week-focus-label { width: fit-content; position: absolute; top: 7px; right: 7px; border-radius: 999px; padding: 2px 6px; color: white; background: var(--week-class-accent); font-size: 6px; font-style: normal; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
+.agenda-week-focus-label { width: fit-content; position: absolute; top: 32px; right: 7px; border-radius: 999px; padding: 2px 6px; color: white; background: var(--week-class-accent); font-size: 6px; font-style: normal; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
 .agenda-week-day-event { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; align-items: center; border: 1px solid #d8b4fe; border-radius: 8px; padding: 7px; color: #7e22ce; background: #faf5ff; text-align: left; }
 .agenda-week-day-event > svg { justify-self: center; }
 .agenda-week-day-event > span { min-width: 0; display: grid; gap: 1px; }

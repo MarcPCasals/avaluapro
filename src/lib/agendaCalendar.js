@@ -58,9 +58,19 @@ export function getCalendarEventsForDate(events = [], dateKey, classId = '') {
     && (!classId || calendarEventAppliesToClass(event, classId)))
 }
 
-export function getNoClassCalendarEvent(events = [], dateKey, classId) {
+export function calendarEventTargetsSession(event) {
+  return Boolean(event?.sessionId || event?.timetableSlotId)
+}
+
+function calendarEventAppliesToSession(event, target = {}) {
+  if (event?.sessionId && event.sessionId !== target.sessionId) return false
+  if (event?.timetableSlotId && event.timetableSlotId !== target.timetableSlotId) return false
+  return true
+}
+
+export function getNoClassCalendarEvent(events = [], dateKey, classId, target = {}) {
   return getCalendarEventsForDate(events, dateKey, classId)
-    .find((event) => NO_CLASS_EVENT_TYPES.has(event.type)) || null
+    .find((event) => NO_CLASS_EVENT_TYPES.has(event.type) && calendarEventAppliesToSession(event, target)) || null
 }
 
 export function isNoClassCalendarEvent(event) {

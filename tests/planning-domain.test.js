@@ -702,6 +702,33 @@ test('la proposta usa la versió d’horari vigent i salta festius, jornades esp
   assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05', '2026-10-12'])
 })
 
+test('inhabilitar una franja concreta conserva les altres classes del mateix dia', () => {
+  const result = buildTimetableSessionCandidates({
+    calendarEvents: [{
+      classIds: ['class-1'],
+      endsOn: '2026-09-21',
+      id: 'cancelled-slot',
+      startsOn: '2026-09-21',
+      timetableSlotId: 'slot-late',
+      title: 'Reunió de centre',
+      type: 'cancellation',
+    }],
+    classId: 'class-1',
+    from: '2026-09-21',
+    slotsByTimetableId: {
+      timetable: [
+        { id: 'slot-early', classId: 'class-1', weekday: 1, startsAt: '09:30', durationMinutes: 60 },
+        { id: 'slot-late', classId: 'class-1', weekday: 1, startsAt: '11:00', durationMinutes: 60 },
+      ],
+    },
+    timetables: [{ id: 'timetable', effectiveFrom: '2026-09-01', effectiveTo: null }],
+    to: '2026-09-21',
+  })
+
+  assert.deepEqual(result.candidates.map((candidate) => candidate.timetableSlotId), ['slot-early'])
+  assert.deepEqual(result.skippedDates[0].eventIds, ['cancelled-slot'])
+})
+
 test('una proposta divide una activitat llarga, manté indicacions i no duplica les ja assignades', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({

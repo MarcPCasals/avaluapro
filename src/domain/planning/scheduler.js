@@ -30,6 +30,11 @@ function eventCoversDate(event, dateKey) {
   return event.startsOn <= dateKey && (event.endsOn || event.startsOn) >= dateKey
 }
 
+function eventBlocksTimetableSlot(event, slot) {
+  if (event.sessionId) return false
+  return !event.timetableSlotId || event.timetableSlotId === slot.id
+}
+
 function candidateKey(candidate) {
   return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${candidate.startsAt}`
 }
@@ -238,14 +243,23 @@ export function buildTimetableSessionCandidates({
       eventCoversDate(event, dateKey) &&
       eventAppliesToClass(event, classId))
 
-    if (matchingSlots.length > 0 && blockingEvents.length > 0) {
+    const blockedSlots = matchingSlots.map((slot) => ({
+      events: blockingEvents.filter((event) => eventBlocksTimetableSlot(event, slot)),
+      slot,
+    }))
+    const skippedEvents = [...new Map(blockedSlots
+      .flatMap((item) => item.events)
+      .map((event) => [event.id, event])).values()]
+
+    if (skippedEvents.length > 0) {
       skippedDates.push({
         date: dateKey,
-        eventIds: blockingEvents.map((event) => event.id),
-        titles: blockingEvents.map((event) => event.title),
+        eventIds: skippedEvents.map((event) => event.id),
+        titles: skippedEvents.map((event) => event.title),
       })
-    } else {
-      for (const slot of matchingSlots) {
+    }
+    for (const { events, slot } of blockedSlots) {
+      if (events.length === 0) {
         const candidate = {
           date: dateKey,
           durationMinutes: Number(slot.durationMinutes),
