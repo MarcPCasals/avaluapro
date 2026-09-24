@@ -65,6 +65,11 @@ import {
   subscribeToTutoringSpaceChangeSignals,
 } from '../../lib/firebase'
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
+import {
+  getTutorialExemptSubjects,
+  normalizeTutorialExemptSubjects,
+  toggleTutorialExemptSubject,
+} from '../../lib/tutorialExemptions'
 import { getUnreadTutoringCoordinationItems } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
@@ -4394,7 +4399,8 @@ export function TutoringView() {
   const [doipDraft, setDoipDraft] = useState('')
   const [showExemptionConfig, setShowExemptionConfig] = useState(false)
   const [showModifiedCompetencyConfig, setShowModifiedCompetencyConfig] = useState(false)
-  const [exemptionForm, setExemptionForm] = useState({ studentId: '', subject: '' })
+  const [exemptionForm, setExemptionForm] = useState({ studentId: '', subjects: [] })
+  const [exemptionSaveState, setExemptionSaveState] = useState({ busy: false, error: '' })
   const [modifiedCompetencyForm, setModifiedCompetencyForm] = useState({ studentId: '', subject: '' })
   const [recordForm, setRecordForm] = useState({
     agendaKind: 'work',
@@ -4871,8 +4877,7 @@ export function TutoringView() {
   )
   const selectedExemptionRow = exemptionRows.find((row) => row.student.id === selectedExemptionStudentId)
   const exemptionConfigStudent = classStudents.find((student) => student.id === exemptionForm.studentId) || classStudents[0]
-  const exemptionConfigSubject =
-    exemptionForm.subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || ''
+  const exemptionConfigSubjects = Array.isArray(exemptionForm.subjects) ? exemptionForm.subjects : []
 
   const isSelectedSubjectLinked = Boolean(selectedSubject && selectedSubject === linkedClass?.subject)
   const toggleStudentArrayValue = async (student, field, value) => {
@@ -4890,11 +4895,44 @@ export function TutoringView() {
     setShowModifiedCompetencyConfig(true)
   }
   const openExemptionConfig = (studentId = '', subject = '') => {
+    const nextStudentId = studentId || classStudents[0]?.id || ''
+    const nextStudent = classStudents.find((student) => student.id === nextStudentId)
+    const currentSubjects = getTutorialExemptSubjects(nextStudent)
     setExemptionForm({
-      studentId: studentId || classStudents[0]?.id || '',
-      subject: subject || selectedSubject || linkedClass?.subject || allSubjectOptions[0]?.subject || '',
+      studentId: nextStudentId,
+      subjects: subject && !currentSubjects.includes(subject) ? [...currentSubjects, subject] : [...currentSubjects],
     })
+    setExemptionSaveState({ busy: false, error: '' })
     setShowExemptionConfig(true)
+  }
+  const selectExemptionStudent = (studentId) => {
+    const student = classStudents.find((item) => item.id === studentId)
+    setExemptionForm({
+      studentId,
+      subjects: getTutorialExemptSubjects(student),
+    })
+    setExemptionSaveState({ busy: false, error: '' })
+  }
+  const toggleExemptionSubject = (subject) => {
+    setExemptionForm((current) => ({
+      ...current,
+      subjects: toggleTutorialExemptSubject(current.subjects, subject),
+    }))
+    setExemptionSaveState((current) => ({ ...current, error: '' }))
+  }
+  const saveExemptionSubjects = async () => {
+    if (!exemptionConfigStudent || exemptionSaveState.busy) return
+    setExemptionSaveState({ busy: true, error: '' })
+    try {
+      const subjects = normalizeTutorialExemptSubjects(
+        exemptionConfigSubjects,
+        allSubjectOptions.map((item) => item.subject),
+      )
+      await updateStudent(exemptionConfigStudent.id, { tutorialExemptSubjects: subjects })
+      setShowExemptionConfig(false)
+    } catch (error) {
+      setExemptionSaveState({ busy: false, error: error?.message || 'No s’han pogut desar les exempcions.' })
+    }
   }
   const linkedGradeCount = useMemo(() => {
     if (!isSelectedSubjectLinked || classStudents.length === 0 || selectedCompetencies.length === 0) return 0
@@ -12768,13 +12806,13 @@ export function TutoringView() {
         >
           <div className="tutorial-exemption-config">
             <p>
-              Tria un alumne i una matèria. Pots repetir el procés si un alumne està exempt de més d’una assignatura.
+              Tria un alumne i marca totes les assignatures de les quals està exempt. Els canvis es desaran conjuntament.
             </p>
-            <div className="tutorial-modified-config-fields">
+            <div className="tutorial-exemption-student-field">
               <label>
                 Alumne
                 <select
-                  onChange={(event) => setExemptionForm((current) => ({ ...current, studentId: event.target.value }))}
+                  onChange={(event) => selectExemptionStudent(event.target.value)}
                   value={exemptionConfigStudent?.id || ''}
                 >
                   {classStudents.map((student) => (
@@ -12784,38 +12822,53 @@ export function TutoringView() {
                   ))}
                 </select>
               </label>
-              <label>
-                Assignatura exempta
-                <select
-                  onChange={(event) => setExemptionForm((current) => ({ ...current, subject: event.target.value }))}
-                  value={exemptionConfigSubject}
-                >
-                  {allSubjectOptions.map((item) => (
-                    <option key={item.subject} value={item.subject}>
-                      {item.subject}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
             {!exemptionConfigStudent ? (
               <div className="empty-state compact">Afegeix alumnes abans de configurar exempcions.</div>
             ) : (
-              <button
-                className={`tutorial-exemption-toggle ${
-                  exemptionConfigStudent.tutorialExemptSubjects?.includes(exemptionConfigSubject) ? 'active' : ''
-                }`}
-                disabled={!exemptionConfigSubject}
-                onClick={() => toggleStudentArrayValue(exemptionConfigStudent, 'tutorialExemptSubjects', exemptionConfigSubject)}
-                type="button"
-              >
-                <span>{exemptionConfigSubject || 'Assignatura'}</span>
-                <strong>
-                  {exemptionConfigStudent.tutorialExemptSubjects?.includes(exemptionConfigSubject)
-                    ? 'Treure exempció'
-                    : 'Marcar com a exempta'}
-                </strong>
-              </button>
+              <>
+                <div className="tutorial-exemption-selection-heading">
+                  <strong>Assignatures exemptes</strong>
+                  <span>{exemptionConfigSubjects.length} seleccionades</span>
+                </div>
+                <div className="tutorial-exemption-subject-grid">
+                  {allSubjectOptions.map((item) => {
+                    const selected = exemptionConfigSubjects.includes(item.subject)
+                    return (
+                      <button
+                        aria-pressed={selected}
+                        className={`tutorial-exemption-subject-option ${selected ? 'selected' : ''}`}
+                        key={item.subject}
+                        onClick={() => toggleExemptionSubject(item.subject)}
+                        type="button"
+                      >
+                        <CheckCircle2 aria-hidden="true" size={18} />
+                        <span>
+                          <strong>{item.subject}</strong>
+                          <small>{item.areaName}</small>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {exemptionSaveState.error && (
+                  <div className="tutorial-exemption-error" role="alert">{exemptionSaveState.error}</div>
+                )}
+                <div className="modal-actions">
+                  <button
+                    className="primary-action"
+                    disabled={exemptionSaveState.busy}
+                    onClick={saveExemptionSubjects}
+                    type="button"
+                  >
+                    {exemptionSaveState.busy
+                      ? 'Desant…'
+                      : exemptionConfigSubjects.length === 0
+                        ? 'Desar sense exempcions'
+                        : `Desar ${exemptionConfigSubjects.length} ${exemptionConfigSubjects.length === 1 ? 'exempció' : 'exempcions'}`}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </Modal>
