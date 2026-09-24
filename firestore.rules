@@ -1234,16 +1234,37 @@ service cloud.firestore {
       return isPlanningOwner(upId)
         || (
           hasActivePlanningGrant(upId)
-          && planningGrantRole(upId) == 'planningEditor'
+          && planningGrantRole(upId) in ['planningEditor', 'tutoringCollaborator']
         );
     }
 
-    function canReadPlanningApplication(upId, classId) {
+    function applicationManagerUid(applicationData) {
+      return 'managerUid' in applicationData
+        ? applicationData.managerUid
+        : applicationData.ownerUid;
+    }
+
+    function isTutoringPlanningUnit(upId) {
+      return 'tutoringSpaceId' in planningUnitData(upId)
+        && planningUnitData(upId).tutoringSpaceId is string
+        && planningUnitData(upId).tutoringSpaceId.size() > 0;
+    }
+
+    function planningOwnerCanAccessApplication(upId, managerUid) {
       return isPlanningOwner(upId)
+        && (!isTutoringPlanningUnit(upId) || managerUid == request.auth.uid);
+    }
+
+    function canReadPlanningApplication(upId, classId, managerUid) {
+      return planningOwnerCanAccessApplication(upId, managerUid)
         || (
           hasActivePlanningGrant(upId)
           && (
             planningGrantRole(upId) == 'directionReader'
+            || (
+              planningGrantRole(upId) == 'tutoringCollaborator'
+              && managerUid == request.auth.uid
+            )
             || (
               planningGrantClassIds(upId) is list
               && classId in planningGrantClassIds(upId)
@@ -1252,18 +1273,32 @@ service cloud.firestore {
         );
     }
 
-    function canManagePlanningAgenda(upId, classId) {
-      return isPlanningOwner(upId)
+    function canManagePlanningAgenda(upId, classId, managerUid) {
+      return planningOwnerCanAccessApplication(upId, managerUid)
         || (
           hasActivePlanningGrant(upId)
-          && planningGrantRole(upId) == 'planningAgendaEditor'
-          && planningGrantClassIds(upId) is list
-          && classId in planningGrantClassIds(upId)
+          && (
+            (
+              planningGrantRole(upId) == 'planningAgendaEditor'
+              && planningGrantClassIds(upId) is list
+              && classId in planningGrantClassIds(upId)
+            )
+            || (
+              planningGrantRole(upId) == 'tutoringCollaborator'
+              && managerUid == request.auth.uid
+            )
+          )
         );
     }
 
     function planningApplicationClassId(upId, applicationId) {
       return get(/databases/$(database)/documents/planningUnits/$(upId)/applications/$(applicationId)).data.classId;
+    }
+
+    function planningApplicationManagerUid(upId, applicationId) {
+      return applicationManagerUid(
+        get(/databases/$(database)/documents/planningUnits/$(upId)/applications/$(applicationId)).data
+      );
     }
 
     function validPlanningUnitShape(upId) {
@@ -1297,6 +1332,7 @@ service cloud.firestore {
           'temporalUnitId',
           'title',
           'transversalResources',
+          'tutoringSpaceId',
           'updatedAt',
           'vehicularLanguage',
           'versionNumber'
@@ -1316,6 +1352,10 @@ service cloud.firestore {
         && request.resource.data.status in ['draft', 'active', 'archived']
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string
+        && (
+          request.resource.data.tutoringSpaceId == null
+          || request.resource.data.tutoringSpaceId is string
+        )
         && (
           !('curriculum' in request.resource.data)
           || (
@@ -1461,7 +1501,7 @@ service cloud.firestore {
         && request.resource.data.planningUnitId == upId
         && request.resource.data.granteeEmail == grantEmail
         && request.resource.data.classIds is list
-        && request.resource.data.role in ['directionReader', 'planningEditor', 'planningAgendaEditor']
+        && request.resource.data.role in ['directionReader', 'planningEditor', 'planningAgendaEditor', 'tutoringCollaborator']
         && request.resource.data.status in ['active', 'revoked']
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string;
@@ -1484,7 +1524,7 @@ service cloud.firestore {
 
     function validPlanningApplication(upId, applicationId) {
       return request.resource.data.keys().hasOnly([
-          'academicYearId', 'classId', 'classLabel', 'createdAt', 'entityType', 'id', 'ownerUid',
+          'academicYearId', 'classId', 'classLabel', 'createdAt', 'entityType', 'id', 'managerUid', 'ownerUid',
           'planningUnitId', 'planningUnitVersion', 'schemaVersion', 'status', 'updatedAt'
         ])
         && request.resource.data.id == applicationId
@@ -1492,6 +1532,10 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
         && request.resource.data.planningUnitId == upId
+        && (
+          !('managerUid' in request.resource.data)
+          || request.resource.data.managerUid is string
+        )
         && request.resource.data.classId is string
         && (
           request.resource.data.classLabel == null
@@ -1657,52 +1701,65 @@ service cloud.firestore {
       }
 
       match /applications/{applicationId} {
-        allow read: if canReadPlanningApplication(upId, resource.data.classId);
+        allow read: if canReadPlanningApplication(
+          upId,
+          resource.data.classId,
+          applicationManagerUid(resource.data)
+        );
         allow create: if validPlanningApplication(upId, applicationId)
-          && canManagePlanningAgenda(upId, request.resource.data.classId);
+          && canManagePlanningAgenda(
+            upId,
+            request.resource.data.classId,
+            applicationManagerUid(request.resource.data)
+          );
         allow update: if validPlanningApplication(upId, applicationId)
           && planningChildIdentityUnchanged()
           && request.resource.data.classId == resource.data.classId
-          && canManagePlanningAgenda(upId, resource.data.classId);
-        allow delete: if canManagePlanningAgenda(upId, resource.data.classId);
+          && applicationManagerUid(request.resource.data) == applicationManagerUid(resource.data)
+          && canManagePlanningAgenda(upId, resource.data.classId, applicationManagerUid(resource.data));
+        allow delete: if canManagePlanningAgenda(
+          upId,
+          resource.data.classId,
+          applicationManagerUid(resource.data)
+        );
 
         match /activityOverrides/{overrideId} {
-          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           allow create: if validPlanningOverride(upId, applicationId, overrideId)
-            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           allow update: if validPlanningOverride(upId, applicationId, overrideId)
             && planningChildIdentityUnchanged()
-            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
-          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
+          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
         }
 
         match /sessions/{sessionId} {
-          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+          allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           allow create: if validPlanningSession(upId, applicationId, sessionId)
-            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           allow update: if validPlanningSession(upId, applicationId, sessionId)
             && planningChildIdentityUnchanged()
-            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
-          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+            && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
+          allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
 
           match /items/{itemId} {
-            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
             allow create: if validPlanningSessionItem(upId, applicationId, sessionId, itemId)
-              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
             allow update: if validPlanningSessionItem(upId, applicationId, sessionId, itemId)
               && planningChildIdentityUnchanged()
-              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
-            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
+            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           }
 
           match /results/{resultId} {
-            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId));
+            allow read: if canReadPlanningApplication(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
             allow create: if validPlanningActivityResult(upId, applicationId, sessionId, resultId)
-              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
             allow update: if validPlanningActivityResult(upId, applicationId, sessionId, resultId)
               && planningChildIdentityUnchanged()
-              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
-            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId));
+              && canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
+            allow delete: if canManagePlanningAgenda(upId, planningApplicationClassId(upId, applicationId), planningApplicationManagerUid(upId, applicationId));
           }
         }
       }

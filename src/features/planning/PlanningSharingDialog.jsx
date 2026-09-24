@@ -26,6 +26,11 @@ const ROLE_OPTIONS = [
     label: 'Agenda per grups',
     value: 'planningAgendaEditor',
   },
+  {
+    description: 'Pot coeditar la UP de tutoria i calendaritzar-la només al seu propi horari.',
+    label: 'Cotutoria · UP i agenda pròpia',
+    value: 'tutoringCollaborator',
+  },
 ]
 
 function emptyDraft() {

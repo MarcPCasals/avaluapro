@@ -61,4 +61,5 @@ export const ACCESS_ROLES = Object.freeze([
   'directionReader',
   'planningEditor',
   'planningAgendaEditor',
+  'tutoringCollaborator',
 ])

@@ -46,11 +46,14 @@ export function getPlanningPermissions({
     }
   }
 
-  const canManageGroupAgenda = grantRole === 'planningAgendaEditor' && hasLinkedGroupAccess
+  const canManageGroupAgenda = (
+    grantRole === 'planningAgendaEditor'
+    || grantRole === 'tutoringCollaborator'
+  ) && hasLinkedGroupAccess
   return {
     ...NO_ACCESS,
     canReadPlanningUnit: true,
-    canEditPlanningUnit: true,
+    canEditPlanningUnit: grantRole === 'planningEditor' || grantRole === 'tutoringCollaborator',
     canReadGroupApplication: hasLinkedGroupAccess,
     canManageGroupAgenda,
     canReadPedagogicalReflections: hasLinkedGroupAccess,

@@ -17,6 +17,7 @@ const ROLE_LABELS = {
   directionReader: 'Vista de direcció',
   planningAgendaEditor: 'Agenda compartida',
   planningEditor: 'Coedició de la UP',
+  tutoringCollaborator: 'Cotutoria · UP compartida i agenda pròpia',
   owner: 'Vista compartida',
 }
 

@@ -57,6 +57,28 @@
 .planning-class-context small { color: #94a3b8; font-size: 9px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
 .planning-class-context strong { color: #334155; font-size: 13px; }
 
+.planning-screen-embedded {
+  min-height: 0;
+  border-radius: 16px;
+  padding-top: 14px;
+}
+
+.planning-context-selector select { min-width: 150px; }
+
+.planning-tutoring-agenda-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+  padding: 11px 13px;
+  color: #5b21b6;
+  background: #f5f3ff;
+}
+.planning-tutoring-agenda-banner > div { display: grid; flex: 1; gap: 2px; }
+.planning-tutoring-agenda-banner span { color: #64748b; font-size: 12px; }
+
 .planning-course-controls { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .planning-course-controls label { gap: 7px; border: 1px solid #e2e8f0; border-radius: 9px; padding-left: 10px; background: #fff; }
 .planning-course-controls label > span { color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; }

@@ -69,7 +69,8 @@ function comparableLabel(value) {
  * escriptura passa pel repositori local-first i la interfície només rep l'estat
  * final de la cua, sense confondre el desament local amb la confirmació remota.
  */
-export function usePlanningWorkspace(user, activeClassId = '') {
+export function usePlanningWorkspace(user, activeClassId = '', options = {}) {
+  const tutoringSpaceId = String(options.tutoringSpaceId || '').trim()
   const [academicYears, setAcademicYears] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
@@ -99,24 +100,27 @@ export function usePlanningWorkspace(user, activeClassId = '') {
   const allPlanningUnits = useMemo(() => Array.from(new Map(
     [...planningUnits, ...sharedPlanningUnits].map((item) => [item.id, item]),
   ).values()), [planningUnits, sharedPlanningUnits])
-  const classPlanningUnits = useMemo(
-    () => getPlanningUnitsForClass(allPlanningUnits, applications, activeClassId),
-    [activeClassId, allPlanningUnits, applications],
-  )
+  const classPlanningUnits = useMemo(() => tutoringSpaceId
+    ? allPlanningUnits.filter((unit) => unit.tutoringSpaceId === tutoringSpaceId)
+    : getPlanningUnitsForClass(allPlanningUnits, applications, activeClassId),
+  [activeClassId, allPlanningUnits, applications, tutoringSpaceId])
   const activeAcademicYear = academicYears.find((item) => item.id === activeAcademicYearId) || null
   const activePlanningUnit = classPlanningUnits.find((item) => item.id === activePlanningUnitId) || null
   const userEmail = String(user?.email || '').trim().toLowerCase()
   const activeRole = activePlanningUnit?.ownerUid === user?.uid
     ? 'owner'
     : activePlanningUnit?.accessByEmail?.[userEmail]?.role || ''
-  const canEditActiveUnit = activeRole === 'owner' || activeRole === 'planningEditor'
-  const canManageActiveAgenda = activeRole === 'owner' || activeRole === 'planningAgendaEditor'
+  const canEditActiveUnit = ['owner', 'planningEditor', 'tutoringCollaborator'].includes(activeRole)
+  const canManageActiveAgenda = ['owner', 'planningAgendaEditor', 'tutoringCollaborator'].includes(activeRole)
   const canReadActiveApplications = activeRole === 'owner'
     || activeRole === 'directionReader'
     || activeRole === 'planningAgendaEditor'
+    || activeRole === 'tutoringCollaborator'
   const activeApplication = applications.find((application) => (
     application.planningUnitId === activePlanningUnitId
     && application.classId === activeClassId
+    && (!(activePlanningUnit?.tutoringSpaceId || activeRole === 'tutoringCollaborator')
+      || (application.managerUid || application.ownerUid) === user?.uid)
     && application.status !== 'archived'
   )) || null
   const effectiveActivities = useMemo(
@@ -265,8 +269,18 @@ export function usePlanningWorkspace(user, activeClassId = '') {
       const allowedClassIds = role === 'planningAgendaEditor'
         ? unit.accessByEmail?.[userEmail]?.classIds || []
         : []
-      if (!['owner', 'directionReader', 'planningAgendaEditor'].includes(role)) return []
+      if (!['owner', 'directionReader', 'planningAgendaEditor', 'tutoringCollaborator'].includes(role)) return []
       if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
+      // La UP de tutoria és comuna, però cada docent només carrega la seva
+      // aplicació: calendari, ajustos i sessions continuen sent personals.
+      if (role === 'tutoringCollaborator' || (role === 'owner' && unit.tutoringSpaceId)) {
+        const result = await repository.loadScope(
+          `planningUnit:${unit.id}:applications:manager:${user.uid}`,
+          () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
+          { completeSnapshot: true },
+        )
+        return result.entities
+      }
       const results = allowedClassIds.length > 0
         ? await Promise.all(allowedClassIds.map((classId) => repository.loadScope(
             `planningUnit:${unit.id}:applications:${classId}`,
@@ -398,6 +412,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
         academicYearId: activeAcademicYearId,
         ownerUid: user.uid,
         status: 'draft',
+        tutoringSpaceId,
       }, { now }),
       accessByEmail: {},
       authorizedEmails: [],
@@ -418,6 +433,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
       academicYearId: activeAcademicYearId,
       classId: classContext.classId,
       classLabel: classContext.classLabel || '',
+      managerUid: user.uid,
       ownerUid: user.uid,
       planningUnitId: unit.id,
       planningUnitVersion: unit.versionNumber,
@@ -430,13 +446,14 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     setActivities([])
     setActivePlanningUnitId(unit.id)
     return unit
-  }, [activeAcademicYearId, persist, user])
+  }, [activeAcademicYearId, persist, tutoringSpaceId, user])
 
   const connectUnitToClass = useCallback(async (unit, classContext = {}) => {
     if (!unit?.id || !classContext.classId) throw new Error('Selecciona una UP i una classe per connectar-les.')
     const existing = applications.find((application) => (
       application.planningUnitId === unit.id
       && application.classId === classContext.classId
+      && (application.managerUid || application.ownerUid) === user.uid
       && application.status !== 'archived'
     ))
     if (existing) {
@@ -445,9 +462,12 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     }
     const now = new Date().toISOString()
     const application = createGroupApplication({
-      academicYearId: unit.academicYearId,
+      // Cada cotutor conserva el seu curs/horari privat encara que la UP
+      // compartida provingui del curs creat pel propietari.
+      academicYearId: activeAcademicYearId || unit.academicYearId,
       classId: classContext.classId,
       classLabel: classContext.classLabel || '',
+      managerUid: user.uid,
       ownerUid: unit.ownerUid,
       planningUnitId: unit.id,
       planningUnitVersion: unit.versionNumber,
@@ -457,7 +477,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     setApplications((items) => replaceById(items, application))
     setActivePlanningUnitId(unit.id)
     return application
-  }, [applications, persist])
+  }, [activeAcademicYearId, applications, persist, user.uid])
 
   /**
    * Una importació sempre crea una UP nova i regenera tots els identificadors.
@@ -481,6 +501,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
         ownerUid: user.uid,
         status: 'draft',
         temporalUnitId,
+        tutoringSpaceId,
       }, { now }),
       accessByEmail: {},
       authorizedEmails: [],
@@ -522,6 +543,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
       academicYearId: activeAcademicYearId,
       classId: classContext.classId,
       classLabel: classContext.classLabel || '',
+      managerUid: user.uid,
       ownerUid: user.uid,
       planningUnitId: unit.id,
       planningUnitVersion: unit.versionNumber,
@@ -534,7 +556,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     setActivities(sortByOrder(importedActivities))
     setActivePlanningUnitId(unit.id)
     return unit
-  }, [activeAcademicYearId, persist, user])
+  }, [activeAcademicYearId, persist, tutoringSpaceId, user])
 
   const saveUnit = useCallback(async (current, values) => {
     const next = preserveSharingFields(current, createPlanningUnit({
@@ -546,7 +568,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     if (next.ownerUid === user?.uid) setPlanningUnits((items) => replaceById(items, next))
     else setSharedPlanningUnits((items) => replaceById(items, next))
     return next
-  }, [persist, user?.uid])
+  }, [persist, user])
 
   /**
    * Afegeix files previsualitzades d’Excel/Numbers a la UP activa. Les fases i
@@ -851,6 +873,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
       academicYearId,
       classId: classContext.classId,
       classLabel: classContext.classLabel || '',
+      managerUid: user.uid,
       ownerUid: copied.planningUnit.ownerUid,
       planningUnitId: copied.planningUnit.id,
       planningUnitVersion: copied.planningUnit.versionNumber,
@@ -899,7 +922,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     }
     setActivities(sortByOrder(result.activities))
     return result
-  }, [activePlanningUnit, activities, persist, user?.uid])
+  }, [activePlanningUnit, activities, persist, user])
 
   const refreshActiveUnitFromCloud = useCallback(async () => {
     if (!repository || !activePlanningUnitId) return null
@@ -920,7 +943,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     setPhases(sortByOrder(result.entities.filter((item) => item.entityType === 'planningPhase')))
     setActivities(sortByOrder(result.entities.filter((item) => item.entityType === 'planningActivity')))
     return unit
-  }, [activePlanningUnitId, repository, user?.uid])
+  }, [activePlanningUnitId, repository, user])
 
   const saveAccessGrant = useCallback(async ({ classIds = [], email, role }) => {
     if (!activePlanningUnit || activeRole !== 'owner') throw new Error('Només el propietari pot gestionar els accessos.')
@@ -953,6 +976,57 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     return grant
   }, [accessGrants, activePlanningUnit, activeRole, isOnline, refreshActiveUnitFromCloud, synchronize, userEmail])
 
+  /**
+   * Manté la coedició tutorial alineada amb els membres de la cotutoria. Només
+   * el propietari crea concessions i mai no amplia l'accés a altres UP.
+   */
+  const syncTutoringCollaborators = useCallback(async (emails = []) => {
+    if (!activePlanningUnit || activePlanningUnit.ownerUid !== user?.uid || !activePlanningUnit.tutoringSpaceId) return []
+    if (!isOnline) return []
+    const targets = [...new Set(emails
+      .map((email) => String(email || '').trim().toLowerCase())
+      .filter((email) => email && email !== userEmail && email.includes('@')))]
+    const targetSet = new Set(targets)
+    const additions = targets.filter((email) => (
+      activePlanningUnit.accessByEmail?.[email]?.role !== 'tutoringCollaborator'
+      || activePlanningUnit.accessByEmail?.[email]?.status !== 'active'
+    ))
+    const removals = Object.entries(activePlanningUnit.accessByEmail || {})
+      .filter(([email, access]) => (
+        access?.role === 'tutoringCollaborator'
+        && access?.status === 'active'
+        && !targetSet.has(email)
+      ))
+      .map(([email]) => email)
+    if (additions.length === 0 && removals.length === 0) return []
+    const syncSummary = await synchronize()
+    if (syncSummary.conflictCount || syncSummary.pendingCount) {
+      throw new Error('Acaba de sincronitzar la UP abans d’actualitzar la cotutoria compartida.')
+    }
+    const saved = []
+    for (const email of additions) {
+      const current = accessGrants.find((grant) => grant.granteeEmail === email)
+      const grant = createAccessGrant({
+        ...(current || {}),
+        classIds: [],
+        granteeEmail: email,
+        ownerUid: activePlanningUnit.ownerUid,
+        planningUnitId: activePlanningUnit.id,
+        role: 'tutoringCollaborator',
+        status: 'active',
+        updatedAt: new Date().toISOString(),
+      })
+      saved.push(await savePlanningAccessGrant(activePlanningUnit.id, grant))
+    }
+    for (const email of removals) {
+      await revokePlanningAccessGrant(activePlanningUnit.id, email)
+      saved.push({ granteeEmail: email, status: 'revoked' })
+    }
+    await refreshActiveUnitFromCloud()
+    setAccessGrants(await loadPlanningAccessGrants(activePlanningUnit.id))
+    return saved
+  }, [accessGrants, activePlanningUnit, isOnline, refreshActiveUnitFromCloud, synchronize, user, userEmail])
+
   const revokeAccessGrant = useCallback(async (grant) => {
     if (!activePlanningUnit || activeRole !== 'owner') throw new Error('Només el propietari pot retirar accessos.')
     if (!isOnline) throw new Error('Cal connexió per retirar un accés.')
@@ -971,12 +1045,19 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     const role = planningUnit.ownerUid === user?.uid
       ? 'owner'
       : planningUnit.accessByEmail?.[userEmail]?.role || ''
-    if (!['owner', 'directionReader', 'planningAgendaEditor'].includes(role)) return []
+    if (!['owner', 'directionReader', 'planningAgendaEditor', 'tutoringCollaborator'].includes(role)) return []
     const allowedClassIds = role === 'planningAgendaEditor'
       ? planningUnit.accessByEmail?.[userEmail]?.classIds || []
       : []
     if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
-    const applicationResults = allowedClassIds.length > 0
+    const applicationResults = role === 'tutoringCollaborator'
+      || (role === 'owner' && planningUnit.tutoringSpaceId)
+      ? [await repository.loadScope(
+          `planningUnit:${planningUnit.id}:applications:manager:${user.uid}`,
+          () => loadPlanningApplications(planningUnit.id, undefined, 100, user.uid),
+          { completeSnapshot: true },
+        )]
+      : allowedClassIds.length > 0
       ? await Promise.all(allowedClassIds.map((classId) => repository.loadScope(
           `planningUnit:${planningUnit.id}:applications:${classId}`,
           () => loadPlanningApplications(planningUnit.id, classId, 100),
@@ -1024,7 +1105,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
         })),
       }
     }))
-  }, [activePlanningUnit, repository, user?.uid, userEmail])
+  }, [activePlanningUnit, repository, user, userEmail])
 
   return {
     accessGrants,
@@ -1035,6 +1116,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     activeAcademicYearId,
     activePlanningUnit,
     activePlanningUnitId,
+    activeApplication,
     activeRole,
     applications,
     applicationsLoading,
@@ -1077,6 +1159,7 @@ export function usePlanningWorkspace(user, activeClassId = '') {
     setError,
     sharedPlanningUnits,
     sync,
+    syncTutoringCollaborators,
     synchronize,
     temporalUnits,
     revokeAccessGrant,

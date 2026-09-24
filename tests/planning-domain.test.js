@@ -46,6 +46,7 @@ import {
   moveTimetableSlot,
   orderActivitiesForScheduling,
   planActivityChange,
+  resolveTutorialPlanningContext,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   updatePlanningActivity,
@@ -1040,6 +1041,21 @@ test('editar la UP no dona accés automàtic a l’Agenda ni a l’alumnat', () 
   assert.equal(collaborator.canReadPrivateNotes, false)
 })
 
+test('la cotutoria pot coeditar la UP i gestionar només la seva aplicació d’Agenda', () => {
+  const collaborator = getPlanningPermissions({
+    actorUid: 'teacher-2',
+    ownerUid: 'teacher-1',
+    grantRole: 'tutoringCollaborator',
+    hasLinkedGroupAccess: true,
+  })
+
+  assert.equal(collaborator.canReadPlanningUnit, true)
+  assert.equal(collaborator.canEditPlanningUnit, true)
+  assert.equal(collaborator.canReadGroupApplication, true)
+  assert.equal(collaborator.canManageGroupAgenda, true)
+  assert.equal(collaborator.canReadPrivateNotes, false)
+})
+
 test('una invitació necessita un correu exacte vàlid', () => {
   assert.throws(
     () => createAccessGrant({
@@ -1062,6 +1078,48 @@ test('l’aplicació de grup conserva el nom llegible per als espais compartits'
   })
 
   assert.equal(application.classLabel, '1r C')
+  assert.equal(application.managerUid, 'teacher-1')
+})
+
+test('la UP de tutoria comparteix la font però resol una classe privada per a cada horari', () => {
+  const classes = [
+    {
+      id: 'class-cfn',
+      name: '1rC',
+      subject: 'Ciències Físiques i de la Natura',
+      sharedTutoringSpaceId: 'tutoring-space-1',
+      tutorialLinkedClassId: 'class-cfn',
+    },
+    {
+      id: 'class-tutoring',
+      name: 'Tutoria',
+      subject: 'Tutoria',
+      tutorialLinkedClassId: 'class-cfn',
+    },
+  ]
+  const context = resolveTutorialPlanningContext(classes, 'class-cfn')
+  const unit = createPlanningUnit({
+    academicYearId: 'year-1',
+    code: 'UP-TUT-1',
+    level: '1r ESO',
+    ownerUid: 'teacher-1',
+    temporalUnitId: 'ut-1',
+    title: 'Acollida del grup',
+    tutoringSpaceId: context.tutoringSpaceId,
+  })
+  const collaboratorApplication = createGroupApplication({
+    academicYearId: 'year-1',
+    classId: context.scheduleClass.id,
+    managerUid: 'teacher-2',
+    ownerUid: unit.ownerUid,
+    planningUnitId: unit.id,
+  })
+
+  assert.equal(context.canonicalClass.id, 'class-cfn')
+  assert.equal(context.scheduleClass.id, 'class-tutoring')
+  assert.equal(unit.tutoringSpaceId, 'tutoring-space-1')
+  assert.equal(collaboratorApplication.ownerUid, 'teacher-1')
+  assert.equal(collaboratorApplication.managerUid, 'teacher-2')
 })
 
 test('totes les entitats principals declaren tipus i versió d’esquema', () => {

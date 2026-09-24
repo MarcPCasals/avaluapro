@@ -7,6 +7,7 @@ import {
   Ban,
   BarChart3,
   BookOpenCheck,
+  BookOpenText,
   CalendarDays,
   CheckCircle2,
   Clipboard,
@@ -65,6 +66,8 @@ import {
 import { GRADE_OPTIONS, calculateGrade, getNumericFromGrade, gradeClassName, gradeTextClassName } from '../../lib/grades'
 import { getUnreadTutoringCoordinationItems } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
+import PlanningModule from '../planning/PlanningModule'
 import { createCooperativeSociometricHelpers } from './cooperativeGroupSociometricUtils'
 import { getCooperativeGroupSetOrigin } from './cooperativeGroupHistoryUtils'
 import { getSharedTutoringCotutorLabel } from './sharedTutoringDisplayUtils'
@@ -4527,6 +4530,10 @@ export function TutoringView() {
   const activeSharedTutoringSpace = (cloud.sharedTutoringSpaces || []).find(
     (space) => space.id === activeClass?.sharedTutoringSpaceId,
   )
+  const tutorialPlanningContext = useMemo(
+    () => resolveTutorialPlanningContext(classes, activeClassId),
+    [activeClassId, classes],
+  )
   const coordinationUnreadCount = getUnreadTutoringCoordinationItems(
     cloud.tutoringCoordinationItems,
     cloud.tutoringCoordinationMemberStates,
@@ -7164,6 +7171,14 @@ export function TutoringView() {
         >
           <UsersRound size={17} />
           Informes tutorials
+        </button>
+        <button
+          className={activePanel === 'tutorial-planning' ? 'active' : ''}
+          onClick={() => setActivePanel('tutorial-planning')}
+          type="button"
+        >
+          <BookOpenText size={17} />
+          Classe de tutoria
         </button>
       </div>
 
@@ -12626,6 +12641,20 @@ export function TutoringView() {
             )}
           </article>
         </section>
+      )}
+
+      {activePanel === 'tutorial-planning' && (
+        tutorialPlanningContext.tutoringSpaceId ? (
+          <PlanningModule embedded tutorialContext={tutorialPlanningContext} />
+        ) : (
+          <section className="tutoring-card tutorial-planning-empty">
+            <BookOpenText size={26} />
+            <div>
+              <h2>Classe de tutoria</h2>
+              <p>Comparteix primer aquesta tutoria amb la cotutora per crear una programació comuna.</p>
+            </div>
+          </section>
+        )
       )}
 
       {selectedTutorialProfile && (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown, ChevronRight, CircleDot,
   Cloud, CloudOff, Copy, Eye, EyeOff, FolderTree, History, Lightbulb, Loader2,
@@ -19,6 +19,7 @@ import { PlanningSharedView } from './PlanningSharedView'
 import { usePlanningWorkspace } from './usePlanningWorkspace'
 import { getPlanningReminderSummary } from '../../lib/reminders'
 import { getConnectablePlanningUnits, getConnectedClassIds } from '../../domain/planning/classPlanning'
+import { getTutorialCollaboratorEmails, resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
 import './planning.css'
 
 const PHASE_LABELS = {
@@ -319,18 +320,35 @@ function UnitSummary({ activities, phases, temporalUnit, unit }) {
   )
 }
 
-export default function PlanningModule() {
+export default function PlanningModule({ embedded = false, tutorialContext: forcedTutorialContext = null }) {
   const user = useAvaluaproStore((state) => state.cloud.user)
+  const sharedTutoringSpaces = useAvaluaproStore((state) => state.cloud.sharedTutoringSpaces || [])
   const classes = useAvaluaproStore((state) => state.classes)
-  const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const storeActiveClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const students = useAvaluaproStore((state) => state.students)
   const competencies = useAvaluaproStore((state) => state.competencies)
   const criteria = useAvaluaproStore((state) => state.criteria)
   const indicators = useAvaluaproStore((state) => state.indicators)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
+  const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
-  const workspace = usePlanningWorkspace(user, activeClassId)
+  const resolvedTutorialContext = useMemo(
+    () => resolveTutorialPlanningContext(classes, storeActiveClassId),
+    [classes, storeActiveClassId],
+  )
+  const tutorialContext = forcedTutorialContext || resolvedTutorialContext
+  const [planningContext, setPlanningContext] = useState(forcedTutorialContext ? 'tutorial' : 'subject')
+  const isTutorialPlanning = Boolean(
+    forcedTutorialContext
+    || (planningContext === 'tutorial' && resolvedTutorialContext.tutoringSpaceId),
+  )
+  const tutorialSpaceId = isTutorialPlanning ? tutorialContext?.tutoringSpaceId || '' : ''
+  const contextClassId = isTutorialPlanning
+    ? tutorialContext?.scheduleClass?.id || storeActiveClassId
+    : storeActiveClassId
+  const activeClassId = contextClassId
+  const workspace = usePlanningWorkspace(user, contextClassId, { tutoringSpaceId: tutorialSpaceId })
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -341,6 +359,7 @@ export default function PlanningModule() {
   const [activityPhaseId, setActivityPhaseId] = useState('')
   const [phaseParentId, setPhaseParentId] = useState('')
   const [connectedDecision, setConnectedDecision] = useState(null)
+  const collaboratorSyncRef = useRef('')
   const curriculumCatalog = useMemo(() => {
     const unique = (items) => Array.from(new Map(items
       .filter((item) => item.label)
@@ -353,10 +372,33 @@ export default function PlanningModule() {
       indicators: unique(indicators.map((item) => ({ label: item.name || item.label || item.title, sourceId: item.id }))),
     }
   }, [competencies, criteria, indicators])
-  const activeClass = classes.find((item) => item.id === activeClassId) || null
+  const activeClass = classes.find((item) => item.id === contextClassId) || null
+  const activeSharedTutoringSpace = sharedTutoringSpaces.find((space) => space.id === tutorialSpaceId) || null
+  const tutorialCollaboratorEmails = useMemo(
+    () => getTutorialCollaboratorEmails(tutorialContext, activeSharedTutoringSpace, user?.email),
+    [activeSharedTutoringSpace, tutorialContext, user?.email],
+  )
+  useEffect(() => {
+    if (!isTutorialPlanning || workspace.activeRole !== 'owner' || tutorialCollaboratorEmails.length === 0) return
+    const key = `${workspace.activePlanningUnit?.id || ''}:${tutorialCollaboratorEmails.join('|')}`
+    if (!workspace.activePlanningUnit?.id || collaboratorSyncRef.current === key) return
+    collaboratorSyncRef.current = key
+    workspace.syncTutoringCollaborators(tutorialCollaboratorEmails)
+      .catch((syncError) => {
+        collaboratorSyncRef.current = ''
+        workspace.setError(syncError.message || 'No s’ha pogut compartir la UP amb la cotutoria.')
+      })
+  }, [isTutorialPlanning, tutorialCollaboratorEmails, workspace])
   const connectableUnits = useMemo(
-    () => getConnectablePlanningUnits(workspace.ownedPlanningUnits, workspace.applications, activeClassId),
-    [activeClassId, workspace.applications, workspace.ownedPlanningUnits],
+    () => isTutorialPlanning
+      ? workspace.classPlanningUnits.filter((unit) => !workspace.applications.some((application) => (
+          application.planningUnitId === unit.id
+          && application.classId === activeClassId
+          && (application.managerUid || application.ownerUid) === user?.uid
+          && application.status !== 'archived'
+        )))
+      : getConnectablePlanningUnits(workspace.ownedPlanningUnits, workspace.applications, activeClassId),
+    [activeClassId, isTutorialPlanning, user?.uid, workspace.applications, workspace.classPlanningUnits, workspace.ownedPlanningUnits],
   )
   const connectedClassIds = getConnectedClassIds(workspace.applications, workspace.activePlanningUnit?.id)
   const connectedClassLabels = connectedClassIds
@@ -365,6 +407,10 @@ export default function PlanningModule() {
     .filter(Boolean)
   const otherConnectedClassLabels = connectedClassLabels.filter((label) => label !== activeClass?.name)
   const requestConnectedScope = (supportsCurrentClass) => {
+    // La programació tutorial és una única font compartida: editar-la des de
+    // qualsevol dels dos accessos sempre actualitza la UP comuna. Les agendas
+    // continuen separades mitjançant les aplicacions de cada docent.
+    if (isTutorialPlanning) return Promise.resolve('all')
     if (otherConnectedClassLabels.length === 0) return Promise.resolve('all')
     return new Promise((resolve) => setConnectedDecision({ resolve, supportsCurrentClass }))
   }
@@ -418,20 +464,51 @@ export default function PlanningModule() {
       return null
     }
   }
-  const openAgendaReflow = () => {
+  const ensureActiveTutorialApplication = async () => {
+    if (!isTutorialPlanning || workspace.activeApplication || !workspace.activePlanningUnit) return workspace.activeApplication
+    return workspace.connectUnitToClass(workspace.activePlanningUnit, {
+      classId: contextClassId,
+      classLabel: activeClass?.name || 'Tutoria',
+    })
+  }
+  const openAgendaReflow = async () => {
+    try {
+      await ensureActiveTutorialApplication()
+      if (contextClassId !== storeActiveClassId) await setActiveClass(contextClassId)
+    } catch (agendaError) {
+      workspace.setError(agendaError.message || 'No s’ha pogut preparar aquesta UP per al teu horari.')
+      return
+    }
     globalThis.sessionStorage?.setItem('avaluapro:open-agenda-scheduling', workspace.activePlanningUnit?.id || '')
     setActiveMode('agenda')
   }
 
   return (
-    <section className="planning-screen" data-app-module="planning">
+    <section className={`planning-screen ${embedded ? 'planning-screen-embedded' : ''}`} data-app-module="planning">
       <header className="planning-topbar">
         <div className="planning-title-lockup">
           <span><BookOpenText size={23} /></span>
           <div><p>Planificació pedagògica</p><h1>Programació</h1></div>
         </div>
-        {activeClass && <div className="planning-class-context"><span style={{ background: activeClass.color }} /><div><small>Programació de</small><strong>{activeClass.name}</strong></div></div>}
+        {activeClass && (
+          <div className="planning-class-context">
+            <span style={{ background: isTutorialPlanning ? '#7c3aed' : activeClass.color }} />
+            <div>
+              <small>{isTutorialPlanning ? 'Programació compartida' : 'Programació de'}</small>
+              <strong>{isTutorialPlanning ? 'Classe de tutoria' : activeClass.name}</strong>
+            </div>
+          </div>
+        )}
         <div className="planning-course-controls">
+          {!forcedTutorialContext && resolvedTutorialContext.tutoringSpaceId && (
+            <label className="planning-context-selector">
+              <span>Àmbit</span>
+              <select onChange={(event) => setPlanningContext(event.target.value)} value={planningContext}>
+                <option value="subject">{classes.find((item) => item.id === storeActiveClassId)?.name || 'La meva matèria'}</option>
+                <option value="tutorial">Tutoria compartida</option>
+              </select>
+            </label>
+          )}
           {workspace.academicYears.length > 0 && (
             <label>
               <span>Curs</span>
@@ -481,16 +558,16 @@ export default function PlanningModule() {
         <div className={`planning-workbench ${showSummary ? '' : 'summary-hidden'}`}>
           <aside className="planning-outline-panel">
             <div className="planning-outline-heading units-heading">
-              <div><BookOpenText size={17} /><strong>Unitats de {activeClass?.name || 'la classe'}</strong></div>
+              <div><BookOpenText size={17} /><strong>{isTutorialPlanning ? 'UP de tutoria compartides' : `Unitats de ${activeClass?.name || 'la classe'}`}</strong></div>
               <div className="planning-outline-actions">
-                <button className="icon-action" onClick={() => setDialog('connect')} title="Connectar una programació" type="button"><Link2 size={15} /></button>
+                {!isTutorialPlanning && <button className="icon-action" onClick={() => setDialog('connect')} title="Connectar una programació" type="button"><Link2 size={15} /></button>}
                 <button className="icon-action accent" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} title="Nova UP" type="button"><Plus size={15} /></button>
               </div>
             </div>
             <div className="planning-unit-list">
               {visibleUnits.map((unit) => (
                 <button className={unit.id === workspace.activePlanningUnitId ? 'active' : ''} key={unit.id} onClick={() => workspace.setActivePlanningUnitId(unit.id)} type="button">
-                  <span>{unit.code}</span><div><strong>{unit.title}</strong><small>{unit.level}{unit.ownerUid !== user.uid ? ` · ${unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningEditor' ? 'Coedició' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningAgendaEditor' ? 'Agenda compartida' : 'Direcció'}` : ''}</small></div><ChevronRight size={15} />
+                  <span>{unit.code}</span><div><strong>{unit.title}</strong><small>{unit.level}{unit.ownerUid !== user.uid ? ` · ${unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'tutoringCollaborator' ? 'Cotutoria' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningEditor' ? 'Coedició' : unit.accessByEmail?.[String(user.email || '').toLowerCase()]?.role === 'planningAgendaEditor' ? 'Agenda compartida' : 'Direcció'}` : ''}</small></div><ChevronRight size={15} />
                 </button>
               ))}
             </div>
@@ -505,6 +582,13 @@ export default function PlanningModule() {
               <>
                 {connectedClassLabels.length > 1 && (
                   <div className="planning-connected-banner"><Users size={17} /><span>Aquesta UP està connectada amb <strong>{connectedClassLabels.join(' i ')}</strong>. En canviar una activitat podràs aplicar-ho només a la classe actual o a totes.</span></div>
+                )}
+                {isTutorialPlanning && !workspace.activeApplication && (
+                  <div className="planning-tutoring-agenda-banner">
+                    <CalendarClock size={18} />
+                    <div><strong>UP compartida, agenda pròpia</strong><span>Connecta-la a la teva classe de tutoria per calendaritzar-la sense barrejar les sessions de la cotutora.</span></div>
+                    <button className="secondary-action compact" onClick={() => ensureActiveTutorialApplication().catch((error) => workspace.setError(error.message))} type="button">Connectar al meu horari</button>
+                  </div>
                 )}
                 <UnitEditor
                   activities={workspace.activities}

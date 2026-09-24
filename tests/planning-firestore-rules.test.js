@@ -48,12 +48,14 @@ const OWNER = { uid: 'planning-owner', email: 'owner@educand.ad' }
 const DIRECTION = { uid: 'planning-direction', email: 'direction@educand.ad' }
 const EDITOR = { uid: 'planning-editor', email: 'editor@educand.ad' }
 const AGENDA_EDITOR = { uid: 'planning-agenda', email: 'agenda@educand.ad' }
+const TUTORING_COLLABORATOR = { uid: 'planning-cotutor', email: 'cotutor@educand.ad' }
 const THIRD = { uid: 'planning-third', email: 'third@educand.ad' }
 const UP_ID = 'plan-up-rules'
 const CLASS_ONE = 'class-1'
 const CLASS_TWO = 'class-2'
 const APP_ONE = 'plan-application-one'
 const APP_TWO = 'plan-application-two'
+const APP_TUTORING = 'plan-application-tutoring'
 const SESSION_ONE = 'plan-session-one'
 
 let testEnv
@@ -69,6 +71,7 @@ function planningUnitData(overrides = {}) {
       ownerUid: OWNER.uid,
       academicYearId: 'plan-year-2026',
       temporalUnitId: 'plan-ut-1',
+      tutoringSpaceId: 'shared-tutoring-space-1c',
       code: 'UP1',
       level: '1r ESO',
       title: 'Paisatge sonor',
@@ -77,8 +80,9 @@ function planningUnitData(overrides = {}) {
       [DIRECTION.email]: { classIds: [], role: 'directionReader', status: 'active' },
       [EDITOR.email]: { classIds: [], role: 'planningEditor', status: 'active' },
       [AGENDA_EDITOR.email]: { classIds: [CLASS_ONE], role: 'planningAgendaEditor', status: 'active' },
+      [TUTORING_COLLABORATOR.email]: { classIds: [], role: 'tutoringCollaborator', status: 'active' },
     },
-    authorizedEmails: [DIRECTION.email, EDITOR.email, AGENDA_EDITOR.email],
+    authorizedEmails: [DIRECTION.email, EDITOR.email, AGENDA_EDITOR.email, TUTORING_COLLABORATOR.email],
     ownerEmailLower: OWNER.email,
     ...overrides,
   }
@@ -279,10 +283,18 @@ beforeEach(async () => {
         doc(upRef(db), 'accessGrants', AGENDA_EDITOR.email),
         accessGrantData(AGENDA_EDITOR, 'planningAgendaEditor', [CLASS_ONE]),
       ),
+      setDoc(
+        doc(upRef(db), 'accessGrants', TUTORING_COLLABORATOR.email),
+        accessGrantData(TUTORING_COLLABORATOR, 'tutoringCollaborator'),
+      ),
       setDoc(doc(upRef(db), 'phases', 'plan-phase-one'), phaseData()),
       setDoc(doc(upRef(db), 'activities', 'plan-activity-one'), activityData()),
       setDoc(appRef(db, APP_ONE), applicationData(APP_ONE, CLASS_ONE)),
       setDoc(appRef(db, APP_TWO), applicationData(APP_TWO, CLASS_TWO)),
+      setDoc(appRef(db, APP_TUTORING), applicationData(APP_TUTORING, CLASS_TWO, {
+        classLabel: 'Tutoria',
+        managerUid: TUTORING_COLLABORATOR.uid,
+      })),
       setDoc(sessionRef(db), sessionData()),
       setDoc(doc(sessionRef(db), 'items', 'plan-session-item-one'), sessionItemData()),
       setDoc(doc(sessionRef(db), 'results', 'plan-result-one'), resultData()),
@@ -420,6 +432,52 @@ describe('Planificació compartida', () => {
     }))
   })
 
+  test('la cotutora coedita la UP però només veu i gestiona la seva pròpia Agenda', async () => {
+    const db = authDb(TUTORING_COLLABORATOR)
+    await assertSucceeds(getDoc(upRef(db)))
+    await assertSucceeds(updateDoc(
+      doc(upRef(db), 'activities', 'plan-activity-one'),
+      { description: 'Activitat acordada entre les dues tutores.', updatedAt: NOW },
+    ))
+    await assertFails(getDoc(appRef(db, APP_ONE)))
+    await assertSucceeds(getDoc(appRef(db, APP_TUTORING)))
+
+    const ownApplications = await assertSucceeds(getDocs(query(
+      collection(upRef(db), 'applications'),
+      where('managerUid', '==', TUTORING_COLLABORATOR.uid),
+      limit(20),
+    )))
+    assert.equal(ownApplications.size, 1)
+    assert.equal(ownApplications.docs[0].id, APP_TUTORING)
+
+    const ownerDb = authDb(OWNER)
+    await assertFails(getDoc(appRef(ownerDb, APP_TUTORING)))
+    const ownerApplications = await assertSucceeds(getDocs(query(
+      collection(upRef(ownerDb), 'applications'),
+      where('managerUid', '==', OWNER.uid),
+      limit(20),
+    )))
+    assert.equal(ownerApplications.size, 2)
+
+    const ownSession = sessionData({
+      applicationId: APP_TUTORING,
+      classId: CLASS_TWO,
+      id: 'plan-session-tutoring',
+    })
+    await assertSucceeds(setDoc(
+      doc(appRef(db, APP_TUTORING), 'sessions', ownSession.id),
+      ownSession,
+    ))
+    await assertFails(setDoc(
+      appRef(db, 'plan-application-forged-manager'),
+      applicationData('plan-application-forged-manager', CLASS_TWO, { managerUid: THIRD.uid }),
+    ))
+    await assertFails(updateDoc(appRef(db, APP_TUTORING), {
+      managerUid: THIRD.uid,
+      updatedAt: NOW,
+    }))
+  })
+
   test('les excepcions d’activitat queden dins del grup autoritzat', async () => {
     const ownerDb = authDb(OWNER)
     const overrideRef = doc(
@@ -490,7 +548,7 @@ describe('Planificació compartida', () => {
         status: 'active',
       },
       'authorizedEmails',
-      [DIRECTION.email, EDITOR.email, AGENDA_EDITOR.email, THIRD.email],
+      [DIRECTION.email, EDITOR.email, AGENDA_EDITOR.email, TUTORING_COLLABORATOR.email, THIRD.email],
       'updatedAt',
       NOW,
     )
@@ -516,8 +574,9 @@ describe('Planificació compartida', () => {
       accessByEmail: {
         [EDITOR.email]: { classIds: [], role: 'planningEditor', status: 'active' },
         [AGENDA_EDITOR.email]: { classIds: [CLASS_ONE], role: 'planningAgendaEditor', status: 'active' },
+        [TUTORING_COLLABORATOR.email]: { classIds: [], role: 'tutoringCollaborator', status: 'active' },
       },
-      authorizedEmails: [EDITOR.email, AGENDA_EDITOR.email],
+      authorizedEmails: [EDITOR.email, AGENDA_EDITOR.email, TUTORING_COLLABORATOR.email],
       updatedAt: NOW,
     })
     await assertSucceeds(batch.commit())

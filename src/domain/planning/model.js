@@ -260,6 +260,7 @@ export function createPlanningUnit(input, options = {}) {
     code: requiredText(input.code, 'codi de la UP'),
     level: requiredText(input.level, 'nivell'),
     title: requiredText(input.title, 'títol de la UP'),
+    tutoringSpaceId: optionalText(input.tutoringSpaceId),
     status: enumValue(input.status || 'draft', PLANNING_UNIT_STATUSES, 'estat de la UP'),
     versionNumber: Math.max(1, Number(input.versionNumber) || 1),
     complexSituation: optionalText(input.complexSituation),
@@ -460,6 +461,10 @@ export function createGroupApplication(input, options = {}) {
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.GROUP_APPLICATION, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
+    // La UP conserva el seu propietari, però cada cotutor gestiona una
+    // aplicació independent al seu horari. En aplicacions antigues ambdós
+    // camps coincideixen, de manera que no cal cap migració destructiva.
+    managerUid: requiredText(input.managerUid || input.ownerUid, 'docent responsable de l’agenda'),
     academicYearId: requiredText(input.academicYearId, 'curs acadèmic'),
     planningUnitId: requiredText(input.planningUnitId, 'UP base'),
     planningUnitVersion: Math.max(1, Number(input.planningUnitVersion) || 1),

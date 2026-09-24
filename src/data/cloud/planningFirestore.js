@@ -300,7 +300,7 @@ export async function loadPlanningUnitStructure(planningUnitId) {
   }
 }
 
-export async function loadPlanningApplications(planningUnitId, classId, maxItems = 50) {
+export async function loadPlanningApplications(planningUnitId, classId, maxItems = 50, managerUid = '') {
   const unitReference = planningUnitRef(planningUnitId)
   const constraints = []
   // El filtre de grup també forma part de la frontera de privacitat per a una
@@ -309,7 +309,8 @@ export async function loadPlanningApplications(planningUnitId, classId, maxItems
   // faria que l'aplicació acabés llegint una còpia local buida. Els consumidors
   // ja ordenen les poques aplicacions retornades per updatedAt.
   if (classId) constraints.push(where('classId', '==', classId))
-  else constraints.push(orderBy('updatedAt', 'desc'))
+  if (managerUid) constraints.push(where('managerUid', '==', managerUid))
+  if (!classId && !managerUid) constraints.push(orderBy('updatedAt', 'desc'))
   constraints.push(limit(maxItems))
   return mapSnapshot(await getDocs(query(collection(unitReference, 'applications'), ...constraints)))
 }
