@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, Loader2, Mail, MessageSquarePlus,
-  Pause, PencilLine, Play, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
+  Pause, PencilLine, Play, Projector, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
   Users, UserX, X,
 } from 'lucide-react'
 import {
@@ -256,6 +256,7 @@ export function ClassroomMode({
   const [timerStoppedAt, setTimerStoppedAt] = useState(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [otherMinutes, setOtherMinutes] = useState('')
+  const [projectionMode, setProjectionMode] = useState(false)
   const [closeReview, setCloseReview] = useState(false)
   const [reviewItem, setReviewItem] = useState(null)
   const [recoveryDraft, setRecoveryDraft] = useState(null)
@@ -323,6 +324,29 @@ export function ClassroomMode({
     const interval = globalThis.setInterval(() => setNowMs(Date.now()), 1000)
     return () => globalThis.clearInterval(interval)
   }, [timerStartedAt, timerStoppedAt])
+
+  useEffect(() => {
+    if (!projectionMode) return undefined
+    const handleProjectionKeys = (event) => {
+      if (event.key === 'Escape') {
+        setProjectionMode(false)
+        return
+      }
+      if (event.code !== 'Space' || event.repeat) return
+      event.preventDefault()
+      if (!timerStartedAt) {
+        const now = Date.now()
+        setTimerStartedAt(now)
+        setNowMs(now)
+      } else if (!timerStoppedAt) {
+        const now = Date.now()
+        setTimerStoppedAt(now)
+        setNowMs(now)
+      }
+    }
+    globalThis.addEventListener('keydown', handleProjectionKeys)
+    return () => globalThis.removeEventListener('keydown', handleProjectionKeys)
+  }, [projectionMode, timerStartedAt, timerStoppedAt])
 
   const selectItem = (index) => {
     if (timerStartedAt && !timerStoppedAt) return
@@ -527,6 +551,28 @@ export function ClassroomMode({
     }
   }
 
+  if (projectionMode && currentItem?.plannedMinutes) {
+    return (
+      <section className={`classroom-mode classroom-projection-mode ${classItem?.color || 'orange'}`}>
+        <button className="classroom-projection-exit" onClick={() => setProjectionMode(false)} type="button"><X size={19} />Tornar al Mode aula</button>
+        <main className="classroom-projection-stage" aria-label="Vista segura de projecció">
+          <div className="classroom-projection-content">
+            <span className="classroom-projection-label"><Projector size={19} />Activitat actual</span>
+            <h1>{currentItem.title}</h1>
+            <div aria-live="off" className={`classroom-projection-timer ${timer.isOvertime ? 'overtime' : ''}`}>
+              <span>{timerStartedAt ? timer.isOvertime ? 'Temps excedit' : timerStoppedAt ? 'Temps aturat' : 'Temps restant' : 'Temps previst'}</span>
+              <strong>{timerStartedAt ? `${timer.isOvertime ? '+' : ''}${formatClock(timer.isOvertime ? timer.overtimeSeconds : timer.remainingSeconds)}` : formatClock(Number(currentItem.plannedMinutes) * 60)}</strong>
+            </div>
+            <div className="classroom-projection-controls">
+              {!timerStartedAt ? <button className="classroom-start" onClick={() => { const now = Date.now(); setTimerStartedAt(now); setNowMs(now) }} type="button"><Play size={20} />Comença</button> : !timerStoppedAt ? <button className="classroom-stop" onClick={() => { const now = Date.now(); setTimerStoppedAt(now); setNowMs(now) }} type="button"><Pause size={20} />Atura</button> : <span>Torna al Mode aula per registrar el temps i continuar.</span>}
+              {!timerStoppedAt && <small>També pots prémer la barra espaiadora.</small>}
+            </div>
+          </div>
+        </main>
+      </section>
+    )
+  }
+
   return (
     <section className={`classroom-mode ${classItem?.color || 'orange'}`}>
       <header className="classroom-header">
@@ -627,6 +673,7 @@ export function ClassroomMode({
         <div>
           <button aria-pressed={sidePanel === 'students'} className={sidePanel === 'students' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'students' ? '' : 'students')} type="button"><Users size={17} />Alumnat{absentStudents.length > 0 && <span>{absentStudents.length}</span>}</button>
           {sessionTasks.length > 0 && <button aria-pressed={sidePanel === 'tasks'} className={sidePanel === 'tasks' ? 'active' : ''} onClick={() => setSidePanel((panel) => panel === 'tasks' ? '' : 'tasks')} type="button"><ClipboardCheck size={17} />Tasques{pendingTaskRecords.length > 0 && <span>{pendingTaskRecords.length}</span>}</button>}
+          <button disabled={!currentItem?.plannedMinutes} onClick={() => { setSidePanel(''); setProjectionMode(true) }} type="button"><Projector size={17} />Projectar</button>
           <button disabled={currentIndex === 0 || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => selectItem(currentIndex - 1)} type="button"><ArrowLeft size={17} />Anterior</button>
           <button disabled={currentIndex >= currentBundle.items.length - 1 || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => selectItem(currentIndex + 1)} type="button">Següent<ArrowRight size={17} /></button>
         </div>
