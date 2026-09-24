@@ -93,6 +93,8 @@
 
 .planning-message { justify-content: space-between; gap: 12px; border-radius: 10px; padding: 11px 13px; }
 .planning-message.error { border: 1px solid #fecdd3; color: #991b1b; background: #fff1f2; }
+.planning-message.warning { justify-content: flex-start; border: 1px solid #fed7aa; color: #9a3412; background: #fff7ed; }
+.planning-message.warning svg { flex: 0 0 auto; }
 .planning-message button { border: 0; color: inherit; background: transparent; font-weight: 900; }
 
 .planning-ut-manager { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-radius: 12px; padding: 13px 15px; }
@@ -223,6 +225,7 @@
 .planning-sequence-phase.closing > header > div > span { color: #10b981; }
 .planning-sequence-phase > header > div > div { min-width: 0; display: grid; gap: 1px; }
 .planning-sequence-phase > header strong { overflow: hidden; color: #334155; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.planning-sequence-phase.root-phase > header strong { color: #1e293b; font-size: 14px; font-weight: 950; letter-spacing: .025em; }
 .planning-sequence-phase > header small { color: #94a3b8; font-size: 10px; font-weight: 800; }
 .planning-sequence-phase-actions { display: flex; align-items: center; gap: 4px; }
 .planning-sequence-phase-actions .icon-action { opacity: .28; transition: opacity .15s, color .15s, background-color .15s; }

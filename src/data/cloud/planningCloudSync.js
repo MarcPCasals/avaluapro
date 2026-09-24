@@ -149,5 +149,5 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
       merge: pathParts.length === 2 && pathParts[0] === 'planningUnits',
     })
     return { applied: true, remoteUpdatedAt: operation.value?.updatedAt || '' }
-  })
+  }, { maxAttempts: 2 })
 }

@@ -26,7 +26,7 @@ import './planning.css'
 function SyncBadge({ isOnline, sync }) {
   const Icon = !isOnline ? CloudOff : sync.state === 'saving' ? Loader2 : sync.state === 'saved' ? Check : Cloud
   return (
-    <span aria-live="polite" className={`planning-sync ${sync.state}`} role="status" title={`${sync.pendingCount || 0} canvis pendents`}>
+    <span aria-live="polite" className={`planning-sync ${sync.state}`} role="status" title={sync.message || `${sync.pendingCount || 0} canvis pendents`}>
       <Icon className={sync.state === 'saving' ? 'spin' : ''} size={15} />
       {sync.label}
     </span>
@@ -484,6 +484,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       </header>
 
       {workspace.error && <div className="planning-message error"><strong>{workspace.error}</strong><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
+      {workspace.sync.message && <div className="planning-message warning"><Cloud size={18} /><strong>{workspace.sync.message}</strong></div>}
 
       {showUtManager && workspace.activeAcademicYear && (
         <section className="planning-ut-manager">

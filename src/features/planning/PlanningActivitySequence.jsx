@@ -115,6 +115,9 @@ export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, o
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const flatPhases = useMemo(() => orderedPhases(phases), [phases])
+  const rootPhaseNumberById = useMemo(() => new Map(flatPhases
+    .filter((phase) => phase.depth === 0)
+    .map((phase, index) => [phase.id, index + 1])), [flatPhases])
   const sequenceNumberById = useMemo(() => new Map(flatPhases
     .flatMap((phase) => activities
       .filter((activity) => activity.phaseId === phase.id)
@@ -184,9 +187,9 @@ export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, o
             .filter((activity) => activity.phaseId === phase.id)
             .sort((left, right) => Number(left.order) - Number(right.order))
           return (
-            <section className={`planning-sequence-phase ${phase.kind}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
+            <section className={`planning-sequence-phase ${phase.kind} ${phase.depth === 0 ? 'root-phase' : 'subphase'}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
               <header>
-                <div><span /><div><strong>{phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
+                <div><span /><div><strong>{phase.depth === 0 ? `FASE ${rootPhaseNumberById.get(phase.id)} — ${phase.title.toLocaleUpperCase('ca')}` : phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
                 <div className="planning-sequence-phase-actions">
                   <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChildPhase(phase.id)} title="Afegir subfase" type="button"><Plus size={15} /></button>
                   <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEditPhase(phase)} title="Editar fase" type="button"><Pencil size={15} /></button>

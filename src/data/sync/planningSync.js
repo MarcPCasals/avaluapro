@@ -5,6 +5,9 @@ import {
   recordPlanningOperationConflict,
   recordPlanningOperationFailure,
 } from '../local/planningIndexedDb.js'
+import { isFirestoreQuotaError } from '../../lib/cloudSyncDiff.js'
+
+export const PLANNING_QUOTA_RETRY_DELAY_MS = 60 * 60 * 1000
 
 export const PLANNING_SYNC_STATES = Object.freeze({
   SAVED: 'saved',
@@ -24,6 +27,13 @@ export const PLANNING_SYNC_LABELS = Object.freeze({
   [PLANNING_SYNC_STATES.ERROR]: 'Error',
 })
 
+function activeQuotaRetry(operations, now = Date.now()) {
+  return operations
+    .map((operation) => operation.retryAt || '')
+    .filter((retryAt) => Date.parse(retryAt) > now)
+    .sort()[0] || ''
+}
+
 export function getPlanningSyncState({ conflictCount = 0, error = '', isOnline = true, pendingCount = 0, syncing = false } = {}) {
   if (conflictCount > 0) return PLANNING_SYNC_STATES.REVIEW
   if (!isOnline) return PLANNING_SYNC_STATES.OFFLINE
@@ -38,6 +48,18 @@ export async function getPlanningSyncSummary(uid, options = {}) {
     loadPlanningOutbox(uid),
     loadPlanningConflicts(uid),
   ])
+  const quotaRetryAt = options.quotaRetryAt || activeQuotaRetry(pending, options.now || Date.now())
+  if (conflicts.length === 0 && quotaRetryAt) {
+    return {
+      conflictCount: 0,
+      errorKind: 'quota',
+      label: 'Desat al dispositiu',
+      message: 'El canvi està protegit en aquest dispositiu. Firebase ha arribat temporalment al límit i AvaluaPro el sincronitzarà automàticament quan la quota torni a estar disponible.',
+      pendingCount: pending.length,
+      retryAvailableAt: quotaRetryAt,
+      state: PLANNING_SYNC_STATES.PENDING,
+    }
+  }
   const state = getPlanningSyncState({
     conflictCount: conflicts.length,
     error: options.error,
@@ -47,8 +69,11 @@ export async function getPlanningSyncSummary(uid, options = {}) {
   })
   return {
     conflictCount: conflicts.length,
+    errorKind: '',
     label: PLANNING_SYNC_LABELS[state],
+    message: '',
     pendingCount: pending.length,
+    retryAvailableAt: '',
     state,
   }
 }
@@ -77,6 +102,9 @@ export async function flushPlanningOutbox(uid, applyRemoteOperation, options = {
   if (typeof applyRemoteOperation !== 'function') throw new Error('Falta el servei de sincronització remota')
   if (options.isOnline === false) return getPlanningSyncSummary(uid, { isOnline: false })
   const operations = orderedOperations(await loadPlanningOutbox(uid))
+  const now = Number(options.now) || Date.now()
+  const quotaRetryAt = activeQuotaRetry(operations, now)
+  if (quotaRetryAt) return getPlanningSyncSummary(uid, { now, quotaRetryAt })
   let lastError = ''
 
   for (const operation of operations) {
@@ -94,7 +122,10 @@ export async function flushPlanningOutbox(uid, applyRemoteOperation, options = {
       await acknowledgePlanningOperation(operation)
     } catch (error) {
       lastError = error?.code || 'planning/sync-error'
-      await recordPlanningOperationFailure(operation, error)
+      const retryAt = isFirestoreQuotaError(error)
+        ? new Date(now + PLANNING_QUOTA_RETRY_DELAY_MS).toISOString()
+        : ''
+      await recordPlanningOperationFailure(operation, error, { retryAt })
       if (options.stopOnError !== false) break
     }
   }

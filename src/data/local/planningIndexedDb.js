@@ -103,11 +103,12 @@ export async function savePlanningEntityLocally(uid, entity, context = {}) {
       cacheKey,
       documentId: location.documentId,
       entityType: entity.entityType,
-      lastError: '',
+      lastError: previousOperation?.lastError || '',
       operation: 'upsert',
       path: location.path,
       queuedAt,
       revision: createRevision(),
+      retryAt: previousOperation?.retryAt || '',
       scopeKeys: location.scopeKeys,
       uid,
       value: entity,
@@ -143,11 +144,12 @@ export async function deletePlanningEntityLocally(uid, entity, context = {}) {
       cacheKey,
       documentId: location.documentId,
       entityType: entity.entityType,
-      lastError: '',
+      lastError: previousOperation?.lastError || '',
       operation: 'delete',
       path: location.path,
       queuedAt,
       revision: createRevision(),
+      retryAt: previousOperation?.retryAt || '',
       scopeKeys: location.scopeKeys,
       uid,
     }
@@ -212,7 +214,7 @@ export async function acknowledgePlanningOperation(operation) {
   }
 }
 
-export async function recordPlanningOperationFailure(operation, error) {
+export async function recordPlanningOperationFailure(operation, error, options = {}) {
   if (!operation?.cacheKey || !operation?.revision) return
   const db = await openPlanningDatabase()
   try {
@@ -223,7 +225,9 @@ export async function recordPlanningOperationFailure(operation, error) {
       store.put({
         ...current,
         attempts: Math.max(0, Number(current.attempts) || 0) + 1,
+        failedAt: options.failedAt || new Date().toISOString(),
         lastError: getSafeCloudSyncError(error),
+        retryAt: options.retryAt || '',
       })
     }
     await transactionDone(transaction)

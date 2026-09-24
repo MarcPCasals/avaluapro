@@ -37,8 +37,11 @@ import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/plan
 
 const EMPTY_SYNC = {
   conflictCount: 0,
+  errorKind: '',
   label: PLANNING_SYNC_LABELS[PLANNING_SYNC_STATES.SAVED],
+  message: '',
   pendingCount: 0,
+  retryAvailableAt: '',
   state: PLANNING_SYNC_STATES.SAVED,
 }
 
@@ -178,6 +181,15 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     }
     repository.synchronize().then(setSync).catch(() => refreshSync({ error: 'planning/sync-error' }))
   }, [isOnline, refreshSync, repository])
+
+  useEffect(() => {
+    const retryAt = Date.parse(sync.retryAvailableAt || '')
+    if (!repository || !Number.isFinite(retryAt)) return undefined
+    const timer = globalThis.setTimeout?.(() => {
+      synchronize().catch(() => refreshSync({ error: 'planning/sync-error' }))
+    }, Math.max(1000, retryAt - Date.now()))
+    return () => globalThis.clearTimeout?.(timer)
+  }, [refreshSync, repository, sync.retryAvailableAt, synchronize])
 
   useEffect(() => {
     let cancelled = false

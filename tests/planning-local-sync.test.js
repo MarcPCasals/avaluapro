@@ -10,12 +10,14 @@ import {
   loadPlanningScope,
   mergePlanningRemoteScope,
   PLANNING_LOCAL_DB_NAME,
+  recordPlanningOperationFailure,
   resolvePlanningConflict,
   savePlanningEntityLocally,
 } from '../src/data/local/planningIndexedDb.js'
 import { createPlanningRepository } from '../src/data/planningRepository.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
 import {
+  PLANNING_QUOTA_RETRY_DELAY_MS,
   PLANNING_SYNC_STATES,
   flushPlanningOutbox,
   getPlanningSyncState,
@@ -247,6 +249,52 @@ test('sense connexió conserva la cua i mostra un estat explícit', async () => 
   assert.equal(summary.state, PLANNING_SYNC_STATES.OFFLINE)
   assert.equal(summary.label, 'Sense connexió')
   assert.equal((await loadPlanningOutbox('teacher-1')).length, 1)
+})
+
+test('una quota esgotada protegeix el canvi local i atura els reintents fins al moment segur', async () => {
+  await savePlanningEntityLocally('teacher-1', academicYear('teacher-1'))
+  const now = Date.now()
+  let calls = 0
+  const quotaError = Object.assign(new Error('Quota exceeded.'), { code: 'firestore/resource-exhausted' })
+  const firstSummary = await flushPlanningOutbox('teacher-1', async () => {
+    calls += 1
+    throw quotaError
+  }, { now })
+
+  assert.equal(calls, 1)
+  assert.equal(firstSummary.state, PLANNING_SYNC_STATES.PENDING)
+  assert.equal(firstSummary.label, 'Desat al dispositiu')
+  assert.equal(firstSummary.errorKind, 'quota')
+  assert.equal((await loadPlanningOutbox('teacher-1')).length, 1)
+
+  await flushPlanningOutbox('teacher-1', async () => {
+    calls += 1
+  }, { now: now + 1000 })
+  assert.equal(calls, 1)
+
+  const finalSummary = await flushPlanningOutbox('teacher-1', async () => {
+    calls += 1
+    return { applied: true }
+  }, { now: now + PLANNING_QUOTA_RETRY_DELAY_MS + 1 })
+  assert.equal(calls, 2)
+  assert.equal(finalSummary.state, PLANNING_SYNC_STATES.SAVED)
+  assert.equal((await loadPlanningOutbox('teacher-1')).length, 0)
+})
+
+test('una nova edició conserva la pausa de quota i no força una altra lectura remota', async () => {
+  await savePlanningEntityLocally('teacher-1', academicYear('teacher-1'))
+  const retryAt = new Date(Date.now() + PLANNING_QUOTA_RETRY_DELAY_MS).toISOString()
+  const [operation] = await loadPlanningOutbox('teacher-1')
+  await recordPlanningOperationFailure(
+    operation,
+    Object.assign(new Error('Quota exceeded.'), { code: 'firestore/resource-exhausted' }),
+    { retryAt },
+  )
+  await savePlanningEntityLocally('teacher-1', academicYear('teacher-1', { label: 'Canvi protegit' }))
+
+  const [pending] = await loadPlanningOutbox('teacher-1')
+  assert.equal(pending.retryAt, retryAt)
+  assert.equal(pending.value.label, 'Canvi protegit')
 })
 
 test('una sincronització correcta buida només la revisió que realment ha enviat', async () => {
