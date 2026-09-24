@@ -7,6 +7,7 @@ import {
   loadCloudWorkspaceManifest,
   loadCloudSyncQueue,
   loadDataset,
+  patchCloudWorkspaceManifestCollections,
   recordCloudSyncQueueFailure,
   saveCollections,
   saveCollectionsWithCloudQueue,
@@ -207,4 +208,36 @@ test('una escriptura local idèntica conserva la revisió verificada', async () 
   await saveCollectionsWithCloudQueue({ students }, ['students'], 'teacher-1')
 
   assert.equal((await loadCloudWorkspaceManifest('teacher-1')).workspaceRevision, 'revision-1')
+})
+
+test('una edició invalida només la col·lecció afectada del manifest', async () => {
+  await saveCollections({
+    students: [{ id: 'student-1', name: 'Inicial' }],
+    tasks: [{ id: 'task-1', title: 'Tasca' }],
+  }, ['students', 'tasks'])
+  await saveCloudWorkspaceManifest('teacher-1', {
+    workspaceRevision: 'workspace-1',
+    datasetFingerprint: 'dataset-1',
+    collectionRevisions: { students: 'students-1', tasks: 'tasks-1' },
+    collectionFingerprints: { students: 'students-fp-1', tasks: 'tasks-fp-1' },
+  })
+
+  await saveCollectionsWithCloudQueue(
+    { students: [{ id: 'student-1', name: 'Canvi local' }] },
+    ['students'],
+    'teacher-1',
+  )
+
+  const invalidated = await loadCloudWorkspaceManifest('teacher-1')
+  assert.equal(invalidated.workspaceRevision, '')
+  assert.equal(invalidated.collectionRevisions.students, undefined)
+  assert.equal(invalidated.collectionRevisions.tasks, 'tasks-1')
+
+  await patchCloudWorkspaceManifestCollections('teacher-1', {
+    collectionRevisions: { students: 'students-2' },
+    collectionFingerprints: { students: 'students-fp-2' },
+  })
+  const patched = await loadCloudWorkspaceManifest('teacher-1')
+  assert.equal(patched.collectionRevisions.students, 'students-2')
+  assert.equal(patched.collectionRevisions.tasks, 'tasks-1')
 })

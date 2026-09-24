@@ -14,6 +14,7 @@ import {
   recordCloudSyncQueueFailure,
   replaceTutoringCoordinationCache,
   resetDatabase,
+  patchCloudWorkspaceManifestCollections,
   saveCollections,
   saveCollectionsWithCloudQueue,
   saveCloudWorkspaceManifest,
@@ -51,6 +52,7 @@ import {
   loadCloudBackup,
   loadCloudWorkspace,
   loadCloudWorkspaceMeta,
+  ensureCloudCollectionManifest,
   loadTutoringSpace,
   markTeacherGradePackageImported,
   observeFirebaseUser,
@@ -94,6 +96,8 @@ import { reconcileCloudDatasets } from '../lib/cloudReconciliation'
 import { getPendingCollectionNames } from '../lib/cloudSyncQueue'
 import {
   canUseCloudWorkspaceManifest,
+  getCloudCollectionRevisions,
+  getCloudCollectionsToLoad,
   getCloudWorkspaceRevision,
 } from '../lib/cloudWorkspaceManifest'
 import {
@@ -854,6 +858,16 @@ async function flushQueuedCloudSync(set, get) {
       user: state.cloud.user,
     })
     await acknowledgeCloudSyncQueue(queuedOperations)
+    const syncedCollectionNames = Object.keys(syncStats.collectionRevisions || {})
+    if (syncedCollectionNames.length > 0) {
+      await patchCloudWorkspaceManifestCollections(userUid, {
+        collectionRevisions: syncStats.collectionRevisions,
+        collectionFingerprints: await getCloudCollectionFingerprints(
+          getDatasetFromState(get()),
+          syncedCollectionNames,
+        ),
+      })
+    }
     const remainingOperations = await loadCloudSyncQueue(userUid)
     cloudSyncInFlight = false
     cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
@@ -1076,9 +1090,22 @@ async function getCloudWorkspaceFingerprint(dataset) {
   return getCloudDocumentsFingerprint(getComparableCloudWorkspace(normalizeDataset(dataset)))
 }
 
+async function getCloudCollectionFingerprints(dataset, collectionNames = COLLECTIONS) {
+  const normalizedDataset = normalizeDataset(dataset)
+  const entries = await Promise.all(collectionNames.map(async (collectionName) => [
+    collectionName,
+    await getCloudDocumentsFingerprint(
+      [...(normalizedDataset[collectionName] || [])]
+        .sort((first, second) => String(first.id || '').localeCompare(String(second.id || ''))),
+    ),
+  ]))
+  return Object.fromEntries(entries)
+}
+
 async function cacheVerifiedCloudWorkspace(uid, dataset, remoteMeta) {
   const workspaceRevision = getCloudWorkspaceRevision(remoteMeta)
-  if (!workspaceRevision) {
+  const collectionRevisions = getCloudCollectionRevisions(remoteMeta)
+  if (!workspaceRevision || !collectionRevisions) {
     await clearCloudWorkspaceManifest(uid)
     return false
   }
@@ -1086,6 +1113,8 @@ async function cacheVerifiedCloudWorkspace(uid, dataset, remoteMeta) {
   await saveCloudWorkspaceManifest(uid, {
     workspaceRevision,
     datasetFingerprint: await getCloudWorkspaceFingerprint(dataset),
+    collectionRevisions,
+    collectionFingerprints: await getCloudCollectionFingerprints(dataset),
   })
   return true
 }
@@ -1114,9 +1143,13 @@ async function synchronizeAfterSignIn(set, get, uid) {
         const localDataset = getDatasetFromState(get())
         const localManifest = await loadCloudWorkspaceManifest(uid)
         const remoteRevision = getCloudWorkspaceRevision(knownMeta.meta)
+        const remoteCollectionRevisions = getCloudCollectionRevisions(knownMeta.meta)
         const localFingerprint = localManifest && remoteRevision
           ? await getCloudWorkspaceFingerprint(localDataset)
           : ''
+        const localCollectionFingerprints = localManifest && remoteCollectionRevisions
+          ? await getCloudCollectionFingerprints(localDataset)
+          : {}
         if (canUseCloudWorkspaceManifest({
           uid,
           remoteMeta: knownMeta.meta,
@@ -1141,8 +1174,69 @@ async function synchronizeAfterSignIn(set, get, uid) {
           return
         }
 
-        const workspace = await loadCloudWorkspace(uid, { knownMeta })
+        const collectionsToLoad = localDataset.classes.length > 0 && !get().onboarding.demoMode
+          ? getCloudCollectionsToLoad({
+              uid,
+              remoteMeta: knownMeta.meta,
+              localManifest,
+              localFingerprints: localCollectionFingerprints,
+            })
+          : null
+        if (Array.isArray(collectionsToLoad)) {
+          if (collectionsToLoad.length === 0) {
+            await cacheVerifiedCloudWorkspace(uid, localDataset, knownMeta.meta)
+            set((current) => ({
+              cloud: {
+                ...current.cloud,
+                status: 'synced',
+                error: '',
+                errorKind: '',
+                lastSyncedAt: new Date().toISOString(),
+                lastSyncStats: { startup: 'collection-manifest', loadedCollections: 0 },
+                pendingCollections: [],
+                pendingOperationCount: 0,
+              },
+            }))
+            return
+          }
+
+          const partialWorkspace = await loadCloudWorkspace(uid, {
+            collectionNames: collectionsToLoad,
+            knownMeta,
+            verifyRevision: true,
+          })
+          if (partialWorkspace.stale) continue
+          if (!cloudWorkspacesMatch(localDataset, getDatasetFromState(get()))) continue
+          const mergedDataset = normalizeDataset({
+            ...localDataset,
+            ...partialWorkspace.dataset,
+          })
+          const applied = await applyCloudWorkspace(set, get, uid, {
+            ...partialWorkspace,
+            dataset: mergedDataset,
+          })
+          if (!applied) continue
+          set((current) => ({
+            cloud: {
+              ...current.cloud,
+              lastSyncStats: {
+                startup: 'collection-manifest',
+                loadedCollections: collectionsToLoad.length,
+              },
+            },
+          }))
+          return
+        }
+
+        const workspace = await loadCloudWorkspace(uid, { knownMeta, verifyRevision: true })
         if (get().cloud.user?.uid !== uid) return
+        if (workspace.stale) continue
+        if (!cloudWorkspacesMatch(localDataset, getDatasetFromState(get()))) continue
+        if (!getCloudCollectionRevisions(workspace.meta)) {
+          const manifestResult = await ensureCloudCollectionManifest(uid, workspace.meta)
+          if (manifestResult.stale) continue
+          workspace.meta = manifestResult.meta
+        }
         const action = getCloudStartupAction({
           cloudWorkspaceExists: workspace.exists,
           localWorkspaceExists: localDataset.classes.length > 0,
@@ -1990,6 +2084,8 @@ export const useAvaluaproStore = create((set, get) => ({
           await saveCloudWorkspaceManifest(state.cloud.user.uid, {
             workspaceRevision: syncStats.workspaceRevision,
             datasetFingerprint: await getCloudWorkspaceFingerprint(getDatasetFromState(get())),
+            collectionRevisions: syncStats.collectionRevisions,
+            collectionFingerprints: await getCloudCollectionFingerprints(getDatasetFromState(get())),
           })
         }
         await get().maybeCreateDailyCloudBackup({ triggeredByConfirmedChange: true })
@@ -2250,8 +2346,16 @@ export const useAvaluaproStore = create((set, get) => ({
 
     set((current) => ({ cloud: { ...current.cloud, status: 'syncing', error: '' } }))
     try {
-      const workspace = await loadCloudWorkspace(state.cloud.user.uid)
+      const workspace = await loadCloudWorkspace(state.cloud.user.uid, { verifyRevision: true })
       if (!workspace.exists) throw new Error('Encara no hi ha cap còpia de dades desada a Firebase.')
+      if (workspace.stale) throw new Error('Les dades del núvol han canviat durant la càrrega. Torna-ho a provar.')
+      if (!getCloudCollectionRevisions(workspace.meta)) {
+        const manifestResult = await ensureCloudCollectionManifest(state.cloud.user.uid, workspace.meta)
+        if (manifestResult.stale) {
+          throw new Error('Les dades del núvol han canviat durant la càrrega. Torna-ho a provar.')
+        }
+        workspace.meta = manifestResult.meta
+      }
       const dataset = normalizeDataset(workspace.dataset)
       await clearCloudSyncQueue(state.cloud.user.uid)
       await resetDatabase()

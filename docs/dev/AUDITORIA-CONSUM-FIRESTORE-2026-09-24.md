@@ -2,7 +2,7 @@
 
 Data: 24 de setembre de 2026
 Abast: lectures, escriptures, listeners, arrencada, Agenda, Programació, tutoria compartida, còpies i regles
-Estat: auditoria aprovada; blocs de mesura, reduccions ràpides i primera fase del manifest aplicats
+Estat: auditoria aprovada; blocs de mesura, reduccions ràpides i manifest incremental aplicats
 
 ## 1. Conclusió executiva
 
@@ -277,19 +277,24 @@ La primera intervenció conserva el model local-first i no canvia l'estructura d
 - comptadors locals i agregats de lectures estimades, sense noms ni dades d'alumnat;
 - proves automàtiques que fixen els límits i la selecció de col·leccions.
 
-La primera fase del manifest d’arrencada afegeix també:
+El manifest incremental d’arrencada afegeix també:
 
 - una revisió global de l’espai de treball publicada en el mateix lot que cada canvi incremental;
 - un estat `updating` que impedeix acceptar una revisió si una substitució completa queda interrompuda;
 - una petjada local, separada per compte, que s’invalida automàticament quan canvia qualsevol dada;
 - una arrencada d’una sola lectura remota quan revisió i petjada coincideixen;
+- revisions i petjades separades per a les 24 col·leccions personals;
+- descàrrega exclusiva de les col·leccions que han canviat en un altre dispositiu;
+- invalidació local limitada a la col·lecció editada, conservant la verificació de les altres;
+- adopció transaccional del manifest nou després d’una lectura completa estable;
+- una segona comprovació de revisió quan cal baixar dades, per repetir la lectura si una altra pestanya escriu al mateix temps;
 - compatibilitat conservadora amb pestanyes antigues: quan una versió anterior desa, baixa la versió de metadades i obliga a repetir la comprovació completa;
 - un marge d’activació fins al 27 de setembre de 2026 perquè les pestanyes obertes durant el desplegament no puguin validar dades antigues;
 - càrrega completa automàtica davant d’una cua pendent, canvi de compte, demo, petjada diferent o metadades incompletes.
 
 Agenda ha rebut una primera reducció reversible: la portada «Avui» carrega dues setmanes, en lloc de sis, amb els detalls de les sessions. Les vistes de setmana, mes, cronologia i recordatoris amplien el rang quan el docent les obre. La pròxima classe sense UP es calcula localment des de l’horari fins a seixanta dies i salta festius i vacances, de manera que la reducció no deixa la portada buida.
 
-Encara falta la segona fase del manifest —revisions per col·lecció per descarregar només els àmbits canviats— i la projecció lleugera de sessions d’Agenda. També queden pendents el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
+Encara falta la projecció lleugera de sessions d’Agenda. També queden pendents el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
 
 ## 9. Capacitat del pla gratuït
 

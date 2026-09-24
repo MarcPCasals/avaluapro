@@ -177,6 +177,45 @@ export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
       )
       const queueStore = transaction.objectStore(CLOUD_SYNC_QUEUE_STORE)
       const manifestStore = transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE)
+      const changedCollections = new Set()
+      let manifest = null
+      let manifestLoaded = false
+      let remainingCollectionReads = collections.length
+      let manifestUpdated = false
+
+      const updateManifestWhenReady = () => {
+        if (manifestUpdated || !manifestLoaded || remainingCollectionReads > 0) return
+        manifestUpdated = true
+        if (!manifest || changedCollections.size === 0) return
+
+        const collectionRevisions = { ...(manifest.collectionRevisions || {}) }
+        const collectionFingerprints = { ...(manifest.collectionFingerprints || {}) }
+        changedCollections.forEach((collectionName) => {
+          delete collectionRevisions[collectionName]
+          delete collectionFingerprints[collectionName]
+        })
+        if (Object.keys(collectionRevisions).length === 0) {
+          manifestStore.delete(uid)
+          return
+        }
+        manifestStore.put({
+          ...manifest,
+          uid,
+          workspaceRevision: '',
+          datasetFingerprint: '',
+          collectionRevisions,
+          collectionFingerprints,
+          verifiedAt: new Date().toISOString(),
+        })
+      }
+
+      const manifestRequest = manifestStore.get(uid)
+      manifestRequest.onsuccess = () => {
+        manifest = manifestRequest.result || null
+        manifestLoaded = true
+        updateManifestWhenReady()
+      }
+      manifestRequest.onerror = () => transaction.abort()
 
       collections.forEach((collection) => {
         const store = transaction.objectStore(collection)
@@ -192,7 +231,9 @@ export async function saveCollectionsWithCloudQueue(dataset, collections, uid) {
           store.clear()
           nextRows.forEach((row) => store.put(row))
           changes.forEach((change) => queueStore.put(change))
-          if (changes.length > 0) manifestStore.delete(uid)
+          if (changes.length > 0) changedCollections.add(collection)
+          remainingCollectionReads -= 1
+          updateManifestWhenReady()
         }
         readRequest.onerror = () => transaction.abort()
       })
@@ -362,8 +403,55 @@ export async function saveCloudWorkspaceManifest(uid, manifest = {}) {
         uid,
         workspaceRevision: manifest.workspaceRevision,
         datasetFingerprint: manifest.datasetFingerprint,
+        collectionRevisions: { ...(manifest.collectionRevisions || {}) },
+        collectionFingerprints: { ...(manifest.collectionFingerprints || {}) },
         verifiedAt: manifest.verifiedAt || new Date().toISOString(),
       })
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+export async function patchCloudWorkspaceManifestCollections(uid, manifest = {}) {
+  const revisions = manifest.collectionRevisions || {}
+  const fingerprints = manifest.collectionFingerprints || {}
+  const collectionNames = Object.keys(revisions).filter(
+    (collectionName) => revisions[collectionName] && fingerprints[collectionName],
+  )
+  if (!uid || collectionNames.length === 0) return
+
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(CLOUD_WORKSPACE_MANIFEST_STORE, 'readwrite')
+      const store = transaction.objectStore(CLOUD_WORKSPACE_MANIFEST_STORE)
+      const request = store.get(uid)
+      request.onsuccess = () => {
+        const current = request.result || { uid }
+        const collectionRevisions = { ...(current.collectionRevisions || {}) }
+        const collectionFingerprints = { ...(current.collectionFingerprints || {}) }
+        collectionNames.forEach((collectionName) => {
+          collectionRevisions[collectionName] = revisions[collectionName]
+          collectionFingerprints[collectionName] = fingerprints[collectionName]
+        })
+        store.put({
+          ...current,
+          uid,
+          // Una escriptura incremental no pot demostrar que cap altre
+          // dispositiu hagi modificat una col·lecció diferent. La revisió
+          // global es tornarà a validar a la pròxima arrencada.
+          workspaceRevision: '',
+          datasetFingerprint: '',
+          collectionRevisions,
+          collectionFingerprints,
+          verifiedAt: manifest.verifiedAt || new Date().toISOString(),
+        })
+      }
+      request.onerror = () => transaction.abort()
       transaction.oncomplete = () => resolve()
       transaction.onerror = () => reject(transaction.error)
       transaction.onabort = () => reject(transaction.error)

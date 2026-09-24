@@ -9,8 +9,10 @@ import {
   CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT,
   buildCloudWorkspaceManifestFields,
   canUseCloudWorkspaceManifest,
+  getCloudCollectionsToLoad,
   getCloudWorkspaceRevision,
 } from '../src/lib/cloudWorkspaceManifest.js'
+import { COLLECTIONS } from '../src/data/seedData.js'
 
 test('un navegador nou baixa les dades quan Firebase ja té un espai de treball', () => {
   assert.equal(
@@ -174,4 +176,48 @@ test('una versió antiga, una cua pendent o una còpia local diferent obliguen a
     ...base,
     now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime() - 1,
   }), false)
+})
+
+test('el manifest per col·lecció només demana els àmbits remots que han canviat', () => {
+  const remoteRevisions = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, 'revision-1']))
+  remoteRevisions.tasks = 'revision-2'
+  const localRevisions = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, 'revision-1']))
+  const localFingerprints = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, `fp-${collectionName}`]))
+  const remoteMeta = buildCloudWorkspaceManifestFields({
+    revision: 'workspace-2',
+    collectionRevisions: remoteRevisions,
+  })
+
+  assert.deepEqual(getCloudCollectionsToLoad({
+    uid: 'teacher-1',
+    remoteMeta,
+    localManifest: {
+      uid: 'teacher-1',
+      collectionRevisions: localRevisions,
+      collectionFingerprints: localFingerprints,
+    },
+    localFingerprints,
+    now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime(),
+  }), ['tasks'])
+})
+
+test('una petjada local inesperada rellegeix només la col·lecció afectada', () => {
+  const revisions = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, 'revision-1']))
+  const storedFingerprints = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, `fp-${collectionName}`]))
+  const currentFingerprints = { ...storedFingerprints, students: 'fp-corrupted' }
+
+  assert.deepEqual(getCloudCollectionsToLoad({
+    uid: 'teacher-1',
+    remoteMeta: buildCloudWorkspaceManifestFields({
+      revision: 'workspace-1',
+      collectionRevisions: revisions,
+    }),
+    localManifest: {
+      uid: 'teacher-1',
+      collectionRevisions: revisions,
+      collectionFingerprints: storedFingerprints,
+    },
+    localFingerprints: currentFingerprints,
+    now: new Date(CLOUD_WORKSPACE_FAST_PATH_ENABLE_AT).getTime(),
+  }), ['students'])
 })

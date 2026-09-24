@@ -30,6 +30,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
   query,
+  runTransaction,
   setDoc,
   where,
   writeBatch,
@@ -56,6 +57,9 @@ import {
 import {
   buildCloudWorkspaceManifestFields,
   createCloudWorkspaceRevision,
+  getCloudCollectionRevisions,
+  getCloudWorkspaceRevision,
+  getLegacyCloudWorkspaceRevision,
 } from './cloudWorkspaceManifest'
 
 export const SHARED_TUTORING_COLLECTIONS = [
@@ -1151,11 +1155,18 @@ export async function saveCloudCollections(uid, dataset, collectionsToSave = COL
     { read: 0, written: 0, deleted: 0, skipped: 0 },
   )
   const workspaceRevision = createCloudWorkspaceRevision()
+  const collectionRevisions = collectionsToSave.reduce((result, collectionName) => ({
+    ...result,
+    [collectionName]: workspaceRevision,
+  }), {})
   await setDoc(
     metaReference,
     cleanForFirestore({
       ...commonMetaValue,
-      ...buildCloudWorkspaceManifestFields({ revision: workspaceRevision }),
+      ...buildCloudWorkspaceManifestFields({
+        revision: workspaceRevision,
+        collectionRevisions,
+      }),
     }),
     { merge: true },
   )
@@ -1165,6 +1176,7 @@ export async function saveCloudCollections(uid, dataset, collectionsToSave = COL
     totals,
     metadataWrites: Number(userWritten) + 2,
     workspaceRevision,
+    collectionRevisions,
   }
 }
 
@@ -1204,10 +1216,12 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
     statsByCollection.set(operation.collectionName, stats)
 
     const reference = doc(getCollectionRef(uid, operation.collectionName), operation.documentId)
-    if (operation.operation === 'delete') return { id: operation.id, type: 'delete', reference }
+    if (operation.operation === 'delete') {
+      return { id: operation.id, collectionName: operation.collectionName, type: 'delete', reference }
+    }
     const value = cleanForFirestore({ ...operation.value, id: operation.documentId })
     assertFirestoreDocumentSize(operation.collectionName, operation.documentId, value)
-    return { id: operation.id, type: 'set', reference, value }
+    return { id: operation.id, collectionName: operation.collectionName, type: 'set', reference, value }
   })
 
   const successfulOperationIds = []
@@ -1219,6 +1233,7 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
     collections: COLLECTIONS,
   })
   let workspaceRevision = ''
+  const collectionRevisions = {}
   let metadataWrites = 0
   let metadataError = ''
   const buildOperationError = (error, failedOperationIds) => {
@@ -1231,9 +1246,16 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
   for (let index = 0; index < firestoreOperations.length; index += 449) {
     const operationBatch = firestoreOperations.slice(index, index + 449)
     const batchRevision = createCloudWorkspaceRevision()
+    const batchCollectionRevisions = operationBatch.reduce((result, operation) => ({
+      ...result,
+      [operation.collectionName]: batchRevision,
+    }), {})
     const readyMetaValue = cleanForFirestore({
       ...commonMetaValue,
-      ...buildCloudWorkspaceManifestFields({ revision: batchRevision }),
+      ...buildCloudWorkspaceManifestFields({
+        revision: batchRevision,
+        collectionRevisions: batchCollectionRevisions,
+      }),
     })
     const batch = writeBatch(db)
     operationBatch.forEach((operation) => {
@@ -1247,6 +1269,7 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
       await batch.commit()
       successfulOperationIds.push(...operationBatch.map((operation) => operation.id))
       workspaceRevision = batchRevision
+      Object.assign(collectionRevisions, batchCollectionRevisions)
       metadataWrites += 1
     } catch (error) {
       const code = String(error?.code || '').toLowerCase()
@@ -1292,6 +1315,7 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
       try {
         await setDoc(metaReference, readyMetaValue, { merge: true })
         workspaceRevision = batchRevision
+        Object.assign(collectionRevisions, batchCollectionRevisions)
         metadataWrites += 1
       } catch (metadataWriteError) {
         metadataError = String(metadataWriteError?.code || metadataWriteError?.name || 'metadata-sync-error')
@@ -1315,6 +1339,7 @@ export async function saveCloudOperations(uid, operations = [], meta = {}) {
     metadataWrites: Number(userWritten) + metadataWrites,
     metadataError,
     workspaceRevision,
+    collectionRevisions,
   }
 }
 
@@ -1328,13 +1353,63 @@ export async function loadCloudWorkspaceMeta(uid) {
   }
 }
 
-export async function loadCloudWorkspace(uid, { knownMeta = null } = {}) {
+function getAnyCloudWorkspaceRevision(meta = null) {
+  return getCloudWorkspaceRevision(meta) || getLegacyCloudWorkspaceRevision(meta)
+}
+
+/**
+ * Després d'una lectura completa i estable, adopta el protocol per col·lecció
+ * amb una transacció condicional. Si una altra pestanya ha escrit mentrestant,
+ * no publica el manifest i demana repetir la lectura.
+ */
+export async function ensureCloudCollectionManifest(uid, expectedMeta = null) {
+  if (!uid) throw new Error('Cal iniciar sessió amb Google abans de preparar el manifest del núvol.')
+  const expectedRevision = getAnyCloudWorkspaceRevision(expectedMeta)
+  if (!expectedRevision) return { meta: expectedMeta, stale: false, upgraded: false }
+
+  return runTransaction(db, async (transaction) => {
+    const reference = getMetaDocRef(uid)
+    const snapshot = await transaction.get(reference)
+    recordFirestoreLookup('startup.workspace.manifestUpgrade')
+    const currentMeta = snapshot.exists() ? snapshot.data() : null
+    const currentRevision = getAnyCloudWorkspaceRevision(currentMeta)
+    if (!currentRevision || currentRevision !== expectedRevision) {
+      return { meta: currentMeta, stale: true, upgraded: false }
+    }
+    if (getCloudCollectionRevisions(currentMeta)) {
+      return { meta: currentMeta, stale: false, upgraded: false }
+    }
+
+    const workspaceRevision = createCloudWorkspaceRevision()
+    const collectionRevisions = COLLECTIONS.reduce((result, collectionName) => ({
+      ...result,
+      [collectionName]: expectedRevision,
+    }), {})
+    const manifestFields = buildCloudWorkspaceManifestFields({
+      revision: workspaceRevision,
+      collectionRevisions,
+    })
+    transaction.set(reference, cleanForFirestore(manifestFields), { merge: true })
+    return {
+      meta: { ...currentMeta, ...manifestFields },
+      stale: false,
+      upgraded: true,
+    }
+  })
+}
+
+export async function loadCloudWorkspace(uid, {
+  collectionNames = COLLECTIONS,
+  knownMeta = null,
+  verifyRevision = false,
+} = {}) {
   if (!uid) throw new Error('Cal iniciar sessió amb Google abans de carregar dades del núvol.')
+  const selectedCollections = collectionNames.filter((collectionName) => COLLECTIONS.includes(collectionName))
 
   const [metaEntry, entries] = await Promise.all([
     knownMeta ? Promise.resolve(knownMeta) : loadCloudWorkspaceMeta(uid),
     Promise.all(
-      COLLECTIONS.map(async (collectionName) => {
+      selectedCollections.map(async (collectionName) => {
         const snapshot = await getDocsFromServer(getCollectionRef(uid, collectionName))
         recordFirestoreQuerySnapshot(`startup.workspace.${collectionName}`, snapshot)
         return [
@@ -1345,6 +1420,18 @@ export async function loadCloudWorkspace(uid, { knownMeta = null } = {}) {
     ),
   ])
 
+  let verifiedMetaEntry = metaEntry
+  let stale = false
+  if (verifyRevision && selectedCollections.length > 0) {
+    verifiedMetaEntry = await loadCloudWorkspaceMeta(uid)
+    const beforeRevision = getAnyCloudWorkspaceRevision(metaEntry.meta)
+    const afterRevision = getAnyCloudWorkspaceRevision(verifiedMetaEntry.meta)
+    // Els comptes que encara tenen metadades anteriors no disposen de revisió.
+    // Conserven el comportament complet tradicional fins a la primera
+    // escriptura nova; quan ja hi ha revisió, qualsevol canvi obliga a repetir.
+    stale = Boolean(beforeRevision) && beforeRevision !== afterRevision
+  }
+
   const dataset = entries.reduce(
     (nextDataset, [collectionName, rows]) => ({ ...nextDataset, [collectionName]: rows }),
     {},
@@ -1352,8 +1439,11 @@ export async function loadCloudWorkspace(uid, { knownMeta = null } = {}) {
 
   return {
     dataset,
-    exists: metaEntry.exists || entries.some(([, rows]) => rows.length > 0),
-    meta: metaEntry.meta,
+    exists: verifiedMetaEntry.exists || entries.some(([, rows]) => rows.length > 0),
+    meta: verifiedMetaEntry.meta,
+    loadedCollections: selectedCollections,
+    partial: selectedCollections.length < COLLECTIONS.length,
+    stale,
   }
 }
 
