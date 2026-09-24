@@ -17,7 +17,6 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
-import { ContextualHelp } from '../../components/ContextualHelp'
 import {
   getOpenTutoringReminders,
   getUrgentTutoringMessages,
@@ -348,22 +347,6 @@ export function TutoringCoordinationPanel({ activeClass, students = [] }) {
 
   return (
     <section className="tutoring-coordination-panel" data-tour="tutoring-coordination-panel">
-      <header className="tutoring-coordination-heading">
-        <div>
-          <span className="section-kicker"><MessageCircle size={17} /> Coordinació de cotutoria</span>
-          <div className="contextual-section-title">
-            <h2>Conversa i pendents compartits</h2>
-            <ContextualHelp title="Conversa i pendents compartits">
-              Tot el que escriviu queda dins d’aquesta tutoria i només és visible per als seus membres. Podeu compartir missatges, avisos urgents i recordatoris vinculats a l’alumnat.
-            </ContextualHelp>
-          </div>
-        </div>
-        <div className={`coordination-live-state ${cloud.tutoringCoordinationStatus}`}>
-          <span />
-          {cloud.tutoringCoordinationStatus === 'pending' ? 'Canvis pendents' : 'Recepció automàtica activa'}
-        </div>
-      </header>
-
       {(error || cloud.tutoringCoordinationError) && (
         <div className="coordination-error" role="alert">
           <span>{error || cloud.tutoringCoordinationError}</span>

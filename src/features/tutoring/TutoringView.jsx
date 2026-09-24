@@ -7615,19 +7615,6 @@ export function TutoringView() {
 
       {activePanel === 'tracking' && (
         <section className="tutorial-tracking-panel" data-tour="tutoring-tracking-panel">
-          <header className="tutorial-registry-header">
-            <div>
-              <span className="section-kicker"><ClipboardList size={17} /> Quadern de tutoria</span>
-              <div className="contextual-section-title">
-                <h2>Registre tutorial de l’alumnat</h2>
-                <ContextualHelp title="Registre tutorial de l’alumnat">Reuneix informacions importants, contactes, orientacions i acords, sempre vinculats a l’alumne corresponent.</ContextualHelp>
-              </div>
-            </div>
-            {activeClass?.sharedTutoringSpaceId && (
-              <span className="tutorial-registry-shared"><UsersRound size={15} /> Compartit amb els cotutors</span>
-            )}
-          </header>
-
           <div className="tutorial-registry-summary">
             <article>
               <span>Informacions registrades</span>
@@ -8120,46 +8107,6 @@ export function TutoringView() {
 
       {activePanel === 'relationships' && (
         <section className="tutorial-relationships-panel" data-tour="tutoring-relationships-panel">
-          <section className="tutorial-relationships-hero">
-            <div>
-              <span className="section-kicker">
-                <Network size={17} />
-                Relacions del grup
-              </span>
-              <div className="contextual-section-title">
-                <h2>Sociograma inicial</h2>
-                <ContextualHelp title="Sociograma inicial">Registra afinitats, parelles que funcionen bé i incompatibilitats abans de generar grups cooperatius o una disposició d’aula.</ContextualHelp>
-              </div>
-            </div>
-            <div className="tutorial-relationship-summary">
-              <article className="green">
-                <HeartHandshake size={19} />
-                <strong>{tutorialRelationSummary.workPositiveCount}</strong>
-                <span>treball positives</span>
-              </article>
-              <article className="blue">
-                <UsersRound size={19} />
-                <strong>{tutorialRelationSummary.socialPositiveCount}</strong>
-                <span>afinitats socials</span>
-              </article>
-              <article className="red">
-                <UserX size={19} />
-                <strong>{tutorialRelationSummary.avoidCount}</strong>
-                <span>incompatibilitats</span>
-              </article>
-              <article>
-                <UsersRound size={19} />
-                <strong>{tutorialRelationSummary.isolatedStudents.length}</strong>
-                <span>sense relacions</span>
-              </article>
-              <article>
-                <Network size={19} />
-                <strong>{tutorialRelationSummary.reciprocalCount}</strong>
-                <span>parelles recíproques</span>
-              </article>
-            </div>
-          </section>
-
           <section className="tutorial-tool-launch-grid" data-tour="tutoring-relationship-tools">
             <ContextualTab data-tour="tutoring-tool-sociogram" help="Obre un mapa visual estable de les relacions reals del grup i permet enfocar cada alumne." helpTitle="Sociograma" onClick={() => setActiveRelationshipTool('sociogram')} type="button">
               <Network size={25} />

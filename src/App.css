@@ -1493,6 +1493,7 @@
 
 .contextual-tab > button:first-child {
   width: 100%;
+  padding-right: 30px !important;
 }
 
 .contextual-help-button {
@@ -1507,16 +1508,13 @@
   background: transparent;
   box-shadow: none;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.48;
   transition: color 160ms ease, opacity 160ms ease;
 }
 
-.contextual-help-letter {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 15px;
-  font-style: italic;
-  font-weight: 700;
-  line-height: 1;
+.contextual-help-button svg {
+  width: 14px;
+  height: 14px;
 }
 
 .contextual-help-button:hover,
@@ -1534,13 +1532,14 @@
   width: 22px;
   height: 22px;
   position: absolute;
-  top: -4px;
-  right: -1px;
+  top: 50%;
+  right: 4px;
   z-index: 4;
+  transform: translateY(-50%);
 }
 
 .contextual-tab.has-contextual-badge .contextual-tab-help {
-  right: 18px;
+  right: 4px;
 }
 
 .contextual-help-content {
@@ -2530,46 +2529,6 @@ button.tutorial-stat-card {
   gap: 8px;
 }
 
-.tutorial-registry-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  border: 1px solid #a7f3d0;
-  border-radius: 12px;
-  padding: 16px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 78%);
-}
-
-.tutorial-registry-header h2,
-.tutorial-registry-header p {
-  margin: 5px 0 0;
-}
-
-.tutorial-registry-header h2 {
-  color: #0f172a;
-  font-size: 21px;
-}
-
-.tutorial-registry-header p {
-  color: #475569;
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.tutorial-registry-shared {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  padding: 7px 10px;
-  color: #0f766e;
-  background: #ccfbf1;
-  font-size: 12px;
-  font-weight: 900;
-}
-
 .tutorial-registry-summary,
 .tutorial-registry-modal-summary {
   display: grid;
@@ -3284,92 +3243,6 @@ button.tutorial-record-pill {
 .tutorial-relationships-panel {
   display: grid;
   gap: 14px;
-}
-
-.tutorial-relationships-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
-  gap: 14px;
-  align-items: stretch;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 16px;
-  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #ecfdf5 100%);
-}
-
-.tutorial-relationships-hero h2 {
-  margin: 6px 0;
-  color: #1f2937;
-  font-size: 24px;
-}
-
-.tutorial-relationships-hero p {
-  max-width: 680px;
-  margin: 0;
-  color: #64748b;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.tutorial-relationship-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-}
-
-.tutorial-relationship-summary article {
-  display: grid;
-  gap: 4px;
-  align-content: center;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 12px;
-  color: #475569;
-  background: rgba(255, 255, 255, 0.86);
-}
-
-.tutorial-relationship-summary article.green {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-}
-
-.tutorial-relationship-summary article.blue {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-}
-
-.tutorial-relationship-summary article.red {
-  border-color: #fecaca;
-  background: #fff1f2;
-}
-
-.tutorial-relationship-summary svg {
-  color: #2563eb;
-}
-
-.tutorial-relationship-summary article.green svg {
-  color: #16a34a;
-}
-
-.tutorial-relationship-summary article.blue svg {
-  color: #2563eb;
-}
-
-.tutorial-relationship-summary article.red svg {
-  color: #dc2626;
-}
-
-.tutorial-relationship-summary strong {
-  color: #111827;
-  font-size: 26px;
-  font-weight: 950;
-}
-
-.tutorial-relationship-summary span {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 950;
-  text-transform: uppercase;
 }
 
 .tutorial-tool-launch-grid {
@@ -11896,7 +11769,6 @@ button.tutorial-record-pill {
 
   body.sociometric-report-printing .app-shell > :not(.content-area),
   body.sociometric-report-printing .tutoring-view > :not(.tutorial-relationships-panel),
-  body.sociometric-report-printing .tutorial-relationships-hero,
   body.sociometric-report-printing .tutorial-tool-launch-grid,
   body.sociometric-report-printing .relationship-tool-panel:not(.sociometric-reports-panel),
   body.sociometric-report-printing .sociometric-reports-panel > header,
@@ -12234,9 +12106,6 @@ button.tutorial-record-pill {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tutorial-registry-header {
-    display: grid;
-  }
 }
 
 .urgent-modal {
@@ -25724,7 +25593,6 @@ button.profile-followup-card:focus-visible {
     overflow: auto;
   }
 
-  .tutorial-relationships-hero,
   .sociometric-reports-panel > header,
   .tutorial-sociogram-visual-card > header,
   .cooperative-generator-panel > header,
@@ -25871,10 +25739,6 @@ button.profile-followup-card:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tutorial-relationship-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .global-action-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -25955,7 +25819,6 @@ button.profile-followup-card:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .tutorial-relationship-summary,
     .sociometric-reports-overview,
     .sociometric-report-type-grid,
     .sociometric-report-config,
@@ -29430,59 +29293,6 @@ button.profile-followup-card:focus-visible {
   gap: 14px;
 }
 
-.tutoring-coordination-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 18px;
-  background: linear-gradient(135deg, #eff6ff, #ffffff 64%);
-}
-
-.tutoring-coordination-heading h2 {
-  margin: 7px 0 5px;
-  color: #0f172a;
-}
-
-.tutoring-coordination-heading p {
-  margin: 0;
-  color: #64748b;
-  font-weight: 750;
-}
-
-.coordination-live-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 7px 10px;
-  color: #047857;
-  background: #ecfdf5;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.coordination-live-state > span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.coordination-live-state.pending,
-.coordination-live-state.loading {
-  color: #a16207;
-  background: #fffbeb;
-}
-
-.coordination-live-state.error {
-  color: #b91c1c;
-  background: #fef2f2;
-}
-
 .coordination-error {
   display: flex;
   align-items: center;
@@ -30136,14 +29946,9 @@ button.profile-followup-card:focus-visible {
 }
 
 @media (max-width: 700px) {
-  .tutoring-coordination-heading,
   .coordination-error {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .coordination-live-state {
-    align-self: flex-start;
   }
 
   .coordination-composer-heading {

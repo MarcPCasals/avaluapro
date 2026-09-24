@@ -22,7 +22,7 @@ export function ContextualHelp({ children, className = '', title }) {
         title={`Informació sobre ${title}`}
         type="button"
       >
-        <span aria-hidden="true" className="contextual-help-letter">i</span>
+        <Info aria-hidden="true" size={14} strokeWidth={1.8} />
       </button>
       {open && (
         <Modal onClose={() => setOpen(false)} size="sm" title={title}>
