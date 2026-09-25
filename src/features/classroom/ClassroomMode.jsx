@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, Loader2, Mail, MessageSquarePlus,
@@ -8,6 +8,7 @@ import {
 import {
   CLASSROOM_BEHAVIOR_CATEGORIES,
   getClassroomEvidenceItems,
+  getBackdatedTimerStart,
   getClassroomStudents,
   getClassroomTimerState,
   getCorrectedActualMinutes,
@@ -37,6 +38,46 @@ function replaceResult(results, nextResult) {
   return results.some((result) => result.id === nextResult.id)
     ? results.map((result) => result.id === nextResult.id ? nextResult : result)
     : [...results, nextResult]
+}
+
+const CLASSROOM_TIMER_PREFIX = 'avaluapro:classroom-timer:'
+const CLASSROOM_TIMER_MAX_AGE = 12 * 60 * 60 * 1000
+
+function currentTimeMs() {
+  return Date.now()
+}
+
+function classroomTimerKey(sessionId, itemId) {
+  return `${CLASSROOM_TIMER_PREFIX}${sessionId}:${itemId}`
+}
+
+function loadClassroomTimer(sessionId, itemId) {
+  if (!sessionId || !itemId) return { startedAtMs: null, stoppedAtMs: null }
+  try {
+    const value = JSON.parse(globalThis.sessionStorage?.getItem(classroomTimerKey(sessionId, itemId)) || 'null')
+    const startedAtMs = Number(value?.startedAtMs)
+    const stoppedAtMs = value?.stoppedAtMs === null ? null : Number(value?.stoppedAtMs)
+    if (!Number.isFinite(startedAtMs) || currentTimeMs() - startedAtMs > CLASSROOM_TIMER_MAX_AGE) {
+      globalThis.sessionStorage?.removeItem(classroomTimerKey(sessionId, itemId))
+      return { startedAtMs: null, stoppedAtMs: null }
+    }
+    return {
+      startedAtMs,
+      stoppedAtMs: Number.isFinite(stoppedAtMs) ? stoppedAtMs : null,
+    }
+  } catch {
+    return { startedAtMs: null, stoppedAtMs: null }
+  }
+}
+
+function saveClassroomTimer(sessionId, itemId, timer) {
+  if (!sessionId || !itemId) return
+  globalThis.sessionStorage?.setItem(classroomTimerKey(sessionId, itemId), JSON.stringify(timer))
+}
+
+function clearClassroomTimer(sessionId, itemId) {
+  if (!sessionId || !itemId) return
+  globalThis.sessionStorage?.removeItem(classroomTimerKey(sessionId, itemId))
 }
 
 const TASK_STATUSES = [
@@ -278,10 +319,13 @@ export function ClassroomMode({
   const pendingIndex = currentBundle.items.findIndex((item) => !completedItemIds.has(item.id))
   const firstPendingIndex = pendingIndex === -1 ? currentBundle.items.length : pendingIndex
   const [currentIndex, setCurrentIndex] = useState(firstPendingIndex)
+  const currentItem = currentBundle.items[currentIndex] || null
+  const [initialTimer] = useState(() => loadClassroomTimer(currentBundle.session.id, currentItem?.id))
   const [sidePanel, setSidePanel] = useState(bundle.session.attendanceConfirmedAt ? '' : 'students')
-  const [timerStartedAt, setTimerStartedAt] = useState(null)
-  const [timerStoppedAt, setTimerStoppedAt] = useState(null)
-  const [nowMs, setNowMs] = useState(() => Date.now())
+  const [timerStartedAt, setTimerStartedAt] = useState(initialTimer.startedAtMs)
+  const [timerStoppedAt, setTimerStoppedAt] = useState(initialTimer.stoppedAtMs)
+  const [nowMs, setNowMs] = useState(() => currentTimeMs())
+  const [elapsedStartMinutes, setElapsedStartMinutes] = useState('')
   const [otherMinutes, setOtherMinutes] = useState('')
   const [projectionMode, setProjectionMode] = useState(false)
   const [closeReview, setCloseReview] = useState(false)
@@ -336,7 +380,6 @@ export function ClassroomMode({
   const existingReflection = reflectionResult?.pedagogicalReflection || ''
   const [summaryReflection, setSummaryReflection] = useState(existingReflection)
   const [summaryPrivateNote, setSummaryPrivateNote] = useState(existingPrivateNote)
-  const currentItem = currentBundle.items[currentIndex] || null
   const currentResult = currentBundle.results.find((result) => result.sessionItemId === currentItem?.id) || null
   const currentDescription = currentItem?.sourceActivity?.description?.trim() || ''
   const timer = getClassroomTimerState({
@@ -350,9 +393,40 @@ export function ClassroomMode({
 
   useEffect(() => {
     if (!timerStartedAt || timerStoppedAt) return undefined
-    const interval = globalThis.setInterval(() => setNowMs(Date.now()), 1000)
+    const interval = globalThis.setInterval(() => setNowMs(currentTimeMs()), 1000)
     return () => globalThis.clearInterval(interval)
   }, [timerStartedAt, timerStoppedAt])
+
+  const startTimer = useCallback((elapsedMinutes = 0) => {
+    if (!currentItem) return
+    const now = currentTimeMs()
+    const startedAtMs = getBackdatedTimerStart({ elapsedMinutes, nowMs: now })
+    setTimerStartedAt(startedAtMs)
+    setTimerStoppedAt(null)
+    setNowMs(now)
+    setElapsedStartMinutes('')
+    saveClassroomTimer(currentBundle.session.id, currentItem.id, { startedAtMs, stoppedAtMs: null })
+  }, [currentBundle.session.id, currentItem])
+
+  const stopTimer = useCallback(() => {
+    if (!currentItem || !timerStartedAt) return
+    const stoppedAtMs = currentTimeMs()
+    setTimerStoppedAt(stoppedAtMs)
+    setNowMs(stoppedAtMs)
+    saveClassroomTimer(currentBundle.session.id, currentItem.id, { startedAtMs: timerStartedAt, stoppedAtMs })
+  }, [currentBundle.session.id, currentItem, timerStartedAt])
+
+  const moveToItem = (index) => {
+    const nextIndex = Math.max(0, Math.min(currentBundle.items.length, index))
+    const nextItem = currentBundle.items[nextIndex] || null
+    const storedTimer = loadClassroomTimer(currentBundle.session.id, nextItem?.id)
+    setCurrentIndex(nextIndex)
+    setTimerStartedAt(storedTimer.startedAtMs)
+    setTimerStoppedAt(storedTimer.stoppedAtMs)
+    setNowMs(currentTimeMs())
+    setElapsedStartMinutes('')
+    setOtherMinutes('')
+  }
 
   useEffect(() => {
     if (!projectionMode) return undefined
@@ -364,32 +438,23 @@ export function ClassroomMode({
       if (event.code !== 'Space' || event.repeat) return
       event.preventDefault()
       if (!timerStartedAt) {
-        const now = Date.now()
-        setTimerStartedAt(now)
-        setNowMs(now)
+        startTimer()
       } else if (!timerStoppedAt) {
-        const now = Date.now()
-        setTimerStoppedAt(now)
-        setNowMs(now)
+        stopTimer()
       }
     }
     globalThis.addEventListener('keydown', handleProjectionKeys)
     return () => globalThis.removeEventListener('keydown', handleProjectionKeys)
-  }, [projectionMode, timerStartedAt, timerStoppedAt])
+  }, [projectionMode, startTimer, stopTimer, timerStartedAt, timerStoppedAt])
 
   const selectItem = (index) => {
     if (timerStartedAt && !timerStoppedAt) return
-    setCurrentIndex(Math.max(0, Math.min(currentBundle.items.length - 1, index)))
-    setTimerStartedAt(null)
-    setTimerStoppedAt(null)
-    setOtherMinutes('')
+    moveToItem(Math.max(0, Math.min(currentBundle.items.length - 1, index)))
   }
 
   const advance = () => {
-    setCurrentIndex((index) => Math.min(currentBundle.items.length, index + 1))
-    setTimerStartedAt(null)
-    setTimerStoppedAt(null)
-    setOtherMinutes('')
+    clearClassroomTimer(currentBundle.session.id, currentItem?.id)
+    moveToItem(currentIndex + 1)
   }
 
   const saveResult = async (changes) => {
@@ -420,7 +485,7 @@ export function ClassroomMode({
 
   const finishTimer = async (endedMinutesAgo = 0) => {
     const actualMinutes = getCorrectedActualMinutes({
-      endedAtMs: timerStoppedAt || Date.now(),
+      endedAtMs: timerStoppedAt || currentTimeMs(),
       endedMinutesAgo,
       startedAtMs: timerStartedAt,
     })
@@ -612,6 +677,7 @@ export function ClassroomMode({
       nextBundle = { ...nextBundle, ...closed }
       for (const item of evidenceItems) await onActivateEvidence(nextBundle, item)
       setCurrentBundle(nextBundle)
+      currentBundle.items.forEach((item) => clearClassroomTimer(currentBundle.session.id, item.id))
       onExit()
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut tancar la classe.')
@@ -633,7 +699,7 @@ export function ClassroomMode({
               <strong>{timerStartedAt ? `${timer.isOvertime ? '+' : ''}${formatClock(timer.isOvertime ? timer.overtimeSeconds : timer.remainingSeconds)}` : formatClock(Number(currentItem.plannedMinutes) * 60)}</strong>
             </div>
             <div className="classroom-projection-controls">
-              {!timerStartedAt ? <button className="classroom-start" onClick={() => { const now = Date.now(); setTimerStartedAt(now); setNowMs(now) }} type="button"><Play size={20} />Comença</button> : !timerStoppedAt ? <button className="classroom-stop" onClick={() => { const now = Date.now(); setTimerStoppedAt(now); setNowMs(now) }} type="button"><Pause size={20} />Atura</button> : <span>Torna al Mode aula per registrar el temps i continuar.</span>}
+              {!timerStartedAt ? <div className="classroom-start-controls"><button className="classroom-start" onClick={() => startTimer()} type="button"><Play size={20} />Comença ara</button><label className="classroom-elapsed-start"><span>Ja fa</span><input aria-label="Minuts que ja portes fent l’activitat" min="1" placeholder="min" type="number" value={elapsedStartMinutes} onChange={(event) => setElapsedStartMinutes(event.target.value)} /><button disabled={Number(elapsedStartMinutes) <= 0} onClick={() => startTimer(elapsedStartMinutes)} type="button">Inicia</button></label></div> : !timerStoppedAt ? <button className="classroom-stop" onClick={stopTimer} type="button"><Pause size={20} />Atura</button> : <span>Torna al Mode aula per registrar el temps i continuar.</span>}
               {!timerStoppedAt && <small>També pots prémer la barra espaiadora.</small>}
             </div>
           </div>
@@ -682,7 +748,7 @@ export function ClassroomMode({
             {currentItem.plannedMinutes ? <div className={`classroom-timer ${timer.isOvertime ? 'overtime' : ''}`}>
               <span>{timerStartedAt ? timer.isOvertime ? 'Temps excedit' : timerStoppedAt ? 'Temps aturat' : 'Temps restant' : 'Temporitzador opcional'}</span>
               <strong>{timerStartedAt ? `${timer.isOvertime ? '+' : ''}${formatClock(timer.isOvertime ? timer.overtimeSeconds : timer.remainingSeconds)}` : formatClock(Number(currentItem.plannedMinutes) * 60)}</strong>
-              {!timerStartedAt ? <button className="classroom-start" onClick={() => { const now = Date.now(); setTimerStartedAt(now); setNowMs(now) }} type="button"><Play size={18} />Comença</button> : !timerStoppedAt ? <button className="classroom-stop" onClick={() => { const now = Date.now(); setTimerStoppedAt(now); setNowMs(now) }} type="button"><Pause size={18} />Atura</button> : <div className="classroom-finish-options">
+              {!timerStartedAt ? <div className="classroom-start-controls"><button className="classroom-start" onClick={() => startTimer()} type="button"><Play size={18} />Comença ara</button><label className="classroom-elapsed-start"><span>Ja fa</span><input aria-label="Minuts que ja portes fent l’activitat" min="1" placeholder="min" type="number" value={elapsedStartMinutes} onChange={(event) => setElapsedStartMinutes(event.target.value)} /><span>min</span><button disabled={Number(elapsedStartMinutes) <= 0} onClick={() => startTimer(elapsedStartMinutes)} type="button">Inicia comptant-los</button></label></div> : !timerStoppedAt ? <button className="classroom-stop" onClick={stopTimer} type="button"><Pause size={18} />Atura</button> : <div className="classroom-finish-options">
                 <span>Quan ha acabat realment?</span>
                 <div><button onClick={() => finishTimer(0)} type="button">Ara</button>{[1, 2, 5, 10].map((minutes) => <button key={minutes} onClick={() => finishTimer(minutes)} type="button">Fa {minutes}</button>)}</div>
                 <label>Altre<input min="0" placeholder="min" type="number" value={otherMinutes} onChange={(event) => setOtherMinutes(event.target.value)} /><button disabled={otherMinutes === ''} onClick={() => finishTimer(Number(otherMinutes))} type="button"><Check size={14} /></button></label>

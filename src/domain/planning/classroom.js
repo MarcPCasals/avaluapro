@@ -28,6 +28,11 @@ export function getCorrectedActualMinutes({ endedAtMs = Date.now(), endedMinutes
   return seconds > 0 ? Math.round((seconds / 60) * 10) / 10 : null
 }
 
+export function getBackdatedTimerStart({ elapsedMinutes = 0, nowMs = Date.now() }) {
+  const minutes = Math.max(0, Number(elapsedMinutes) || 0)
+  return Number(nowMs) - minutes * 60 * 1000
+}
+
 export function getClassroomStudents(students = [], classId, subgroupId = '') {
   return students
     .filter((student) => student.classId === classId)

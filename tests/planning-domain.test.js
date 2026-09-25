@@ -34,6 +34,7 @@ import {
   getPlanningTotals,
   getNextTimetableDuration,
   getActivityActualComparisons,
+  getBackdatedTimerStart,
   getClassroomPromptState,
   getClassroomEvidenceItems,
   groupParallelSessionBundles,
@@ -462,6 +463,7 @@ test('el temporitzador de Mode aula passa de compte enrere a excés sense so ni 
   assert.equal(overtime.overtimeSeconds, 120)
   assert.equal(overtime.isOvertime, true)
   assert.equal(getCorrectedActualMinutes({ startedAtMs: 1_000, endedAtMs: 721_000, endedMinutesAgo: 2 }), 10)
+  assert.equal(getBackdatedTimerStart({ elapsedMinutes: 7, nowMs: 721_000 }), 301_000)
 })
 
 test('Mode aula avisa cinc minuts abans i filtra exactament el mig grup de la sessió', () => {
