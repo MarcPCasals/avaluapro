@@ -23,6 +23,17 @@ function selectTimetableForDate(timetables = [], dateKey) {
     .sort((left, right) => String(right.effectiveFrom).localeCompare(String(left.effectiveFrom)))[0] || null
 }
 
+function sharedProgrammingRootId(slot, slotsById) {
+  let current = slot
+  const visited = new Set()
+  while (current?.sharedProgrammingSlotId && !visited.has(current.id)) {
+    visited.add(current.id)
+    current = slotsById.get(current.sharedProgrammingSlotId) || current
+    if (visited.has(current.id)) break
+  }
+  return current?.id || slot.id
+}
+
 /**
  * Resumeix el temps real disponible dins d'una UT. Els dies lectius només
  * compten de dilluns a divendres i exclouen els dies complets no lectius. Les
@@ -55,10 +66,14 @@ export function getTemporalUnitProgress({
 
     if (!classId) continue
     const timetable = selectTimetableForDate(timetables, dateKey)
-    const slots = (slotsByTimetableId[timetable?.id] || [])
+    const timetableSlots = slotsByTimetableId[timetable?.id] || []
+    const slotsById = new Map(timetableSlots.map((slot) => [slot.id, slot]))
+    const slots = timetableSlots
       .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday)
-    for (const slot of slots) {
-      if (getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id })) continue
+      .filter((slot) => !getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id }))
+    const logicalSessionIds = new Set(slots.map((slot) => sharedProgrammingRootId(slot, slotsById)))
+    for (const sessionId of logicalSessionIds) {
+      if (!sessionId) continue
       totalSessions += 1
       if (dateKey >= firstRemainingDate) remainingSessions += 1
     }

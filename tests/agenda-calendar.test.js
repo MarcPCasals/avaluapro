@@ -142,7 +142,7 @@ test('les sessions reals de la UT respecten versions d horari, festius i el comp
     slotsByTimetableId: {
       'timetable-1': [
         { id: 'monday-a', classId: 'class-1', weekday: 1 },
-        { id: 'monday-b', classId: 'class-1', weekday: 1 },
+        { id: 'monday-b', classId: 'class-1', sharedProgrammingSlotId: 'monday-a', weekday: 1 },
         { id: 'wednesday', classId: 'class-1', weekday: 3 },
         { id: 'friday', classId: 'class-1', weekday: 5 },
       ],
@@ -152,6 +152,6 @@ test('les sessions reals de la UT respecten versions d horari, festius i el comp
     today: '2026-09-22',
   })
 
-  assert.equal(progress.totalSessions, 2)
+  assert.equal(progress.totalSessions, 1)
   assert.equal(progress.remainingSessions, 0)
 })
