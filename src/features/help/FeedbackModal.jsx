@@ -2,6 +2,7 @@ import { HelpCircle, Lightbulb, Mail, Send, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { isFeedbackAdmin, markFeedbackRead, sendFeedback, subscribeFeedback } from '../../lib/firebase'
+import { subscribeWithSingleTabLeader } from '../../lib/singleTabResource'
 
 const CATEGORY_OPTIONS = [
   { id: 'suggeriment', label: 'Suggeriment', icon: Lightbulb },
@@ -26,8 +27,14 @@ function FeedbackInbox() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState('')
   const [retry, setRetry] = useState(0)
-  useEffect(() => subscribeFeedback(setMessages, () => {
-    setError('No s’ha pogut carregar la bústia. Comprova la connexió i torna-ho a provar.')
+  useEffect(() => subscribeWithSingleTabLeader({
+    onError: () => setError('No s’ha pogut carregar la bústia. Comprova la connexió i torna-ho a provar.'),
+    onPayload: (nextMessages) => {
+      setMessages(nextMessages)
+      setError('')
+    },
+    scope: 'feedback-inbox:admin',
+    start: ({ emit, fail }) => subscribeFeedback(emit, fail),
   }), [retry])
 
   async function handleRead(id) {

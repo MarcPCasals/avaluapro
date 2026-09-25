@@ -72,6 +72,7 @@ import {
   toggleTutorialExemptSubject,
 } from '../../lib/tutorialExemptions'
 import { getUnreadTutoringCoordinationItems } from '../../lib/tutoringCoordination'
+import { subscribeWithSingleTabLeader } from '../../lib/singleTabResource'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
 import PlanningModule from '../planning/PlanningModule'
@@ -4580,21 +4581,26 @@ export function TutoringView() {
     if (!activeClass?.sharedTutoringSpaceId || !cloud.user?.uid) return undefined
     const spaceId = activeClass.sharedTutoringSpaceId
 
-    return subscribeToTutoringSpaceChangeSignals(
-      spaceId,
-      (signals) => {
-        setTutoringChangeSignals(signals)
-        setTutoringChangeSignalsSpaceId(spaceId)
-        setTutoringChangeSignalError({ message: '', spaceId })
-      },
-      () => {
+    return subscribeWithSingleTabLeader({
+      onError: () => {
         setTutoringChangeSignalsSpaceId(spaceId)
         setTutoringChangeSignalError({
           message: 'No s’han pogut comprovar les novetats de la cotutoria.',
           spaceId,
         })
       },
-    )
+      onPayload: (signals) => {
+        setTutoringChangeSignals(signals)
+        setTutoringChangeSignalsSpaceId(spaceId)
+        setTutoringChangeSignalError({ message: '', spaceId })
+      },
+      scope: `tutoring-change-signals:${cloud.user.uid}:${spaceId}`,
+      start: ({ emit, fail }) => subscribeToTutoringSpaceChangeSignals(
+        spaceId,
+        emit,
+        fail,
+      ),
+    })
   }, [activeClass?.sharedTutoringSpaceId, cloud.user?.uid])
   const pendingRemoteTutoringSignals = useMemo(() => {
     if (tutoringChangeSignalsSpaceId !== activeClass?.sharedTutoringSpaceId) return []

@@ -45,6 +45,7 @@ import {
 } from '../lib/firebase'
 import { shouldOpenInternalMessagingListeners } from '../lib/firestoreReadPolicy'
 import { getPendingReminderSummary } from '../lib/reminders'
+import { subscribeWithSingleTabLeader } from '../lib/singleTabResource'
 
 const AgendaRemindersModal = lazy(() =>
   import('../features/agenda/AgendaRemindersModal').then((module) => ({ default: module.AgendaRemindersModal })),
@@ -272,27 +273,51 @@ export function TopBar() {
       return undefined
     }
 
-    const handleError = () => setInternalMessageError('No s’han pogut carregar els missatges. Torna-ho a provar més tard.')
-    const unsubscribeMessages = subscribeInternalMessages(cloud.user.email, (items) => {
-      setInternalMessagesOwnerUid(cloud.user.uid)
-      setInternalMessages(items)
-      setInternalMessageError('')
-    }, handleError)
-    const unsubscribeAnnouncements = subscribeInternalAnnouncements((items) => {
-      setInternalAnnouncementsOwnerUid(cloud.user.uid)
-      setInternalAnnouncements(items)
-      setInternalMessageError('')
-    }, handleError)
-    const unsubscribeState = subscribeInternalMessageState(cloud.user.uid, (messageState) => {
-      setInternalMessageStateOwnerUid(cloud.user.uid)
-      setInternalMessageState(messageState)
-    }, handleError)
-
-    return () => {
-      unsubscribeMessages()
-      unsubscribeAnnouncements()
-      unsubscribeState()
+    const userUid = cloud.user.uid
+    const applyPayload = (payload) => {
+      if (payload?.kind === 'messages') {
+        setInternalMessagesOwnerUid(userUid)
+        setInternalMessages(payload.value || [])
+        setInternalMessageError('')
+      }
+      if (payload?.kind === 'announcements') {
+        setInternalAnnouncementsOwnerUid(userUid)
+        setInternalAnnouncements(payload.value || [])
+        setInternalMessageError('')
+      }
+      if (payload?.kind === 'state') {
+        setInternalMessageStateOwnerUid(userUid)
+        setInternalMessageState(payload.value || {})
+      }
     }
+
+    return subscribeWithSingleTabLeader({
+      getPayloadKey: (payload) => payload?.kind || 'unknown',
+      onError: () => setInternalMessageError('No s’han pogut carregar els missatges. Torna-ho a provar més tard.'),
+      onPayload: applyPayload,
+      scope: `internal-messaging:${userUid}`,
+      start: ({ emit, fail }) => {
+        const unsubscribeMessages = subscribeInternalMessages(
+          cloud.user.email,
+          (items) => emit({ kind: 'messages', value: items }),
+          fail,
+        )
+        const unsubscribeAnnouncements = subscribeInternalAnnouncements(
+          (items) => emit({ kind: 'announcements', value: items }),
+          fail,
+        )
+        const unsubscribeState = subscribeInternalMessageState(
+          userUid,
+          (messageState) => emit({ kind: 'state', value: messageState }),
+          fail,
+        )
+        return () => {
+          unsubscribeMessages()
+          unsubscribeAnnouncements()
+          unsubscribeState()
+        }
+      },
+    })
   }, [cloud.user?.email, cloud.user?.uid, showMessaging])
 
   useEffect(() => {

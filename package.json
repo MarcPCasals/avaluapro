@@ -21,7 +21,7 @@
     "test:shared-sync": "node --test tests/shared-tutoring-sync.test.js",
     "test:coordination": "node --test tests/tutoring-coordination.test.js tests/tutoring-coordination-db.test.js",
     "test:cloud-sync": "node --test tests/cloud-startup.test.js tests/cloud-reconciliation.test.js tests/cloud-sync-diff.test.js tests/cloud-sync-queue.test.js",
-    "test:firestore-budget": "node --test tests/firestore-read-policy.test.js",
+    "test:firestore-budget": "node --test tests/firestore-read-policy.test.js tests/single-tab-resource.test.js",
     "test:security": "npm run test:firestore-budget && npm run test:cloud-sync && npm run test:planning-sync && npm run test:shared-sync && npm run test:coordination && npm run test:retention && npm run test:purge && npm run test:classroom && npm run test:rules"
   },
   "dependencies": {

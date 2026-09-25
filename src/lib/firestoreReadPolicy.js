@@ -4,6 +4,7 @@
  * les proves de pressupost de lectures ho detectin.
  */
 export const FIRESTORE_QUERY_LIMITS = Object.freeze({
+  feedbackMessages: 100,
   internalAnnouncements: 50,
   internalMessages: 200,
   teacherGradePackages: 20,

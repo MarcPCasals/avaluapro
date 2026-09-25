@@ -105,6 +105,7 @@ import {
   getCloudWorkspaceRevision,
 } from '../lib/cloudWorkspaceManifest'
 import { getActiveTutoringListenerSpaceIds } from '../lib/firestoreReadPolicy'
+import { subscribeWithSingleTabLeader } from '../lib/singleTabResource'
 import {
   getCloudStartupAction,
   getCloudWorkspacePreferences,
@@ -794,80 +795,90 @@ async function startTutoringCoordinationSubscriptions(set, get, activeSpaceId = 
     || tutoringCoordinationActiveSpaceId !== spaceIds[0]
   ) return
 
-  spaceIds.forEach((spaceId) => {
-    const unsubscribeItems = subscribeToTutoringCoordinationItems(
-      spaceId,
-      async (remoteItems) => {
-        const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        const pendingItems = pendingOperations
-          .filter((operation) => operation.type === 'item' && operation.spaceId === spaceId)
-          .map((operation) => operation.item)
-        const mergedItems = mergeTutoringCoordinationItems(remoteItems, pendingItems)
-        await replaceTutoringCoordinationCache(user.uid, spaceId, mergedItems)
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        set((current) => ({
-          cloud: {
-            ...current.cloud,
-            tutoringCoordinationError: '',
-            tutoringCoordinationItems: [
-              ...current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId),
-              ...mergedItems,
-            ],
-            tutoringCoordinationStatus: pendingItems.length > 0 ? 'pending' : 'live',
-          },
-        }))
+  const spaceId = spaceIds[0]
+  const applyItems = async (remoteItems) => {
+    const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+    if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
+    const pendingItems = pendingOperations
+      .filter((operation) => operation.type === 'item' && operation.spaceId === spaceId)
+      .map((operation) => operation.item)
+    const mergedItems = mergeTutoringCoordinationItems(remoteItems, pendingItems)
+    await replaceTutoringCoordinationCache(user.uid, spaceId, mergedItems)
+    if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationError: '',
+        tutoringCoordinationItems: [
+          ...current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId),
+          ...mergedItems,
+        ],
+        tutoringCoordinationStatus: pendingItems.length > 0 ? 'pending' : 'live',
       },
-      (error) => {
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        const accessRevoked = String(error?.code || '').includes('permission-denied')
-        if (accessRevoked) replaceTutoringCoordinationCache(user.uid, spaceId, []).catch(() => {})
-        set((current) => ({
-          cloud: {
-            ...current.cloud,
-            tutoringCoordinationError: error.message || 'No s’han pogut rebre els missatges de cotutoria.',
-            tutoringCoordinationItems: accessRevoked
-              ? current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId)
-              : current.cloud.tutoringCoordinationItems,
-            tutoringCoordinationStatus: 'error',
-          },
-        }))
+    }))
+  }
+  const applyMemberStates = async (memberStates) => {
+    const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+    if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
+    const pendingStates = pendingOperations
+      .filter((operation) => operation.type === 'memberState' && operation.spaceId === spaceId)
+      .map((operation) => operation.state)
+    const memberStateByUid = new Map(memberStates.map((item) => [item.uid, item]))
+    pendingStates.forEach((item) => memberStateByUid.set(item.uid, item))
+    await replaceTutoringCoordinationStateCache(user.uid, spaceId, Array.from(memberStateByUid.values()))
+    if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationMemberStates: [
+          ...current.cloud.tutoringCoordinationMemberStates.filter((item) => item.spaceId !== spaceId),
+          ...memberStateByUid.values(),
+        ],
       },
-    )
-    const unsubscribeMemberStates = subscribeToTutoringCoordinationMemberStates(
-      spaceId,
-      async (memberStates) => {
-        const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        const pendingStates = pendingOperations
-          .filter((operation) => operation.type === 'memberState' && operation.spaceId === spaceId)
-          .map((operation) => operation.state)
-        const memberStateByUid = new Map(memberStates.map((item) => [item.uid, item]))
-        pendingStates.forEach((item) => memberStateByUid.set(item.uid, item))
-        await replaceTutoringCoordinationStateCache(user.uid, spaceId, Array.from(memberStateByUid.values()))
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        set((current) => ({
-          cloud: {
-            ...current.cloud,
-            tutoringCoordinationMemberStates: [
-              ...current.cloud.tutoringCoordinationMemberStates.filter((item) => item.spaceId !== spaceId),
-              ...memberStateByUid.values(),
-            ],
-          },
-        }))
+    }))
+  }
+  const handleSubscriptionError = (error) => {
+    if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
+    const accessRevoked = String(error?.code || '').includes('permission-denied')
+    if (accessRevoked) replaceTutoringCoordinationCache(user.uid, spaceId, []).catch(() => {})
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationError: error.message || 'No s’han pogut rebre les novetats de cotutoria.',
+        tutoringCoordinationItems: accessRevoked
+          ? current.cloud.tutoringCoordinationItems.filter((item) => item.spaceId !== spaceId)
+          : current.cloud.tutoringCoordinationItems,
+        tutoringCoordinationStatus: 'error',
       },
-      (error) => {
-        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
-        set((current) => ({
-          cloud: {
-            ...current.cloud,
-            tutoringCoordinationError: error.message || 'No s’ha pogut actualitzar l’estat de lectura.',
-          },
-        }))
-      },
-    )
-    tutoringCoordinationUnsubscribers.push(unsubscribeItems, unsubscribeMemberStates)
+    }))
+  }
+
+  const stopSharedSubscription = subscribeWithSingleTabLeader({
+    getPayloadKey: (payload) => payload?.kind || 'unknown',
+    onError: handleSubscriptionError,
+    onPayload: (payload) => {
+      if (payload?.kind === 'items') applyItems(payload.value || []).catch(handleSubscriptionError)
+      if (payload?.kind === 'memberStates') applyMemberStates(payload.value || []).catch(handleSubscriptionError)
+    },
+    scope: `tutoring-coordination:${user.uid}:${spaceId}`,
+    start: ({ emit, fail }) => {
+      const unsubscribeItems = subscribeToTutoringCoordinationItems(
+        spaceId,
+        (remoteItems) => emit({ kind: 'items', value: remoteItems }),
+        fail,
+      )
+      const unsubscribeMemberStates = subscribeToTutoringCoordinationMemberStates(
+        spaceId,
+        (memberStates) => emit({ kind: 'memberStates', value: memberStates }),
+        fail,
+      )
+      return () => {
+        unsubscribeItems()
+        unsubscribeMemberStates()
+      }
+    },
   })
+  tutoringCoordinationUnsubscribers.push(stopSharedSubscription)
 
   ensureTutoringCoordinationOnlineListener(set, get)
   await flushTutoringCoordinationOutbox(set, get)

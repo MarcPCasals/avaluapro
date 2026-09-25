@@ -325,13 +325,22 @@ La capa de listeners globals també queda aplicada:
 - l’estat de lectura i els avisos acceptats de cotutoria també es desen localment, de manera que treure els listeners globals no crea falsos avisos després de recarregar;
 - els formularis sociomètrics, els senyals de canvi, el feedback i la resta de listeners revisats ja depenen de pantalles o panells oberts.
 
+El lideratge entre pestanyes completa aquest bloc:
+
+- cada recurs en temps real té una única pestanya líder per navegador i compte;
+- la pestanya líder distribueix les novetats a les altres mitjançant `BroadcastChannel`, sense crear una base paral·lela;
+- en tancar-se la pestanya líder, una altra pren el relleu automàticament i torna a obrir la font;
+- la missatgeria, la coordinació de cotutoria, els senyals de canvi, les respostes de formularis tutorials i la bústia de suggeriments comparteixen així una única font o conjunt de listeners per recurs;
+- si el navegador no permet aquesta coordinació, es conserva el funcionament anterior per no deixar cap pantalla sense actualitzar;
+- els tres recomptes petits de la campana es reutilitzen durant trenta segons entre pestanyes i s'invaliden quan es marquen missatges o avisos com a llegits.
+
 La protecció de la versió d'Agenda i Programació també queda desacoblada de la navegació:
 
 - la còpia «pre actualització» continua intentant-se i mostrant el seu estat;
 - Agenda i Programació no desapareixen ni expulsen el docent mentre la còpia es prepara o necessita revisió;
 - la comprovació d'una còpia antiga consulta com a màxim una capçalera pel seu motiu estable, en lloc de rellegir fins a cent còpies a cada inici.
 
-Amb tres cotutories compartides, l’arrencada passa de sis listeners de coordinació a zero. En obrir-ne una en manté dos, independentment del nombre total d’espais compartits. Encara queda pendent el lideratge explícit d’una sola pestanya per evitar que dues pestanyes obertes al mateix mòdul dupliquin aquestes connexions sota demanda.
+Amb tres cotutories compartides, l’arrencada passa de sis listeners de coordinació a zero. En obrir-ne una es mantenen dos listeners per navegador i espai actiu, independentment del nombre total d’espais compartits o de pestanyes obertes al mateix mòdul.
 
 ## 9. Capacitat del pla gratuït
 

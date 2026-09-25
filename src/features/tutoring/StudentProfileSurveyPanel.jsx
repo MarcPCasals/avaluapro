@@ -33,6 +33,7 @@ import {
   updateStudentProfileSurveyResponse,
   updateStudentProfileSurveyStatus,
 } from '../../lib/firebase'
+import { subscribeWithSingleTabLeader } from '../../lib/singleTabResource'
 import { StudentProfilePublicForm } from './StudentProfilePublicForm'
 import {
   STUDENT_PROFILE_FORM_VERSION,
@@ -566,16 +567,18 @@ export function StudentProfileSurveyPanel({ activeClass, classStudents, cloud, o
   }, [cloud.user?.uid, surveyClassIds])
 
   useEffect(() => {
-    if (!selectedSurvey?.id) return undefined
-    return subscribeToStudentProfileSurveyResponses(
-      selectedSurvey.id,
-      (nextResponses) => {
+    if (!selectedSurvey?.id || !cloud.user?.uid) return undefined
+    const surveyId = selectedSurvey.id
+    return subscribeWithSingleTabLeader({
+      onError: (error) => setMessage(error.message || 'No s’han pogut carregar les respostes.'),
+      onPayload: (nextResponses) => {
         setResponses(nextResponses)
-        setLoadedResponsesSurveyId(selectedSurvey.id)
+        setLoadedResponsesSurveyId(surveyId)
       },
-      (error) => setMessage(error.message || 'No s’han pogut carregar les respostes.'),
-    )
-  }, [selectedSurvey?.id])
+      scope: `student-profile-responses:${cloud.user.uid}:${surveyId}`,
+      start: ({ emit, fail }) => subscribeToStudentProfileSurveyResponses(surveyId, emit, fail),
+    })
+  }, [cloud.user?.uid, selectedSurvey?.id])
 
   useEffect(() => {
     if (

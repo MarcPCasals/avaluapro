@@ -955,6 +955,7 @@ export function subscribeToStudentProfileSurveyResponses(surveyId, onChange, onE
   return onSnapshot(
     responsesQuery,
     (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.studentProfileResponses', snapshot)
       onChange?.(snapshot.docs.map((snapshotDoc) => {
         const value = snapshotDoc.data()
         return {
@@ -2186,6 +2187,7 @@ export function subscribeToTutoringSpaceChangeSignals(spaceId, onChange, onError
   return onSnapshot(
     collection(db, 'tutoringSpaces', spaceId, 'changeSignals'),
     (snapshot) => {
+      recordFirestoreListenerSnapshot('listener.tutoringChangeSignals', snapshot)
       onChange?.(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() })))
     },
     onError,
@@ -2236,7 +2238,12 @@ export async function sendFeedback({ category, message, name }) {
 }
 
 export function subscribeFeedback(onMessages, onError) {
-  return onSnapshot(query(collection(db, 'feedbackMessages'), orderBy('createdAt', 'desc')), (snapshot) => {
+  return onSnapshot(query(
+    collection(db, 'feedbackMessages'),
+    orderBy('createdAt', 'desc'),
+    limit(FIRESTORE_QUERY_LIMITS.feedbackMessages),
+  ), (snapshot) => {
+    recordFirestoreListenerSnapshot('listener.feedbackInbox', snapshot)
     onMessages(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })))
   }, onError)
 }
@@ -2303,9 +2310,53 @@ export function subscribeInternalMessageState(userUid, callback, onError) {
  * globals oberts. Cada recompte agregat costa només la lectura mínima de la
  * consulta mentre no superi els primers 1.000 índexs.
  */
+const INTERNAL_ATTENTION_CACHE_TTL_MS = 30 * 1000
+
+function getInternalAttentionCacheKey(userUid) {
+  return `avaluapro-internal-attention:${userUid}`
+}
+
+function readInternalAttentionCache(userUid, now = Date.now()) {
+  if (typeof window === 'undefined' || !userUid) return null
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(getInternalAttentionCacheKey(userUid)) || 'null')
+    if (!cached || cached.expiresAt <= now) return null
+    return {
+      unreadAnnouncements: Number(cached.unreadAnnouncements) || 0,
+      unreadMessages: Number(cached.unreadMessages) || 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeInternalAttentionCache(userUid, summary, now = Date.now()) {
+  if (typeof window === 'undefined' || !userUid) return
+  try {
+    window.localStorage.setItem(getInternalAttentionCacheKey(userUid), JSON.stringify({
+      ...summary,
+      expiresAt: now + INTERNAL_ATTENTION_CACHE_TTL_MS,
+    }))
+  } catch {
+    // Els recomptes són una ajuda visual; si no hi ha emmagatzematge, la
+    // consulta remota continua funcionant com abans.
+  }
+}
+
+function clearInternalAttentionCache(userUid) {
+  if (typeof window === 'undefined' || !userUid) return
+  try {
+    window.localStorage.removeItem(getInternalAttentionCacheKey(userUid))
+  } catch {
+    // No cal bloquejar el canvi de lectura per una memòria local indisponible.
+  }
+}
+
 export async function loadInternalMessageAttentionSummary(userUid, userEmail) {
   const cleanEmail = normalizeEmail(userEmail)
   if (!userUid || !cleanEmail) return { unreadAnnouncements: 0, unreadMessages: 0 }
+  const cached = readInternalAttentionCache(userUid)
+  if (cached) return cached
 
   const [messageStateSnapshot, unreadMessagesSnapshot] = await Promise.all([
     getDocFromServer(getInternalMessageStateDocRef(userUid)),
@@ -2326,10 +2377,12 @@ export async function loadInternalMessageAttentionSummary(userUid, userEmail) {
   const unreadAnnouncementsSnapshot = await getCountFromServer(announcementQuery)
   recordFirestoreLookup('shell.internalUnreadAnnouncements')
 
-  return {
+  const summary = {
     unreadAnnouncements: unreadAnnouncementsSnapshot.data().count,
     unreadMessages: unreadMessagesSnapshot.data().count,
   }
+  writeInternalAttentionCache(userUid, summary)
+  return summary
 }
 
 export async function sendInternalMessage({ message, recipientEmail, user }) {
@@ -2380,6 +2433,7 @@ export async function markInternalMessagesRead(messages, user) {
     })
     await batch.commit()
   }
+  clearInternalAttentionCache(user.uid)
 }
 
 export async function sendInternalAnnouncement({ message, user }) {
@@ -2390,13 +2444,15 @@ export async function sendInternalAnnouncement({ message, user }) {
   if (!body) throw new Error('Escriu una novetat abans d’enviar-la.')
   if (body.length > 2000) throw new Error('La novetat no pot superar els 2.000 caràcters.')
 
-  return addDoc(collection(db, 'internalAnnouncements'), cleanForFirestore({
+  const result = await addDoc(collection(db, 'internalAnnouncements'), cleanForFirestore({
     body,
     createdAt: serverTimestamp(),
     senderEmail: user.email,
     senderName: user.displayName || 'Marc Pérez Casals',
     senderUid: user.uid,
   }))
+  clearInternalAttentionCache(user.uid)
+  return result
 }
 
 export async function markInternalAnnouncementsRead(user) {
@@ -2406,6 +2462,7 @@ export async function markInternalAnnouncementsRead(user) {
     { announcementsReadAt: serverTimestamp() },
     { merge: true },
   )
+  clearInternalAttentionCache(user.uid)
 }
 
 // Els mòduls de dades nous comparteixen aquesta instància per evitar crear una
