@@ -803,69 +803,160 @@ export function buildAgendaRecoveryReflow({
   }
 }
 
-/**
- * Substitueix un fragment futur de l'Agenda i torna a compactar tota la
- * cronologia posterior. Així, quan se'n redueix la durada, el contingut de la
- * sessió següent retrocedeix per omplir els minuts alliberats; si augmenta,
- * l'efecte dominó continua cap endavant. La UP original no es modifica.
- */
-export function buildAgendaItemChangeReflow({
+function buildAgendaItemsReflow({
   application,
   candidates = [],
   changes = {},
   existingSessionBundles = [],
   options = {},
-  targetItemId,
+  targetItemId = '',
   targetSessionId,
 }) {
   const applicationBundles = existingSessionBundles
     .filter((bundle) => bundle?.session?.applicationId === application?.id)
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const targetBundle = applicationBundles.find((bundle) => bundle.session.id === targetSessionId)
-  const targetItemIndex = targetBundle?.items.findIndex((item) => item.id === targetItemId) ?? -1
-  const targetItem = targetItemIndex >= 0 ? targetBundle.items[targetItemIndex] : null
-  if (!targetBundle || !targetItem?.sourceActivityId) {
+  if (!targetBundle) throw new Error('No s’ha trobat la sessió que vols reajustar.')
+  const targetDate = String(targetBundle.session.startsAt).slice(0, 10)
+  if (!canReflowSession(targetBundle, targetDate)) {
+    throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
+  }
+  const reflowableBundles = applicationBundles.filter((bundle) =>
+    bundle.session.startsAt >= targetBundle.session.startsAt && canReflowSession(bundle, targetDate))
+  const logicalGroups = groupParallelSessionBundles(reflowableBundles)
+  const targetGroup = logicalGroups.find((group) =>
+    group.bundles.some((bundle) => bundle.session.id === targetSessionId))
+  const physicalTarget = targetGroup?.bundles.find((bundle) => bundle.session.id === targetSessionId)
+  const targetItemIndex = targetItemId
+    ? physicalTarget?.items.findIndex((item) => item.id === targetItemId) ?? -1
+    : -1
+  const targetItem = targetItemIndex >= 0 ? physicalTarget.items[targetItemIndex] : null
+  if (targetItemId && !targetItem?.sourceActivityId) {
     throw new Error('No s’ha trobat el fragment que vols reajustar.')
   }
-  const minutes = Number(changes.plannedMinutes)
-  if (!Number.isFinite(minutes) || minutes <= 0) {
+  const minutes = targetItem ? Number(changes.plannedMinutes) : null
+  if (targetItem && (!Number.isFinite(minutes) || minutes <= 0)) {
     throw new Error('Cal indicar una durada superior a zero minuts.')
   }
 
-  const targetParallelGroup = groupParallelSessionBundles(applicationBundles)
-    .find((group) => group.bundles.some((bundle) => bundle.session.id === targetSessionId))
-  const removedTargetItems = []
-  const adjustedBundles = applicationBundles.map((bundle) => {
-    if (!targetParallelGroup?.bundles.some((candidate) => candidate.session.id === bundle.session.id)) {
-      return bundle
-    }
-    const counterpart = bundle.items[targetItemIndex]
-    if (!counterpart || counterpart.sourceActivityId !== targetItem.sourceActivityId) return bundle
-    removedTargetItems.push(counterpart)
-    return { ...bundle, items: bundle.items.filter((_, index) => index !== targetItemIndex) }
+  const activityMeta = new Map()
+  const activities = []
+  logicalGroups.forEach((group, groupIndex) => {
+    const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
+    representativeItems.forEach((item, itemIndex) => {
+      const key = `agenda-reflow:${groupIndex}:${itemIndex}:${item.id}`
+      const isTarget = group === targetGroup && itemIndex === targetItemIndex
+      const title = isTarget ? String(changes.title || item.title).trim() || item.title : item.title
+      activityMeta.set(key, {
+        sourceActivityId: item.sourceActivityId || null,
+        title,
+        type: item.type || 'activity',
+      })
+      activities.push({
+        id: key,
+        plannedMinutes: isTarget ? minutes : item.plannedMinutes,
+        title,
+        type: item.type || 'activity',
+      })
+    })
   })
-  const replacement = {
-    ...targetItem,
-    plannedMinutes: minutes,
-    segmentIndex: Math.max(0, (Number(targetItem.segmentIndex) || 1) - 1),
-    title: String(changes.title || targetItem.title).trim() || targetItem.title,
-  }
-  const preview = buildAgendaRecoveryReflow({
+
+  const distribution = buildActivitySessionDistribution({
+    activities,
     application,
     candidates,
-    existingSessionBundles: adjustedBundles,
+    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
     options,
-    recoveryItem: replacement,
-    recoveryMinutes: minutes,
-    targetSessionId,
   })
-  return {
-    ...preview,
-    editedItem: targetItem,
-    kind: 'agenda-item-change',
-    removedItems: [...removedTargetItems, ...preview.removedItems],
-    replacedItemCount: preview.replacedItemCount + removedTargetItems.length,
+  const provisionalSessions = distribution.sessions.map((bundle) => ({
+    ...bundle,
+    items: bundle.items.map((item) => {
+      const meta = activityMeta.get(item.sourceActivityId)
+      return createSessionItem({
+        ...item,
+        sourceActivityId: meta?.sourceActivityId || null,
+        title: meta?.title || item.title,
+        type: meta?.type || item.type,
+      }, options)
+    }),
+  }))
+  const lockedBundles = applicationBundles.filter((bundle) => !reflowableBundles.includes(bundle))
+  const segmentOffsetByActivityId = {}
+  for (const group of groupParallelSessionBundles(lockedBundles.filter((bundle) =>
+    !['cancelled', 'notHeld'].includes(bundle.session.status)))) {
+    for (const item of group.bundles[0]?.items || []) {
+      if (!item.sourceActivityId) continue
+      segmentOffsetByActivityId[item.sourceActivityId] = Math.max(
+        segmentOffsetByActivityId[item.sourceActivityId] || 0,
+        Number(item.segmentIndex) || 0,
+      )
+    }
   }
+  const logicalNewCountByActivityId = {}
+  for (const group of groupParallelSessionBundles(provisionalSessions)) {
+    for (const item of group.bundles[0]?.items || []) {
+      if (!item.sourceActivityId) continue
+      logicalNewCountByActivityId[item.sourceActivityId] =
+        (logicalNewCountByActivityId[item.sourceActivityId] || 0) + 1
+    }
+  }
+  const totalCountByActivityId = Object.fromEntries(Object.entries(logicalNewCountByActivityId)
+    .map(([sourceActivityId, count]) => [
+      sourceActivityId,
+      (segmentOffsetByActivityId[sourceActivityId] || 0) + count,
+    ]))
+  const nextIndexByActivityId = { ...segmentOffsetByActivityId }
+  const segmentByItemId = new Map()
+  for (const group of groupParallelSessionBundles(provisionalSessions)) {
+    ;(group.bundles[0]?.items || []).forEach((item, itemIndex) => {
+      if (!item.sourceActivityId) return
+      const segmentIndex = (nextIndexByActivityId[item.sourceActivityId] || 0) + 1
+      nextIndexByActivityId[item.sourceActivityId] = segmentIndex
+      for (const physicalBundle of group.bundles) {
+        const physicalItem = physicalBundle.items[itemIndex]
+        if (physicalItem) segmentByItemId.set(physicalItem.id, segmentIndex)
+      }
+    })
+  }
+  const sessions = provisionalSessions.map((bundle) => ({
+    ...bundle,
+    items: bundle.items.map((item) => !item.sourceActivityId ? item : createSessionItem({
+      ...item,
+      segmentCount: totalCountByActivityId[item.sourceActivityId],
+      segmentIndex: segmentByItemId.get(item.id),
+    }, options)),
+  }))
+  const changedLockedItems = lockedBundles.flatMap((bundle) => bundle.items || [])
+    .filter((item) => item.sourceActivityId && totalCountByActivityId[item.sourceActivityId])
+    .filter((item) => Number(item.segmentCount) !== totalCountByActivityId[item.sourceActivityId])
+    .map((item) => createSessionItem({
+      ...item,
+      segmentCount: totalCountByActivityId[item.sourceActivityId],
+    }, options))
+  const usedSessionIds = new Set(sessions.map((bundle) => bundle.session.id))
+  return {
+    ...distribution,
+    changedLockedItems,
+    changedTargetResults: [],
+    editedItem: targetItem,
+    removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedSessions: reflowableBundles.map((bundle) => bundle.session)
+      .filter((session) => !usedSessionIds.has(session.id)),
+    replacedItemCount: reflowableBundles.reduce((total, bundle) =>
+      total + (bundle.items || []).length, 0),
+    sessions,
+    targetBundle,
+  }
+}
+
+/** Substitueix un fragment futur i compacta tota la cronologia posterior. */
+export function buildAgendaItemChangeReflow(input) {
+  return { ...buildAgendaItemsReflow(input), kind: 'agenda-item-change' }
+}
+
+/** Omple els buits d'una sessió futura avançant el contingut posterior. */
+export function buildAgendaSessionCompaction(input) {
+  return { ...buildAgendaItemsReflow(input), kind: 'agenda-compaction' }
 }
 
 export function getSessionCandidateKey(candidate) {

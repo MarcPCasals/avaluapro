@@ -93,7 +93,7 @@ function ActivityReviewDialog({ item, onClose, onSave, result }) {
       <label>Temps real (min)<input min="0.1" step="0.1" type="number" value={values.actualMinutes} onChange={(event) => setValues({ ...values, actualMinutes: event.target.value })} /></label>
       <label>Recomanació<select value={values.improvementRecommendation} onChange={(event) => setValues({ ...values, improvementRecommendation: event.target.value })}><option value="">Sense recomanació</option><option value="keep">Conservar</option><option value="modify">Modificar</option><option value="remove">Retirar</option></select></label>
     </div>
-    <label>Comentari d’aplicació<textarea rows="2" value={values.applicationComment} onChange={(event) => setValues({ ...values, applicationComment: event.target.value })} /></label>
+    <label>Comentari d’aplicació <span>s’afegirà també a l’activitat de la UP</span><textarea rows="2" value={values.applicationComment} onChange={(event) => setValues({ ...values, applicationComment: event.target.value })} /></label>
     <label>Reflexió pedagògica <span>visible per direcció</span><textarea rows="2" value={values.pedagogicalReflection} onChange={(event) => setValues({ ...values, pedagogicalReflection: event.target.value })} /></label>
     <label>Materials que han faltat <span>un per línia</span><textarea rows="2" value={values.missingMaterials} onChange={(event) => setValues({ ...values, missingMaterials: event.target.value })} /></label>
     {measures.length > 0 && <fieldset><legend>Adaptacions que han funcionat</legend>{measures.map((measure) => <label key={measure.id}><input checked={values.usefulAdaptationIds.includes(measure.id)} onChange={(event) => setValues((current) => ({ ...current, usefulAdaptationIds: event.target.checked ? [...current.usefulAdaptationIds, measure.id] : current.usefulAdaptationIds.filter((id) => id !== measure.id) }))} type="checkbox" />{measure.label}</label>)}</fieldset>}
@@ -221,6 +221,30 @@ function ClassroomTimelineItem({ active, item, position, result, onSelect }) {
   )
 }
 
+function ClassroomTimingProposalDialog({ actualMinutes, activity, onApply, onKeep }) {
+  const titleId = useId()
+  const dialogRef = useDialogAccessibility(onKeep)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const apply = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await onApply()
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut actualitzar la UP.')
+      setSaving(false)
+    }
+  }
+  return <div className="classroom-close-backdrop"><section aria-labelledby={titleId} aria-modal="true" className="classroom-review-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
+    <header><span><Clock3 size={20} /></span><div><small>Temps real de Mode aula</small><h2 id={titleId}>Vols ajustar la programació?</h2></div></header>
+    <div className="classroom-timing-comparison"><span><small>Previst a la UP</small><strong>{activity.plannedMinutes} min</strong></span><ArrowRight size={20} /><span><small>Temps real</small><strong>{actualMinutes} min</strong></span></div>
+    <p>«{activity.title}» ha tingut una durada diferent. Pots actualitzar ara la UP perquè la pròxima calendarització parteixi del teu ritme real.</p>
+    {error && <p className="classroom-review-error" role="alert">{error}</p>}
+    <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onKeep} type="button">Mantenir {activity.plannedMinutes} min</button><button className="primary-action" disabled={saving} onClick={apply} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Clock3 size={16} />}Actualitzar la UP a {actualMinutes} min</button></div>
+  </section></div>
+}
+
 export function ClassroomMode({
   absenceRecords,
   agendaNotes = [],
@@ -229,6 +253,7 @@ export function ClassroomMode({
   classes,
   onActivateEvidence,
   onAddBehavior,
+  onApplyTimingToPlanning,
   onCancelRecovery,
   onCloseSession,
   onContinue,
@@ -260,6 +285,7 @@ export function ClassroomMode({
   const [projectionMode, setProjectionMode] = useState(false)
   const [closeReview, setCloseReview] = useState(false)
   const [reviewItem, setReviewItem] = useState(null)
+  const [timingProposal, setTimingProposal] = useState(null)
   const [recoveryDraft, setRecoveryDraft] = useState(null)
   const [selectedStudentIds, setSelectedStudentIds] = useState([])
   const [behaviorKind, setBehaviorKind] = useState('incident')
@@ -374,7 +400,16 @@ export function ClassroomMode({
       const nextBundle = { ...currentBundle, results: replaceResult(currentBundle.results, result) }
       setCurrentBundle(nextBundle)
       await onActivateEvidence(nextBundle, currentItem)
-      advance()
+      const actualMinutes = Number(changes.actualMinutes)
+      const programmedMinutes = Number(currentItem.sourceActivity?.plannedMinutes)
+      if (Number.isFinite(actualMinutes) && actualMinutes > 0
+        && Number.isFinite(programmedMinutes) && programmedMinutes > 0
+        && Math.abs(actualMinutes - programmedMinutes) >= 0.5
+        && onApplyTimingToPlanning) {
+        setTimingProposal({ actualMinutes, advanceAfter: true, item: currentItem })
+      } else {
+        advance()
+      }
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut desar el resultat de l’activitat.')
     } finally {
@@ -389,6 +424,29 @@ export function ClassroomMode({
       startedAtMs: timerStartedAt,
     })
     await saveResult({ actualMinutes, status: 'completed' })
+  }
+
+  const keepProgrammedTiming = () => {
+    const shouldAdvance = timingProposal.advanceAfter
+    setTimingProposal(null)
+    if (shouldAdvance) advance()
+  }
+
+  const applyRealTimingToPlanning = async () => {
+    const activity = await onApplyTimingToPlanning(
+      currentBundle,
+      timingProposal.item,
+      timingProposal.actualMinutes,
+    )
+    setCurrentBundle((current) => ({
+      ...current,
+      items: current.items.map((item) => item.sourceActivityId === activity.id
+        ? { ...item, sourceActivity: activity }
+        : item),
+    }))
+    const shouldAdvance = timingProposal.advanceAfter
+    setTimingProposal(null)
+    if (shouldAdvance) advance()
   }
 
   const confirmAttendance = async () => {
@@ -439,6 +497,14 @@ export function ClassroomMode({
   const saveReview = async (item, changes) => {
     const result = await onSaveResult(currentBundle, item, changes)
     setCurrentBundle((current) => ({ ...current, results: replaceResult(current.results, result) }))
+    const actualMinutes = Number(changes.actualMinutes)
+    const programmedMinutes = Number(item.sourceActivity?.plannedMinutes)
+    if (Number.isFinite(actualMinutes) && actualMinutes > 0
+      && Number.isFinite(programmedMinutes) && programmedMinutes > 0
+      && Math.abs(actualMinutes - programmedMinutes) >= 0.5
+      && onApplyTimingToPlanning) {
+      setTimingProposal({ actualMinutes, advanceAfter: false, item })
+    }
     // El resum final ha de reflectir immediatament l'última reflexió escrita a
     // Revisar; així no la substitueix per un camp antic quan es tanca la classe.
     if (Object.prototype.hasOwnProperty.call(changes, 'pedagogicalReflection')) {
@@ -684,6 +750,7 @@ export function ClassroomMode({
 
       {closeReview && <ClassroomCloseReviewDialog attendanceConfirmed={Boolean(currentBundle.session.attendanceConfirmedAt)} attendanceIssueCount={attendanceIssueIds.size} attendanceIssueDetail={attendanceIssueDetail} busy={busy === 'close'} className={classItem?.name} onClose={() => setCloseReview(false)} onConfirm={closeSession} pendingTaskCount={pendingTaskRecords.length} reminderCount={reminderCount} sessionTime={String(currentBundle.session.startsAt).slice(11, 16)} setSummaryPrivateNote={setSummaryPrivateNote} setSummaryReflection={setSummaryReflection} showNotes={!currentBundle.standalone} summaryPrivateNote={summaryPrivateNote} summaryReflection={summaryReflection} />}
       {reviewItem && <ActivityReviewDialog item={reviewItem} onClose={() => setReviewItem(null)} onSave={(changes) => saveReview(reviewItem, changes)} result={currentBundle.results.find((result) => result.sessionItemId === reviewItem.id)} />}
+      {timingProposal && <ClassroomTimingProposalDialog actualMinutes={timingProposal.actualMinutes} activity={timingProposal.item.sourceActivity} onApply={applyRealTimingToPlanning} onKeep={keepProgrammedTiming} />}
       {recoveryDraft && <RecoveryDialog bundle={currentBundle} existing={recoveryDraft.existing} kind={recoveryDraft.kind} nextSession={recoveryDraft.nextSession} onClose={() => setRecoveryDraft(null)} onSave={saveRecovery} student={recoveryDraft.student} />}
     </section>
   )

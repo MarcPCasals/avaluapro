@@ -187,6 +187,12 @@
 .classroom-review-dialog > header > span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; color: #7c3aed; background: #ede9fe; }
 .classroom-review-dialog > header small { color: #8b5cf6; font-size: 8px; font-weight: 950; letter-spacing: .07em; text-transform: uppercase; }
 .classroom-review-dialog h2 { margin: 1px 0 0; color: #263247; font-size: 18px; }
+.classroom-review-dialog > p { margin: 0; color: #64748b; font-size: 10px; font-weight: 700; line-height: 1.55; }
+.classroom-timing-comparison { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; border-radius: 12px; padding: 14px; background: #f8fafc; }
+.classroom-timing-comparison span { display: grid; gap: 3px; }
+.classroom-timing-comparison small { color: #94a3b8; font-size: 8px; font-weight: 900; text-transform: uppercase; }
+.classroom-timing-comparison strong { color: #263247; font-size: 22px; }
+.classroom-timing-comparison svg { color: #f97316; }
 .classroom-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .classroom-review-dialog fieldset { display: flex; flex-wrap: wrap; gap: 7px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
 .classroom-review-dialog legend { padding: 0 4px; color: #64748b; font-size: 8px; font-weight: 900; }

@@ -14,10 +14,10 @@ function dateLabel(startsAt) {
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
 }
 
-export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom }) {
+export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onResolveGap }) {
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-session-dialog" size="lg" title="Detall de la sessió">
-      <AgendaSessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} />
+      <AgendaSessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
     </Modal>
   )
 }

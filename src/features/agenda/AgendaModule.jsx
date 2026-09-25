@@ -686,6 +686,17 @@ export default function AgendaModule() {
     setAdjustItemId(item?.id || '')
     setDialog('session-adjust')
   }
+  const resolveSessionGap = async (bundle) => {
+    try {
+      await workspace.compactAgendaSession(bundle)
+      setScheduleNotice('Buit resolt: la cronologia futura s’ha compactat automàticament.')
+      await reloadActiveView()
+      return true
+    } catch (error) {
+      workspace.setError(error.message || 'No s’ha pogut omplir el temps lliure de la sessió.')
+      return false
+    }
+  }
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, includeDetails: false, to: addDateDays(weekStart, 4) })
   const reloadActiveView = () => {
     if (view === 'timeline') return workspace.loadSessionRange({
@@ -853,6 +864,7 @@ export default function AgendaModule() {
         onContinue={(bundle, item) => adjustSession(bundle, 'continuation', item)}
         onActivateEvidence={activateClassroomEvidence}
         onAddBehavior={addBehaviorEvent}
+        onApplyTimingToPlanning={activeBundle.standalone ? null : workspace.applyClassroomTimingToPlanning}
         onExit={exitClassroom}
         onFindNextSession={findNextClassroomSession}
         onSaveRecovery={registerClassroomRecovery}
@@ -912,7 +924,7 @@ export default function AgendaModule() {
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'reminders' && <RemindersModal focusedReminderIds={focusedReminderIds} onClose={() => { setDialog(null); setFocusedReminderIds([]) }} sessionOptions={reminderSessionOptions} sessionOptionsLoading={workspace.sessionsLoading} />}
       {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { const sessionCount = result.logicalSessionCount ?? result.sessionCount; setScheduleNotice(result.reflowed ? `${sessionCount} ${sessionCount === 1 ? 'sessió futura reorganitzada' : 'sessions futures reorganitzades'} amb l’efecte dominó.` : `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
-      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} />}
+      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} onResolveGap={resolveSessionGap} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>
   )

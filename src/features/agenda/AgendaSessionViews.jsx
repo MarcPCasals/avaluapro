@@ -1,10 +1,10 @@
 import {
-  ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
+  AlertTriangle, ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
   ExternalLink, History, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
-import { getClassroomPromptState, groupParallelSessionBundles } from '../../domain/planning'
+import { getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -98,9 +98,11 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.filter((item) => item?.url).map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom }) {
+function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onResolveGap }) {
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
+  const sessionLoad = getSessionLoad(bundle.items, bundle.session.durationMinutes)
+  const freeMinutes = Math.max(0, sessionLoad.programmableMinutes - sessionLoad.plannedMinutes)
   const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
   return (
     <div className="agenda-session-detail">
@@ -110,6 +112,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         <span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span>
       </header>
       {blockingEvent && <div className="agenda-session-calendar-blocked"><Moon size={18} /><div><strong>{blockingEvent.title}</strong><span>{CALENDAR_EVENT_LABELS[blockingEvent.type] || 'Canvi de calendari'} · aquesta sessió no es fa.</span>{blockingEvent.reason && <p>{blockingEvent.reason}</p>}</div></div>}
+      {!blockingEvent && bundle.session.status === 'planned' && freeMinutes > 0 && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{freeMinutes} min programables sense ocupar</strong><span>Pots avançar la propera activitat i, si cal, dividir-la per completar els {sessionLoad.programmableMinutes} minuts.</span></div>{onResolveGap && <button className="secondary-action compact" onClick={() => onResolveGap(bundle)} type="button"><ArrowLeft size={14} />Avançar la propera activitat</button>}</div>}
       <div className="agenda-session-activities">
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
         {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
@@ -405,9 +408,13 @@ export function AgendaMonthView({ academicYear, bundles, calendarEvents, coordin
 function TimelineRows({ calendarEvents, groups, onOpenSession }) {
   return <div className="agenda-timeline-list">{groups.flatMap((group) => group.bundles.map((bundle) => {
     const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
+    const load = bundle.detailsLoaded === false ? null : getSessionLoad(bundle.items, bundle.session.durationMinutes)
+    const freeMinutes = load && bundle.session.status === 'planned'
+      ? Math.max(0, load.programmableMinutes - load.plannedMinutes)
+      : 0
     const activitySummary = bundle.items.map((item) => item.title).join(' · ')
       || (bundle.detailsLoaded === false ? 'Obre per veure les activitats' : 'Sessió sense activitats')
-    return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}{group.isParallel ? ' · mateixa sessió de mig grup' : ''}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : activitySummary}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
+    return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}{group.isParallel ? ' · mateixa sessió de mig grup' : ''}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : activitySummary}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : freeMinutes > 0 ? 'underfilled' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : freeMinutes > 0 ? `${freeMinutes} min lliures` : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
   }))}</div>
 }
 
@@ -452,6 +459,6 @@ export function AgendaTimelineView({
   )
 }
 
-export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom }) {
-  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} />
+export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onResolveGap }) {
+  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onResolveGap={onResolveGap} />
 }

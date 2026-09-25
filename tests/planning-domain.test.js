@@ -4,6 +4,7 @@ import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
   buildAgendaItemChangeReflow,
+  buildAgendaSessionCompaction,
   applyImprovementProposals,
   buildAgendaRecoveryReflow,
   buildActivityImprovementProposals,
@@ -1125,6 +1126,43 @@ test('reduir un fragment omple el buit amb l’activitat següent i compacta la 
   assert.deepEqual(result.sessions[1].items.map((item) => [item.title, item.plannedMinutes]), [
     ['Situació competencial', 30],
   ])
+  assert.equal(result.unscheduled.length, 0)
+})
+
+test('un avís de sessió incompleta avança i divideix la propera activitat fins als 55 minuts', () => {
+  const application = createGroupApplication({
+    id: 'application-gap', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const firstSession = createCalendarSession({
+    id: 'session-gap', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-25T11:00:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const secondSession = createCalendarSession({
+    id: 'session-next', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T09:30:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const firstItem = createSessionItem({
+    id: 'item-gap', ownerUid: 'teacher-1', applicationId: application.id, sessionId: firstSession.id,
+    sourceActivityId: 'initial', title: 'Coneixements previs', type: 'activity', order: 0, plannedMinutes: 40,
+  }, { now: NOW })
+  const nextItem = createSessionItem({
+    id: 'item-next', ownerUid: 'teacher-1', applicationId: application.id, sessionId: secondSession.id,
+    sourceActivityId: 'next', title: 'Activitat següent', type: 'activity', order: 0, plannedMinutes: 30,
+  }, { now: NOW })
+
+  const result = buildAgendaSessionCompaction({
+    application,
+    existingSessionBundles: [
+      { session: firstSession, items: [firstItem], results: [] },
+      { session: secondSession, items: [nextItem], results: [] },
+    ],
+    options: options(sequenceIdFactory()),
+    targetSessionId: firstSession.id,
+  })
+
+  assert.deepEqual(result.sessions[0].items.map((item) => item.plannedMinutes), [40, 15])
+  assert.deepEqual(result.sessions[1].items.map((item) => item.plannedMinutes), [15])
   assert.equal(result.unscheduled.length, 0)
 })
 

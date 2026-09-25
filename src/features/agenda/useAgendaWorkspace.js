@@ -22,6 +22,7 @@ import {
   copyTimetableVersionStructure,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
+  buildAgendaSessionCompaction,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
@@ -31,6 +32,7 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createPlanningActivity,
   createPlanningPrivateNote,
   createSessionItem,
   createTimetableSlot,
@@ -775,18 +777,62 @@ export function useAgendaWorkspace(user, classes = []) {
       sourceActivityId: item.sourceActivityId,
       updatedAt: now,
     }, { now })
-    await persist({
+    const entries = [{
       entity: result,
       context: {
         applicationId: bundle.application.id,
         planningUnitId: bundle.planningUnit.id,
         sessionId: bundle.session.id,
       },
-    })
+    }]
+    let updatedSourceActivity = null
+    const applicationComment = String(changes.applicationComment || '').trim()
+    if (applicationComment && item.sourceActivity) {
+      const currentComment = String(item.sourceActivity.applicationComment || '').trim()
+      const mergedComment = currentComment && !currentComment.includes(applicationComment)
+        ? `${currentComment}\n\n${applicationComment}`
+        : applicationComment || currentComment
+      updatedSourceActivity = createPlanningActivity({
+        ...item.sourceActivity,
+        applicationComment: mergedComment,
+        updatedAt: now,
+      }, { now })
+      entries.push({ entity: updatedSourceActivity })
+    }
+    await persist(entries)
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
-      ? { ...current, results: replaceById(current.results, result) }
+      ? {
+          ...current,
+          items: updatedSourceActivity
+            ? current.items.map((currentItem) => currentItem.sourceActivityId === updatedSourceActivity.id
+              ? { ...currentItem, sourceActivity: updatedSourceActivity }
+              : currentItem)
+            : current.items,
+          results: replaceById(current.results, result),
+        }
       : current))
     return result
+  }, [persist])
+
+  /** Aplica a la UP, amb confirmació prèvia de Mode aula, el temps real observat. */
+  const applyClassroomTimingToPlanning = useCallback(async (bundle, item, actualMinutes) => {
+    if (!item?.sourceActivity) throw new Error('No s’ha trobat l’activitat original de la UP.')
+    const minutes = Number(actualMinutes)
+    if (!Number.isFinite(minutes) || minutes <= 0) throw new Error('El temps real no és vàlid.')
+    const now = new Date().toISOString()
+    const activity = createPlanningActivity({
+      ...item.sourceActivity,
+      plannedMinutes: minutes,
+      updatedAt: now,
+    }, { now })
+    await persist(activity)
+    setSessionBundles((bundles) => bundles.map((current) => ({
+      ...current,
+      items: current.items.map((currentItem) => currentItem.sourceActivityId === activity.id
+        ? { ...currentItem, sourceActivity: activity }
+        : currentItem),
+    })))
+    return activity
   }, [persist])
 
   const loadClassroomPrivateNotes = useCallback(async (bundle) => {
@@ -1444,7 +1490,7 @@ export function useAgendaWorkspace(user, classes = []) {
         items: candidate.items.map((item) => ({
           ...item,
           sourceActivity: activityById.get(item.sourceActivityId)
-            || (item.sourceActivityId === preview.recoveryItem.sourceActivityId
+            || (preview.recoveryItem && item.sourceActivityId === preview.recoveryItem.sourceActivityId
               ? preview.recoveryItem.sourceActivity
               : null)
             || null,
@@ -1528,6 +1574,55 @@ export function useAgendaWorkspace(user, classes = []) {
     })
     if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou sessions disponibles per reajustar totes les activitats posteriors.')
+    }
+    return persistAgendaReflowPreview({ ...preview, setup })
+  }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
+
+  /** Omple els minuts lliures d'una sessió avançant la seqüència posterior. */
+  const compactAgendaSession = useCallback(async (bundle) => {
+    if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu per reajustar l’Agenda.')
+    const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id,
+      classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const targetBundle = setup.existingSessionBundles.find((candidate) =>
+      candidate.session.id === bundle.session.id)
+    if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId,
+      date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt,
+      timetableSlotId: session.timetableSlotId,
+    }))
+    const temporalProposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents,
+      classId: setup.application.classId,
+      from: String(targetBundle.session.startsAt).slice(0, 10),
+      occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId,
+      timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const preview = buildAgendaSessionCompaction({
+      application: setup.application,
+      candidates: temporalProposal.candidates.filter((candidate) =>
+        candidate.startsAt > targetBundle.session.startsAt),
+      existingSessionBundles: setup.existingSessionBundles,
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      targetSessionId: targetBundle.session.id,
+    })
+    const previousMinutes = targetBundle.items.reduce((total, item) =>
+      total + (Number(item.plannedMinutes) || 0), 0)
+    const compactedTarget = preview.sessions.find((candidate) =>
+      candidate.session.id === targetBundle.session.id)
+    const compactedMinutes = (compactedTarget?.items || []).reduce((total, item) =>
+      total + (Number(item.plannedMinutes) || 0), 0)
+    if (compactedMinutes <= previousMinutes) {
+      throw new Error('No hi ha cap activitat posterior disponible per omplir aquest buit.')
+    }
+    if (preview.unscheduled.length > 0) {
+      throw new Error('No hi ha prou sessions disponibles per compactar tota la cronologia.')
     }
     return persistAgendaReflowPreview({ ...preview, setup })
   }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
@@ -1678,6 +1773,7 @@ export function useAgendaWorkspace(user, classes = []) {
 
   return {
     academicYears,
+    applyClassroomTimingToPlanning,
     activeAcademicYear,
     activeAcademicYearId,
     activeTimetable,
@@ -1686,6 +1782,7 @@ export function useAgendaWorkspace(user, classes = []) {
     buildSchedulingPreview,
     buildAgendaRecoveryPreview,
     buildContinuationPreview,
+    compactAgendaSession,
     confirmAgendaRecoveryPreview,
     confirmContinuationPreview,
     confirmSchedulingPreview,
