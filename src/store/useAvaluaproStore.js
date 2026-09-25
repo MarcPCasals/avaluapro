@@ -48,6 +48,7 @@ import {
   createSociometricSurveyDocument,
   deleteSociometricSurveyDocument,
   ensureSociometricSurveyPublicForm,
+  findCloudBackupByReason,
   listCloudBackups,
   listSociometricSurveyResponses,
   listTutoringSpacesForUser,
@@ -2249,27 +2250,31 @@ export const useAvaluaproStore = create((set, get) => ({
     const uid = state.cloud.user?.uid
     if (!uid) throw new Error('Cal iniciar sessió amb Google abans de crear una còpia al núvol.')
 
-    let allRecentBackups = []
-    try {
-      allRecentBackups = await listCloudBackups(uid, 100)
-    } catch {
-      // La còpia usa un identificador estable derivat de les dades. Si no podem
-      // consultar l’historial, repetir l’escriptura continua sent idempotent.
-    }
-    const existingBackup = allRecentBackups.find(
+    let existingBackup = state.cloud.recentBackups.find(
       (backup) => (backupId && backup.id === backupId) || backup.reason === reason,
     )
+    if (!existingBackup) {
+      try {
+        // La còpia prèvia pot haver quedat fora de les cinc còpies visibles.
+        // La cerquem pel motiu estable amb una consulta d'un sol document, en
+        // lloc de rellegir fins a cent capçaleres a cada inici de sessió.
+        existingBackup = await findCloudBackupByReason(uid, reason)
+      } catch {
+        // La còpia usa un identificador estable derivat de les dades. Si no podem
+        // confirmar-la, repetir l’escriptura continua sent idempotent.
+      }
+    }
     if (existingBackup) {
       const visibleBackups = [
         existingBackup,
-        ...allRecentBackups.filter((backup) => backup.id !== existingBackup.id),
+        ...get().cloud.recentBackups.filter((backup) => backup.id !== existingBackup.id),
       ].slice(0, 5)
       set((current) => ({
         cloud: {
           ...current.cloud,
           backupStatus: 'saved',
           backupError: '',
-          lastCloudBackupAt: allRecentBackups[0]?.createdAt || existingBackup.createdAt,
+          lastCloudBackupAt: current.cloud.lastCloudBackupAt || existingBackup.createdAt,
           recentBackups: visibleBackups,
         },
       }))

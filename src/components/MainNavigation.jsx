@@ -107,7 +107,7 @@ function UrgentModal({ profiles, onClose }) {
   )
 }
 
-export function MainNavigation({ optionalModulesEnabled = false }) {
+export function MainNavigation({ optionalModulesEnabled = true }) {
   const [showUrgent, setShowUrgent] = useState(false)
   const state = useAvaluaproStore()
   const { activeClassId, activeMode, activeInsight } = useAvaluaproStore((state) => state.ui)

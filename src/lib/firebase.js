@@ -1504,7 +1504,21 @@ export async function listCloudBackups(uid, maxItems = 5) {
   if (!uid) return []
   const backupsQuery = query(getCloudBackupCollectionRef(uid), orderBy('createdAt', 'desc'), limit(maxItems))
   const snapshot = await getDocs(backupsQuery)
+  recordFirestoreQuerySnapshot('backups.list', snapshot)
   return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }))
+}
+
+export async function findCloudBackupByReason(uid, reason) {
+  if (!uid || !reason) return null
+  const backupQuery = query(
+    getCloudBackupCollectionRef(uid),
+    where('reason', '==', reason),
+    limit(1),
+  )
+  const snapshot = await getDocs(backupQuery)
+  recordFirestoreQuerySnapshot('backups.byReason', snapshot)
+  const snapshotDoc = snapshot.docs[0]
+  return snapshotDoc ? { id: snapshotDoc.id, ...snapshotDoc.data() } : null
 }
 
 export async function loadCloudBackup(uid, backupId) {

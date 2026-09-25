@@ -13,7 +13,6 @@ import {
   acknowledgeRelease,
   getPreUpdateReleaseGate,
   isReleaseAcknowledged,
-  isReleaseModeEnabled,
 } from './lib/preUpdateRelease'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
 import './App.css'
@@ -49,11 +48,11 @@ function ReleaseProtectionBanner({ error = '', onRetry, state }) {
 
   const isBlocked = state === 'review' || state === 'error'
   const message = state === 'signed-out'
-    ? 'Inicia sessió amb Google per crear la còpia al núvol i activar Agenda i Programació.'
+    ? 'Inicia sessió amb Google per crear la còpia de seguretat prèvia al núvol.'
     : state === 'review'
-      ? 'Hi ha dues versions diferents de les dades. Resol «Revisió necessària» abans d’activar les pantalles noves.'
+      ? 'Hi ha dues versions diferents de les dades. Resol «Revisió necessària» per completar la còpia prèvia.'
       : state === 'error'
-        ? error || 'No s’ha pogut confirmar la còpia al núvol. La versió anterior continua disponible.'
+        ? error || 'No s’ha pogut confirmar la còpia al núvol. Pots continuar treballant i tornar-ho a provar.'
         : state === 'saving'
           ? 'Estem creant «Còpia de seguretat pre actualització» al teu compte.'
           : 'Estem esperant que Firebase acabi de confirmar les dades abans de crear la còpia.'
@@ -225,7 +224,6 @@ function App() {
   const cloud = useAvaluaproStore((state) => state.cloud)
   const ensureCloudBackup = useAvaluaproStore((state) => state.ensureCloudBackup)
   const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
-  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const defaultSubject = useAvaluaproStore((state) => state.profile.defaultSubject)
   const onboarding = useAvaluaproStore((state) => state.onboarding)
   const [releaseBackupState, setReleaseBackupState] = useState('')
@@ -257,16 +255,14 @@ function App() {
     !releaseAnnouncementDismissed &&
     !isReleaseAcknowledged(cloud.user.uid, window.localStorage),
   )
-  const effectiveActiveMode = isReleaseModeEnabled(activeMode, releaseReady) ? activeMode : 'evaluation'
+  // La còpia prèvia protegeix les dades, però no pot bloquejar la feina diària.
+  // Agenda i Programació continuen disponibles mentre la còpia s'està preparant.
+  const effectiveActiveMode = activeMode
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId) return
     initialize()
   }, [initialize, sociometricSurveyId, studentProfileSurveyId])
-
-  useEffect(() => {
-    if (effectiveActiveMode !== activeMode) setActiveMode(effectiveActiveMode)
-  }, [activeMode, effectiveActiveMode, setActiveMode])
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId) return
@@ -383,7 +379,7 @@ function App() {
           <span>{cloud.error}</span>
         </div>
       )}
-      <MainNavigation optionalModulesEnabled={releaseReady} />
+      <MainNavigation optionalModulesEnabled />
       {TIMELINE_MODES.has(effectiveActiveMode) && <SemesterUtTabs />}
       <main className="content-area">
         <Suspense fallback={<ModuleLoadingFallback />}>

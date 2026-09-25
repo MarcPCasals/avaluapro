@@ -325,6 +325,12 @@ La capa de listeners globals també queda aplicada:
 - l’estat de lectura i els avisos acceptats de cotutoria també es desen localment, de manera que treure els listeners globals no crea falsos avisos després de recarregar;
 - els formularis sociomètrics, els senyals de canvi, el feedback i la resta de listeners revisats ja depenen de pantalles o panells oberts.
 
+La protecció de la versió d'Agenda i Programació també queda desacoblada de la navegació:
+
+- la còpia «pre actualització» continua intentant-se i mostrant el seu estat;
+- Agenda i Programació no desapareixen ni expulsen el docent mentre la còpia es prepara o necessita revisió;
+- la comprovació d'una còpia antiga consulta com a màxim una capçalera pel seu motiu estable, en lloc de rellegir fins a cent còpies a cada inici.
+
 Amb tres cotutories compartides, l’arrencada passa de sis listeners de coordinació a zero. En obrir-ne una en manté dos, independentment del nombre total d’espais compartits. Encara queda pendent el lideratge explícit d’una sola pestanya per evitar que dues pestanyes obertes al mateix mòdul dupliquin aquestes connexions sota demanda.
 
 ## 9. Capacitat del pla gratuït

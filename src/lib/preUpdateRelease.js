@@ -5,8 +5,6 @@ export const PRE_UPDATE_RELEASE = Object.freeze({
   backupLabel: 'Còpia de seguretat pre actualització',
 })
 
-const OPTIONAL_MODES = new Set(['agenda', 'planning'])
-
 export function hasPreUpdateReleaseBackup(backups = []) {
   return backups.some(
     (backup) =>
@@ -32,10 +30,6 @@ export function getPreUpdateReleaseGate({
   if (pendingOperationCount > 0 || cloudStatus === 'pending' || cloudStatus === 'syncing') return 'waiting'
   if (cloudStatus === 'synced' || cloudStatus === 'signed-in') return 'backup-required'
   return 'waiting'
-}
-
-export function isReleaseModeEnabled(mode, releaseReady = false) {
-  return !OPTIONAL_MODES.has(mode) || releaseReady
 }
 
 export function getReleaseAcknowledgementKey(uid = '') {

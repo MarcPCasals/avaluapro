@@ -6,7 +6,6 @@ import {
   getPreUpdateReleaseGate,
   hasPreUpdateReleaseBackup,
   isReleaseAcknowledged,
-  isReleaseModeEnabled,
 } from '../src/lib/preUpdateRelease.js'
 
 test('la còpia de preactualització es reconeix pel motiu o per l’identificador estable', () => {
@@ -43,13 +42,6 @@ test('una còpia confirmada activa la versió sense crear-ne una altra', () => {
     }),
     'ready',
   )
-})
-
-test('Agenda i Programació continuen tancades fins que la còpia està preparada', () => {
-  assert.equal(isReleaseModeEnabled('agenda', false), false)
-  assert.equal(isReleaseModeEnabled('planning', false), false)
-  assert.equal(isReleaseModeEnabled('evaluation', false), true)
-  assert.equal(isReleaseModeEnabled('agenda', true), true)
 })
 
 test('l’avís queda confirmat per compte i versió', () => {
