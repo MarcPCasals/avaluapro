@@ -226,6 +226,7 @@ function ClassroomTimingProposalDialog({ actualMinutes, activity, onApply, onKee
   const dialogRef = useDialogAccessibility(onKeep)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const finishesEarlier = Number(actualMinutes) < Number(activity.plannedMinutes)
   const apply = async () => {
     setSaving(true)
     setError('')
@@ -237,11 +238,11 @@ function ClassroomTimingProposalDialog({ actualMinutes, activity, onApply, onKee
     }
   }
   return <div className="classroom-close-backdrop"><section aria-labelledby={titleId} aria-modal="true" className="classroom-review-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
-    <header><span><Clock3 size={20} /></span><div><small>Temps real de Mode aula</small><h2 id={titleId}>Vols ajustar la programació?</h2></div></header>
+    <header><span><Clock3 size={20} /></span><div><small>Temps real de Mode aula</small><h2 id={titleId}>{finishesEarlier ? 'Has acabat abans. Vols escurçar l’activitat?' : 'Has necessitat més temps. Vols ampliar l’activitat?'}</h2></div></header>
     <div className="classroom-timing-comparison"><span><small>Previst a la UP</small><strong>{activity.plannedMinutes} min</strong></span><ArrowRight size={20} /><span><small>Temps real</small><strong>{actualMinutes} min</strong></span></div>
-    <p>«{activity.title}» ha tingut una durada diferent. Pots actualitzar ara la UP perquè la pròxima calendarització parteixi del teu ritme real.</p>
+    <p>«{activity.title}» ha durat {actualMinutes} minuts en lloc dels {activity.plannedMinutes} previstos. Pots {finishesEarlier ? 'escurçar' : 'ampliar'} ara la UP perquè la pròxima calendarització parteixi del teu ritme real.</p>
     {error && <p className="classroom-review-error" role="alert">{error}</p>}
-    <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onKeep} type="button">Mantenir {activity.plannedMinutes} min</button><button className="primary-action" disabled={saving} onClick={apply} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Clock3 size={16} />}Actualitzar la UP a {actualMinutes} min</button></div>
+    <div className="classroom-close-actions"><button className="secondary-action" disabled={saving} onClick={onKeep} type="button">Mantenir {activity.plannedMinutes} min</button><button className="primary-action" disabled={saving} onClick={apply} type="button">{saving ? <Loader2 className="spin" size={16} /> : <Clock3 size={16} />}{finishesEarlier ? 'Escurçar' : 'Ampliar'} la UP a {actualMinutes} min</button></div>
   </section></div>
 }
 
