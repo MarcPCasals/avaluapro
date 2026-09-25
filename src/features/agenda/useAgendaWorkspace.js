@@ -35,6 +35,7 @@ import {
   createPlanningActivity,
   createPlanningPrivateNote,
   createSessionItem,
+  createTemporalUnit,
   createTimetableSlot,
   createTimetableVersion,
   findTimetableSlotConflicts,
@@ -476,6 +477,19 @@ export function useAgendaWorkspace(user, classes = []) {
     await remove(event)
     setCalendarEvents((items) => items.filter((item) => item.id !== event.id))
   }, [remove])
+
+  const saveTemporalUnit = useCallback(async (current, values) => {
+    const temporalUnit = createTemporalUnit({
+      ...current,
+      ...values,
+      updatedAt: new Date().toISOString(),
+    })
+    await persist(temporalUnit)
+    setTemporalUnits((items) => items
+      .map((item) => item.id === temporalUnit.id ? temporalUnit : item)
+      .sort((left, right) => String(left.startsOn).localeCompare(String(right.startsOn))))
+    return temporalUnit
+  }, [persist])
 
   /**
    * Obre només el tram temporal que la vista necessita. Les aplicacions viuen
@@ -1837,6 +1851,7 @@ export function useAgendaWorkspace(user, classes = []) {
     saveSessionStatus,
     saveSlot,
     saveTimetable,
+    saveTemporalUnit,
     setActiveAcademicYearId,
     setActiveTimetableId,
     setError,
