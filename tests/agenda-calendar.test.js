@@ -8,6 +8,7 @@ import {
   getAgendaDefaultWeekStart,
   getMonthCalendarWeeks,
   getNoClassCalendarEvent,
+  getTemporalUnitProgress,
 } from '../src/lib/agendaCalendar.js'
 
 test('la cronologia obre vuit setmanes i amplia el curs sense solapaments', () => {
@@ -112,4 +113,45 @@ test('una anul lacio d un sol grup no marca tota la setmana com a vacances', () 
     startsOn: '2026-12-21',
     type: 'cancellation',
   }, '2026-12-21'), false)
+})
+
+test('el compte enrere de la UT exclou caps de setmana i dies complets no lectius', () => {
+  const progress = getTemporalUnitProgress({
+    calendarEvents: [{
+      classIds: [],
+      endsOn: '2026-09-23',
+      id: 'holiday',
+      startsOn: '2026-09-23',
+      type: 'holiday',
+    }],
+    temporalUnit: { startsOn: '2026-09-21', endsOn: '2026-09-27' },
+    today: '2026-09-22',
+  })
+
+  assert.equal(progress.totalWorkingDays, 4)
+  assert.equal(progress.remainingWorkingDays, 3)
+})
+
+test('les sessions reals de la UT respecten versions d horari, festius i el compte enrere', () => {
+  const progress = getTemporalUnitProgress({
+    calendarEvents: [
+      { classIds: [], endsOn: '2026-09-23', id: 'holiday', startsOn: '2026-09-23', type: 'holiday' },
+      { classIds: ['class-1'], endsOn: '2026-09-25', id: 'cancelled', startsOn: '2026-09-25', timetableSlotId: 'friday', type: 'cancellation' },
+    ],
+    classId: 'class-1',
+    slotsByTimetableId: {
+      'timetable-1': [
+        { id: 'monday-a', classId: 'class-1', weekday: 1 },
+        { id: 'monday-b', classId: 'class-1', weekday: 1 },
+        { id: 'wednesday', classId: 'class-1', weekday: 3 },
+        { id: 'friday', classId: 'class-1', weekday: 5 },
+      ],
+    },
+    temporalUnit: { startsOn: '2026-09-21', endsOn: '2026-09-27' },
+    timetables: [{ id: 'timetable-1', effectiveFrom: '2026-09-01', effectiveTo: '' }],
+    today: '2026-09-22',
+  })
+
+  assert.equal(progress.totalSessions, 2)
+  assert.equal(progress.remainingSessions, 0)
 })

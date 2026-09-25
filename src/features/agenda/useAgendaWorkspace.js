@@ -97,6 +97,7 @@ export function useAgendaWorkspace(user, classes = []) {
   const [academicYears, setAcademicYears] = useState([])
   const [timetables, setTimetables] = useState([])
   const [slots, setSlots] = useState([])
+  const [slotsByTimetableId, setSlotsByTimetableId] = useState({})
   const [calendarEvents, setCalendarEvents] = useState([])
   const [planningUnits, setPlanningUnits] = useState([])
   const [sharedPlanningUnits, setSharedPlanningUnits] = useState([])
@@ -347,6 +348,29 @@ export function useAgendaWorkspace(user, classes = []) {
     return () => { cancelled = true }
   }, [activeTimetableId, repository, user?.uid])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!repository || !user?.uid || timetables.length === 0) {
+      queueMicrotask(() => !cancelled && setSlotsByTimetableId({}))
+      return () => { cancelled = true }
+    }
+    Promise.all(timetables.map((timetable) => repository.loadScope(
+      `timetable:${timetable.id}:slots`,
+      () => loadPlanningTimetableSlots(user.uid, timetable.id),
+      { completeSnapshot: true },
+    ))).then((results) => {
+      if (cancelled) return
+      setSlotsByTimetableId(Object.fromEntries(timetables.map((timetable, index) => [
+        timetable.id,
+        sortSlots(results[index]?.entities || []),
+      ])))
+    }).catch(() => {
+      // La versió activa continua disponible a `slots`; el recompte podrà
+      // mostrar-la encara que una versió històrica no s'hagi pogut carregar.
+    })
+    return () => { cancelled = true }
+  }, [repository, timetables, user?.uid])
+
   const createTimetable = useCallback(async (values) => {
     if (!activeAcademicYear) throw new Error('Cal seleccionar un curs acadèmic.')
     const now = new Date().toISOString()
@@ -385,6 +409,7 @@ export function useAgendaWorkspace(user, classes = []) {
       copied.timetableVersion,
     ]))
     setSlots(sortSlots(copied.slots))
+    setSlotsByTimetableId((items) => ({ ...items, [copied.timetableVersion.id]: sortSlots(copied.slots) }))
     setActiveTimetableId(copied.timetableVersion.id)
     return copied
   }, [activeAcademicYear, activeTimetable, persist, slots, user])
@@ -1816,6 +1841,9 @@ export function useAgendaWorkspace(user, classes = []) {
     setActiveTimetableId,
     setError,
     slots,
+    slotsByTimetableId: activeTimetableId
+      ? { ...slotsByTimetableId, [activeTimetableId]: slots }
+      : slotsByTimetableId,
     sessionBundles,
     sessionsLoading,
     sync,

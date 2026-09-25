@@ -6,6 +6,72 @@ function addDays(dateKey, amount) {
   return date.toISOString().slice(0, 10)
 }
 
+function weekdayFromDate(dateKey) {
+  const weekday = new Date(`${dateKey}T12:00:00Z`).getUTCDay()
+  return weekday === 0 ? 7 : weekday
+}
+
+function isWholeDayNoClassEvent(event) {
+  return isNoClassCalendarEvent(event)
+    && (!Array.isArray(event.classIds) || event.classIds.length === 0)
+    && !calendarEventTargetsSession(event)
+}
+
+function selectTimetableForDate(timetables = [], dateKey) {
+  return timetables
+    .filter((item) => item.effectiveFrom <= dateKey && (!item.effectiveTo || item.effectiveTo >= dateKey))
+    .sort((left, right) => String(right.effectiveFrom).localeCompare(String(left.effectiveFrom)))[0] || null
+}
+
+/**
+ * Resumeix el temps real disponible dins d'una UT. Els dies lectius només
+ * compten de dilluns a divendres i exclouen els dies complets no lectius. Les
+ * sessions parteixen de la versió d'horari vigent a cada data i respecten les
+ * excepcions globals, de grup i de franja.
+ */
+export function getTemporalUnitProgress({
+  calendarEvents = [],
+  classId = '',
+  slotsByTimetableId = {},
+  temporalUnit,
+  timetables = [],
+  today,
+}) {
+  if (!temporalUnit?.startsOn || !temporalUnit?.endsOn) return null
+  const firstRemainingDate = today > temporalUnit.startsOn ? today : temporalUnit.startsOn
+  let totalWorkingDays = 0
+  let remainingWorkingDays = 0
+  let totalSessions = 0
+  let remainingSessions = 0
+
+  for (let dateKey = temporalUnit.startsOn; dateKey <= temporalUnit.endsOn; dateKey = addDays(dateKey, 1)) {
+    const weekday = weekdayFromDate(dateKey)
+    const wholeDayBlocked = calendarEvents.some((event) =>
+      calendarEventCoversDate(event, dateKey) && isWholeDayNoClassEvent(event))
+    if (weekday <= 5 && !wholeDayBlocked) {
+      totalWorkingDays += 1
+      if (dateKey >= firstRemainingDate) remainingWorkingDays += 1
+    }
+
+    if (!classId) continue
+    const timetable = selectTimetableForDate(timetables, dateKey)
+    const slots = (slotsByTimetableId[timetable?.id] || [])
+      .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday)
+    for (const slot of slots) {
+      if (getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id })) continue
+      totalSessions += 1
+      if (dateKey >= firstRemainingDate) remainingSessions += 1
+    }
+  }
+
+  return {
+    remainingSessions,
+    remainingWorkingDays,
+    totalSessions,
+    totalWorkingDays,
+  }
+}
+
 export function startOfCalendarWeek(dateKey) {
   const date = new Date(`${dateKey}T12:00:00Z`)
   const weekday = date.getUTCDay() || 7
