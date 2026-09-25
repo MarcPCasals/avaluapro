@@ -466,7 +466,14 @@
 .agenda-timeline-empty strong { color: #334155; }
 .agenda-timeline-empty p { max-width: 420px; margin: 0; color: #94a3b8; font-size: 11px; font-weight: 750; }
 .agenda-timeline-empty.compact { min-height: 180px; }
+.agenda-timeline-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 5px; }
+.agenda-timeline-empty-actions button, .agenda-timeline-pager button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #ddd6fe; border-radius: 9px; padding: 8px 11px; color: #6d28d9; background: white; font-size: 9px; font-weight: 900; }
+.agenda-timeline-empty-actions button:hover, .agenda-timeline-pager button:hover { border-color: #8b5cf6; background: #f5f3ff; }
+.agenda-timeline-empty-actions button:disabled, .agenda-timeline-pager button:disabled { cursor: wait; opacity: .48; }
 .agenda-timeline-sections { display: grid; }
+.agenda-timeline-pager { display: flex; padding: 10px 20px; background: #fafafa; }
+.agenda-timeline-pager.future { justify-content: flex-end; border-top: 1px solid #edf0f4; }
+.agenda-timeline-pager.past { border-top: 1px solid #e2e8f0; }
 .agenda-timeline-list { display: grid; padding: 16px 20px 24px; }
 .agenda-timeline-list > button { min-height: 66px; display: grid; grid-template-columns: 28px 16px 142px minmax(220px, 1fr) auto 18px; gap: 10px; align-items: center; position: relative; border: 0; border-bottom: 1px solid #edf0f4; padding: 7px 0; color: #94a3b8; background: white; text-align: left; }
 .agenda-timeline-index { color: #cbd5e1; font-size: 9px; font-weight: 900; text-align: right; }

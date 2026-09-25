@@ -3,10 +3,45 @@ import test from 'node:test'
 
 import {
   calendarEventCoversSchoolWeek,
+  getAdjacentAgendaTimelineRange,
+  getAgendaTimelineInitialRange,
   getAgendaDefaultWeekStart,
   getMonthCalendarWeeks,
   getNoClassCalendarEvent,
 } from '../src/lib/agendaCalendar.js'
+
+test('la cronologia obre vuit setmanes i amplia el curs sense solapaments', () => {
+  const initial = getAgendaTimelineInitialRange({
+    endsOn: '2027-06-25',
+    startsOn: '2026-09-09',
+    today: '2026-09-25',
+  })
+  const later = getAdjacentAgendaTimelineRange(initial, 'later', {
+    endsOn: initial.courseEnd,
+    startsOn: initial.courseStart,
+  })
+  const earlier = getAdjacentAgendaTimelineRange(initial, 'earlier', {
+    endsOn: initial.courseEnd,
+    startsOn: initial.courseStart,
+  })
+
+  assert.deepEqual({ from: initial.from, to: initial.to }, { from: '2026-09-25', to: '2026-11-19' })
+  assert.deepEqual(later, { from: '2026-11-20', to: '2027-01-14' })
+  assert.deepEqual(earlier, { from: '2026-09-09', to: '2026-09-24' })
+  assert.equal(initial.hasEarlier, true)
+  assert.equal(initial.hasLater, true)
+})
+
+test('la cronologia respecta el final de curs encara que avui sigui posterior', () => {
+  const range = getAgendaTimelineInitialRange({
+    endsOn: '2027-06-25',
+    startsOn: '2026-09-09',
+    today: '2027-07-10',
+  })
+
+  assert.deepEqual({ from: range.from, to: range.to }, { from: '2027-05-01', to: '2027-06-25' })
+  assert.equal(range.hasLater, false)
+})
 
 test('el calendari obre la setmana entrant durant el cap de setmana', () => {
   assert.equal(getAgendaDefaultWeekStart('2026-09-18'), '2026-09-14')

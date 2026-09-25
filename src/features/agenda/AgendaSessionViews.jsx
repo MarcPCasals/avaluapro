@@ -411,7 +411,20 @@ function TimelineRows({ calendarEvents, groups, onOpenSession }) {
   }))}</div>
 }
 
-export function AgendaTimelineView({ bundles, calendarEvents = [], classes, loading, onOpenSession, onSchedule, selectedClassId, today = new Date().toISOString().slice(0, 10) }) {
+export function AgendaTimelineView({
+  bundles,
+  calendarEvents = [],
+  classes,
+  hasEarlier = false,
+  hasLater = false,
+  loading,
+  onLoadEarlier,
+  onLoadLater,
+  onOpenSession,
+  onSchedule,
+  selectedClassId,
+  today = new Date().toISOString().slice(0, 10),
+}) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = globalThis.setInterval(() => setNow(Date.now()), 60_000)
@@ -429,9 +442,11 @@ export function AgendaTimelineView({ bundles, calendarEvents = [], classes, load
         <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{selectedClass && <ContextualHelp title="Cronologia del grup">Primer es mostren les sessions pendents; les sessions anteriors es conserven plegades dins l’històric.</ContextualHelp>}{loading && <Loader2 className="spin" size={16} />}</div></div>
         {onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}
       </header>
-      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>Aquest grup encara no té sessions</strong><p>Calendaritza una UP per començar la cronologia.</p></div> : <div className="agenda-timeline-sections">
+      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <div className="agenda-timeline-sections">
         {upcomingGroups.length > 0 ? <TimelineRows calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}
+        {hasLater && <div className="agenda-timeline-pager future"><button disabled={loading} onClick={onLoadLater} type="button">Veure 8 setmanes següents<ArrowRight size={14} /></button></div>}
         {archivedGroups.length > 0 && <details className="agenda-timeline-archive"><summary><span><History size={16} />Sessions anteriors</span><small>{archivedGroups.length} {archivedGroups.length === 1 ? 'sessió arxivada' : 'sessions arxivades'}</small><ChevronDown size={16} /></summary><TimelineRows calendarEvents={calendarEvents} groups={archivedGroups} onOpenSession={onOpenSession} /></details>}
+        {hasEarlier && <div className="agenda-timeline-pager past"><button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />Veure 8 setmanes anteriors</button></div>}
       </div>}
     </section>
   )

@@ -14,7 +14,11 @@ import {
   resolvePlanningConflict,
   savePlanningEntityLocally,
 } from '../src/data/local/planningIndexedDb.js'
-import { createPlanningRepository } from '../src/data/planningRepository.js'
+import {
+  clearSharedPlanningRepository,
+  createPlanningRepository,
+  getSharedPlanningRepository,
+} from '../src/data/planningRepository.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
 import {
   PLANNING_QUOTA_RETRY_DELAY_MS,
@@ -56,8 +60,14 @@ function academicYear(uid, changes = {}) {
   }, { now: changes.updatedAt || '2026-09-18T08:00:00.000Z' })
 }
 
-test.beforeEach(deleteTestDatabase)
-test.after(deleteTestDatabase)
+test.beforeEach(async () => {
+  clearSharedPlanningRepository()
+  await deleteTestDatabase()
+})
+test.after(async () => {
+  clearSharedPlanningRepository()
+  await deleteTestDatabase()
+})
 
 test('les quinze entitats comparteixen una ruta estable entre la cua i Firestore', () => {
   const uid = 'teacher-1'
@@ -437,6 +447,62 @@ test('si la consulta remota falla el repositori retorna la còpia local sense pe
   assert.equal(result.source, 'local')
   assert.equal(result.entities.length, 1)
   assert.equal(result.error.code, 'firestore/unavailable')
+})
+
+test('Agenda i Programació comparteixen les consultes simultànies del mateix àmbit', async () => {
+  let remoteLoads = 0
+  const repositoryFromAgenda = getSharedPlanningRepository({
+    applyRemoteOperation: async () => ({ applied: true }),
+    isOnline: () => true,
+    uid: 'teacher-1',
+  })
+  const repositoryFromPlanning = getSharedPlanningRepository({
+    applyRemoteOperation: async () => ({ applied: true }),
+    isOnline: () => true,
+    uid: 'teacher-1',
+  })
+  const loadRemote = async () => {
+    remoteLoads += 1
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    return [academicYear('teacher-1')]
+  }
+
+  const [agendaResult, planningResult] = await Promise.all([
+    repositoryFromAgenda.loadScope('academicYears', loadRemote, { completeSnapshot: true }),
+    repositoryFromPlanning.loadScope('academicYears', loadRemote, { completeSnapshot: true }),
+  ])
+
+  assert.equal(repositoryFromAgenda, repositoryFromPlanning)
+  assert.equal(remoteLoads, 1)
+  assert.deepEqual(new Set([agendaResult.source, planningResult.source]), new Set(['remote', 'shared']))
+  assert.equal(agendaResult.entities.length, 1)
+  assert.equal(planningResult.entities.length, 1)
+})
+
+test('una validació recent s’aprofita fins que hi ha una edició local', async () => {
+  let remoteLoads = 0
+  let remoteYear = academicYear('teacher-1')
+  const repository = getSharedPlanningRepository({
+    applyRemoteOperation: async () => ({ applied: true }),
+    isOnline: () => true,
+    uid: 'teacher-1',
+  })
+  const loadRemote = async () => {
+    remoteLoads += 1
+    return [remoteYear]
+  }
+
+  await repository.loadScope('academicYears', loadRemote, { completeSnapshot: true })
+  const recent = await repository.loadScope('academicYears', loadRemote, { completeSnapshot: true })
+  remoteYear = academicYear('teacher-1', {
+    label: 'Curs actualitzat',
+    updatedAt: '2026-09-18T09:00:00.000Z',
+  })
+  await repository.save(remoteYear)
+  await repository.loadScope('academicYears', loadRemote, { completeSnapshot: true })
+
+  assert.equal(recent.source, 'memory')
+  assert.equal(remoteLoads, 2)
 })
 
 test('el tancament de sessió neteja la còpia local però protegeix canvis pendents', async () => {

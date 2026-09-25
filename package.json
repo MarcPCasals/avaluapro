@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "smoke:sociometric:production": "node scripts/smoke-test-sociometric-production.mjs",
     "test:purge": "bash scripts/run-sociometric-purge-tests.sh",
-    "test:classroom": "node --test tests/attendance.test.js tests/classroom-tracking.test.js tests/classroom-recovery.test.js tests/agenda-today.test.js",
+    "test:classroom": "node --test tests/attendance.test.js tests/classroom-tracking.test.js tests/classroom-recovery.test.js tests/agenda-today.test.js tests/agenda-calendar.test.js",
     "test:planning-domain": "node --test tests/planning-domain.test.js tests/planning-documents.test.js tests/planning-class-connections.test.js",
     "test:planning-sync": "node --test tests/planning-local-sync.test.js",
     "test:retention": "node --test tests/sociometric-retention.test.js",

@@ -23,6 +23,49 @@ export function getAgendaDefaultWeekStart(dateKey) {
   return [0, 6].includes(date.getUTCDay()) ? addDays(currentWeekStart, 7) : currentWeekStart
 }
 
+/**
+ * La cronologia comença pel tram immediat del curs i només amplia el rang quan
+ * el docent ho demana. Això evita consultar tot l'any per veure les pròximes
+ * sessions.
+ */
+export function getAgendaTimelineInitialRange({ endsOn, pageDays = 56, startsOn, today }) {
+  const safePageDays = Math.max(1, Math.floor(Number(pageDays) || 56))
+  const courseStart = startsOn || addDays(today, -180)
+  const courseEnd = endsOn || addDays(today, 365)
+  const from = today < courseStart
+    ? courseStart
+    : today > courseEnd ? [courseStart, addDays(courseEnd, -(safePageDays - 1))].sort().at(-1) : today
+  const to = [courseEnd, addDays(from, safePageDays - 1)].sort()[0]
+  return {
+    courseEnd,
+    courseStart,
+    from,
+    hasEarlier: from > courseStart,
+    hasLater: to < courseEnd,
+    to,
+  }
+}
+
+export function getAdjacentAgendaTimelineRange(current, direction, options = {}) {
+  if (!current?.from || !current?.to) return null
+  const safePageDays = Math.max(1, Math.floor(Number(options.pageDays) || 56))
+  const courseStart = options.startsOn || current.courseStart || addDays(current.from, -180)
+  const courseEnd = options.endsOn || current.courseEnd || addDays(current.to, 365)
+  if (direction === 'earlier' && current.from > courseStart) {
+    return {
+      from: [courseStart, addDays(current.from, -safePageDays)].sort().at(-1),
+      to: addDays(current.from, -1),
+    }
+  }
+  if (direction === 'later' && current.to < courseEnd) {
+    return {
+      from: addDays(current.to, 1),
+      to: [courseEnd, addDays(current.to, safePageDays)].sort()[0],
+    }
+  }
+  return null
+}
+
 export function getMonthCalendarWeeks(monthKey, range = {}) {
   const monthStart = `${String(monthKey).slice(0, 7)}-01`
   const nextMonth = new Date(`${monthStart}T12:00:00Z`)

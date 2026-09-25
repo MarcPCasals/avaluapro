@@ -14,7 +14,7 @@ import {
   revokePlanningAccessGrant,
   savePlanningAccessGrant,
 } from '../../data/cloud/planningFirestore'
-import { createPlanningRepository } from '../../data/planningRepository'
+import { getSharedPlanningRepository } from '../../data/planningRepository'
 import {
   copyPlanningActivityToPhase,
   copyPlanningUnitStructureToAcademicYear,
@@ -99,12 +99,12 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   const [sync, setSync] = useState(EMPTY_SYNC)
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
   const repository = useMemo(() => user?.uid
-    ? createPlanningRepository({
+    ? getSharedPlanningRepository({
         applyRemoteOperation: applyPlanningCloudOperation,
         uid: user.uid,
         isOnline: () => globalThis.navigator?.onLine !== false,
       })
-    : null, [user])
+    : null, [user.uid])
 
   const allPlanningUnits = useMemo(() => Array.from(new Map(
     [...planningUnits, ...sharedPlanningUnits].map((item) => [item.id, item]),

@@ -23,6 +23,7 @@ import {
 } from '../db/indexedDb'
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { clearPlanningLocalData } from '../data/local/planningIndexedDb'
+import { clearSharedPlanningRepository } from '../data/planningRepository'
 import {
   canonicalizeSubjectName,
   canonicalizeSubjectScopedKey,
@@ -2003,6 +2004,7 @@ export const useAvaluaproStore = create((set, get) => ({
       cloudSyncBlockedUntil = 0
       cloudSyncRetryDelayMs = CLOUD_NETWORK_RETRY_MIN_DELAY_MS
       await clearPlanningLocalData(signedInUid)
+      clearSharedPlanningRepository(signedInUid)
       await clearCloudWorkspaceManifest(signedInUid)
       await signOutFromGoogle()
       set((state) => ({

@@ -2,7 +2,7 @@
 
 Data: 24 de setembre de 2026
 Abast: lectures, escriptures, listeners, arrencada, Agenda, Programació, tutoria compartida, còpies i regles
-Estat: auditoria aprovada; blocs de mesura, reduccions ràpides, manifest incremental i primera capa d’Agenda aplicats
+Estat: auditoria aprovada; blocs de mesura, reduccions ràpides, manifest incremental, Agenda per capes, cronologia paginada i memòria compartida aplicats
 
 ## 1. Conclusió executiva
 
@@ -305,7 +305,17 @@ La primera capa lleugera d’Agenda reutilitza els documents de sessió existent
 - les recuperacions antigues busquen l’estructura a la còpia local i no obliguen a rellegir totes les UP arxivades;
 - els recordatoris de material només es reconcilien amb sessions que tenen el detall complet, evitant cancel·lacions falses.
 
-Encara queden pendents la paginació de cronologia, la memòria compartida entre Agenda i Programació, el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
+La segona capa d’Agenda completa aquest bloc:
+
+- la cronologia obre un tram de vuit setmanes des d’avui, no el curs complet;
+- els botons «Veure 8 setmanes anteriors» i «Veure 8 setmanes següents» amplien el rang sense repetir els trams ja carregats;
+- Agenda, Programació i el càlcul de pròxima classe comparteixen una única instància del repositori per compte;
+- les consultes idèntiques simultànies s’agrupen en una sola petició;
+- una validació remota recent es reutilitza durant trenta segons, sempre des de la mateixa còpia IndexedDB;
+- qualsevol desament o eliminació invalida immediatament aquesta finestra, i el tancament de sessió elimina també la instància compartida;
+- no es manté cap base de dades nova ni cap còpia en memòria de dades d’alumnat.
+
+Encara queden pendents el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
 
 ## 9. Capacitat del pla gratuït
 

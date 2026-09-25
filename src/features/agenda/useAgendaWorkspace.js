@@ -15,7 +15,7 @@ import {
   loadPlanningUnitStructure,
   loadSharedPlanningUnits,
 } from '../../data/cloud/planningFirestore'
-import { createPlanningRepository } from '../../data/planningRepository'
+import { getSharedPlanningRepository } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import {
@@ -81,6 +81,11 @@ function sortEvents(items) {
   return [...items].sort((left, right) => left.startsOn.localeCompare(right.startsOn))
 }
 
+function mergeSessionBundles(current, incoming) {
+  return [...new Map([...current, ...incoming].map((bundle) => [bundle.session.id, bundle])).values()]
+    .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+}
+
 /**
  * Aïlla les dades privades d'Agenda de la pantalla. Horaris, franges i
  * excepcions passen pel mateix repositori local-first que Programació, però es
@@ -106,7 +111,7 @@ export function useAgendaWorkspace(user, classes = []) {
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
   const today = localDateKey()
   const repository = useMemo(() => user?.uid
-    ? createPlanningRepository({
+    ? getSharedPlanningRepository({
         applyRemoteOperation: applyPlanningCloudOperation,
         uid: user.uid,
         isOnline: () => globalThis.navigator?.onLine !== false,
@@ -450,7 +455,13 @@ export function useAgendaWorkspace(user, classes = []) {
    * sota cada UP, per això primer es resolen aquestes relacions i després es
    * carreguen les sessions i els seus elements concrets.
    */
-  const loadSessionRange = useCallback(async ({ classId = '', from, includeDetails = true, to }) => {
+  const loadSessionRange = useCallback(async ({
+    classId = '',
+    from,
+    includeDetails = true,
+    mergeWithExisting = false,
+    to,
+  }) => {
     if (!repository || !from || !to) return []
     setSessionsLoading(true)
     try {
@@ -515,7 +526,7 @@ export function useAgendaWorkspace(user, classes = []) {
           results: cachedDetails[index].entities
             .filter((entity) => entity.entityType === 'activityResult'),
         })).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-        setSessionBundles(bundles)
+        setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
         return bundles
       }
       const detailResults = await Promise.all(sessionRecords.map(({ application, planningUnit, session }) =>
@@ -604,7 +615,7 @@ export function useAgendaWorkspace(user, classes = []) {
           results: entities.filter((entity) => entity.entityType === 'activityResult'),
         }
       }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-      setSessionBundles(bundles)
+      setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
       return bundles
     } finally {
       setSessionsLoading(false)

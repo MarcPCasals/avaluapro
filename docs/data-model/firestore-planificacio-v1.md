@@ -80,6 +80,10 @@ Els límits de resultats formen part de cada consulta. Els històrics no es carr
 
 Els elements de sessió nous conserven `sourcePlanningUnitId` quan provenen d'una activitat. Aquest vincle no duplica el contingut pedagògic: permet recuperar descripcions i materials de la UP exacta quan s'obre el detall, sense consultar totes les UP pròpies i arxivades.
 
+La cronologia consulta les sessions en trams consecutius de vuit setmanes. Els trams s'uneixen per `session.id` a la vista local, de manera que ampliar cap al passat o el futur no repeteix els documents ja visibles.
+
+Agenda, Programació i el càlcul de la pròxima classe utilitzen el mateix repositori per `uid`. El repositori només comparteix consultes en curs i l'estat temporal de validació dels àmbits; les entitats continuen vivint a IndexedDB. Una validació es considera recent durant trenta segons i qualsevol canvi local la invalida abans de la pròxima lectura.
+
 ## Índexs
 
 `firestore.indexes.json` declara els índexs per:

@@ -1,10 +1,11 @@
 import {
+  applyPlanningCloudOperation,
   loadPlanningAcademicYears,
   loadPlanningCalendarEvents,
   loadPlanningTimetables,
   loadPlanningTimetableSlots,
 } from '../../data/cloud/planningFirestore'
-import { createPlanningRepository } from '../../data/planningRepository'
+import { getSharedPlanningRepository } from '../../data/planningRepository'
 import { buildTimetableSessionCandidates } from '../../domain/planning'
 
 function localDateKey(date) {
@@ -24,8 +25,8 @@ function localTimeKey(date) {
  */
 export async function loadNextClassSessions(user, classIds, now = new Date()) {
   if (!user?.uid || classIds.length === 0) return {}
-  const repository = createPlanningRepository({
-    applyRemoteOperation: async () => {},
+  const repository = getSharedPlanningRepository({
+    applyRemoteOperation: applyPlanningCloudOperation,
     uid: user.uid,
     isOnline: () => globalThis.navigator?.onLine !== false,
   })
