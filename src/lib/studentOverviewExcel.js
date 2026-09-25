@@ -1,4 +1,4 @@
-import { DIAGNOSIS_OPTIONS, getDominantDiagnosis } from '../data/studentAnnotations'
+import { getDiagnosisLabels, getDominantDiagnosis } from '../data/studentAnnotations'
 
 const HEADER_COLOR = '#1E3A5F'
 const HEADER_TEXT_COLOR = '#FFFFFF'
@@ -98,9 +98,7 @@ function numberCell(value, extra = {}) {
 
 function getDataRow(row, index, showTutoringColumns) {
   const { absenceHours, absenceRecords, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, otherTutorialRecords, pendingRecords, profile, records, student } = row
-  const diagnoses = DIAGNOSIS_OPTIONS.filter((option) => (student.diagnoses || []).includes(option.id))
-    .map((option) => option.label)
-    .join(', ')
+  const diagnoses = getDiagnosisLabels(student.diagnoses, student.progressReason).join(', ')
   const backgroundColor = index % 2 === 1 ? ALT_ROW_COLOR : undefined
   const baseStyle = backgroundColor ? { backgroundColor } : {}
   const importantText = joinNotes(

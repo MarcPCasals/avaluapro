@@ -14,7 +14,15 @@ import {
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_LIBRARY } from '../../data/diagnosisLibrary'
-import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
+import {
+  ATTENTION_DIAGNOSIS_IDS,
+  cycleAttentionDiagnosis,
+  DIAGNOSIS_OPTIONS,
+  LITERACY_DIAGNOSIS_IDS,
+  PROGRESS_REASON_OPTIONS,
+  replaceDiagnosisGroup,
+  resolveProgressReason,
+} from '../../data/studentAnnotations'
 import { getSubjectStructure } from '../../data/subjects'
 import {
   getStudentEvaluationScore,
@@ -113,7 +121,8 @@ const TEXT_LIMITS = {
   antecedentNotes: 700,
 }
 
-const modificationTriggerDiagnoses = new Set(['qi-tdl', 'progress'])
+const modificationTriggerDiagnoses = new Set(['qi-tdl', 'qi-limit', 'progress'])
+const groupedDiagnosisIds = new Set([...ATTENTION_DIAGNOSIS_IDS, ...LITERACY_DIAGNOSIS_IDS, 'progress', 'qi-tdl'])
 
 const antecedentProfileLabels = {
   invisible: 'Alumne invisible',
@@ -273,6 +282,9 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const teamNote = agendaNotes.find((note) => note.type === 'team')
   const tutoringNote = agendaNotes.find((note) => note.type === 'tutoring')
   const diagnoses = student?.diagnoses || []
+  const literacyDiagnoses = LITERACY_DIAGNOSIS_IDS.filter((diagnosisId) => diagnoses.includes(diagnosisId))
+  const attentionDiagnosisId = ATTENTION_DIAGNOSIS_IDS.find((diagnosisId) => diagnoses.includes(diagnosisId)) || ''
+  const progressReason = resolveProgressReason(student?.progressReason)
   const classUtIds = new Set(state.uts.filter((ut) => ut.classId === student?.classId).map((ut) => ut.id))
   const classCompetencies = state.competencies.filter((competency) => classUtIds.has(competency.utId))
   const subjectModifiedCompetencies = subjectCompetencies.map((competency, index) => {
@@ -306,7 +318,14 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const deleteStudentAntecedent = state.deleteStudentAntecedent
   const [antecedentDraft, setAntecedentDraft] = useState(() => createAntecedentDraft(antecedent))
   const [antecedentState, setAntecedentState] = useState('idle')
-  const [diagnosisInfoId, setDiagnosisInfoId] = useState(null)
+  const [diagnosisInfoIds, setDiagnosisInfoIds] = useState([])
+  const [showLiteracyConfig, setShowLiteracyConfig] = useState(false)
+  const [literacyDraft, setLiteracyDraft] = useState([])
+  const [showLegacyQiTdlConfig, setShowLegacyQiTdlConfig] = useState(false)
+  const [legacyQiTdlDraft, setLegacyQiTdlDraft] = useState([])
+  const [showProgressConfig, setShowProgressConfig] = useState(false)
+  const [progressReasonDraft, setProgressReasonDraft] = useState(student?.progressReason || '')
+  const [progressGuidanceId, setProgressGuidanceId] = useState('')
   const [showPtiLinkModal, setShowPtiLinkModal] = useState(false)
   const [ptiLinkDraft, setPtiLinkDraft] = useState(student?.ptiUrl || '')
   const [historyModalType, setHistoryModalType] = useState('')
@@ -372,6 +391,65 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
     updateStudent(studentId, { diagnoses: nextDiagnoses })
   }
 
+  const cycleAttention = () => {
+    updateStudent(studentId, { diagnoses: cycleAttentionDiagnosis(diagnoses) })
+  }
+
+  const openLiteracyConfig = () => {
+    setLiteracyDraft(literacyDiagnoses)
+    setShowLiteracyConfig(true)
+  }
+
+  const toggleLiteracyDraft = (diagnosisId) => {
+    setLiteracyDraft((current) =>
+      current.includes(diagnosisId) ? current.filter((id) => id !== diagnosisId) : [...current, diagnosisId],
+    )
+  }
+
+  const saveLiteracyConfig = async () => {
+    await updateStudent(studentId, {
+      diagnoses: replaceDiagnosisGroup(diagnoses, LITERACY_DIAGNOSIS_IDS, literacyDraft),
+    })
+    setShowLiteracyConfig(false)
+  }
+
+  const openLegacyQiTdlConfig = () => {
+    setLegacyQiTdlDraft([])
+    setShowLegacyQiTdlConfig(true)
+  }
+
+  const toggleLegacyQiTdlDraft = (diagnosisId) => {
+    setLegacyQiTdlDraft((current) =>
+      current.includes(diagnosisId) ? current.filter((id) => id !== diagnosisId) : [...current, diagnosisId],
+    )
+  }
+
+  const saveLegacyQiTdlConfig = async () => {
+    const withoutLegacy = diagnoses.filter((id) => id !== 'qi-tdl')
+    await updateStudent(studentId, { diagnoses: [...new Set([...withoutLegacy, ...legacyQiTdlDraft])] })
+    setShowLegacyQiTdlConfig(false)
+  }
+
+  const openProgressConfig = () => {
+    setProgressReasonDraft(student.progressReason || '')
+    setProgressGuidanceId('')
+    setShowProgressConfig(true)
+  }
+
+  const saveProgressConfig = async () => {
+    const nextDiagnoses = diagnoses.includes('progress') ? diagnoses : [...diagnoses, 'progress']
+    await updateStudent(studentId, { diagnoses: nextDiagnoses, progressReason: progressReasonDraft })
+    setShowProgressConfig(false)
+  }
+
+  const removeProgressDiagnosis = async () => {
+    await updateStudent(studentId, {
+      diagnoses: diagnoses.filter((id) => id !== 'progress'),
+      progressReason: '',
+    })
+    setShowProgressConfig(false)
+  }
+
   const handleDiagnosisInfoClick = (diagnosisId) => {
     if (diagnosisId === 'progress') {
       if (student.ptiUrl) {
@@ -383,7 +461,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
       return
     }
 
-    setDiagnosisInfoId(diagnosisId)
+    setDiagnosisInfoIds([diagnosisId])
   }
 
   const savePtiLink = async () => {
@@ -592,10 +670,60 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             Diagnòstics
           </h3>
           <div className="diagnosis-chip-list">
-            {DIAGNOSIS_OPTIONS.map((diagnosis) => {
+            <div className={`diagnosis-chip-shell blue ${literacyDiagnoses.length > 0 ? 'active' : ''}`}>
+              <button className="diagnosis-chip" onClick={openLiteracyConfig} type="button">
+                {literacyDiagnoses.length > 0
+                  ? literacyDiagnoses
+                      .map((diagnosisId) => DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)?.label)
+                      .filter(Boolean)
+                      .join(' + ')
+                  : 'Dislèxia · Discalcúlia · Disortografia'}
+              </button>
+              {literacyDiagnoses.length > 0 && (
+                <button
+                  className="diagnosis-chip-info"
+                  onClick={() => setDiagnosisInfoIds(literacyDiagnoses)}
+                  title="Veure pautes diferenciades"
+                  type="button"
+                >
+                  i
+                </button>
+              )}
+            </div>
+
+            <div className={`diagnosis-chip-shell green ${attentionDiagnosisId ? 'active' : ''}`}>
+              <button
+                className="diagnosis-chip diagnosis-chip-cycle"
+                onClick={cycleAttention}
+                title="Clics successius: TDA → TDAH → desmarcat"
+                type="button"
+              >
+                {attentionDiagnosisId ? attentionDiagnosisId.toUpperCase() : 'TDA / TDAH'}
+              </button>
+              {attentionDiagnosisId && (
+                <button
+                  className="diagnosis-chip-info"
+                  onClick={() => setDiagnosisInfoIds([attentionDiagnosisId])}
+                  title={`Veure resum de ${attentionDiagnosisId.toUpperCase()}`}
+                  type="button"
+                >
+                  i
+                </button>
+              )}
+            </div>
+
+            {diagnoses.includes('qi-tdl') && (
+              <div className="diagnosis-chip-shell red active legacy-diagnosis-chip">
+                <button className="diagnosis-chip" onClick={openLegacyQiTdlConfig} type="button">
+                  QI límit / TDL · concretar
+                </button>
+              </div>
+            )}
+
+            {DIAGNOSIS_OPTIONS.filter((diagnosis) => !groupedDiagnosisIds.has(diagnosis.id)).map((diagnosis) => {
               const libraryEntry = DIAGNOSIS_LIBRARY[diagnosis.id]
               const diagnosisIsActive = diagnoses.includes(diagnosis.id)
-              const hasInfoAction = diagnosisIsActive && (libraryEntry || diagnosis.id === 'progress')
+              const hasInfoAction = diagnosisIsActive && libraryEntry
               return (
                 <div
                   className={`diagnosis-chip-shell ${diagnosis.color} ${
@@ -614,13 +742,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                     <button
                       className="diagnosis-chip-info"
                       onClick={() => handleDiagnosisInfoClick(diagnosis.id)}
-                      title={
-                        diagnosis.id === 'progress'
-                          ? student.ptiUrl
-                            ? 'Obrir document PTI'
-                            : 'Configurar enllaç PTI'
-                          : `Veure resum de ${diagnosis.label}`
-                      }
+                      title={`Veure resum de ${diagnosis.label}`}
                       type="button"
                     >
                       i
@@ -629,6 +751,24 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
                 </div>
               )
             })}
+
+            <div className={`diagnosis-chip-shell purple ${diagnoses.includes('progress') ? 'active' : ''}`}>
+              <button className="diagnosis-chip" onClick={openProgressConfig} type="button">
+                {diagnoses.includes('progress') && progressReason
+                  ? `Progrés · ${progressReason.label}`
+                  : 'Alumne de progrés'}
+              </button>
+              {diagnoses.includes('progress') && (
+                <button
+                  className="diagnosis-chip-info"
+                  onClick={() => handleDiagnosisInfoClick('progress')}
+                  title={student.ptiUrl ? 'Obrir document PTI' : 'Configurar enllaç PTI'}
+                  type="button"
+                >
+                  i
+                </button>
+              )}
+            </div>
             <button
               className={`diagnosis-modification-entry ${showModifiedCompetenciesPanel ? 'active' : ''}`}
               data-tour="student-modified-competencies"
@@ -676,15 +816,132 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             value={student.diagnosisNotes || ''}
           />
         </section>
-        {diagnosisInfoId && DIAGNOSIS_LIBRARY[diagnosisInfoId] && (
-          <Modal onClose={() => setDiagnosisInfoId(null)} size="md" title={DIAGNOSIS_LIBRARY[diagnosisInfoId].title}>
+        {diagnosisInfoIds.length > 0 && (
+          <Modal
+            onClose={() => setDiagnosisInfoIds([])}
+            size="md"
+            title={diagnosisInfoIds.length > 1 ? 'Pautes diferenciades' : DIAGNOSIS_LIBRARY[diagnosisInfoIds[0]]?.title}
+          >
             <div className="diagnosis-info-modal">
-              <strong>Necessitats específiques</strong>
-              <ul>
-                {DIAGNOSIS_LIBRARY[diagnosisInfoId].summary.map((item) => (
-                  <li key={item}>{item}</li>
+              {diagnosisInfoIds.map((diagnosisId) => {
+                const libraryEntry = DIAGNOSIS_LIBRARY[diagnosisId]
+                if (!libraryEntry) return null
+                return (
+                  <section key={diagnosisId}>
+                    <strong>{libraryEntry.title}</strong>
+                    <ul>
+                      {libraryEntry.summary.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )
+              })}
+            </div>
+          </Modal>
+        )}
+        {showLiteracyConfig && (
+          <Modal onClose={() => setShowLiteracyConfig(false)} size="md" title="Configurar dificultats específiques">
+            <div className="diagnosis-config-modal">
+              <p>Pots marcar una, dues o les tres opcions. Les pautes es mantindran separades per no barrejar necessitats diferents.</p>
+              <div className="diagnosis-config-grid">
+                {LITERACY_DIAGNOSIS_IDS.map((diagnosisId) => {
+                  const diagnosis = DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)
+                  return (
+                    <button
+                      className={literacyDraft.includes(diagnosisId) ? 'active' : ''}
+                      key={diagnosisId}
+                      onClick={() => toggleLiteracyDraft(diagnosisId)}
+                      type="button"
+                    >
+                      <span className="diagnosis-config-check">{literacyDraft.includes(diagnosisId) ? '✓' : ''}</span>
+                      <span>{diagnosis?.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="diagnosis-config-actions">
+                <button className="secondary-action" onClick={() => setShowLiteracyConfig(false)} type="button">Cancel·lar</button>
+                <button className="primary-action" onClick={saveLiteracyConfig} type="button">Guardar combinació</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+        {showLegacyQiTdlConfig && (
+          <Modal onClose={() => setShowLegacyQiTdlConfig(false)} size="md" title="Concretar el diagnòstic anterior">
+            <div className="diagnosis-config-modal">
+              <p>Aquest registre antic agrupava QI límit i TDL. Tria l’opció correcta —o totes dues— abans de substituir-lo.</p>
+              <div className="diagnosis-config-grid two-columns">
+                {['qi-limit', 'tdl'].map((diagnosisId) => {
+                  const diagnosis = DIAGNOSIS_OPTIONS.find((option) => option.id === diagnosisId)
+                  return (
+                    <button
+                      className={legacyQiTdlDraft.includes(diagnosisId) ? 'active' : ''}
+                      key={diagnosisId}
+                      onClick={() => toggleLegacyQiTdlDraft(diagnosisId)}
+                      type="button"
+                    >
+                      <span className="diagnosis-config-check">{legacyQiTdlDraft.includes(diagnosisId) ? '✓' : ''}</span>
+                      <span>{diagnosis?.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="diagnosis-config-actions">
+                <button className="secondary-action" onClick={() => setShowLegacyQiTdlConfig(false)} type="button">Cancel·lar</button>
+                <button className="primary-action" disabled={legacyQiTdlDraft.length === 0} onClick={saveLegacyQiTdlConfig} type="button">Substituir registre antic</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+        {showProgressConfig && (
+          <Modal onClose={() => setShowProgressConfig(false)} size="md" title="Alumne de progrés">
+            <div className="diagnosis-config-modal">
+              <p>Indica el motiu principal d’incorporació al programa. Aquesta dada orienta els suports, però no substitueix el PTI ni l’informe professional.</p>
+              <div className="progress-reason-grid">
+                {PROGRESS_REASON_OPTIONS.map((reason) => (
+                  <div className={progressReasonDraft === reason.id ? 'active' : ''} key={reason.id}>
+                    <label>
+                      <input
+                        checked={progressReasonDraft === reason.id}
+                        name="progress-reason"
+                        onChange={() => setProgressReasonDraft(reason.id)}
+                        type="radio"
+                        value={reason.id}
+                      />
+                      <span>{reason.label}</span>
+                    </label>
+                    {reason.libraryId && (
+                      <button
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setProgressGuidanceId(reason.libraryId)
+                        }}
+                        type="button"
+                      >
+                        Veure pautes
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </ul>
+              </div>
+              {progressGuidanceId && DIAGNOSIS_LIBRARY[progressGuidanceId] && (
+                <div className="progress-guidance-preview">
+                  <strong>{DIAGNOSIS_LIBRARY[progressGuidanceId].title}</strong>
+                  <ul>
+                    {DIAGNOSIS_LIBRARY[progressGuidanceId].summary.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div className="diagnosis-config-actions split-actions">
+                {diagnoses.includes('progress') ? (
+                  <button className="danger-action" onClick={removeProgressDiagnosis} type="button">Treure de Progrés</button>
+                ) : <span />}
+                <div>
+                  <button className="secondary-action" onClick={() => setShowProgressConfig(false)} type="button">Cancel·lar</button>
+                  <button className="primary-action" disabled={!progressReasonDraft} onClick={saveProgressConfig} type="button">Guardar</button>
+                </div>
+              </div>
             </div>
           </Modal>
         )}

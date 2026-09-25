@@ -14,6 +14,11 @@ function orderedStudents(students) {
   return [...students].sort((left, right) => String(left.name).localeCompare(String(right.name), 'ca'))
 }
 
+function studentMatchesProfile(student, profileId) {
+  if (profileId === 'down-syndrome') return student.progressReason === 'down-syndrome'
+  return (student.diagnoses || []).includes(profileId)
+}
+
 export function PlanningDiversityEditor({ classes, measures, onChange, students }) {
   const availableClasses = useMemo(() => classes.filter((classItem) => students.some((student) => student.classId === classItem.id)), [classes, students])
   const [classId, setClassId] = useState(availableClasses[0]?.id || '')
@@ -22,20 +27,20 @@ export function PlanningDiversityEditor({ classes, measures, onChange, students 
   const suggestions = profile ? libraryMeasures(profile) : []
   const [label, setLabel] = useState(suggestions[0] || '')
   const classStudents = useMemo(() => orderedStudents(students.filter((student) => student.classId === classId)), [classId, students])
-  const matchingStudentIds = useMemo(() => classStudents.filter((student) => (student.diagnoses || []).includes(profileId)).map((student) => student.id), [classStudents, profileId])
+  const matchingStudentIds = useMemo(() => classStudents.filter((student) => studentMatchesProfile(student, profileId)).map((student) => student.id), [classStudents, profileId])
   const [studentIds, setStudentIds] = useState(() => students
-    .filter((student) => student.classId === (availableClasses[0]?.id || '') && (student.diagnoses || []).includes(DIAGNOSIS_LIBRARY_ITEMS[0]?.id))
+    .filter((student) => student.classId === (availableClasses[0]?.id || '') && studentMatchesProfile(student, DIAGNOSIS_LIBRARY_ITEMS[0]?.id))
     .map((student) => student.id))
 
   const changeProfile = (nextProfileId) => {
     const nextProfile = DIAGNOSIS_LIBRARY_ITEMS.find((item) => item.id === nextProfileId)
     setProfileId(nextProfileId)
     setLabel(libraryMeasures(nextProfile)[0] || '')
-    setStudentIds(classStudents.filter((student) => (student.diagnoses || []).includes(nextProfileId)).map((student) => student.id))
+    setStudentIds(classStudents.filter((student) => studentMatchesProfile(student, nextProfileId)).map((student) => student.id))
   }
   const changeClass = (nextClassId) => {
     setClassId(nextClassId)
-    setStudentIds(students.filter((student) => student.classId === nextClassId && (student.diagnoses || []).includes(profileId)).map((student) => student.id))
+    setStudentIds(students.filter((student) => student.classId === nextClassId && studentMatchesProfile(student, profileId)).map((student) => student.id))
   }
   const add = () => {
     const cleanLabel = String(label || '').trim()

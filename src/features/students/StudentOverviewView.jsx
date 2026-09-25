@@ -14,7 +14,7 @@ import {
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { ContextualHelp } from '../../components/ContextualHelp'
-import { DIAGNOSIS_OPTIONS, getDominantDiagnosis } from '../../data/studentAnnotations'
+import { DIAGNOSIS_OPTIONS, getDominantDiagnosis, resolveProgressReason } from '../../data/studentAnnotations'
 import { buildStudentProfiles } from '../../lib/analytics'
 import { formatAbsenceDateTime, formatAbsenceHours, getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
@@ -472,7 +472,13 @@ export function StudentOverviewView() {
             </thead>
             <tbody>
               {rows.map(({ absenceHours, absenceRecords: rowAbsences, importantRecords, latestTeamNote, latestTrackingNote, latestTutoringNote, otherTutorialRecords, pendingRecords, profile, records, student }) => {
-                const diagnoses = DIAGNOSIS_OPTIONS.filter((option) => (student.diagnoses || []).includes(option.id))
+                const studentProgressReason = resolveProgressReason(student.progressReason)
+                const diagnoses = DIAGNOSIS_OPTIONS.filter((option) => (student.diagnoses || []).includes(option.id)).map(
+                  (option) =>
+                    option.id === 'progress' && studentProgressReason
+                      ? { ...option, label: `${option.label} · ${studentProgressReason.label}` }
+                      : option,
+                )
                 const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
                 const overdue = pendingRecords.some((record) => record.followUpDate < todayInputValue())
                 const otherRecordCounts = OTHER_TUTORING_TYPES

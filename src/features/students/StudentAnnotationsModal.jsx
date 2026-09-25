@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
-import { DIAGNOSIS_OPTIONS } from '../../data/studentAnnotations'
+import { DIAGNOSIS_OPTIONS, resolveProgressReason } from '../../data/studentAnnotations'
 import { buildStudentProfiles, getStudentTrackingStats } from '../../lib/analytics'
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -466,7 +466,12 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   if (!student) return null
 
   const diagnoses = student.diagnoses || []
-  const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id))
+  const progressReason = resolveProgressReason(student.progressReason)
+  const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id)).map((diagnosis) =>
+    diagnosis.id === 'progress' && progressReason
+      ? { ...diagnosis, label: `${diagnosis.label} · ${progressReason.label}` }
+      : diagnosis,
+  )
   const hasTeamAlert = teamNotes.length > 0
   const hasTutoringAlert = tutoringNotes.length > 0
   const reminder = getReminderText({ teamNotes, tutoringNotes })

@@ -32,7 +32,9 @@ const PAIR_GRADE_MATRIX = {
 
 const DIAGNOSIS_MAP = {
   dislexia: 'dyslexia',
-  discalculia: 'dyslexia',
+  discalculia: 'dyscalculia',
+  disortografia: 'dysorthography',
+  tda: 'tda',
   tdah: 'tdah',
   tea: 'tea',
   ta: 'tea',

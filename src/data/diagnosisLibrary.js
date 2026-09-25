@@ -125,16 +125,103 @@ const dyscalculiaSections = [
   },
 ]
 
+const dysorthographySections = [
+  {
+    title: 'Disortografia · Descripció',
+    tone: 'blue',
+    items: [
+      'La disortografia és una dificultat persistent per aplicar les convencions ortogràfiques, malgrat haver rebut ensenyament i pràctica adequats.',
+      'Pot aparèixer sola o juntament amb dislèxia, però no són equivalents: una afecta especialment l’ortografia i l’altra, sobretot, la precisió i fluïdesa lectores.',
+      'Els errors poden afectar la correspondència so-grafia, les regles ortogràfiques, les paraules irregulars, els accents o la segmentació de paraules.',
+    ],
+  },
+  {
+    title: 'Àmbit d’intervenció personal',
+    tone: 'amber',
+    items: [
+      'Separar la qualitat de les idees de la correcció ortogràfica per evitar que l’alumne associï escriure amb fracassar.',
+      'Corregir un nombre assumible d’errors prioritaris i evitar retornar textos completament marcats en vermell.',
+      'Fer visible el progrés comparant l’alumne amb les seves produccions anteriors, no amb la velocitat dels companys.',
+      'Permetre revisar en privat i donar temps per explicar oralment què volia escriure quan el text no ho reflecteix prou bé.',
+    ],
+  },
+  {
+    title: 'Estratègies metodològiques',
+    tone: 'green',
+    items: [
+      'Ensenyar explícitament una regla o patró cada vegada, amb exemples, contraexemples i pràctica espaiada.',
+      'Construir un registre personal d’errors freqüents i convertir-lo en una llista breu de revisió.',
+      'Treballar famílies de paraules, morfemes, arrels i regularitats, no només la còpia repetida de paraules aïllades.',
+      'Modelar una revisió per fases: primer contingut i estructura; després un o dos objectius ortogràfics concrets.',
+      'Permetre diccionari, corrector i predicció de text quan l’ortografia no sigui l’objectiu que s’avalua.',
+      'Combinar canals visual, auditiu i cinestèsic per fixar paraules i patrons especialment resistents.',
+    ],
+  },
+  {
+    title: 'Adaptacions específiques',
+    tone: 'purple',
+    items: [
+      'No descomptar reiteradament el mateix error ni penalitzar tota la producció quan s’avaluen continguts d’una altra matèria.',
+      'Indicar abans de la tasca quins aspectes ortogràfics concrets es tindran en compte.',
+      'Facilitar una llista de comprovació breu, exemples de referència i temps específic de revisió.',
+      'Permetre lliurar textos digitals o complementar-los oralment quan l’ortografia impedeixi mostrar el coneixement real.',
+    ],
+  },
+]
+
+const tdaSections = [
+  {
+    title: 'TDA · Perfil predominantment inatent',
+    tone: 'blue',
+    items: [
+      'En l’ús escolar habitual, TDA descriu el perfil predominantment inatent del trastorn per dèficit d’atenció amb o sense hiperactivitat.',
+      'Pot manifestar-se amb oblits, pèrdua del fil, dificultat per iniciar o acabar tasques, lentitud, desorganització i poca memòria de treball.',
+      'La dificultat pot passar desapercebuda perquè no sempre genera moviment, impulsivitat o conflicte a l’aula.',
+    ],
+  },
+  {
+    title: 'Àmbit d’intervenció personal',
+    tone: 'amber',
+    items: [
+      'Comprovar discretament que ha captat l’inici de la consigna i sap quin és el primer pas.',
+      'Acordar un senyal breu i privat per recuperar el fil sense exposar l’alumne davant del grup.',
+      'Evitar interpretar la lentitud, els oblits o la desconnexió com a desinterès o falta d’esforç.',
+      'Ajudar a estimar el temps, preparar el material i tancar cada tasca amb una comprovació final.',
+    ],
+  },
+  {
+    title: 'Estratègies metodològiques',
+    tone: 'green',
+    items: [
+      'Donar instruccions breus, d’una en una, i deixar-ne una versió visual durant la tasca.',
+      'Dividir activitats llargues en trams curts amb un punt de control visible entre trams.',
+      'Utilitzar llistes de passos, temporitzadors visuals, agenda i recordatoris externs.',
+      'Reduir distractors irrellevants i destacar només la informació necessària en cada moment.',
+      'Alternar escolta, resposta i manipulació per evitar períodes llargs d’atenció passiva.',
+      'Preveure temps addicional quan la lentitud atencional, i no el contingut, sigui la barrera.',
+    ],
+  },
+  {
+    title: 'Adaptacions específiques',
+    tone: 'purple',
+    items: [
+      'Presentar menys exercicis per pàgina i marcar clarament on comença i acaba cada bloc.',
+      'Permetre pauses breus planificades i reprendre la tasca des d’un punt assenyalat.',
+      'Fer comprovacions intermèdies en proves llargues perquè un error d’inici no arrossegui tota l’activitat.',
+      'Permetre eines d’organització i formats alternatius quan la doble demanda d’atendre i escriure penalitzi massa.',
+    ],
+  },
+]
+
 const tdahSections = [
   {
     title: 'TDAH · Descripció',
     tone: 'blue',
     items: [
       'Es caracteritza per un nivell d’impulsivitat, activitat i atenció no adequats a l’edat de desenvolupament.',
-      'Tipus inatent: dificultats atencionals, oblits freqüents, distracció davant estímuls irrellevants i estil cognitiu lent.',
-      'Tipus hiperactiu/impulsiu: excés de moviments motrius i impulsivitat verbal o conductual.',
-      'Tipus combinat: combina manifestacions d’inatenció, hiperactivitat i impulsivitat.',
-      'Té base neurobiològica i pot afectar el rendiment per impulsivitat, manca d’atenció, poca planificació i dificultats de memòria de treball.',
+      'En aquest perfil, les dificultats d’atenció s’acompanyen d’hiperactivitat i/o impulsivitat amb impacte funcional a l’aula.',
+      'Pot haver-hi necessitat intensa de moviment, dificultat per esperar, interrupcions, respostes precipitades i regulació emocional variable.',
+      'Té base neurobiològica i pot afectar el rendiment per impulsivitat, poca planificació, dificultats de memòria de treball i fatiga d’autoregulació.',
     ],
   },
   {
@@ -149,7 +236,7 @@ const tdahSections = [
       'Reforçar positivament les conductes adequades i els petits progressos.',
       'Utilitzar senyals no verbals pactats per redirigir l’atenció sense exposar-lo davant del grup.',
       'Comprovar que ha anotat deures, tasques o consignes importants abans d’acabar la classe.',
-      'Ajudar-lo a planificar el temps i a dividir les tasques.',
+      'Ajudar-lo a planificar el temps i a dividir les tasques, anticipant també els moments d’espera.',
       'Treballar estratègies d’autoinstruccions i revisió.',
       'Ajudar-lo a organitzar el material i l’espai de treball.',
       'Evitar que el dèficit d’atenció es converteixi en etiqueta personal.',
@@ -162,14 +249,14 @@ const tdahSections = [
     items: [
       'Dividir les tasques llargues en parts curtes amb objectius visibles.',
       'Evitar demanar moltes tasques simultànies o consignes encadenades sense suport visual.',
-      'Alternar activitats de moviment amb activitats més sedentàries.',
+      'Alternar activitats de moviment amb activitats més sedentàries i assignar encàrrecs funcionals que permetin moure’s amb propòsit.',
       'Utilitzar suports visuals, auditius i cinestèsics.',
       'Fer pauses breus i estructurades quan sigui necessari.',
       'Fer preguntes directes i freqüents per mantenir l’atenció.',
       'Utilitzar resums freqüents del que s’està treballant.',
       'Afavorir el treball cooperatiu en grups petits i amb rols definits.',
       'Utilitzar les TIC per estructurar tasques, temporitzar i reforçar continguts.',
-      'Permetre moviment controlat si ajuda a regular-se.',
+      'Permetre moviment controlat si ajuda a regular-se i pactar com tornar a la tasca.',
       'Revisar la comprensió abans de començar la tasca.',
       'Ampliar el temps en activitats o proves quan calgui, aproximadament un 30% si és necessari.',
       'Permetre fer algunes proves en un espai amb menys estímuls si el context general interfereix massa.',
@@ -253,7 +340,7 @@ const teaSections = [
   },
 ]
 
-const qiTdlSections = [
+const qiLimitSections = [
   {
     title: 'QI límit · Descripció',
     tone: 'blue',
@@ -265,25 +352,14 @@ const qiTdlSections = [
     ],
   },
   {
-    title: 'TDL · Descripció',
-    tone: 'blue',
-    items: [
-      'El trastorn del desenvolupament del llenguatge pot dificultar la comunicació i l’aprenentatge de manera persistent.',
-      'Pot afectar la comprensió oral, l’expressió, l’accés al vocabulari, l’organització sintàctica, la coherència del discurs i la comprensió lectora.',
-      'Pot aparèixer amb dificultats d’atenció, funcions executives, conducta adaptativa o aprenentatges instrumentals.',
-      'A l’aula pot fer que l’alumne/a sembli menys autònom del que realment és si les instruccions, els textos o les preguntes són massa llargues o poc estructurades.',
-    ],
-  },
-  {
     title: 'Àmbit d’intervenció personal',
     tone: 'amber',
     items: [
-      'Comprovar la comprensió abans de donar per iniciada una tasca.',
-      'Donar temps de resposta i evitar pressionar perquè contesti ràpidament davant del grup.',
-      'Reduir la càrrega oral simultània: poques instruccions, clares i seqüenciades.',
-      'Reforçar l’autonomia amb rutines estables, materials visibles i models de resposta.',
-      'Validar l’esforç i separar dificultat de manca de voluntat.',
-      'Ajudar l’alumne a verbalitzar què ha entès, què no i quina ajuda necessita.',
+      'Fixar objectius assolibles i visibles, amb temps suficient per consolidar-los abans d’augmentar la dificultat.',
+      'Validar l’esforç i separar la dificultat global d’aprenentatge de la manca de voluntat.',
+      'Evitar infantilitzar: adaptar la complexitat mantenint materials, temes i tracte adequats a l’edat.',
+      'Reforçar autonomia, presa de decisions i habilitats adaptatives dins de les rutines ordinàries.',
+      'Fer explícit què ja sap fer, quin és el pas següent i quina ajuda pot demanar.',
     ],
   },
   {
@@ -291,26 +367,120 @@ const qiTdlSections = [
     tone: 'green',
     items: [
       'Fraccionar les tasques en passos curts i visibles.',
-      'Combinar explicacions orals amb suports visuals: esquemes, exemples, vocabulari clau i models de resposta.',
-      'Anticipar paraules noves o conceptes complexos abans de començar una activitat.',
-      'Fer servir preguntes més concretes i reduir enunciats massa llargs.',
-      'Repetir i reformular instruccions sense infantilitzar.',
-      'Permetre respostes orals, visuals, guiades o amb plantilles quan l’objectiu no sigui avaluar expressió escrita.',
-      'Ajustar expectatives i prioritzar competències essencials quan hi hagi un decalatge global i sostingut d’aprenentatge.',
-      'Treballar amb materials manipulatius, experimentals o molt modelats quan l’abstracció pura sigui una barrera.',
-      'Fer seguiment de petites fites assolibles a curt termini i revisar-les amb l’alumne.',
+      'Partir d’exemples concrets i materials manipulatius abans d’avançar cap a l’abstracció.',
+      'Modelar el procediment, practicar-lo de manera guiada i retirar l’ajuda gradualment.',
+      'Repetir aprenentatges essencials en contextos diferents per afavorir-ne la transferència.',
+      'Reduir simultaneïtat: una demanda cognitiva principal cada vegada i passos curts i visibles.',
+      'Activar coneixements previs i connectar explícitament el contingut nou amb allò ja consolidat.',
+      'Prioritzar competències essencials i funcionals quan hi hagi un decalatge global i sostingut.',
+      'Fer seguiment de petites fites a curt termini i revisar-les amb l’alumne.',
     ],
   },
   {
     title: 'Adaptacions específiques',
     tone: 'purple',
     items: [
-      'Utilitzar frases curtes, estructura clara i vocabulari accessible.',
-      'Destacar paraules clau i separar visualment passos, dades i exemples.',
+      'Reduir volum mantenint els objectius prioritaris i oferir pràctica addicional distribuïda en el temps.',
+      'Destacar paraules clau i separar visualment passos, dades, exemples i criteris d’èxit.',
       'Donar exemples resolts o mig resolts abans de demanar autonomia completa.',
-      'Permetre més temps i reduir volum quan la càrrega lingüística o cognitiva no sigui l’objectiu principal.',
+      'Permetre més temps i formes de resposta guiades quan la càrrega cognitiva no sigui l’objectiu principal.',
       'Prioritzar criteris essencials i, si escau, marcar competències modificades al perfil de l’alumne.',
       'Organitzar la feina amb agenda, calendari, horaris o graelles visibles quan hi hagi dificultat de planificació general.',
+    ],
+  },
+]
+
+const tdlSections = [
+  {
+    title: 'TDL · Descripció',
+    tone: 'blue',
+    items: [
+      'El trastorn del desenvolupament del llenguatge és una dificultat persistent que interfereix en la comunicació i/o l’aprenentatge quotidià.',
+      'Pot afectar la comprensió oral, l’expressió, l’accés al vocabulari, la morfosintaxi, la coherència del discurs i la comprensió lectora.',
+      'Les demandes lingüístiques llargues o implícites poden fer que l’alumne sembli menys autònom o menys competent del que és.',
+      'Pot coexistir amb dificultats d’atenció, funcions executives o lectoescriptura, però requereix una resposta específicament lingüística.',
+    ],
+  },
+  {
+    title: 'Àmbit d’intervenció personal',
+    tone: 'amber',
+    items: [
+      'Donar temps de processament i resposta sense completar immediatament les frases de l’alumne.',
+      'Comprovar què ha entès demanant-li que expliqui o mostri el primer pas, no només preguntant “ho has entès?”.',
+      'Acceptar gestos, assenyalament, dibuix o paraules clau com a suport a la comunicació.',
+      'Evitar corregir públicament cada error lingüístic; reformular amb naturalitat oferint un model correcte.',
+      'Preparar la participació oral i evitar situacions improvisades que el deixin en evidència.',
+    ],
+  },
+  {
+    title: 'Estratègies metodològiques',
+    tone: 'green',
+    items: [
+      'Utilitzar frases curtes, sintaxi simple i una velocitat de parla natural però pausada.',
+      'Combinar sempre que calgui llenguatge oral amb gestos, imatges, esquemes, paraules clau i exemples.',
+      'Anticipar vocabulari acadèmic, verbs de consigna i conceptes nous abans de l’activitat.',
+      'Donar una instrucció cada vegada, repetir-la o reformular-la i mantenir-ne un suport visual.',
+      'Modelar estructures de frase, inicis de resposta i organitzadors del discurs sense donar la resposta.',
+      'Fer preguntes concretes o amb alternatives abans de passar a preguntes obertes.',
+      'Treballar explícitament comprensió, expressió oral, lectura i ús funcional del vocabulari.',
+    ],
+  },
+  {
+    title: 'Adaptacions específiques',
+    tone: 'purple',
+    items: [
+      'Reduir la complexitat lingüística de l’enunciat sense rebaixar el contingut que es vol avaluar.',
+      'Facilitar glossaris visuals, bancs de paraules, esquemes de frase i models de resposta.',
+      'Permetre respostes orals, visuals, guiades o digitals quan l’expressió lingüística no sigui l’objectiu.',
+      'Valorar separadament el coneixement del contingut i la forma lingüística.',
+      'Coordinar les estratègies de l’aula amb els professionals de llenguatge i el pla individualitzat, si n’hi ha.',
+    ],
+  },
+]
+
+const downSyndromeSections = [
+  {
+    title: 'Síndrome de Down · Descripció',
+    tone: 'blue',
+    items: [
+      'La síndrome de Down és una condició genètica associada a un perfil d’aprenentatge propi, però amb una gran variabilitat entre persones.',
+      'Sovint hi ha una fortalesa relativa en el processament visual i l’aprenentatge amb models, juntament amb més dificultat en llenguatge oral, memòria auditiva i abstracció.',
+      'La resposta educativa s’ha de basar en les capacitats, els interessos i les necessitats observades de l’alumne, no en expectatives fixades pel diagnòstic.',
+    ],
+  },
+  {
+    title: 'Àmbit d’intervenció personal',
+    tone: 'amber',
+    items: [
+      'Mantenir expectatives altes i realistes, amb objectius clars i adequats a l’edat.',
+      'Promoure autonomia: donar temps per intentar-ho abans d’ajudar i retirar el suport gradualment.',
+      'Afavorir la participació amb companys de la mateixa edat i evitar que el suport individual l’aïlli del grup.',
+      'Comprovar si audició, visió, fatiga o dificultat motriu estan interferint abans d’atribuir una resposta a manca de comprensió.',
+      'Ensenyar explícitament habilitats socials i rutines, sense infantilitzar ni sobreprotegir.',
+    ],
+  },
+  {
+    title: 'Estratègies metodològiques',
+    tone: 'green',
+    items: [
+      'Presentar la informació amb suport visual estable: model, imatge, paraula escrita, seqüència o demostració.',
+      'Dividir aprenentatges en passos petits, ensenyar-los explícitament i practicar-los en contextos reals.',
+      'Utilitzar la lectura i la paraula escrita per reforçar el llenguatge oral i el vocabulari.',
+      'Donar temps addicional per processar, respondre i executar, evitant repetir massa de pressa la pregunta.',
+      'Preensenyar vocabulari i conceptes nous i revisar-los de manera espaiada.',
+      'Afavorir aprenentatge cooperatiu, modelatge entre iguals i rols reals dins del grup.',
+      'Generalitzar el que s’ha après practicant-ho amb persones, materials i situacions diferents.',
+    ],
+  },
+  {
+    title: 'Adaptacions específiques',
+    tone: 'purple',
+    items: [
+      'Prioritzar objectius funcionals i essencials dins del currículum de referència de l’edat.',
+      'Permetre demostrar l’aprenentatge assenyalant, ordenant, manipulant, parlant o amb suport visual.',
+      'Reduir la càrrega verbal simultània i conservar una instrucció visual mentre es fa la tasca.',
+      'Avaluar el progrés individual amb evidències freqüents i ajustar els suports sense limitar anticipadament les oportunitats.',
+      'Coordinar adaptacions i objectius amb la família i els professionals del programa Progrés.',
     ],
   },
 ]
@@ -406,6 +576,40 @@ export const DIAGNOSIS_LIBRARY = {
       'La discalcúlia és una dificultat específica d’aprenentatge que afecta la comprensió del sistema numèric, els càlculs i els conceptes matemàtics bàsics.',
     sections: dyscalculiaSections,
   },
+  dysorthography: {
+    id: 'dysorthography',
+    title: 'Disortografia',
+    shortTitle: 'Disortografia',
+    tag: 'Ortografia i expressió escrita',
+    accent: 'blue',
+    summary: [
+      'Separar l’avaluació del contingut de la correcció ortogràfica quan l’ortografia no sigui l’objectiu.',
+      'Treballar pocs patrons o regles cada vegada, amb pràctica espaiada i exemples significatius.',
+      'Utilitzar un registre personal d’errors i una llista breu de revisió.',
+      'Permetre corrector, diccionari o text digital quan calgui mostrar coneixement d’una altra matèria.',
+      'Corregir de manera selectiva i evitar marcar reiteradament el mateix tipus d’error.',
+    ],
+    description:
+      'La disortografia afecta l’aprenentatge i l’aplicació estable de les convencions ortogràfiques. Pot aparèixer amb dislèxia, però necessita pautes pròpies centrades en l’escriptura.',
+    sections: dysorthographySections,
+  },
+  tda: {
+    id: 'tda',
+    title: 'TDA · Perfil predominantment inatent',
+    shortTitle: 'TDA',
+    tag: 'Atenció, inici i organització',
+    accent: 'green',
+    summary: [
+      'Assegurar el primer pas i deixar instruccions breus visibles durant la tasca.',
+      'Fragmentar el treball i incorporar punts de control intermedis.',
+      'Utilitzar agenda, llistes, temporitzadors i recordatoris externs.',
+      'Reduir distractors sense aïllar i acordar un senyal privat per recuperar el fil.',
+      'Donar més temps quan la lentitud atencional, i no el contingut, sigui la barrera.',
+    ],
+    description:
+      'El TDA és el nom d’ús habitual per al perfil predominantment inatent: pot afectar l’inici, la continuïtat, la memòria de treball i l’organització sense hiperactivitat marcada.',
+    sections: tdaSections,
+  },
   tdah: {
     id: 'tdah',
     title: 'TDAH',
@@ -441,22 +645,56 @@ export const DIAGNOSIS_LIBRARY = {
       'El TEA és un trastorn del neurodesenvolupament que pot afectar la comunicació, la interacció social, la flexibilitat i la manera de processar la informació.',
     sections: teaSections,
   },
-  'qi-tdl': {
-    id: 'qi-tdl',
-    title: 'QI límit o TDL',
-    shortTitle: 'QI límit / TDL',
-    tag: 'Raonament i llenguatge',
+  'qi-limit': {
+    id: 'qi-limit',
+    title: 'QI límit',
+    shortTitle: 'QI límit',
+    tag: 'Consolidació i transferència',
     accent: 'red',
     summary: [
-      'Donar instruccions curtes, seqüenciades i amb suport visual.',
-      'Comprovar comprensió abans de començar la tasca i fer reformulacions si cal.',
-      'Fraccionar activitats complexes en passos petits.',
-      'Ajustar expectatives, volum i càrrega lingüística quan no siguin l’objectiu d’avaluació.',
-      'Prioritzar objectius essencials i planificació guiada, amb competències modificades quan calgui.',
+      'Partir de situacions concretes i avançar cap a l’abstracció de manera molt gradual.',
+      'Modelar, practicar amb ajuda i retirar el suport només quan l’aprenentatge estigui consolidat.',
+      'Repetir continguts essencials en contextos diferents per afavorir la transferència.',
+      'Prioritzar objectius essencials, reduir simultaneïtat i oferir més temps.',
+      'Treballar autonomia i habilitats adaptatives sense infantilitzar materials ni tracte.',
     ],
     description:
-      'Agrupa necessitats que sovint apareixen al seguiment docent amb molta càrrega de suport: dificultats persistents de llenguatge, dificultats globals de raonament/aprenentatge i necessitat d’un acompanyament més estructurat per comprendre, planificar i demostrar el que saben.',
-    sections: qiTdlSections,
+      'El funcionament intel·lectual límit pot requerir més temps, estructura i pràctica per comprendre conceptes abstractes, consolidar aprenentatges i transferir-los a situacions noves.',
+    sections: qiLimitSections,
+  },
+  tdl: {
+    id: 'tdl',
+    title: 'Trastorn del desenvolupament del llenguatge (TDL)',
+    shortTitle: 'TDL',
+    tag: 'Comprensió i expressió lingüística',
+    accent: 'red',
+    summary: [
+      'Utilitzar frases curtes, sintaxi simple i suport visual per a la informació oral.',
+      'Anticipar vocabulari i verbs de consigna abans de l’activitat.',
+      'Donar temps de processament i comprovar la comprensió fent mostrar el primer pas.',
+      'Modelar estructures de resposta i permetre gestos, esquemes o formats alternatius.',
+      'Reduir la complexitat lingüística sense rebaixar el contingut que es vol avaluar.',
+    ],
+    description:
+      'El TDL és una dificultat persistent del llenguatge que interfereix en la comunicació o l’aprenentatge i pot afectar comprensió, expressió, vocabulari, sintaxi i discurs.',
+    sections: tdlSections,
+  },
+  'down-syndrome': {
+    id: 'down-syndrome',
+    title: 'Síndrome de Down',
+    shortTitle: 'Síndrome de Down',
+    tag: 'Programa Progrés',
+    accent: 'red',
+    summary: [
+      'Combinar explicació oral amb models, imatges, paraules escrites i seqüències visuals.',
+      'Ensenyar en passos petits, practicar i retirar l’ajuda gradualment per protegir l’autonomia.',
+      'Donar temps de processament i permetre formes diverses de demostrar l’aprenentatge.',
+      'Afavorir participació real amb iguals i evitar que el suport individual aïlli l’alumne.',
+      'Mantenir expectatives altes i ajustar-les a les evidències de progrés individual.',
+    ],
+    description:
+      'La síndrome de Down s’associa a un perfil d’aprenentatge amb gran variabilitat individual. Les pautes aprofiten les fortaleses visuals i reforcen llenguatge, memòria, autonomia i inclusió.',
+    sections: downSyndromeSections,
   },
   'high-capacity': {
     id: 'high-capacity',
