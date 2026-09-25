@@ -432,9 +432,12 @@ function TimelineRows({ calendarEvents, groups, onOpenSession }) {
     const freeMinutes = load && bundle.session.status === 'planned'
       ? Math.max(0, load.programmableMinutes - load.plannedMinutes)
       : 0
-    const activitySummary = bundle.items.map((item) => item.title).join(' · ')
-      || (bundle.detailsLoaded === false ? 'Obre per veure les activitats' : 'Sessió sense activitats')
-    return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content"><span>{bundle.planningUnit.code}{group.isParallel ? ' · mateixa sessió de mig grup' : ''}</span><strong>{bundle.planningUnit.title}</strong><small>{blockingEvent ? `${blockingEvent.title} · aquesta sessió no es fa` : activitySummary}</small></div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : freeMinutes > 0 ? 'underfilled' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : freeMinutes > 0 ? `${freeMinutes} min lliures` : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
+    const activities = bundle.detailsLoaded === false
+      ? [{ id: 'loading', title: 'Obre per veure les activitats', showTiming: false }]
+      : bundle.items.length > 0
+        ? bundle.items
+        : [{ id: 'empty', title: 'Sessió sense activitats', showTiming: false }]
+    return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content">{group.isParallel && <span>Mateixa sessió de mig grup</span>}{blockingEvent ? <div className="agenda-timeline-activity"><strong>{blockingEvent.title}</strong><small>Aquesta sessió no es fa</small></div> : activities.map((item) => <div className="agenda-timeline-activity" key={item.id}><strong>{item.title}</strong>{item.showTiming !== false && <small>{item.plannedMinutes ? `${item.plannedMinutes} min${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}` : 'Sense temps assignat'}</small>}</div>)}</div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : freeMinutes > 0 ? 'underfilled' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : freeMinutes > 0 ? `${freeMinutes} min lliures` : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
   }))}</div>
 }
 
@@ -462,8 +465,12 @@ export function AgendaTimelineView({
   const classBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
   const logicalGroups = groupParallelSessionBundles(classBundles)
     .map((group, index) => ({ ...group, sequence: index + 1 }))
-  const archivedGroups = logicalGroups.filter((group) => group.bundles.every((bundle) => sessionHasPassed(bundle, now, today)))
-  const upcomingGroups = logicalGroups.filter((group) => !group.bundles.every((bundle) => sessionHasPassed(bundle, now, today)))
+  const archivedGroups = logicalGroups
+    .map((group) => ({ ...group, bundles: group.bundles.filter((bundle) => sessionHasPassed(bundle, now, today)) }))
+    .filter((group) => group.bundles.length > 0)
+  const upcomingGroups = logicalGroups
+    .map((group) => ({ ...group, bundles: group.bundles.filter((bundle) => !sessionHasPassed(bundle, now, today)) }))
+    .filter((group) => group.bundles.length > 0)
   const selectedClass = classes.find((item) => item.id === selectedClassId)
   return (
     <section className="agenda-timeline-view">

@@ -514,6 +514,9 @@
 .agenda-timeline-content > span { color: #8b5cf6; font-size: 7px; font-weight: 950; text-transform: uppercase; }
 .agenda-timeline-content strong { color: #334155; font-size: 11px; }
 .agenda-timeline-content small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-timeline-activity { min-width: 0; display: flex; align-items: baseline; gap: 6px; }
+.agenda-timeline-activity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-timeline-activity small { flex: none; color: #64748b; font-size: 8px; font-weight: 850; }
 .agenda-timeline-archive { border-top: 1px solid #e2e8f0; background: #f8fafc; }
 .agenda-timeline-archive > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; gap: 9px; align-items: center; padding: 12px 20px; color: #475569; cursor: pointer; list-style: none; }
 .agenda-timeline-archive > summary::-webkit-details-marker { display: none; }
