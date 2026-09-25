@@ -6,8 +6,9 @@ import {
 } from '../lib/cloudSyncQueue.js'
 
 const DB_NAME = 'avaluapro-v2'
-const DB_VERSION = 16
+const DB_VERSION = 17
 const TUTORING_COORDINATION_CACHE_STORE = 'tutoringCoordinationCache'
+const TUTORING_COORDINATION_STATE_CACHE_STORE = 'tutoringCoordinationStateCache'
 const TUTORING_COORDINATION_OUTBOX_STORE = 'tutoringCoordinationOutbox'
 const CLOUD_WORKSPACE_MANIFEST_STORE = 'cloudWorkspaceManifests'
 
@@ -82,6 +83,17 @@ function openDatabase() {
       }
       if (!coordinationCacheStore.indexNames.contains('spaceKey')) {
         coordinationCacheStore.createIndex('spaceKey', 'spaceKey', { unique: false })
+      }
+      const coordinationStateCacheStore = ensureCustomStore(
+        db,
+        TUTORING_COORDINATION_STATE_CACHE_STORE,
+        'cacheKey',
+      ) || request.transaction.objectStore(TUTORING_COORDINATION_STATE_CACHE_STORE)
+      if (!coordinationStateCacheStore.indexNames.contains('ownerUid')) {
+        coordinationStateCacheStore.createIndex('ownerUid', 'ownerUid', { unique: false })
+      }
+      if (!coordinationStateCacheStore.indexNames.contains('spaceKey')) {
+        coordinationStateCacheStore.createIndex('spaceKey', 'spaceKey', { unique: false })
       }
       const coordinationOutboxStore = ensureCustomStore(db, TUTORING_COORDINATION_OUTBOX_STORE, 'id') ||
         request.transaction.objectStore(TUTORING_COORDINATION_OUTBOX_STORE)
@@ -495,6 +507,24 @@ function stripCoordinationCacheMeta(row = {}) {
   return item
 }
 
+function coordinationStateCacheRow(ownerUid, spaceId, state) {
+  return {
+    ...state,
+    cacheKey: `${ownerUid}:${spaceId}:${state.uid}`,
+    ownerUid,
+    spaceId,
+    spaceKey: `${ownerUid}:${spaceId}`,
+  }
+}
+
+function stripCoordinationStateCacheMeta(row = {}) {
+  const state = { ...row }
+  delete state.cacheKey
+  delete state.ownerUid
+  delete state.spaceKey
+  return state
+}
+
 export async function loadTutoringCoordinationCache(uid) {
   if (!uid) return []
   const db = await openDatabase()
@@ -536,19 +566,69 @@ export async function replaceTutoringCoordinationCache(uid, spaceId, items = [])
   }
 }
 
+export async function loadTutoringCoordinationStateCache(uid) {
+  if (!uid) return []
+  const db = await openDatabase()
+  try {
+    const rows = await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(TUTORING_COORDINATION_STATE_CACHE_STORE, 'readonly')
+        .objectStore(TUTORING_COORDINATION_STATE_CACHE_STORE)
+        .index('ownerUid')
+        .getAll(uid)
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+    return rows.map(stripCoordinationStateCacheMeta)
+  } finally {
+    db.close()
+  }
+}
+
+export async function replaceTutoringCoordinationStateCache(uid, spaceId, memberStates = []) {
+  if (!uid || !spaceId) return
+  const db = await openDatabase()
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(TUTORING_COORDINATION_STATE_CACHE_STORE, 'readwrite')
+      const store = transaction.objectStore(TUTORING_COORDINATION_STATE_CACHE_STORE)
+      const request = store.index('spaceKey').getAllKeys(`${uid}:${spaceId}`)
+      request.onsuccess = () => {
+        request.result.forEach((key) => store.delete(key))
+        memberStates.forEach((state) => store.put(coordinationStateCacheRow(uid, spaceId, state)))
+      }
+      request.onerror = () => transaction.abort()
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
 export async function queueTutoringCoordinationOperation(uid, operation) {
   if (!uid || !operation?.id) return
   const db = await openDatabase()
   try {
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(
-        [TUTORING_COORDINATION_CACHE_STORE, TUTORING_COORDINATION_OUTBOX_STORE],
+        [
+          TUTORING_COORDINATION_CACHE_STORE,
+          TUTORING_COORDINATION_STATE_CACHE_STORE,
+          TUTORING_COORDINATION_OUTBOX_STORE,
+        ],
         'readwrite',
       )
       if (operation.type === 'item' && operation.item?.id && operation.spaceId) {
         transaction
           .objectStore(TUTORING_COORDINATION_CACHE_STORE)
           .put(coordinationCacheRow(uid, operation.spaceId, operation.item))
+      }
+      if (operation.type === 'memberState' && operation.state?.uid && operation.spaceId) {
+        transaction
+          .objectStore(TUTORING_COORDINATION_STATE_CACHE_STORE)
+          .put(coordinationStateCacheRow(uid, operation.spaceId, operation.state))
       }
       transaction.objectStore(TUTORING_COORDINATION_OUTBOX_STORE).put({ ...operation, uid })
       transaction.oncomplete = () => resolve()

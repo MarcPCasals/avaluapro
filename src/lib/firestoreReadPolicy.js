@@ -27,3 +27,22 @@ export function getTutoringCollectionsToSync(changeCollections = [], allowedColl
   const requested = Array.from(new Set(changeCollections)).filter((collectionName) => allowed.has(collectionName))
   return requested.length > 0 ? requested : [...allowedCollections]
 }
+
+/**
+ * La coordinació compartida només manté listeners per l'espai que el docent
+ * està mirant. Sense una tutoria oberta, la interfície reutilitza la memòria
+ * local i no obre una connexió remota per cada espai compartit.
+ */
+export function getActiveTutoringListenerSpaceIds(allowedSpaceIds = [], activeSpaceId = '') {
+  const normalizedActiveSpaceId = String(activeSpaceId || '').trim()
+  if (!normalizedActiveSpaceId) return []
+  return allowedSpaceIds.includes(normalizedActiveSpaceId) ? [normalizedActiveSpaceId] : []
+}
+
+/**
+ * Els historials de missatgeria només necessiten temps real mentre el modal és
+ * obert. El recompte conegut es conserva en memòria quan es tanca.
+ */
+export function shouldOpenInternalMessagingListeners({ isOpen = false, userEmail = '', userUid = '' } = {}) {
+  return Boolean(isOpen && String(userEmail).trim() && String(userUid).trim())
+}

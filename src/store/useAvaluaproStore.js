@@ -9,10 +9,12 @@ import {
   loadCloudSyncQueue,
   loadDataset,
   loadTutoringCoordinationCache,
+  loadTutoringCoordinationStateCache,
   loadTutoringCoordinationOutbox,
   queueTutoringCoordinationOperation,
   recordCloudSyncQueueFailure,
   replaceTutoringCoordinationCache,
+  replaceTutoringCoordinationStateCache,
   resetDatabase,
   patchCloudWorkspaceManifestCollections,
   saveCollections,
@@ -101,6 +103,7 @@ import {
   getCloudCollectionsToLoad,
   getCloudWorkspaceRevision,
 } from '../lib/cloudWorkspaceManifest'
+import { getActiveTutoringListenerSpaceIds } from '../lib/firestoreReadPolicy'
 import {
   getCloudStartupAction,
   getCloudWorkspacePreferences,
@@ -157,6 +160,8 @@ let cloudStartupPromise = null
 let cloudStartupUid = ''
 const queuedCloudCollections = new Set()
 let tutoringCoordinationUnsubscribers = []
+let tutoringCoordinationActiveSpaceId = ''
+let tutoringCoordinationSubscriptionGeneration = 0
 let tutoringCoordinationOnlineListenerReady = false
 
 function getQueuedCloudCollections() {
@@ -649,9 +654,63 @@ function scheduleCloudSync(set, get, collections, pendingOperationCount = 0) {
   }, CLOUD_SYNC_DELAY_MS)
 }
 
-function stopTutoringCoordinationSubscriptions() {
+function stopTutoringCoordinationSubscriptions(expectedSpaceId = '') {
+  if (expectedSpaceId && tutoringCoordinationActiveSpaceId !== expectedSpaceId) return false
+  tutoringCoordinationSubscriptionGeneration += 1
   tutoringCoordinationUnsubscribers.forEach((unsubscribe) => unsubscribe())
   tutoringCoordinationUnsubscribers = []
+  tutoringCoordinationActiveSpaceId = ''
+  return true
+}
+
+async function loadCachedTutoringCoordination(
+  set,
+  get,
+  status = 'cached',
+  expectedGeneration = tutoringCoordinationSubscriptionGeneration,
+) {
+  const state = get()
+  const user = state.cloud.user
+  if (!user?.uid) return
+
+  const allowedSpaceIds = new Set((state.cloud.sharedTutoringSpaces || []).map((space) => space.id))
+  const [cachedItemsRaw, cachedMemberStatesRaw, pendingOperations] = await Promise.all([
+    loadTutoringCoordinationCache(user.uid),
+    loadTutoringCoordinationStateCache(user.uid),
+    loadTutoringCoordinationOutbox(user.uid),
+  ])
+  const cachedItems = cachedItemsRaw.filter((item) => allowedSpaceIds.has(item.spaceId))
+  const cachedMemberStates = cachedMemberStatesRaw.filter((item) => allowedSpaceIds.has(item.spaceId))
+  const pendingMemberStates = pendingOperations
+    .filter((operation) => operation.type === 'memberState' && allowedSpaceIds.has(operation.spaceId))
+    .map((operation) => operation.state)
+  if (expectedGeneration !== tutoringCoordinationSubscriptionGeneration) return
+
+  set((current) => ({
+    cloud: (() => {
+      const memberStateByKey = new Map(
+        [
+          ...cachedMemberStates,
+          ...current.cloud.tutoringCoordinationMemberStates.filter((item) => allowedSpaceIds.has(item.spaceId)),
+        ]
+          .map((item) => [`${item.spaceId}:${item.uid}`, item]),
+      )
+      pendingMemberStates.forEach((item) => memberStateByKey.set(`${item.spaceId}:${item.uid}`, item))
+      return {
+        ...current.cloud,
+        tutoringCoordinationItems: cachedItems,
+        tutoringCoordinationMemberStates: Array.from(memberStateByKey.values()),
+        tutoringCoordinationPendingCount: pendingOperations.length,
+        tutoringCoordinationStatus: pendingOperations.length > 0 ? 'pending' : status,
+      }
+    })(),
+  }))
+}
+
+function ensureTutoringCoordinationOnlineListener(set, get) {
+  if (tutoringCoordinationOnlineListenerReady) return
+  window.addEventListener('online', () => flushTutoringCoordinationOutbox(set, get))
+  tutoringCoordinationOnlineListenerReady = true
 }
 
 async function flushTutoringCoordinationOutbox(set, get) {
@@ -697,45 +756,55 @@ async function flushTutoringCoordinationOutbox(set, get) {
     cloud: {
       ...current.cloud,
       tutoringCoordinationPendingCount: pending.length,
-      tutoringCoordinationStatus: pending.length > 0 ? 'pending' : 'live',
+      tutoringCoordinationStatus: pending.length > 0
+        ? 'pending'
+        : tutoringCoordinationActiveSpaceId
+          ? 'live'
+          : 'cached',
       ...(pending.length === 0 ? { tutoringCoordinationError: '' } : {}),
     },
   }))
 }
 
-async function startTutoringCoordinationSubscriptions(set, get) {
-  stopTutoringCoordinationSubscriptions()
+async function startTutoringCoordinationSubscriptions(set, get, activeSpaceId = '') {
   const state = get()
   const user = state.cloud.user
-  if (!user?.uid) return
+  if (!user?.uid) {
+    stopTutoringCoordinationSubscriptions()
+    return
+  }
 
-  const allowedSpaceIds = new Set((state.cloud.sharedTutoringSpaces || []).map((space) => space.id))
-  const cachedItems = (await loadTutoringCoordinationCache(user.uid)).filter((item) => allowedSpaceIds.has(item.spaceId))
-  const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
-  const pendingMemberStates = pendingOperations
-    .filter((operation) => operation.type === 'memberState' && allowedSpaceIds.has(operation.spaceId))
-    .map((operation) => operation.state)
-  set((current) => ({
-    cloud: {
-      ...current.cloud,
-      tutoringCoordinationItems: cachedItems,
-      tutoringCoordinationMemberStates: pendingMemberStates,
-      tutoringCoordinationStatus: 'loading',
-    },
-  }))
+  const allowedSpaceIds = (state.cloud.sharedTutoringSpaces || []).map((space) => space.id)
+  const spaceIds = getActiveTutoringListenerSpaceIds(allowedSpaceIds, activeSpaceId)
+  if (spaceIds.length === 0) {
+    stopTutoringCoordinationSubscriptions()
+    const generation = tutoringCoordinationSubscriptionGeneration
+    await loadCachedTutoringCoordination(set, get, 'cached', generation)
+    return
+  }
+  if (tutoringCoordinationActiveSpaceId === spaceIds[0] && tutoringCoordinationUnsubscribers.length > 0) return
 
-  const spaceIds = Array.from(allowedSpaceIds)
+  stopTutoringCoordinationSubscriptions()
+  tutoringCoordinationActiveSpaceId = spaceIds[0]
+  const subscriptionGeneration = tutoringCoordinationSubscriptionGeneration
+  await loadCachedTutoringCoordination(set, get, 'loading', subscriptionGeneration)
+  if (
+    subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration
+    || tutoringCoordinationActiveSpaceId !== spaceIds[0]
+  ) return
 
   spaceIds.forEach((spaceId) => {
     const unsubscribeItems = subscribeToTutoringCoordinationItems(
       spaceId,
       async (remoteItems) => {
         const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         const pendingItems = pendingOperations
           .filter((operation) => operation.type === 'item' && operation.spaceId === spaceId)
           .map((operation) => operation.item)
         const mergedItems = mergeTutoringCoordinationItems(remoteItems, pendingItems)
         await replaceTutoringCoordinationCache(user.uid, spaceId, mergedItems)
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         set((current) => ({
           cloud: {
             ...current.cloud,
@@ -749,6 +818,7 @@ async function startTutoringCoordinationSubscriptions(set, get) {
         }))
       },
       (error) => {
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         const accessRevoked = String(error?.code || '').includes('permission-denied')
         if (accessRevoked) replaceTutoringCoordinationCache(user.uid, spaceId, []).catch(() => {})
         set((current) => ({
@@ -767,11 +837,14 @@ async function startTutoringCoordinationSubscriptions(set, get) {
       spaceId,
       async (memberStates) => {
         const pendingOperations = await loadTutoringCoordinationOutbox(user.uid)
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         const pendingStates = pendingOperations
           .filter((operation) => operation.type === 'memberState' && operation.spaceId === spaceId)
           .map((operation) => operation.state)
         const memberStateByUid = new Map(memberStates.map((item) => [item.uid, item]))
         pendingStates.forEach((item) => memberStateByUid.set(item.uid, item))
+        await replaceTutoringCoordinationStateCache(user.uid, spaceId, Array.from(memberStateByUid.values()))
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         set((current) => ({
           cloud: {
             ...current.cloud,
@@ -783,6 +856,7 @@ async function startTutoringCoordinationSubscriptions(set, get) {
         }))
       },
       (error) => {
+        if (subscriptionGeneration !== tutoringCoordinationSubscriptionGeneration) return
         set((current) => ({
           cloud: {
             ...current.cloud,
@@ -794,10 +868,7 @@ async function startTutoringCoordinationSubscriptions(set, get) {
     tutoringCoordinationUnsubscribers.push(unsubscribeItems, unsubscribeMemberStates)
   })
 
-  if (!tutoringCoordinationOnlineListenerReady) {
-    window.addEventListener('online', () => flushTutoringCoordinationOutbox(set, get))
-    tutoringCoordinationOnlineListenerReady = true
-  }
+  ensureTutoringCoordinationOnlineListener(set, get)
   await flushTutoringCoordinationOutbox(set, get)
 }
 
@@ -3328,7 +3399,9 @@ export const useAvaluaproStore = create((set, get) => ({
             : null
         }),
       )
-      await startTutoringCoordinationSubscriptions(set, get)
+      await loadCachedTutoringCoordination(set, get)
+      ensureTutoringCoordinationOnlineListener(set, get)
+      await flushTutoringCoordinationOutbox(set, get)
       return sharedTutoringSpaces
     } catch (error) {
       set((current) => ({
@@ -3340,6 +3413,21 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       return []
     }
+  },
+
+  activateTutoringCoordination: async (spaceId) => {
+    await startTutoringCoordinationSubscriptions(set, get, spaceId)
+  },
+
+  deactivateTutoringCoordination: (spaceId = '') => {
+    const stopped = stopTutoringCoordinationSubscriptions(spaceId)
+    if (!stopped) return
+    set((current) => ({
+      cloud: {
+        ...current.cloud,
+        tutoringCoordinationStatus: current.cloud.tutoringCoordinationPendingCount > 0 ? 'pending' : 'cached',
+      },
+    }))
   },
 
   addTutoringCoordinationItem: async ({

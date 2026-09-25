@@ -315,7 +315,16 @@ La segona capa d’Agenda completa aquest bloc:
 - qualsevol desament o eliminació invalida immediatament aquesta finestra, i el tancament de sessió elimina també la instància compartida;
 - no es manté cap base de dades nova ni cap còpia en memòria de dades d’alumnat.
 
-Encara queden pendents el lideratge explícit d’una sola pestanya i l’activació sota demanda dels listeners de cotutoria.
+La capa de listeners globals també queda aplicada:
+
+- els tres listeners de missatgeria interna només s’obren mentre el docent té oberta la pantalla de Missatges;
+- en tancar-la es conserva el darrer recompte conegut, però ja no es manté cap connexió remota;
+- la coordinació de cotutoria carrega la memòria IndexedDB a l’arrencada i només obre els dos listeners de l’espai que està visible al Mode tutoria;
+- canviar ràpidament de classe o tancar la pantalla invalida qualsevol resposta asíncrona antiga i evita que es reactivi un listener obsolet;
+- l’estat de lectura i els avisos acceptats de cotutoria també es desen localment, de manera que treure els listeners globals no crea falsos avisos després de recarregar;
+- els formularis sociomètrics, els senyals de canvi, el feedback i la resta de listeners revisats ja depenen de pantalles o panells oberts.
+
+Amb tres cotutories compartides, l’arrencada passa de sis listeners de coordinació a zero. En obrir-ne una en manté dos, independentment del nombre total d’espais compartits. Encara queda pendent el lideratge explícit d’una sola pestanya per evitar que dues pestanyes obertes al mateix mòdul dupliquin aquestes connexions sota demanda.
 
 ## 9. Capacitat del pla gratuït
 

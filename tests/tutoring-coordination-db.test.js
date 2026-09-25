@@ -5,8 +5,10 @@ import {
   acknowledgeTutoringCoordinationOperation,
   loadTutoringCoordinationCache,
   loadTutoringCoordinationOutbox,
+  loadTutoringCoordinationStateCache,
   queueTutoringCoordinationOperation,
   replaceTutoringCoordinationCache,
+  replaceTutoringCoordinationStateCache,
 } from '../src/db/indexedDb.js'
 
 function deleteTestDatabase() {
@@ -58,5 +60,30 @@ describe('cua local de coordinacio', () => {
     ])
     assert.equal((await loadTutoringCoordinationCache('user-1'))[0].text, 'Compte 1')
     assert.equal((await loadTutoringCoordinationCache('user-2'))[0].text, 'Compte 2')
+  })
+
+  test('conserva localment la lectura dels avisos sense mantenir listeners globals', async () => {
+    await replaceTutoringCoordinationStateCache('user-1', 'space-1', [
+      { lastReadAt: '2026-09-25T08:00:00.000Z', spaceId: 'space-1', uid: 'user-1' },
+    ])
+
+    assert.equal(
+      (await loadTutoringCoordinationStateCache('user-1'))[0].lastReadAt,
+      '2026-09-25T08:00:00.000Z',
+    )
+
+    await queueTutoringCoordinationOperation('user-1', {
+      createdAt: '2026-09-25T09:00:00.000Z',
+      id: 'state-operation-1',
+      revision: 'state-revision-1',
+      spaceId: 'space-1',
+      state: { lastReadAt: '2026-09-25T09:00:00.000Z', spaceId: 'space-1', uid: 'user-1' },
+      type: 'memberState',
+    })
+
+    assert.equal(
+      (await loadTutoringCoordinationStateCache('user-1'))[0].lastReadAt,
+      '2026-09-25T09:00:00.000Z',
+    )
   })
 })

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 
 import {
   FIRESTORE_QUERY_LIMITS,
+  getActiveTutoringListenerSpaceIds,
   getBoundedFirestoreLimit,
   getTutoringCollectionsToSync,
+  shouldOpenInternalMessagingListeners,
 } from '../src/lib/firestoreReadPolicy.js'
 import {
   getFirestoreReadDiagnostics,
@@ -52,6 +54,20 @@ test('una edició compartida només sincronitza les col·leccions modificades', 
 test('la creació o reparació sense filtre conserva la sincronització completa', () => {
   const allowed = ['students', 'tutorialRecords', 'tutorialMarks']
   assert.deepEqual(getTutoringCollectionsToSync([], allowed), allowed)
+})
+
+test('la cotutoria només obre listeners per l’espai actiu i autoritzat', () => {
+  const allowedSpaceIds = ['space-a', 'space-b', 'space-c']
+
+  assert.deepEqual(getActiveTutoringListenerSpaceIds(allowedSpaceIds, ''), [])
+  assert.deepEqual(getActiveTutoringListenerSpaceIds(allowedSpaceIds, 'space-b'), ['space-b'])
+  assert.deepEqual(getActiveTutoringListenerSpaceIds(allowedSpaceIds, 'space-unknown'), [])
+})
+
+test('la missatgeria només manté temps real mentre la pantalla és oberta', () => {
+  assert.equal(shouldOpenInternalMessagingListeners({ isOpen: false, userEmail: 'docent@educand.ad', userUid: 'u1' }), false)
+  assert.equal(shouldOpenInternalMessagingListeners({ isOpen: true, userEmail: '', userUid: 'u1' }), false)
+  assert.equal(shouldOpenInternalMessagingListeners({ isOpen: true, userEmail: 'docent@educand.ad', userUid: 'u1' }), true)
 })
 
 test('el diagnòstic compta una lectura mínima per consulta buida sense dades personals', () => {

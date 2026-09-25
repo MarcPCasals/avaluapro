@@ -4544,6 +4544,8 @@ export function TutoringView() {
   const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
   const linkClassToSharedTutoringSpace = useAvaluaproStore((state) => state.linkClassToSharedTutoringSpace)
   const syncSharedTutoringClass = useAvaluaproStore((state) => state.syncSharedTutoringClass)
+  const activateTutoringCoordination = useAvaluaproStore((state) => state.activateTutoringCoordination)
+  const deactivateTutoringCoordination = useAvaluaproStore((state) => state.deactivateTutoringCoordination)
   const activeClass = classes.find((classItem) => classItem.id === activeClassId)
   const linkedClassId = activeClass?.tutorialLinkedClassId || activeClass?.id
   const linkedClass = classes.find((classItem) => classItem.id === linkedClassId) || activeClass
@@ -4559,6 +4561,21 @@ export function TutoringView() {
     cloud.tutoringCoordinationMemberStates,
     cloud.user?.uid,
   ).filter((item) => item.spaceId === activeClass?.sharedTutoringSpaceId).length
+  useEffect(() => {
+    const spaceId = activeSharedTutoringSpace?.id || ''
+    if (!spaceId || !cloud.user?.uid) {
+      deactivateTutoringCoordination()
+      return undefined
+    }
+
+    activateTutoringCoordination(spaceId).catch(() => {})
+    return () => deactivateTutoringCoordination(spaceId)
+  }, [
+    activateTutoringCoordination,
+    activeSharedTutoringSpace?.id,
+    cloud.user?.uid,
+    deactivateTutoringCoordination,
+  ])
   useEffect(() => {
     if (!activeClass?.sharedTutoringSpaceId || !cloud.user?.uid) return undefined
     const spaceId = activeClass.sharedTutoringSpaceId

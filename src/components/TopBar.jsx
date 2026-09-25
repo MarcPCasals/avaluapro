@@ -42,6 +42,7 @@ import {
   subscribeInternalMessages,
   subscribeInternalMessageState,
 } from '../lib/firebase'
+import { shouldOpenInternalMessagingListeners } from '../lib/firestoreReadPolicy'
 import { getPendingReminderSummary } from '../lib/reminders'
 
 const AgendaRemindersModal = lazy(() =>
@@ -159,6 +160,9 @@ export function TopBar() {
   const [internalAnnouncements, setInternalAnnouncements] = useState([])
   const [internalMessageState, setInternalMessageState] = useState({})
   const [internalMessageError, setInternalMessageError] = useState('')
+  const [internalMessagesOwnerUid, setInternalMessagesOwnerUid] = useState('')
+  const [internalAnnouncementsOwnerUid, setInternalAnnouncementsOwnerUid] = useState('')
+  const [internalMessageStateOwnerUid, setInternalMessageStateOwnerUid] = useState('')
   const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
   const dataMenuRef = useRef(null)
@@ -217,35 +221,47 @@ export function TopBar() {
           : 'gray'
   const dataMenuBadgeTotal = pendingTeacherPackages + pendingTutoringShares
   const ownEmail = String(cloud.user?.email || '').trim().toLowerCase()
-  const announcementsReadAt = timestampToMillis(internalMessageState.announcementsReadAt)
-  const unreadInternalMessageCount = cloud.user ? internalMessages.filter(
+  const visibleInternalMessages = cloud.user?.uid === internalMessagesOwnerUid ? internalMessages : []
+  const visibleInternalAnnouncements = cloud.user?.uid === internalAnnouncementsOwnerUid ? internalAnnouncements : []
+  const visibleInternalMessageState = cloud.user?.uid === internalMessageStateOwnerUid ? internalMessageState : {}
+  const announcementsReadAt = timestampToMillis(visibleInternalMessageState.announcementsReadAt)
+  const unreadInternalMessageCount = cloud.user ? visibleInternalMessages.filter(
       (item) => item.recipientEmailLower === ownEmail && item.status === 'unread',
-    ).length + internalAnnouncements.filter(
+    ).length + visibleInternalAnnouncements.filter(
       (item) => timestampToMillis(item.createdAt) > announcementsReadAt,
     ).length : 0
 
   useEffect(() => {
-    if (!cloud.user?.uid || !cloud.user?.email) {
+    if (!shouldOpenInternalMessagingListeners({
+      isOpen: showMessaging,
+      userEmail: cloud.user?.email,
+      userUid: cloud.user?.uid,
+    })) {
       return undefined
     }
 
     const handleError = () => setInternalMessageError('No s’han pogut carregar els missatges. Torna-ho a provar més tard.')
     const unsubscribeMessages = subscribeInternalMessages(cloud.user.email, (items) => {
+      setInternalMessagesOwnerUid(cloud.user.uid)
       setInternalMessages(items)
       setInternalMessageError('')
     }, handleError)
     const unsubscribeAnnouncements = subscribeInternalAnnouncements((items) => {
+      setInternalAnnouncementsOwnerUid(cloud.user.uid)
       setInternalAnnouncements(items)
       setInternalMessageError('')
     }, handleError)
-    const unsubscribeState = subscribeInternalMessageState(cloud.user.uid, setInternalMessageState, handleError)
+    const unsubscribeState = subscribeInternalMessageState(cloud.user.uid, (messageState) => {
+      setInternalMessageStateOwnerUid(cloud.user.uid)
+      setInternalMessageState(messageState)
+    }, handleError)
 
     return () => {
       unsubscribeMessages()
       unsubscribeAnnouncements()
       unsubscribeState()
     }
-  }, [cloud.user?.email, cloud.user?.uid])
+  }, [cloud.user?.email, cloud.user?.uid, showMessaging])
 
   useEffect(() => {
     if (!showDataMenu) return undefined
@@ -630,9 +646,9 @@ export function TopBar() {
       )}
       {showMessaging && (
         <InternalMessagingModal
-          announcements={internalAnnouncements}
-          messageState={internalMessageState}
-          messages={internalMessages}
+          announcements={visibleInternalAnnouncements}
+          messageState={visibleInternalMessageState}
+          messages={visibleInternalMessages}
           onClose={() => setShowMessaging(false)}
           sharedTutoringSpaces={cloud.sharedTutoringSpaces}
           subscriptionError={internalMessageError}
