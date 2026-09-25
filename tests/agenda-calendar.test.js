@@ -141,12 +141,14 @@ test('les sessions reals de la UT respecten versions d horari, festius i el comp
     classId: 'class-1',
     slotsByTimetableId: {
       'timetable-1': [
-        { id: 'monday-a', classId: 'class-1', weekday: 1 },
-        { id: 'monday-b', classId: 'class-1', sharedProgrammingSlotId: 'monday-a', weekday: 1 },
-        { id: 'wednesday', classId: 'class-1', weekday: 3 },
-        { id: 'friday', classId: 'class-1', weekday: 5 },
+        { id: 'monday-a', classId: 'class-1', subject: 'Ciències', weekday: 1 },
+        { id: 'monday-b', classId: 'class-1', sharedProgrammingSlotId: 'monday-a', subject: 'Ciències', weekday: 1 },
+        { id: 'wednesday', classId: 'class-1', subject: 'Ciències', weekday: 3 },
+        { id: 'tutorial', classId: 'class-1', subject: 'Tutoria', weekday: 4 },
+        { id: 'friday', classId: 'class-1', subject: 'Ciències', weekday: 5 },
       ],
     },
+    subject: 'Ciencies',
     temporalUnit: { startsOn: '2026-09-21', endsOn: '2026-09-27' },
     timetables: [{ id: 'timetable-1', effectiveFrom: '2026-09-01', effectiveTo: '' }],
     today: '2026-09-22',

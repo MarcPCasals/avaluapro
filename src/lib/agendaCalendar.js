@@ -1,5 +1,13 @@
 const NO_CLASS_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
+function normalizedSubject(subject = '') {
+  return String(subject || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('ca')
+}
+
 function addDays(dateKey, amount) {
   const date = new Date(`${dateKey}T12:00:00Z`)
   date.setUTCDate(date.getUTCDate() + amount)
@@ -44,6 +52,7 @@ export function getTemporalUnitProgress({
   calendarEvents = [],
   classId = '',
   slotsByTimetableId = {},
+  subject = '',
   temporalUnit,
   timetables = [],
   today,
@@ -68,8 +77,10 @@ export function getTemporalUnitProgress({
     const timetable = selectTimetableForDate(timetables, dateKey)
     const timetableSlots = slotsByTimetableId[timetable?.id] || []
     const slotsById = new Map(timetableSlots.map((slot) => [slot.id, slot]))
+    const subjectKey = normalizedSubject(subject)
     const slots = timetableSlots
       .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday)
+      .filter((slot) => !subjectKey || normalizedSubject(slot.subject) === subjectKey)
       .filter((slot) => !getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id }))
     const logicalSessionIds = new Set(slots.map((slot) => sharedProgrammingRootId(slot, slotsById)))
     for (const sessionId of logicalSessionIds) {

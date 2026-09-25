@@ -441,14 +441,19 @@ export default function AgendaModule() {
     () => findCurrentTemporalUnit(workspace.temporalUnits, workspace.today),
     [workspace.temporalUnits, workspace.today],
   )
+  const activeClassSubject = useMemo(
+    () => classes.find((item) => item.id === activeClassId)?.subject || '',
+    [activeClassId, classes],
+  )
   const temporalUnitProgress = useMemo(() => getTemporalUnitProgress({
     calendarEvents: workspace.calendarEvents,
     classId: activeClassId,
     slotsByTimetableId: workspace.slotsByTimetableId,
+    subject: activeClassSubject,
     temporalUnit: activeTemporalUnit,
     timetables: workspace.timetables,
     today: workspace.today,
-  }), [activeClassId, activeTemporalUnit, workspace.calendarEvents, workspace.slotsByTimetableId, workspace.timetables, workspace.today])
+  }), [activeClassId, activeClassSubject, activeTemporalUnit, workspace.calendarEvents, workspace.slotsByTimetableId, workspace.timetables, workspace.today])
   const reminderSummary = useMemo(
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
