@@ -1166,6 +1166,92 @@ test('un avís de sessió incompleta avança i divideix la propera activitat fin
   assert.equal(result.unscheduled.length, 0)
 })
 
+test('compactar repara fragments duplicats i respecta els minuts originals de cada activitat', () => {
+  const application = createGroupApplication({
+    id: 'application-repair', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const makeSession = (id, startsAt) => createCalendarSession({
+    id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt, durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const sessions = [
+    makeSession('repair-1', '2026-09-25T11:00:00'),
+    makeSession('repair-2', '2026-09-28T09:30:00'),
+    makeSession('repair-3', '2026-09-30T11:00:00'),
+  ]
+  const makeItem = (id, session, sourceActivityId, title, plannedMinutes, order) => createSessionItem({
+    id, ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+    sourceActivityId, title, type: 'activity', order, plannedMinutes,
+  }, { now: NOW })
+  const bundles = [
+    { session: sessions[0], items: [makeItem('repair-initial', sessions[0], 'initial', 'Inicial', 40, 0)], results: [] },
+    { session: sessions[1], items: [
+      makeItem('repair-presentation-1', sessions[1], 'presentation', 'Presentació', 5, 0),
+      makeItem('repair-presentation-2', sessions[1], 'presentation', 'Presentació', 10, 1),
+    ], results: [] },
+    { session: sessions[2], items: [
+      makeItem('repair-presentation-3', sessions[2], 'presentation', 'Presentació', 15, 0),
+      makeItem('repair-situation', sessions[2], 'situation', 'Situació', 30, 1),
+    ], results: [] },
+  ]
+
+  const result = buildAgendaSessionCompaction({
+    activityMinutesById: { initial: 40, presentation: 15, situation: 30 },
+    application,
+    existingSessionBundles: bundles,
+    options: options(sequenceIdFactory()),
+    targetSessionId: sessions[0].id,
+  })
+
+  const presentationMinutes = result.sessions.flatMap((bundle) => bundle.items)
+    .filter((item) => item.sourceActivityId === 'presentation')
+    .reduce((total, item) => total + item.plannedMinutes, 0)
+  assert.equal(presentationMinutes, 15)
+  assert.deepEqual(result.sessions[0].items.map((item) => [item.title, item.plannedMinutes]), [
+    ['Inicial', 40],
+    ['Presentació', 15],
+  ])
+})
+
+test('si el docent ho confirma la compactació evita avançar un fragment de només cinc minuts', () => {
+  const application = createGroupApplication({
+    id: 'application-small-fragment', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const firstSession = createCalendarSession({
+    id: 'small-1', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-25T11:00:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const secondSession = createCalendarSession({
+    id: 'small-2', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T09:30:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const firstItem = createSessionItem({
+    id: 'small-initial', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: firstSession.id, sourceActivityId: 'initial', title: 'Inicial',
+    type: 'activity', order: 0, plannedMinutes: 50,
+  }, { now: NOW })
+  const nextItem = createSessionItem({
+    id: 'small-next', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: secondSession.id, sourceActivityId: 'next', title: 'Activitat de 40 minuts',
+    type: 'activity', order: 0, plannedMinutes: 40,
+  }, { now: NOW })
+
+  const result = buildAgendaSessionCompaction({
+    activityMinutesById: { initial: 50, next: 40 },
+    application,
+    existingSessionBundles: [
+      { session: firstSession, items: [firstItem], results: [] },
+      { session: secondSession, items: [nextItem], results: [] },
+    ],
+    options: { ...options(sequenceIdFactory()), avoidSmallFragments: true, minimumFragmentMinutes: 5 },
+    targetSessionId: firstSession.id,
+  })
+
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => item.plannedMinutes)), [[50], [40]])
+})
+
 test('l’horari vigent es resol per data sense reescriure les sessions passades', () => {
   const versions = [
     { id: 'old', effectiveFrom: '2026-09-01', effectiveTo: '2026-10-31' },

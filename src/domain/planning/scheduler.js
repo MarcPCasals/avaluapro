@@ -344,6 +344,8 @@ export function buildActivitySessionDistribution({
     throw new Error("Cal una aplicació de grup per preparar les sessions")
   }
   const scheduled = new Set(scheduledSourceActivityIds)
+  const avoidSmallFragments = Boolean(options.avoidSmallFragments)
+  const minimumFragmentMinutes = Math.max(0, Number(options.minimumFragmentMinutes) || 5)
   const skippedAlreadyScheduled = []
   const pendingActivities = []
   for (const activity of activities) {
@@ -419,6 +421,18 @@ export function buildActivitySessionDistribution({
         break
       }
       const segmentMinutes = Math.min(remainingMinutes, draft.remainingMinutes)
+      const assignedMinutes = plannedMinutes - remainingMinutes
+      if (avoidSmallFragments && plannedMinutes > minimumFragmentMinutes
+        && segmentMinutes <= minimumFragmentMinutes) {
+        if (assignedMinutes > 0 && remainingMinutes <= minimumFragmentMinutes) {
+          break
+        }
+        if (assignedMinutes === 0 && segmentMinutes < remainingMinutes) {
+          draft.remainingMinutes = 0
+          currentDraft = null
+          continue
+        }
+      }
       draft.items.push({ activity, plannedMinutes: segmentMinutes })
       draft.remainingMinutes -= segmentMinutes
       remainingMinutes -= segmentMinutes
@@ -804,6 +818,7 @@ export function buildAgendaRecoveryReflow({
 }
 
 function buildAgendaItemsReflow({
+  activityMinutesById = {},
   application,
   candidates = [],
   changes = {},
@@ -840,25 +855,64 @@ function buildAgendaItemsReflow({
   }
 
   const activityMeta = new Map()
-  const activities = []
+  const activitySequence = []
+  const activityBySourceKey = new Map()
   logicalGroups.forEach((group, groupIndex) => {
     const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
     representativeItems.forEach((item, itemIndex) => {
-      const key = `agenda-reflow:${groupIndex}:${itemIndex}:${item.id}`
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
       const title = isTarget ? String(changes.title || item.title).trim() || item.title : item.title
-      activityMeta.set(key, {
-        sourceActivityId: item.sourceActivityId || null,
-        title,
-        type: item.type || 'activity',
-      })
-      activities.push({
-        id: key,
-        plannedMinutes: isTarget ? minutes : item.plannedMinutes,
-        title,
-        type: item.type || 'activity',
-      })
+      const sourceKey = item.sourceActivityId || `unlinked:${groupIndex}:${itemIndex}:${item.id}`
+      let activity = activityBySourceKey.get(sourceKey)
+      if (!activity) {
+        const key = `agenda-reflow:${sourceKey}`
+        activity = {
+          id: key,
+          plannedMinutes: 0,
+          sourceKey,
+          title,
+          type: item.type || 'activity',
+        }
+        activityBySourceKey.set(sourceKey, activity)
+        activitySequence.push(activity)
+        activityMeta.set(key, {
+          sourceActivityId: item.sourceActivityId || null,
+          sourcePlanningUnitId: item.sourcePlanningUnitId || null,
+          title,
+          type: item.type || 'activity',
+        })
+      }
+      activity.plannedMinutes += isTarget ? minutes : (Number(item.plannedMinutes) || 0)
+      if (isTarget) {
+        activity.title = title
+        activityMeta.set(activity.id, {
+          ...activityMeta.get(activity.id),
+          title,
+        })
+      }
     })
+  })
+
+  const reflowableIds = new Set(reflowableBundles.map((bundle) => bundle.session.id))
+  const lockedLogicalBundles = groupParallelSessionBundles(applicationBundles)
+    .filter((group) => !group.bundles.some((bundle) => reflowableIds.has(bundle.session.id)))
+    .map((group) => group.bundles[0])
+    .filter((bundle) => !['cancelled', 'notHeld'].includes(bundle.session.status))
+  const lockedMinutesByActivityId = summarizeAssignedActivityProgress(lockedLogicalBundles)
+    .assignedMinutesByActivityId
+  const activities = activitySequence.flatMap((activity) => {
+    const meta = activityMeta.get(activity.id)
+    const sourceActivityId = meta?.sourceActivityId
+    const sourceMinutes = Number(activityMinutesById[sourceActivityId])
+    const remainingSourceMinutes = Number.isFinite(sourceMinutes) && sourceMinutes > 0
+      ? Math.max(0, sourceMinutes - (lockedMinutesByActivityId[sourceActivityId] || 0))
+      : Number.POSITIVE_INFINITY
+    const plannedMinutes = Math.min(activity.plannedMinutes, remainingSourceMinutes)
+    if (plannedMinutes <= 0) return []
+    return [{
+      ...activity,
+      plannedMinutes,
+    }]
   })
 
   const distribution = buildActivitySessionDistribution({
@@ -875,6 +929,7 @@ function buildAgendaItemsReflow({
       return createSessionItem({
         ...item,
         sourceActivityId: meta?.sourceActivityId || null,
+        sourcePlanningUnitId: meta?.sourcePlanningUnitId || null,
         title: meta?.title || item.title,
         type: meta?.type || item.type,
       }, options)

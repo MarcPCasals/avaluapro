@@ -89,6 +89,23 @@ function mergeSessionBundles(current, incoming) {
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
 }
 
+function activityMinutesById(activities = []) {
+  return Object.fromEntries(activities.map((activity) => [activity.id, activity.plannedMinutes]))
+}
+
+function confirmAvoidTinyAgendaFragments(preview) {
+  const tinyFragments = preview.sessions
+    .flatMap((candidate) => candidate.items || [])
+    .filter((item) => Number(item.segmentCount) > 1 && Number(item.plannedMinutes) <= 5)
+  if (tinyFragments.length === 0) return false
+  const titles = [...new Set(tinyFragments.map((item) => `«${item.title}»`))].join(', ')
+  return globalThis.confirm?.(
+    `La proposta crea un fragment de només 5 minuts de ${titles}. `
+    + 'Vols evitar-lo? Si és l’inici, l’activitat quedarà per a la sessió següent; '
+    + 'si és l’últim fragment, aquests 5 minuts s’eliminaran de l’Agenda.',
+  ) === true
+}
+
 /**
  * Aïlla les dades privades d'Agenda de la pantalla. Horaris, franges i
  * excepcions passen pel mateix repositori local-first que Programació, però es
@@ -1601,7 +1618,8 @@ export function useAgendaWorkspace(user, classes = []) {
       timetables: setup.timetables,
       to: activeAcademicYear.endsOn,
     })
-    const preview = buildAgendaItemChangeReflow({
+    const reflowInput = {
+      activityMinutesById: activityMinutesById(setup.activities),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
@@ -1610,7 +1628,14 @@ export function useAgendaWorkspace(user, classes = []) {
       options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
       targetItemId: item.id,
       targetSessionId: targetBundle.session.id,
-    })
+    }
+    let preview = buildAgendaItemChangeReflow(reflowInput)
+    if (confirmAvoidTinyAgendaFragments(preview)) {
+      preview = buildAgendaItemChangeReflow({
+        ...reflowInput,
+        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
+      })
+    }
     if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou sessions disponibles per reajustar totes les activitats posteriors.')
     }
@@ -1643,14 +1668,22 @@ export function useAgendaWorkspace(user, classes = []) {
       timetables: setup.timetables,
       to: activeAcademicYear.endsOn,
     })
-    const preview = buildAgendaSessionCompaction({
+    const reflowInput = {
+      activityMinutesById: activityMinutesById(setup.activities),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
       existingSessionBundles: setup.existingSessionBundles,
       options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
       targetSessionId: targetBundle.session.id,
-    })
+    }
+    let preview = buildAgendaSessionCompaction(reflowInput)
+    if (confirmAvoidTinyAgendaFragments(preview)) {
+      preview = buildAgendaSessionCompaction({
+        ...reflowInput,
+        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
+      })
+    }
     const previousMinutes = targetBundle.items.reduce((total, item) =>
       total + (Number(item.plannedMinutes) || 0), 0)
     const compactedTarget = preview.sessions.find((candidate) =>
