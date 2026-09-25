@@ -534,7 +534,7 @@ export default function AgendaModule() {
     loadSessionRange({
       classId: activeClassId,
       from: initialRange.from,
-      includeDetails: false,
+      includeDetails: true,
       to: initialRange.to,
     })
       .then(() => {
@@ -664,7 +664,7 @@ export default function AgendaModule() {
       await workspace.loadSessionRange({
         classId: activeClassId,
         from: nextRange.from,
-        includeDetails: false,
+        includeDetails: true,
         mergeWithExisting: true,
         to: nextRange.to,
       })
@@ -685,7 +685,7 @@ export default function AgendaModule() {
       await workspace.loadSessionRange({
         classId: activeClassId,
         from: nextRange.from,
-        includeDetails: false,
+        includeDetails: true,
         mergeWithExisting: true,
         to: nextRange.to,
       })
@@ -727,7 +727,7 @@ export default function AgendaModule() {
     if (view === 'timeline') return workspace.loadSessionRange({
       classId: activeClassId,
       from: timelineRange?.from || workspace.today,
-      includeDetails: false,
+      includeDetails: true,
       to: timelineRange?.to || addDateDays(workspace.today, TIMELINE_PAGE_DAYS - 1),
     })
     if (view === 'week' && calendarMode === 'month') return workspace.loadSessionRange({

@@ -552,7 +552,7 @@ export function useAgendaWorkspace(user, classes = []) {
         .filter((session) => !classId || session.classId === classId)
         .map((session) => ({ ...applications[index], session })))
       if (!includeDetails) {
-        // Calendari, cronologia i selectors només necessiten l'encapçalament de
+        // Calendari i selectors només necessiten l'encapçalament de
         // sessió. Recuperem els títols que ja existeixin a IndexedDB, però no
         // fem cap consulta remota d'elements, resultats, descripcions o materials.
         const cachedDetails = await Promise.all(sessionRecords.map(({ session }) =>
