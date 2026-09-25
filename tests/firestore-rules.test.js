@@ -1251,6 +1251,12 @@ describe('Internal messaging', () => {
       collection(recipientDb, 'internalMessages'),
       where('participantEmails', 'array-contains', 'cotutor@educand.ad'),
     )))
+    await assertSucceeds(getDocs(query(
+      collection(recipientDb, 'internalMessages'),
+      where('participantEmails', 'array-contains', 'cotutor@educand.ad'),
+      where('recipientEmailLower', '==', 'cotutor@educand.ad'),
+      where('status', '==', 'unread'),
+    )))
     await assertFails(getDoc(doc(messagingDb('third', 'third@educand.ad'), 'internalMessages', 'direct-1')))
     await assertFails(updateDoc(ref, { readAt: serverTimestamp(), status: 'read' }))
     await assertSucceeds(updateDoc(

@@ -318,7 +318,8 @@ La segona capa d’Agenda completa aquest bloc:
 La capa de listeners globals també queda aplicada:
 
 - els tres listeners de missatgeria interna només s’obren mentre el docent té oberta la pantalla de Missatges;
-- en tancar-la es conserva el darrer recompte conegut, però ja no es manté cap connexió remota;
+- la campana fa només tres lectures agregades petites en iniciar sessió per conservar el recompte útil, sense descarregar cap historial;
+- en tancar Missatges es conserva el darrer recompte conegut, però ja no es manté cap connexió remota;
 - la coordinació de cotutoria carrega la memòria IndexedDB a l’arrencada i només obre els dos listeners de l’espai que està visible al Mode tutoria;
 - canviar ràpidament de classe o tancar la pantalla invalida qualsevol resposta asíncrona antiga i evita que es reactivi un listener obsolet;
 - l’estat de lectura i els avisos acceptats de cotutoria també es desen localment, de manera que treure els listeners globals no crea falsos avisos després de recarregar;

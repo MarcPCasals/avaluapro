@@ -21,6 +21,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
+  getCountFromServer,
   getDocs,
   getDocsFromServer,
   getFirestore,
@@ -2281,6 +2282,40 @@ export function subscribeInternalMessageState(userUid, callback, onError) {
     },
     onError,
   )
+}
+
+/**
+ * Manté la campana útil sense descarregar l'historial ni deixar listeners
+ * globals oberts. Cada recompte agregat costa només la lectura mínima de la
+ * consulta mentre no superi els primers 1.000 índexs.
+ */
+export async function loadInternalMessageAttentionSummary(userUid, userEmail) {
+  const cleanEmail = normalizeEmail(userEmail)
+  if (!userUid || !cleanEmail) return { unreadAnnouncements: 0, unreadMessages: 0 }
+
+  const [messageStateSnapshot, unreadMessagesSnapshot] = await Promise.all([
+    getDocFromServer(getInternalMessageStateDocRef(userUid)),
+    getCountFromServer(query(
+      collection(db, 'internalMessages'),
+      where('participantEmails', 'array-contains', cleanEmail),
+      where('recipientEmailLower', '==', cleanEmail),
+      where('status', '==', 'unread'),
+    )),
+  ])
+  recordFirestoreLookup('shell.internalMessageState')
+  recordFirestoreLookup('shell.internalUnreadMessages')
+
+  const announcementsReadAt = messageStateSnapshot.data()?.announcementsReadAt
+  const announcementQuery = announcementsReadAt
+    ? query(collection(db, 'internalAnnouncements'), where('createdAt', '>', announcementsReadAt))
+    : query(collection(db, 'internalAnnouncements'))
+  const unreadAnnouncementsSnapshot = await getCountFromServer(announcementQuery)
+  recordFirestoreLookup('shell.internalUnreadAnnouncements')
+
+  return {
+    unreadAnnouncements: unreadAnnouncementsSnapshot.data().count,
+    unreadMessages: unreadMessagesSnapshot.data().count,
+  }
 }
 
 export async function sendInternalMessage({ message, recipientEmail, user }) {

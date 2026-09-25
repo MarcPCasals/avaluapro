@@ -38,6 +38,7 @@ import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
 import { downloadJson, getTodaySlug } from '../lib/downloads'
 import {
+  loadInternalMessageAttentionSummary,
   subscribeInternalAnnouncements,
   subscribeInternalMessages,
   subscribeInternalMessageState,
@@ -163,6 +164,11 @@ export function TopBar() {
   const [internalMessagesOwnerUid, setInternalMessagesOwnerUid] = useState('')
   const [internalAnnouncementsOwnerUid, setInternalAnnouncementsOwnerUid] = useState('')
   const [internalMessageStateOwnerUid, setInternalMessageStateOwnerUid] = useState('')
+  const [internalAttentionSummary, setInternalAttentionSummary] = useState({
+    ownerUid: '',
+    unreadAnnouncements: 0,
+    unreadMessages: 0,
+  })
   const [draggedClassId, setDraggedClassId] = useState('')
   const fileInputRef = useRef(null)
   const dataMenuRef = useRef(null)
@@ -224,12 +230,38 @@ export function TopBar() {
   const visibleInternalMessages = cloud.user?.uid === internalMessagesOwnerUid ? internalMessages : []
   const visibleInternalAnnouncements = cloud.user?.uid === internalAnnouncementsOwnerUid ? internalAnnouncements : []
   const visibleInternalMessageState = cloud.user?.uid === internalMessageStateOwnerUid ? internalMessageState : {}
+  const hasCompleteInternalMessagingSnapshot = Boolean(
+    cloud.user?.uid
+    && cloud.user.uid === internalMessagesOwnerUid
+    && cloud.user.uid === internalAnnouncementsOwnerUid
+    && cloud.user.uid === internalMessageStateOwnerUid,
+  )
   const announcementsReadAt = timestampToMillis(visibleInternalMessageState.announcementsReadAt)
-  const unreadInternalMessageCount = cloud.user ? visibleInternalMessages.filter(
-      (item) => item.recipientEmailLower === ownEmail && item.status === 'unread',
-    ).length + visibleInternalAnnouncements.filter(
-      (item) => timestampToMillis(item.createdAt) > announcementsReadAt,
-    ).length : 0
+  const snapshotUnreadInternalMessageCount = visibleInternalMessages.filter(
+    (item) => item.recipientEmailLower === ownEmail && item.status === 'unread',
+  ).length + visibleInternalAnnouncements.filter(
+    (item) => timestampToMillis(item.createdAt) > announcementsReadAt,
+  ).length
+  const summaryUnreadInternalMessageCount = internalAttentionSummary.ownerUid === cloud.user?.uid
+    ? internalAttentionSummary.unreadAnnouncements + internalAttentionSummary.unreadMessages
+    : 0
+  const unreadInternalMessageCount = hasCompleteInternalMessagingSnapshot
+    ? snapshotUnreadInternalMessageCount
+    : summaryUnreadInternalMessageCount
+
+  useEffect(() => {
+    if (!cloud.user?.uid || !cloud.user?.email) return undefined
+    let cancelled = false
+    loadInternalMessageAttentionSummary(cloud.user.uid, cloud.user.email)
+      .then((summary) => {
+        if (cancelled) return
+        setInternalAttentionSummary({ ownerUid: cloud.user.uid, ...summary })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [cloud.user?.email, cloud.user?.uid])
 
   useEffect(() => {
     if (!shouldOpenInternalMessagingListeners({
