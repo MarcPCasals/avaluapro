@@ -34,7 +34,11 @@ function orderedPhases(phases) {
 
 function materialLinks(activity) {
   return [...(activity.teacherMaterials || []), ...(activity.studentMaterials || [])]
-    .filter((material) => material.kind === 'link')
+    .filter((material) => material.kind === 'link' && material.url)
+}
+
+function openMaterialLinks(links) {
+  links.forEach((material) => globalThis.open?.(material.url, '_blank', 'noopener,noreferrer'))
 }
 
 function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
@@ -116,7 +120,15 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
         <span className={`planning-time-pill ${load?.status || 'untimed'}`} title={load?.status === 'red' ? `Supera els ${programmableMinutes} minuts programables` : ''}>
           <Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}
         </span>
-        {links.slice(0, 1).map((material) => <a aria-label={`Obrir ${material.label}`} href={material.url} key={material.id || material.url} rel="noreferrer" target="_blank"><ExternalLink size={14} /></a>)}
+        {links.length > 0 && (
+          <button
+            aria-label={links.length === 1 ? `Obrir ${links[0].label}` : `Obrir els ${links.length} enllaços de ${activity.title}`}
+            className="planning-open-links"
+            onClick={() => openMaterialLinks(links)}
+            title={links.length === 1 ? 'Obrir l’enllaç' : `Obrir ${links.length} enllaços en pestanyes noves`}
+            type="button"
+          ><ExternalLink size={14} /></button>
+        )}
       </div>
       <div className="planning-activity-actions">
         <button aria-label={`Editar ${activity.title}`} className="icon-action" onClick={() => onEdit(activity)} type="button"><Pencil size={15} /></button>

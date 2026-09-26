@@ -356,8 +356,8 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       id: material.id,
       kind: material.kind,
       label: material.label,
-      preparationKind: material.preparationKind || 'reference',
-      reminderDaysBefore: Number(material.reminderDaysBefore ?? 1),
+      preparationKind: material.kind === 'link' ? 'reference' : material.preparationKind || 'reference',
+      reminderDaysBefore: material.kind === 'link' ? 0 : Number(material.reminderDaysBefore ?? 1),
       url: material.kind === 'link' ? material.url : '',
     }))
     return onSave({
@@ -414,19 +414,19 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       <section className="planning-material-editor">
         <div><div><strong>Materials</strong><span>Enllaços externs o referències físiques.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
         {materials.map((material, index) => (
-          <div className="planning-material-row" key={material.id || index}>
+          <div className={`planning-material-row ${material.kind}`} key={material.id || index}>
             <select aria-label="Destinatari del material" value={material.audience} onChange={(event) => updateMaterial(index, 'audience', event.target.value)}>
               <option value="teacher">Docent</option><option value="students">Alumnat</option>
             </select>
             <select aria-label="Tipus de material" value={material.kind} onChange={(event) => updateMaterial(index, 'kind', event.target.value)}>
               <option value="link">Enllaç</option><option value="physical">Material físic</option>
             </select>
-            <select aria-label="Funció del material" value={material.preparationKind || 'reference'} onChange={(event) => updateMaterial(index, 'preparationKind', event.target.value)}>
+            {material.kind === 'physical' && <select aria-label="Funció del material" value={material.preparationKind || 'reference'} onChange={(event) => updateMaterial(index, 'preparationKind', event.target.value)}>
               <option value="reference">Consulta</option><option value="student">L’ha de portar l’alumnat</option><option value="teacher">Preparar</option><option value="print">Imprimir</option><option value="buy">Comprar</option><option value="reserve">Reservar espai</option>
-            </select>
+            </select>}
             <input aria-label="Nom del material" placeholder="Nom" required value={material.label} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
             {material.kind === 'link' && <input aria-label="Enllaç del material" placeholder="https://…" required type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} />}
-            {(material.preparationKind || 'reference') !== 'reference' && <label className="planning-material-reminder">Avisar<input aria-label="Dies d’antelació" min="0" onChange={(event) => updateMaterial(index, 'reminderDaysBefore', event.target.value)} type="number" value={material.reminderDaysBefore ?? 1} /><span>dies abans</span></label>}
+            {material.kind === 'physical' && (material.preparationKind || 'reference') !== 'reference' && <label className="planning-material-reminder">Avisar<input aria-label="Dies d’antelació" min="0" onChange={(event) => updateMaterial(index, 'reminderDaysBefore', event.target.value)} type="number" value={material.reminderDaysBefore ?? 1} /><span>dies abans</span></label>}
             <button aria-label="Eliminar material" className="icon-action" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 size={15} /></button>
           </div>
         ))}

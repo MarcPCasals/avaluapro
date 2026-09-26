@@ -199,11 +199,12 @@ function entityBase(entityType, input, options = {}) {
 function normalizeMaterials(materials) {
   return (materials || []).map((material) => {
     const kind = enumValue(material.kind || 'link', ['link', 'physical'], 'tipus de material')
-    const preparationKind = enumValue(
+    const selectedPreparationKind = enumValue(
       material.preparationKind || 'reference',
       ['reference', 'student', 'teacher', 'print', 'buy', 'reserve'],
       'funció del material',
     )
+    const preparationKind = kind === 'link' ? 'reference' : selectedPreparationKind
     const url = optionalText(material.url)
     if (kind === 'link' && !url) throw new Error("Un material d'enllaç necessita una URL")
     return {

@@ -108,8 +108,16 @@ test('els identificadors es mantenen quan una activitat es revisa o es reordena'
   assert.equal(revised.createdAt, activity.createdAt)
   assert.equal(revised.order, 3)
   assert.equal(revised.title, 'Escolta en parelles')
-  assert.equal(revised.teacherMaterials[0].preparationKind, 'teacher')
-  assert.equal(revised.teacherMaterials[0].reminderDaysBefore, 2)
+  assert.equal(revised.teacherMaterials[0].preparationKind, 'reference')
+  assert.equal(revised.teacherMaterials[0].reminderDaysBefore, 0)
+})
+
+test('els enllaços sempre són de consulta, encara que arribin amb una altra funció', () => {
+  const activity = baseActivity()
+
+  assert.equal(activity.teacherMaterials[0].kind, 'link')
+  assert.equal(activity.teacherMaterials[0].preparationKind, 'reference')
+  assert.equal(activity.teacherMaterials[0].reminderDaysBefore, 0)
 })
 
 test('una indicació queda dins la seqüència sense exigir temporització', () => {
