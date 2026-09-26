@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, BookOpenText, Clock3, ExternalLink, History, Layers3, Menu, Pencil,
+  ArrowRight, BookOpenText, ChevronDown, Clock3, ExternalLink, History, Layers3, Menu, Pencil,
   Plus, Trash2,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -38,6 +38,7 @@ function materialLinks(activity) {
 }
 
 function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = materialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
@@ -103,6 +104,15 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
         </small>
       </button>
       <div className="planning-activity-meta">
+        {activity.description && (
+          <button
+            aria-controls={`planning-description-${activity.id}`}
+            aria-expanded={descriptionExpanded}
+            className="planning-description-toggle"
+            onClick={() => setDescriptionExpanded((current) => !current)}
+            type="button"
+          >Descripció<ChevronDown aria-hidden="true" className={descriptionExpanded ? 'expanded' : ''} size={13} /></button>
+        )}
         <span className={`planning-time-pill ${load?.status || 'untimed'}`} title={load?.status === 'red' ? `Supera els ${programmableMinutes} minuts programables` : ''}>
           <Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}
         </span>
@@ -112,6 +122,14 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
         <button aria-label={`Editar ${activity.title}`} className="icon-action" onClick={() => onEdit(activity)} type="button"><Pencil size={15} /></button>
         <button aria-label={`Eliminar ${activity.title}`} className="icon-action danger" onClick={() => onDelete(activity)} type="button"><Trash2 size={15} /></button>
       </div>
+      {descriptionExpanded && (
+        <FormattedText
+          as="div"
+          className="planning-activity-description-expanded"
+          id={`planning-description-${activity.id}`}
+          text={activity.description}
+        />
+      )}
     </article>
   )
 }

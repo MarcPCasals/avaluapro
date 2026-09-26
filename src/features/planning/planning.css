@@ -267,6 +267,11 @@
 .planning-activity-content small span + span::before { content: '·'; margin-right: 5px; }
 .planning-activity-meta { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
 .planning-activity-meta > a { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 7px; color: #6d28d9; background: #f5f3ff; }
+.planning-description-toggle { display: inline-flex; align-items: center; gap: 3px; border: 0; border-radius: 999px; padding: 5px 7px; color: #6d28d9; background: #f5f3ff; font-size: 9px; font-weight: 850; white-space: nowrap; }
+.planning-description-toggle:hover, .planning-description-toggle[aria-expanded="true"] { color: #4c1d95; background: #ede9fe; }
+.planning-description-toggle svg { transition: transform .15s ease; }
+.planning-description-toggle svg.expanded { transform: rotate(180deg); }
+.planning-activity-description-expanded { grid-column: 3 / -1; border-top: 1px solid #ede9fe; padding: 10px 4px 5px; color: #475569; font-size: 12px; font-weight: 400; line-height: 1.55; }
 .planning-time-pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 5px 7px; color: #166534; background: #dcfce7; font-size: 9px; font-weight: 900; white-space: nowrap; }
 .planning-time-pill.orange { color: #9a3412; background: #ffedd5; }
 .planning-time-pill.red { color: #991b1b; background: #fee2e2; }
