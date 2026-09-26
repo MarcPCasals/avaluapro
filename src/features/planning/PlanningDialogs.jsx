@@ -1,53 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Clock3, Copy, History, Italic, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
-import { FormattedText } from '../../components/FormattedText'
 import { Modal } from '../../components/Modal'
 import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
-import { stripInlineFormatting } from '../../lib/formattedText'
+import { inlineFormattingToHtml, stripInlineFormatting } from '../../lib/formattedText'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
-function AutoGrowTextarea({ className = '', textareaRef: externalRef, value, ...props }) {
-  const textareaRef = useRef(null)
-  useEffect(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    textarea.style.height = 'auto'
-    const nextHeight = Math.max(140, Math.min(textarea.scrollHeight, 440))
-    textarea.style.height = `${nextHeight}px`
-    textarea.style.overflowY = textarea.scrollHeight > 440 ? 'auto' : 'hidden'
-  }, [value])
-  const setTextareaRef = (node) => {
-    textareaRef.current = node
-    if (externalRef) externalRef.current = node
-  }
-  return <textarea {...props} className={`planning-autogrow-textarea ${className}`.trim()} ref={setTextareaRef} value={value} />
+function serializeEditorNode(node) {
+  if (node.nodeType === globalThis.Node?.TEXT_NODE) return node.nodeValue || ''
+  if (node.nodeType !== globalThis.Node?.ELEMENT_NODE) return ''
+  if (node.tagName === 'BR') return '\n'
+  const content = [...node.childNodes].map(serializeEditorNode).join('')
+  if (node.tagName === 'STRONG' || node.tagName === 'B') return `**${content}**`
+  if (node.tagName === 'EM' || node.tagName === 'I') return `*${content}*`
+  if ((node.tagName === 'DIV' || node.tagName === 'P') && content && !content.endsWith('\n')) return `${content}\n`
+  return content
 }
 
-function FormattedTextarea({ onChange, value }) {
-  const textareaRef = useRef(null)
-  const applyFormat = (marker) => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = value.slice(start, end)
-    const insertion = `${marker}${selected}${marker}`
-    onChange(`${value.slice(0, start)}${insertion}${value.slice(end)}`)
-    globalThis.requestAnimationFrame?.(() => {
-      textarea.focus()
-      const selectionStart = start + marker.length
-      textarea.setSelectionRange(selectionStart, selectionStart + selected.length)
-    })
+function readFormattedEditor(editor) {
+  if (!editor) return ''
+  return [...editor.childNodes]
+    .map(serializeEditorNode)
+    .join('')
+    .replaceAll('\u00a0', ' ')
+    .replace(/\r/g, '')
+    .replace(/\n+$/, '')
+}
+
+function FormattedTextarea({ onChange, value = '' }) {
+  const editorRef = useRef(null)
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor || readFormattedEditor(editor) === value) return
+    editor.innerHTML = inlineFormattingToHtml(value)
+  }, [value])
+
+  const syncValue = () => onChange(readFormattedEditor(editorRef.current))
+  const applyFormat = (command) => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.focus()
+    editor.ownerDocument.execCommand(command, false)
+    syncValue()
   }
+  const handlePaste = (event) => {
+    event.preventDefault()
+    const pastedText = event.clipboardData.getData('text/plain')
+    editorRef.current?.ownerDocument.execCommand('insertText', false, pastedText)
+    globalThis.requestAnimationFrame?.(syncValue)
+  }
+
   return (
     <div className="planning-format-editor">
       <div aria-label="Format de la descripció" className="planning-format-toolbar" role="toolbar">
-        <button aria-label="Posar la selecció en negreta" onClick={() => applyFormat('**')} onMouseDown={(event) => event.preventDefault()} title="Negreta" type="button"><Bold size={15} /></button>
-        <button aria-label="Posar la selecció en cursiva" onClick={() => applyFormat('*')} onMouseDown={(event) => event.preventDefault()} title="Cursiva" type="button"><Italic size={15} /></button>
+        <button aria-label="Posar la selecció en negreta" onClick={() => applyFormat('bold')} onMouseDown={(event) => event.preventDefault()} title="Negreta" type="button"><Bold size={15} /></button>
+        <button aria-label="Posar la selecció en cursiva" onClick={() => applyFormat('italic')} onMouseDown={(event) => event.preventDefault()} title="Cursiva" type="button"><Italic size={15} /></button>
         <span>Selecciona unes paraules i aplica-hi el format.</span>
       </div>
-      <AutoGrowTextarea onChange={(event) => onChange(event.target.value)} rows="6" textareaRef={textareaRef} value={value} />
-      {value && <div className="planning-format-preview"><small>Vista prèvia</small><FormattedText as="p" text={value} /></div>}
+      <div
+        aria-label="Descripció"
+        aria-multiline="true"
+        className="planning-format-content"
+        contentEditable
+        data-empty={!value}
+        onBlur={syncValue}
+        onInput={syncValue}
+        onPaste={handlePaste}
+        ref={editorRef}
+        role="textbox"
+        suppressContentEditableWarning
+      />
     </div>
   )
 }
