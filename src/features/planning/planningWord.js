@@ -21,6 +21,7 @@ import {
   PEDAGOGICAL_TYPE_LABELS,
 } from '../../domain/planning/documents'
 import { stripInlineFormatting } from '../../lib/formattedText'
+import { activityCurriculumText } from '../../domain/planning/activityCurriculum'
 
 const PURPLE = '7C3AED'
 const PURPLE_DARK = '4C1D95'
@@ -185,7 +186,7 @@ function activityDescription(activity) {
 }
 
 function activityTable({ activities, phase, unit }) {
-  const headerLabels = ['Núm.', 'Subfase', 'Descriptiu activitat', 'Min.', 'Materials', 'Agrup. / espai', 'IA']
+  const headerLabels = ['Núm.', 'Subfase', 'Descriptiu activitat', 'Min.', 'Materials', 'Agrup. / espai', 'Competències / criteris']
   const allIndicators = new Map((unit.curriculum?.indicators || []).map((indicator) => [indicator.id, indicator.label]))
   return new Table({
     columnWidths: [550, 1000, 4250, 650, 1500, 1200, 850],
@@ -221,7 +222,7 @@ function activityTable({ activities, phase, unit }) {
             materialText(activity.studentMaterials),
           ].filter(Boolean).join('\n'), { run: { size: 14 } })),
           cell(paragraph([activity.grouping, activity.space].filter(Boolean).join('\n'), { run: { size: 14 } })),
-          cell(paragraph((activity.indicatorIds || []).map((id) => allIndicators.get(id)).filter(Boolean).join('\n'), { run: { size: 14 } })),
+          cell(paragraph(activityCurriculumText(activity) || (activity.indicatorIds || []).map((id) => allIndicators.get(id)).filter(Boolean).join('\n'), { run: { size: 14 } })),
         ],
       })),
       new TableRow({

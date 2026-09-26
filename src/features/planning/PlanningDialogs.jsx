@@ -221,7 +221,87 @@ function materialDrafts(initialValue) {
   return [...teacher, ...students]
 }
 
-export function ActivityDialog({ availableIndicators = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, students = [] }) {
+function ActivityCurriculumPicker({ competencies, onChange, selections }) {
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set(
+    selections.filter((selection) => selection.assessmentCriteria?.length > 0).map((selection) => selection.competencyKey),
+  ))
+  const selectedByKey = new Map(selections.map((selection) => [selection.competencyKey, selection]))
+  const toggleCompetency = (competency, checked) => {
+    if (checked) {
+      onChange([...selections, {
+        competencyKey: competency.key,
+        label: competency.label,
+        assessmentCriteria: [],
+      }])
+      return
+    }
+    onChange(selections.filter((selection) => selection.competencyKey !== competency.key))
+    setExpandedKeys((current) => {
+      const next = new Set(current)
+      next.delete(competency.key)
+      return next
+    })
+  }
+  const toggleCriterion = (competency, criterion, checked) => {
+    onChange(selections.map((selection) => {
+      if (selection.competencyKey !== competency.key) return selection
+      const current = selection.assessmentCriteria || []
+      return {
+        ...selection,
+        assessmentCriteria: checked
+          ? [...current, { criterionKey: criterion.key, label: criterion.label }]
+          : current.filter((item) => item.criterionKey !== criterion.key),
+      }
+    }))
+  }
+  const toggleExpanded = (key) => setExpandedKeys((current) => {
+    const next = new Set(current)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+
+  return (
+    <fieldset className="planning-competency-picker">
+      <legend>Competències associades</legend>
+      <p>Selecciona les competències que es treballen. Els criteris d’avaluació són opcionals.</p>
+      <div>
+        {competencies.map((competency) => {
+          const selected = selectedByKey.get(competency.key)
+          const expanded = expandedKeys.has(competency.key)
+          return (
+            <section className={selected ? 'selected' : ''} key={competency.key}>
+              <div>
+                <label><input checked={Boolean(selected)} onChange={(event) => toggleCompetency(competency, event.target.checked)} type="checkbox" /><span>{competency.label}</span></label>
+                {selected && competency.criteria.length > 0 && (
+                  <button aria-expanded={expanded} onClick={() => toggleExpanded(competency.key)} type="button">
+                    Criteri d’avaluació
+                  </button>
+                )}
+              </div>
+              {selected && expanded && (
+                <div className="planning-criterion-picker">
+                  {competency.criteria.map((criterion) => (
+                    <label key={criterion.key}>
+                      <input
+                        checked={selected.assessmentCriteria?.some((item) => item.criterionKey === criterion.key) || false}
+                        onChange={(event) => toggleCriterion(competency, criterion, event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>{criterion.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </section>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
+export function ActivityDialog({ availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, students = [] }) {
   const [values, setValues] = useState(() => ({
     description: initialValue?.description || '',
     evidenceMode: initialValue?.evidenceMode || 'none',
@@ -235,7 +315,7 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
     type: initialValue?.type || 'activity',
   }))
   const [materials, setMaterials] = useState(() => materialDrafts(initialValue))
-  const [indicatorIds, setIndicatorIds] = useState(() => initialValue?.indicatorIds || [])
+  const [curriculumSelections, setCurriculumSelections] = useState(() => initialValue?.curriculumSelections || [])
   const [diversityMeasures, setDiversityMeasures] = useState(() => initialValue?.diversityMeasures || [])
   const updateMaterial = (index, field, value) => setMaterials((items) => items.map((item, itemIndex) => (
     itemIndex === index ? { ...item, [field]: value } : item
@@ -262,7 +342,8 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
       ...values,
       evidenceMode: values.type === 'activity' ? values.evidenceMode : 'none',
       plannedMinutes: values.hasTiming ? Number(values.plannedMinutes) : null,
-      indicatorIds,
+      curriculumSelections,
+      indicatorIds: initialValue?.indicatorIds || [],
       diversityMeasureIds: diversityMeasures.map((measure) => measure.id),
       diversityMeasures,
       studentMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'students'),
@@ -302,13 +383,8 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
         <option value="final">Comprovar al final de l’activitat</option>
         <option value="perSession">Comprovar a cada sessió</option>
       </select></label>}
-      {values.type === 'activity' && availableIndicators.length > 0 && (
-        <fieldset className="planning-indicator-picker">
-          <legend>Indicadors associats</legend>
-          <div>{availableIndicators.map((indicator) => (
-            <label key={indicator.id}><input checked={indicatorIds.includes(indicator.id)} onChange={(event) => setIndicatorIds((current) => event.target.checked ? [...current, indicator.id] : current.filter((id) => id !== indicator.id))} type="checkbox" />{indicator.label}</label>
-          ))}</div>
-        </fieldset>
+      {values.type === 'activity' && availableCompetencies.length > 0 && (
+        <ActivityCurriculumPicker competencies={availableCompetencies} onChange={setCurriculumSelections} selections={curriculumSelections} />
       )}
       {values.type === 'activity' && (
         <PlanningDiversityEditor classes={classes} measures={diversityMeasures} onChange={setDiversityMeasures} students={students} />

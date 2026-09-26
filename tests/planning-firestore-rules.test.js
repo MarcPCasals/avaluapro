@@ -850,6 +850,11 @@ describe('Recorregut local-first de la UP', () => {
       order: 0,
       plannedMinutes: 20,
       grouping: 'Parelles',
+      curriculumSelections: [{
+        competencyKey: 'competency:modelitzacio',
+        label: 'C1: Modelització',
+        assessmentCriteria: [{ criterionKey: 'criterion:rigor', label: 'CA1: Rigor' }],
+      }],
       teacherMaterials: [{ id: 'material-1', kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
     }, { now: NOW })
     const indication = createPlanningActivity({
@@ -869,7 +874,9 @@ describe('Recorregut local-first de la UP', () => {
     const reorderedAt = '2026-09-18T14:00:00.000Z'
     const reordered = { ...first, order: 1, updatedAt: reorderedAt }
     assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedOperation(reordered, {}, NOW))).applied, true)
-    assert.equal((await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', first.id))).data().teacherMaterials[0].label, 'Àudio')
+    const savedActivity = (await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', first.id))).data()
+    assert.equal(savedActivity.teacherMaterials[0].label, 'Àudio')
+    assert.equal(savedActivity.curriculumSelections[0].assessmentCriteria[0].label, 'CA1: Rigor')
 
     assert.equal((await applyPlanningCloudOperationToDatabase(db, queuedDelete(indication, {}, NOW))).applied, true)
     assert.equal((await getDoc(doc(db, 'planningUnits', UP_ID, 'activities', indication.id))).exists(), false)

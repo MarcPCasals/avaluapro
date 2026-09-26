@@ -1454,7 +1454,7 @@ service cloud.firestore {
 
     function validPlanningActivity(upId, activityId) {
       return request.resource.data.keys().hasOnly([
-          'applicationComment', 'copiedFrom', 'createdAt', 'description', 'diversityMeasureIds', 'diversityMeasures',
+          'applicationComment', 'copiedFrom', 'createdAt', 'curriculumSelections', 'description', 'diversityMeasureIds', 'diversityMeasures',
           'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order', 'pedagogicalType',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
           'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
@@ -1472,6 +1472,8 @@ service cloud.firestore {
           'response', 'theorization', 'competencyTest', 'custom'
         ]
         && request.resource.data.indicatorIds is list
+        && request.resource.data.curriculumSelections is list
+        && request.resource.data.curriculumSelections.size() <= 50
         && request.resource.data.diversityMeasureIds is list
         && request.resource.data.diversityMeasures is list
         && request.resource.data.diversityMeasures.size() <= 100

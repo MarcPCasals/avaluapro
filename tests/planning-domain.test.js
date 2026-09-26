@@ -243,6 +243,11 @@ test('la còpia anual duplica fases, subfases i activitats sense conservar permi
     id: 'activity-source', ownerUid: 'teacher-1', planningUnitId: unit.id, phaseId: child.id,
     title: 'Escolta guiada', description: 'Identificar contrastos.', order: 0, plannedMinutes: 35,
     indicatorIds: ['indicator-1'],
+    curriculumSelections: [{
+      competencyKey: 'competency:modelitzacio',
+      label: 'C1: Modelització',
+      assessmentCriteria: [{ criterionKey: 'criterion:rigor', label: 'CA1: Rigor' }],
+    }],
     teacherMaterials: [{ id: 'material-1', kind: 'link', label: 'Àudio', url: 'https://example.test/audio' }],
     diversityMeasures: [{ id: 'measure-1', label: 'Fragmentar les instruccions', studentIds: ['student-1'], studentNames: ['Joana'] }],
   }, options(idFactory))
@@ -261,6 +266,8 @@ test('la còpia anual duplica fases, subfases i activitats sense conservar permi
   assert.equal(copied.activities[0].phaseId, copied.phases[1].id)
   assert.equal(copied.activities[0].teacherMaterials[0].label, 'Àudio')
   assert.deepEqual(copied.activities[0].indicatorIds, ['indicator-1'])
+  assert.equal(copied.activities[0].curriculumSelections[0].label, 'C1: Modelització')
+  assert.equal(copied.activities[0].curriculumSelections[0].assessmentCriteria[0].label, 'CA1: Rigor')
   assert.equal(copied.activities[0].diversityMeasures[0].label, 'Fragmentar les instruccions')
   assert.equal(copied.activities[0].copiedFrom.activityId, activity.id)
   assert.equal(activity.copiedFrom, null)

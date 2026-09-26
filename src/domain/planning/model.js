@@ -15,6 +15,7 @@ import {
 import { ensurePlanningId } from './ids.js'
 import { createId } from '../../lib/ids.js'
 import { normalizeResourceSections, PEDAGOGICAL_TYPES } from './documents.js'
+import { normalizeActivityCurriculumSelections } from './activityCurriculum.js'
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -339,6 +340,7 @@ export function createPlanningActivity(input, options = {}) {
     studentMaterials: normalizeMaterials(input.studentMaterials),
     grouping: optionalText(input.grouping),
     space: optionalText(input.space),
+    curriculumSelections: normalizeActivityCurriculumSelections(input.curriculumSelections),
     indicatorIds: textList(input.indicatorIds),
     diversityMeasureIds: Object.prototype.hasOwnProperty.call(input, 'diversityMeasures')
       ? diversityMeasures.map((measure) => measure.id)

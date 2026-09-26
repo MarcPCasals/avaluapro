@@ -8,6 +8,7 @@ import {
 } from '../../domain/planning/documents'
 import { downloadBlob, downloadJson } from '../../lib/downloads'
 import { FormattedText } from '../../components/FormattedText'
+import { activityCurriculumText } from '../../domain/planning/activityCurriculum'
 
 const PHASE_LABELS = {
   closing: 'Tancament',
@@ -92,7 +93,7 @@ function SequenceDocument({ activities, phases, unit }) {
         <header><span>Fase de {PHASE_LABELS[root.kind]?.toLocaleLowerCase('ca') || root.title.toLocaleLowerCase('ca')}</span><strong>{total} min</strong></header>
         <div className="planning-document-table-wrap">
           <table className="planning-document-sequence">
-            <thead><tr><th>Núm.</th><th>Subfase</th><th>Descriptiu activitat</th><th>Min.</th><th>Materials</th><th>Agrup. / espai</th><th>IA</th></tr></thead>
+            <thead><tr><th>Núm.</th><th>Subfase</th><th>Descriptiu activitat</th><th>Min.</th><th>Materials</th><th>Agrup. / espai</th><th>Competències / criteris</th></tr></thead>
             <tbody>{phaseActivities.map((activity) => {
               const phase = phaseById.get(activity.phaseId)
               return (
@@ -112,7 +113,7 @@ function SequenceDocument({ activities, phases, unit }) {
                   <td className="number">{activity.plannedMinutes ?? '—'}</td>
                   <td>{materialsText(activity) || '—'}</td>
                   <td>{[activity.grouping, activity.space].filter(Boolean).join(' · ') || '—'}</td>
-                  <td>{(activity.indicatorIds || []).map((id) => indicatorsById.get(id)).filter(Boolean).join(' · ') || '—'}</td>
+                  <td>{activityCurriculumText(activity) || (activity.indicatorIds || []).map((id) => indicatorsById.get(id)).filter(Boolean).join(' · ') || '—'}</td>
                 </tr>
               )
             })}</tbody>

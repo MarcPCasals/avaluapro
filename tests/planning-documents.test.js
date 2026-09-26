@@ -121,3 +121,22 @@ test('the official Word curriculum and resource blocks are preserved', () => {
   assert.deepEqual(parsed.unit.resourceSections.transversal.attitudesAndValues, ['Constància'])
   assert.equal(parsed.importSummary.warning, '')
 })
+
+test('the new Word activity column restores competencies and optional assessment criteria', () => {
+  const html = `
+    <table><tr><td><p><strong>UP5</strong></p><p><strong>2n curs</strong></p></td><td>SEQÜÈNCIA</td></tr></table>
+    <table><tr><td>INFORMACIÓ GENERAL</td></tr><tr><td><p><strong>Títol:</strong> Matèria</p></td></tr></table>
+    <table>
+      <tr><td>COMPETÈNCIA</td><td>APRENENTATGE ESPERAT</td><td>CRITERI D’AVALUACIÓ</td><td>INDICADOR D’AVALUACIÓ</td></tr>
+      <tr><td>C1: Modelització</td><td></td><td>CA1: Rigor</td><td></td></tr>
+    </table>
+    <table>
+      <tr><td>FASE DE PREPARACIÓ</td></tr>
+      <tr><td>Núm.</td><td>Subfase</td><td>Descriptiu activitat</td><td>Min.</td><td>Materials</td><td>Agrup. / espai</td><td>Competències / criteris</td></tr>
+      <tr><td>1</td><td>Motivació</td><td>Activitat: Observar</td><td>10</td><td>Mostres</td><td>Gran grup</td><td><p>C1: Modelització</p><p>CA1: Rigor</p></td></tr>
+    </table>`
+  const parsed = parsePlanningWordHtml(html)
+  assert.equal(parsed.activities[0].curriculumSelections[0].label, 'C1: Modelització')
+  assert.equal(parsed.activities[0].curriculumSelections[0].assessmentCriteria[0].label, 'CA1: Rigor')
+  assert.deepEqual(parsed.activities[0].indicatorLabels, [])
+})

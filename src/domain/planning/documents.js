@@ -161,6 +161,7 @@ export function buildPlanningDocumentExport({ activities = [], phases = [], unit
     })),
     activities: activities.map((activity, index) => ({
       applicationComment: text(activity.applicationComment),
+      curriculumSelections: clone(activity.curriculumSelections || []),
       description: text(activity.description),
       diversityMeasures: clone(activity.diversityMeasures || []),
       evidenceMode: activity.evidenceMode || 'none',
@@ -325,6 +326,40 @@ function phaseKindFromLabel(value) {
   return 'custom'
 }
 
+function importedCurriculumKey(prefix, label, parentKey = '') {
+  const normalized = normalizedHeader(label).replace(/\s+/g, '-')
+  return [parentKey, prefix, normalized].filter(Boolean).join(':')
+}
+
+function parseActivityCurriculum(lines, curriculum) {
+  const competenciesByLabel = new Map((curriculum.competencies || [])
+    .map((item) => [normalizedHeader(item.label), item.label]))
+  const criteriaByLabel = new Map((curriculum.assessmentCriteria || [])
+    .map((item) => [normalizedHeader(item.label), item.label]))
+  const selections = []
+  let current = null
+  ;(lines || []).map(text).filter(Boolean).forEach((line) => {
+    const normalized = normalizedHeader(line)
+    if (competenciesByLabel.has(normalized)) {
+      const label = competenciesByLabel.get(normalized)
+      current = {
+        competencyKey: importedCurriculumKey('competency', label),
+        label,
+        assessmentCriteria: [],
+      }
+      selections.push(current)
+      return
+    }
+    if (!current || !criteriaByLabel.has(normalized)) return
+    const label = criteriaByLabel.get(normalized)
+    current.assessmentCriteria.push({
+      criterionKey: importedCurriculumKey('criterion', label, current.competencyKey),
+      label,
+    })
+  })
+  return selections
+}
+
 function materialFromText(label) {
   return {
     id: null,
@@ -367,6 +402,9 @@ export function parsePlanningWordHtml(html) {
     phaseKeyByKind.set(kind, key)
     return key
   }
+  const parsedCurriculum = parseCurriculum(tables)
+  const sequenceHeader = sequenceTable.find((row) => row.some((cell) => normalizedHeader(cell.text) === 'descriptiu activitat')) || []
+  const hasActivityCurriculum = /competencies criteris/.test(normalizedHeader(sequenceHeader[6]?.text))
   sequenceTable.forEach((row) => {
     const rowText = row.map((cell) => cell.text).join(' ')
     if (/fase de (preparaci|resoluci|tancament)/i.test(rowText)) {
@@ -394,9 +432,10 @@ export function parsePlanningWordHtml(html) {
       phaseKey = subphaseKeyBySignature.get(signature)
     }
     const parsedContent = parseActivityContent(row[2]?.lines || [])
-    const indicatorLabels = textList((row[6]?.lines || []).flatMap((line) => line.split(/[;,]/)))
+    const indicatorLabels = hasActivityCurriculum ? [] : textList((row[6]?.lines || []).flatMap((line) => line.split(/[;,]/)))
     activities.push({
       ...parsedContent,
+      curriculumSelections: hasActivityCurriculum ? parseActivityCurriculum(row[6]?.lines || [], parsedCurriculum) : [],
       diversityMeasures: parsedContent.diversityText ? [{ label: parsedContent.diversityText, studentNames: [] }] : [],
       evidenceMode: 'none',
       grouping: text(row[5]?.text),
@@ -412,7 +451,6 @@ export function parsePlanningWordHtml(html) {
     })
   })
   if (activities.length === 0) throw new Error('No s’ha trobat cap activitat numerada al Word.')
-  const parsedCurriculum = parseCurriculum(tables)
   const curriculum = {
     ...parsedCurriculum,
     indicators: textList([

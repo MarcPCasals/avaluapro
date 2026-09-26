@@ -21,6 +21,7 @@ import { usePlanningWorkspace } from './usePlanningWorkspace'
 import { getPlanningReminderSummary } from '../../lib/reminders'
 import { getConnectablePlanningUnits, getConnectedClassIds } from '../../domain/planning/classPlanning'
 import { getTutorialCollaboratorEmails, resolveTutorialPlanningContext } from '../../domain/planning/tutorialPlanning'
+import { buildActivityCurriculumOptions } from '../../domain/planning/activityCurriculum'
 import './planning.css'
 
 function SyncBadge({ isOnline, sync }) {
@@ -281,6 +282,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
   const competencies = useAvaluaproStore((state) => state.competencies)
   const criteria = useAvaluaproStore((state) => state.criteria)
   const indicators = useAvaluaproStore((state) => state.indicators)
+  const uts = useAvaluaproStore((state) => state.uts)
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
@@ -324,6 +326,13 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
     }
   }, [competencies, criteria, indicators])
   const activeClass = classes.find((item) => item.id === contextClassId) || null
+  const activityCurriculumOptions = useMemo(() => buildActivityCurriculumOptions({
+    classId: contextClassId,
+    competencies,
+    criteria,
+    subjectName: activeClass?.subject || '',
+    uts,
+  }), [activeClass?.subject, competencies, contextClassId, criteria, uts])
   const activeSharedTutoringSpace = sharedTutoringSpaces.find((space) => space.id === tutorialSpaceId) || null
   const tutorialCollaboratorEmails = useMemo(
     () => getTutorialCollaboratorEmails(tutorialContext, activeSharedTutoringSpace, user?.email),
@@ -602,7 +611,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={(values) => workspace.createUnit(values, { classId: activeClassId, classLabel: activeClass?.name })} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog availableIndicators={workspace.activePlanningUnit?.curriculum?.indicators || []} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
+      {dialog === 'activity' && <ActivityDialog availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
         () => workspace.saveActivity(values, current),
         () => workspace.saveActivityForActiveClass(values, current),
       )} phases={workspace.phases} students={students} />}

@@ -41,6 +41,8 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = materialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
+  const competencyCount = activity.curriculumSelections?.length || 0
+  const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)
   const load = activity.plannedMinutes ? getSessionLoad([activity], sessionDuration) : null
   return (
     <article
@@ -92,7 +94,9 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
           {activity.grouping && <span>{activity.grouping}</span>}
           {activity.space && <span>{activity.space}</span>}
           {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
-          {activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador' : 'indicadors'}</span>}
+          {competencyCount > 0 && <span>{competencyCount} {competencyCount === 1 ? 'competència' : 'competències'}</span>}
+          {criterionCount > 0 && <span>{criterionCount} {criterionCount === 1 ? 'criteri' : 'criteris'}</span>}
+          {competencyCount === 0 && activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador anterior' : 'indicadors anteriors'}</span>}
           {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
           {activity.groupOverride && <span className="planning-group-override-mark">Adaptada a aquest grup</span>}
           {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
