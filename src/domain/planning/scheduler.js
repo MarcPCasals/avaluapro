@@ -818,12 +818,14 @@ export function buildAgendaRecoveryReflow({
 }
 
 function buildAgendaItemsReflow({
+  additionalActivities = [],
   activityMinutesById = {},
   application,
   candidates = [],
   changes = {},
   existingSessionBundles = [],
   options = {},
+  startAfterTarget = false,
   targetItemId = '',
   targetSessionId,
 }) {
@@ -833,11 +835,14 @@ function buildAgendaItemsReflow({
   const targetBundle = applicationBundles.find((bundle) => bundle.session.id === targetSessionId)
   if (!targetBundle) throw new Error('No s’ha trobat la sessió que vols reajustar.')
   const targetDate = String(targetBundle.session.startsAt).slice(0, 10)
-  if (!canReflowSession(targetBundle, targetDate)) {
+  if (!startAfterTarget && !canReflowSession(targetBundle, targetDate)) {
     throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
   }
   const reflowableBundles = applicationBundles.filter((bundle) =>
-    bundle.session.startsAt >= targetBundle.session.startsAt && canReflowSession(bundle, targetDate))
+    (startAfterTarget
+      ? bundle.session.startsAt > targetBundle.session.startsAt
+      : bundle.session.startsAt >= targetBundle.session.startsAt)
+      && canReflowSession(bundle, targetDate))
   const logicalGroups = groupParallelSessionBundles(reflowableBundles)
   const targetGroup = logicalGroups.find((group) =>
     group.bundles.some((bundle) => bundle.session.id === targetSessionId))
@@ -857,32 +862,40 @@ function buildAgendaItemsReflow({
   const activityMeta = new Map()
   const activitySequence = []
   const activityBySourceKey = new Map()
+  const includeActivity = ({
+    plannedMinutes,
+    sourceActivityId = null,
+    sourcePlanningUnitId = null,
+    title,
+    type = 'activity',
+  }, fallbackKey) => {
+    const sourceKey = sourceActivityId || fallbackKey
+    let activity = activityBySourceKey.get(sourceKey)
+    if (!activity) {
+      const key = `agenda-reflow:${sourceKey}`
+      activity = { id: key, plannedMinutes: 0, sourceKey, title, type }
+      activityBySourceKey.set(sourceKey, activity)
+      activitySequence.push(activity)
+      activityMeta.set(key, { sourceActivityId, sourcePlanningUnitId, title, type })
+    }
+    activity.plannedMinutes += Number(plannedMinutes) || 0
+    return activity
+  }
+  additionalActivities.forEach((activity, index) => {
+    includeActivity(activity, `additional:${index}`)
+  })
   logicalGroups.forEach((group, groupIndex) => {
     const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
     representativeItems.forEach((item, itemIndex) => {
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
       const title = isTarget ? String(changes.title || item.title).trim() || item.title : item.title
-      const sourceKey = item.sourceActivityId || `unlinked:${groupIndex}:${itemIndex}:${item.id}`
-      let activity = activityBySourceKey.get(sourceKey)
-      if (!activity) {
-        const key = `agenda-reflow:${sourceKey}`
-        activity = {
-          id: key,
-          plannedMinutes: 0,
-          sourceKey,
-          title,
-          type: item.type || 'activity',
-        }
-        activityBySourceKey.set(sourceKey, activity)
-        activitySequence.push(activity)
-        activityMeta.set(key, {
-          sourceActivityId: item.sourceActivityId || null,
-          sourcePlanningUnitId: item.sourcePlanningUnitId || null,
-          title,
-          type: item.type || 'activity',
-        })
-      }
-      activity.plannedMinutes += isTarget ? minutes : (Number(item.plannedMinutes) || 0)
+      const activity = includeActivity({
+        plannedMinutes: isTarget ? minutes : item.plannedMinutes,
+        sourceActivityId: item.sourceActivityId || null,
+        sourcePlanningUnitId: item.sourcePlanningUnitId || null,
+        title,
+        type: item.type || 'activity',
+      }, `unlinked:${groupIndex}:${itemIndex}:${item.id}`)
       if (isTarget) {
         activity.title = title
         activityMeta.set(activity.id, {
@@ -1012,6 +1025,18 @@ export function buildAgendaItemChangeReflow(input) {
 /** Omple els buits d'una sessió futura avançant el contingut posterior. */
 export function buildAgendaSessionCompaction(input) {
   return { ...buildAgendaItemsReflow(input), kind: 'agenda-compaction' }
+}
+
+/**
+ * Afegeix una continuació a partir de la sessió següent i refà tota la part
+ * futura. Els fragments amb la mateixa activitat es fusionen i la suma mai no
+ * supera els minuts definits a la Programació.
+ */
+export function buildAgendaContinuationReflow(input) {
+  return {
+    ...buildAgendaItemsReflow({ ...input, startAfterTarget: true }),
+    kind: 'agenda-continuation',
+  }
 }
 
 export function getSessionCandidateKey(candidate) {

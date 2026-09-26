@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
+  buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
   buildAgendaSessionCompaction,
   applyImprovementProposals,
@@ -1214,6 +1215,53 @@ test('compactar repara fragments duplicats i respecta els minuts originals de ca
     ['Inicial', 40],
     ['Presentació', 15],
   ])
+})
+
+test('continuar fusiona fragments repetits i no supera la durada original de la Programació', () => {
+  const application = createGroupApplication({
+    id: 'application-continuation', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const currentSession = createCalendarSession({
+    id: 'continuation-current', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-25T11:00:00', durationMinutes: 60, status: 'held',
+  }, { now: NOW })
+  const nextSession = createCalendarSession({
+    id: 'continuation-next', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T09:30:00', durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const makeItem = (id, session, plannedMinutes, order) => createSessionItem({
+    id, ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+    sourceActivityId: 'presentation', title: 'Presentació', type: 'activity', order, plannedMinutes,
+  }, { now: NOW })
+
+  const result = buildAgendaContinuationReflow({
+    additionalActivities: [{
+      plannedMinutes: 10,
+      sourceActivityId: 'presentation',
+      sourcePlanningUnitId: 'up-1',
+      title: 'Presentació',
+      type: 'activity',
+    }],
+    activityMinutesById: { presentation: 30 },
+    application,
+    existingSessionBundles: [
+      { session: currentSession, items: [makeItem('presentation-current', currentSession, 10, 0)], results: [] },
+      { session: nextSession, items: [
+        makeItem('presentation-next-1', nextSession, 5, 0),
+        makeItem('presentation-next-2', nextSession, 10, 1),
+      ], results: [] },
+    ],
+    options: options(sequenceIdFactory()),
+    targetSessionId: currentSession.id,
+  })
+
+  const presentationItems = result.sessions.flatMap((bundle) => bundle.items)
+    .filter((item) => item.sourceActivityId === 'presentation')
+  assert.equal(presentationItems.length, 1)
+  assert.equal(presentationItems[0].plannedMinutes, 20)
+  assert.equal(10 + presentationItems[0].plannedMinutes, 30)
+  assert.equal(result.removedItems.length, 2)
 })
 
 test('si el docent ho confirma la compactació evita avançar un fragment de només cinc minuts', () => {

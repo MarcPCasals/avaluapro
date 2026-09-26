@@ -20,6 +20,7 @@ import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/plan
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import {
   copyTimetableVersionStructure,
+  buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
   buildAgendaSessionCompaction,
@@ -34,7 +35,6 @@ import {
   createGroupApplication,
   createPlanningActivity,
   createPlanningPrivateNote,
-  createSessionItem,
   createTemporalUnit,
   createTimetableSlot,
   createTimetableVersion,
@@ -1539,6 +1539,13 @@ export function useAgendaWorkspace(user, classes = []) {
 
     const activityById = new Map(preview.setup.activities.map((activity) => [activity.id, activity]))
     const changedById = new Map(preview.changedLockedItems.map((item) => [item.id, item]))
+    const changedResultsBySessionId = new Map()
+    for (const result of preview.changedTargetResults || []) {
+      changedResultsBySessionId.set(result.sessionId, [
+        ...(changedResultsBySessionId.get(result.sessionId) || []),
+        result,
+      ])
+    }
     const replacementBySessionId = new Map(preview.sessions.map((candidate) => [
       candidate.session.id,
       {
@@ -1565,11 +1572,13 @@ export function useAgendaWorkspace(user, classes = []) {
         .map((current) => {
           const replacement = replacementBySessionId.get(current.session.id)
           if (replacement) return replacement
+          const changedResults = changedResultsBySessionId.get(current.session.id) || []
           return {
             ...current,
             items: current.items.map((item) => changedById.has(item.id)
               ? { ...changedById.get(item.id), sourceActivity: item.sourceActivity }
               : item),
+            results: changedResults.reduce((results, result) => replaceById(results, result), current.results),
           }
         })
       const knownIds = new Set(next.map((current) => current.session.id))
@@ -1700,9 +1709,9 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
 
   /**
-   * Una continuació no altera el temps ideal de la UP. Construeix fragments
-   * nous per al grup i actualitza els comptadors de parts, però espera una
-   * confirmació separada abans de desar-los.
+   * Una continuació no altera el temps ideal de la UP. Refà tota la part
+   * futura perquè dos fragments de la mateixa activitat dins d'una sessió es
+   * fusionin i la suma mai no superi la durada definida a la Programació.
    */
   const buildContinuationPreview = useCallback(async (bundle, item, minutes) => {
     if (!item?.sourceActivityId || Number(minutes) <= 0) {
@@ -1728,120 +1737,58 @@ export function useAgendaWorkspace(user, classes = []) {
       timetables: setup.timetables,
       to: activeAcademicYear.endsOn,
     })
-    const futureBundles = setup.existingSessionBundles.filter((candidate) =>
-      candidate.session.status === 'planned' && candidate.session.startsAt > bundle.session.startsAt)
-    const distribution = buildActivitySessionDistribution({
-      activities: [{
-        id: item.sourceActivityId,
+    const reflowInput = {
+      additionalActivities: [{
         plannedMinutes: Number(minutes),
+        sourceActivityId: item.sourceActivityId,
         sourcePlanningUnitId: item.sourcePlanningUnitId || bundle.planningUnit.id,
         title: item.title,
         type: item.type,
       }],
+      activityMinutesById: activityMinutesById(setup.activities),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) => candidate.startsAt > bundle.session.startsAt),
-      existingSessionBundles: futureBundles,
-      options: { now: new Date().toISOString() },
-    })
-    if (distribution.unscheduled.length > 0) {
+      existingSessionBundles: setup.existingSessionBundles,
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      targetSessionId: bundle.session.id,
+    }
+    let preview = buildAgendaContinuationReflow(reflowInput)
+    if (confirmAvoidTinyAgendaFragments(preview)) {
+      preview = buildAgendaContinuationReflow({
+        ...reflowInput,
+        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
+      })
+    }
+    if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou temps disponible per afegir aquesta continuació.')
     }
-    const activeSourceItems = setup.existingSessionBundles
-      .filter((candidate) => !['cancelled', 'notHeld'].includes(candidate.session.status))
-      .flatMap((candidate) => candidate.items)
-      .filter((candidate) => candidate.sourceActivityId === item.sourceActivityId)
-    const segmentOffset = Math.max(0, ...activeSourceItems.map((candidate) => Number(candidate.segmentIndex) || 0))
-    const newSegmentCount = segmentOffset + distribution.sessions.reduce((total, candidate) => total + candidate.items.length, 0)
     const now = new Date().toISOString()
-    const changedExistingItems = activeSourceItems.map((candidate) => createSessionItem({
-      ...candidate,
-      segmentCount: newSegmentCount,
-      updatedAt: now,
-    }, { now }))
-    let addedIndex = 0
-    const sessions = distribution.sessions.map((candidate) => ({
-      ...candidate,
-      items: candidate.items.map((newItem) => {
-        addedIndex += 1
-        return createSessionItem({
-          ...newItem,
-          segmentCount: newSegmentCount,
-          segmentIndex: segmentOffset + addedIndex,
-          updatedAt: now,
-        }, { now })
-      }),
-    }))
-    return { bundle, changedExistingItems, item, minutes: Number(minutes), sessions, setup }
-  }, [activeAcademicYear, loadSchedulingSetup])
-
-  /** Desa en una sola cua la continuació confirmada i els comptadors revisats. */
-  const confirmContinuationPreview = useCallback(async (preview) => {
-    const planningUnitId = preview.setup.planningUnit.id
-    const now = new Date().toISOString()
-    const existingResult = preview.bundle.results.find((result) => result.sessionItemId === preview.item.id)
+    const existingResult = bundle.results.find((result) => result.sessionItemId === item.id)
     const sourceResult = createActivityResult({
       ...existingResult,
-      applicationId: preview.bundle.application.id,
-      ownerUid: preview.bundle.session.ownerUid,
-      sessionId: preview.bundle.session.id,
-      sessionItemId: preview.item.id,
-      sourceActivityId: preview.item.sourceActivityId,
+      applicationId: bundle.application.id,
+      ownerUid: bundle.session.ownerUid,
+      sessionId: bundle.session.id,
+      sessionItemId: item.id,
+      sourceActivityId: item.sourceActivityId,
       status: 'continued',
       updatedAt: now,
     }, { now })
-    const entries = preview.changedExistingItems.map((item) => ({
-      entity: item,
-      context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
-    }))
-    entries.push({
-      entity: sourceResult,
-      context: {
-        applicationId: preview.bundle.application.id,
-        planningUnitId,
-        sessionId: preview.bundle.session.id,
-      },
-    })
-    for (const bundle of preview.sessions) {
-      if (!bundle.isExisting) entries.push({ entity: bundle.session, context: { planningUnitId } })
-      for (const item of bundle.items) {
-        entries.push({
-          entity: item,
-          context: { applicationId: item.applicationId, planningUnitId, sessionId: item.sessionId },
-        })
-      }
+    return {
+      ...preview,
+      bundle,
+      changedTargetResults: [sourceResult],
+      item,
+      minutes: Number(minutes),
+      setup,
     }
-    await persist(entries)
-    const changedById = new Map(preview.changedExistingItems.map((item) => [item.id, item]))
-    setSessionBundles((currentBundles) => {
-      const next = currentBundles.map((current) => {
-        const continuation = preview.sessions.find((candidate) => candidate.session.id === current.session.id)
-        return {
-          ...current,
-          items: [
-            ...current.items.map((currentItem) => changedById.has(currentItem.id)
-              ? { ...changedById.get(currentItem.id), sourceActivity: currentItem.sourceActivity }
-              : currentItem),
-            ...(continuation?.items || []).map((newItem) => ({ ...newItem, sourceActivity: preview.item.sourceActivity })),
-          ].sort((left, right) => Number(left.order) - Number(right.order)),
-          results: current.session.id === preview.bundle.session.id
-            ? replaceById(current.results, sourceResult)
-            : current.results,
-        }
-      })
-      const knownIds = new Set(next.map((current) => current.session.id))
-      for (const continuation of preview.sessions.filter((candidate) => !knownIds.has(candidate.session.id))) {
-        next.push({
-          application: preview.setup.application,
-          items: continuation.items.map((newItem) => ({ ...newItem, sourceActivity: preview.item.sourceActivity })),
-          planningUnit: preview.setup.planningUnit,
-          results: [],
-          session: continuation.session,
-        })
-      }
-      return next.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-    })
-    return { ...preview, sourceResult }
-  }, [persist])
+  }, [activeAcademicYear, loadSchedulingSetup])
+
+  /** Desa en una sola cua la continuació i tota la cronologia futura normalitzada. */
+  const confirmContinuationPreview = useCallback(
+    (preview) => persistAgendaReflowPreview(preview),
+    [persistAgendaReflowPreview],
+  )
 
   return {
     academicYears,
