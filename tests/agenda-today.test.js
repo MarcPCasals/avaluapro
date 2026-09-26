@@ -1,12 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getUpcomingAgendaReminders, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
   { id: 'monday-second', classId: '1c', weekday: 1, startsAt: '09:30', durationMinutes: 60 },
   { id: 'wednesday', classId: '1d', weekday: 3, startsAt: '11:00', durationMinutes: 60 },
 ]
+
+test('Avui mostra només els recordatoris des del dia actual fins a tres dies després', () => {
+  const reminders = getUpcomingAgendaReminders([
+    { id: 'past', reminder: { date: '2026-09-24', time: '10:00' } },
+    { id: 'today-late', reminder: { date: '2026-09-26', time: '13:00' } },
+    { id: 'today-early', reminder: { date: '2026-09-26', time: '09:00' } },
+    { id: 'future', reminder: { date: '2026-09-28', time: '11:00' } },
+    { id: 'horizon', reminder: { date: '2026-09-29', time: '08:00' } },
+    { id: 'too-far', reminder: { date: '2026-09-30', time: '08:00' } },
+    { id: 'undated', reminder: {} },
+  ], '2026-09-26', 3)
+
+  assert.deepEqual(reminders.map((item) => item.id), [
+    'today-early',
+    'today-late',
+    'future',
+    'horizon',
+  ])
+})
 
 test('el cap de setmana mostra la primera classe de dilluns', () => {
   const next = findNextTimetableOccurrence(slots, '2026-09-20', '09:00')

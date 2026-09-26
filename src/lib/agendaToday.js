@@ -17,6 +17,25 @@ function timeToMinutes(value = '') {
 }
 
 /**
+ * Limita el resum d'Avui als recordatoris del dia actual i dels dies futurs
+ * inclosos dins l'horitzó. Els pendents vençuts continuen existint a les seves
+ * fonts, però no ocupen aquest bloc de preparació immediata.
+ */
+export function getUpcomingAgendaReminders(items = [], today, daysAhead = 3) {
+  const horizon = addDays(today, daysAhead)
+  return items
+    .filter((item) => {
+      const date = item?.reminder?.date
+      return date && date >= today && date <= horizon
+    })
+    .sort((left, right) =>
+      `${left.reminder?.date || ''}T${left.reminder?.time || '00:00'}`.localeCompare(
+        `${right.reminder?.date || ''}T${right.reminder?.time || '00:00'}`,
+      ),
+    )
+}
+
+/**
  * Calcula l'estat temporal de les classes visibles a la setmana. Les sessions
  * en curs tenen prioritat; si no n'hi ha cap, es ressalta la primera franja
  * futura. Les sessions simultànies comparteixen el mateix focus.

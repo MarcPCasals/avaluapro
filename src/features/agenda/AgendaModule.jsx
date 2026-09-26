@@ -19,7 +19,7 @@ import {
   getAgendaTimelineInitialRange,
   getTemporalUnitProgress,
 } from '../../lib/agendaCalendar'
-import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, mergeAgendaClassCatalog } from '../../lib/agendaToday'
+import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getUpcomingAgendaReminders, mergeAgendaClassCatalog } from '../../lib/agendaToday'
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { findCurrentTemporalUnit } from '../../lib/currentTemporalUnit'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
@@ -482,19 +482,10 @@ export default function AgendaModule() {
     [agendaClasses, workspace.activeTimetable, workspace.calendarEvents, workspace.sessionBundles, workspace.slots, workspace.today],
   )
   const upcomingReminders = useMemo(() => {
-    const horizon = addDateDays(workspace.today, 3)
-    // Els pendents vençuts no desapareixen d'Avui: es mantenen al radar fins
-    // que el docent els marca com a fets, juntament amb els pròxims tres dies.
-    return [
+    return getUpcomingAgendaReminders([
       ...reminderSummary.items,
       ...tutoringCalendarReminders,
-    ]
-      .filter((item) => item?.reminder?.date && item.reminder.date <= horizon)
-      .sort((left, right) =>
-        `${left.reminder?.date || ''}T${left.reminder?.time || '00:00'}`.localeCompare(
-          `${right.reminder?.date || ''}T${right.reminder?.time || '00:00'}`,
-        ),
-      )
+    ], workspace.today, 3)
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
   const [view, setView] = useState('today')
   const [weekStart, setWeekStart] = useState(() => getAgendaDefaultWeekStart(workspace.today))
