@@ -310,7 +310,10 @@ function ActivityCurriculumPicker({ competencies, onChange, selections }) {
                         onChange={(event) => toggleCriterion(competency, criterion, event.target.checked)}
                         type="checkbox"
                       />
-                      <span>{criterion.label}</span>
+                      <span className="planning-criterion-copy">
+                        <span>{criterion.label}</span>
+                        {criterion.actionVerbs?.length > 0 && <small>{criterion.actionVerbs.join(' · ')}</small>}
+                      </span>
                     </label>
                   ))}
                 </div>

@@ -1,4 +1,13 @@
-import { getSubjectStructure } from '../../data/subjects.js'
+import { canonicalizeSubjectName, getSubjectStructure } from '../../data/subjects.js'
+
+const CFN_CRITERION_ACTION_VERBS = {
+  '1:1': ['Predir', 'Contrastar', 'Representar'],
+  '1:2': ['Descriure', 'Relacionar', 'Explicar'],
+  '2:1': ['Formular', 'Relacionar', 'Concloure'],
+  '2:2': ['Dissenyar', 'Mesurar', 'Comunicar'],
+  '3:1': ['Valorar', 'Decidir', 'Defensar'],
+  '3:2': ['Fonamentar', 'Raonar', 'Contraargumentar'],
+}
 
 function normalizedLabel(value) {
   return String(value || '').trim().toLocaleLowerCase('ca')
@@ -11,6 +20,13 @@ function curriculumKey(prefix, label, parentKey = '') {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
   return [parentKey, prefix, normalized].filter(Boolean).join(':')
+}
+
+export function criterionActionVerbs({ competencyLabel = '', criterionLabel = '', subjectName = '' } = {}) {
+  if (canonicalizeSubjectName(subjectName) !== 'Ciències Físiques i de la Natura') return []
+  const competencyNumber = String(competencyLabel).match(/(?:^|\s)C\s*([1-3])\b/i)?.[1]
+  const criterionNumber = String(criterionLabel).match(/(?:^|\s)CA\s*([1-2])\b/i)?.[1]
+  return [...(CFN_CRITERION_ACTION_VERBS[`${competencyNumber}:${criterionNumber}`] || [])]
 }
 
 export function normalizeActivityCurriculumSelections(selections = []) {
@@ -80,6 +96,11 @@ export function buildActivityCurriculumOptions({ classId, competencies = [], cri
         criteria: uniqueLabels.map((label) => ({
           key: curriculumKey('criterion', label, competency.key),
           label,
+          actionVerbs: criterionActionVerbs({
+            competencyLabel: competency.label,
+            criterionLabel: label,
+            subjectName,
+          }),
         })),
       }
     })

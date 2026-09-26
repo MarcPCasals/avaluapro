@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   activityCurriculumText,
   buildActivityCurriculumOptions,
+  criterionActionVerbs,
 } from '../src/domain/planning/activityCurriculum.js'
 
 test('agrupa les competències i els criteris repetits de les diferents UT', () => {
@@ -42,6 +43,19 @@ test('usa les tres competències oficials de CFN si encara no hi ha cap UT d’a
     'C3: Argumentació',
   ])
   assert.deepEqual(options[0].criteria.map((criterion) => criterion.label), ['CA1: Rigor', 'CA2: Precisió'])
+  assert.deepEqual(options.map((option) => option.criteria.map((criterion) => criterion.actionVerbs)), [
+    [['Predir', 'Contrastar', 'Representar'], ['Descriure', 'Relacionar', 'Explicar']],
+    [['Formular', 'Relacionar', 'Concloure'], ['Dissenyar', 'Mesurar', 'Comunicar']],
+    [['Valorar', 'Decidir', 'Defensar'], ['Fonamentar', 'Raonar', 'Contraargumentar']],
+  ])
+})
+
+test('els verbs d’acció de CFN no s’apliquen a criteris homònims d’altres assignatures', () => {
+  assert.deepEqual(criterionActionVerbs({
+    competencyLabel: 'C1: Comprendre discursos orals multimodals',
+    criterionLabel: 'CA1: Pertinència',
+    subjectName: 'Català',
+  }), [])
 })
 
 test('genera una còpia llegible de les competències i criteris seleccionats', () => {
