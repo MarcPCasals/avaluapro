@@ -139,9 +139,25 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
+  const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
+  const [completedActivitiesLoading, setCompletedActivitiesLoading] = useState(true)
+  useEffect(() => {
+    let active = true
+    Promise.resolve(loadCompletedActivityIds?.())
+      .then((ids) => {
+        if (active) setCompletedActivityIds(new Set(ids || []))
+      })
+      .catch(() => {
+        if (active) setCompletedActivityIds(new Set())
+      })
+      .finally(() => {
+        if (active) setCompletedActivitiesLoading(false)
+      })
+    return () => { active = false }
+  }, [loadCompletedActivityIds, unit.id])
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
   const acceptImprovements = async (proposalIds) => {
     const result = await onAcceptImprovements(proposalIds)
@@ -236,6 +252,8 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, onAc
       </details>
       <PlanningActivitySequence
         activities={activities}
+        completedActivityIds={completedActivityIds}
+        completedActivitiesLoading={completedActivitiesLoading}
         onAdd={onAddActivity}
         onAddChildPhase={onAddChildPhase}
         onAddPhase={onAddPhase}
@@ -552,8 +570,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                 )}
                 <UnitEditor
                   activities={workspace.activities}
+                  loadCompletedActivityIds={workspace.loadCompletedActivityIds}
                   curriculumCatalog={curriculumCatalog}
-                  key={workspace.activePlanningUnit.id}
+                  key={`${workspace.activePlanningUnit.id}:${activeClassId}`}
                   canManageUnit={workspace.activeRole === 'owner'}
                   onAcceptImprovements={(proposalIds) => withConnectedConfirmation(() => workspace.acceptImprovementSuggestions(proposalIds))}
                   onAddActivity={(phaseId) => handleOpenActivity(null, phaseId)}

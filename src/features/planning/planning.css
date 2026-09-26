@@ -213,6 +213,7 @@
 .planning-sequence-section { display: grid; gap: 15px; border-bottom: 1px solid #edf0f4; padding: 22px; background: #fcfcff; }
 .planning-sequence-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .planning-sequence-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.planning-completed-loading { color: #94a3b8; font-size: 9px; font-weight: 700; }
 .planning-budget-summary { min-width: 285px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; border: 1px solid #ddd6fe; border-radius: 10px; padding: 8px 10px; background: #faf5ff; }
 .planning-budget-summary label { min-width: 100px; gap: 2px; color: #7c3aed; font-size: 9px; text-transform: uppercase; }
 .planning-budget-summary select { border: 0; padding: 2px 24px 2px 0; color: #4c1d95; background: transparent; font-size: 12px; }

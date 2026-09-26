@@ -851,6 +851,37 @@ test('la selecció progressiva amaga només les activitats realment acabades', (
   assert.deepEqual([...completedIds], ['finished-activity'])
 })
 
+test('una activitat repetida per mitjos grups no consta com acabada fins que tots dos han finalitzat', () => {
+  const sessionA = createCalendarSession({
+    id: 'session-a', ownerUid: 'teacher-1', applicationId: 'application-1', classId: 'class-1',
+    startsAt: '2026-09-25T09:30:00', durationMinutes: 60, status: 'held', subgroupId: 'Grup A',
+  }, { now: NOW })
+  const sessionB = createCalendarSession({
+    id: 'session-b', ownerUid: 'teacher-1', applicationId: 'application-1', classId: 'class-1',
+    startsAt: '2026-09-25T12:00:00', durationMinutes: 60, status: 'held', subgroupId: 'Grup B',
+  }, { now: NOW })
+  const itemFor = (session, suffix) => createSessionItem({
+    id: `item-${suffix}`, ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: session.id,
+    sourceActivityId: 'shared-activity', title: 'Activitat compartida', type: 'activity', order: 0,
+    plannedMinutes: 30, segmentIndex: 1, segmentCount: 1,
+  }, { now: NOW })
+  const itemA = itemFor(sessionA, 'a')
+  const itemB = itemFor(sessionB, 'b')
+  const resultFor = (session, item, suffix) => createActivityResult({
+    id: `result-${suffix}`, ownerUid: 'teacher-1', applicationId: 'application-1',
+    sessionId: session.id, sessionItemId: item.id, sourceActivityId: item.sourceActivityId,
+    status: 'completed',
+  }, { now: NOW })
+  const bundles = [
+    { session: sessionA, items: [itemA], results: [resultFor(sessionA, itemA, 'a')] },
+    { session: sessionB, items: [itemB], results: [] },
+  ]
+
+  assert.deepEqual([...summarizeCompletedActivityIds(bundles)], [])
+  bundles[1].results = [resultFor(sessionB, itemB, 'b')]
+  assert.deepEqual([...summarizeCompletedActivityIds(bundles)], ['shared-activity'])
+})
+
 test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar dues vegades la UP', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({

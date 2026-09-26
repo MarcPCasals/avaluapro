@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, BookOpenText, ChevronDown, Clock3, ExternalLink, History, Layers3, Menu, Pencil,
+  ArrowRight, BookOpenText, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Menu, Pencil,
   Plus, Trash2,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -146,10 +146,12 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
   )
 }
 
-export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, phases }) {
+export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, phases }) {
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
+  const [showCompleted, setShowCompleted] = useState(false)
   const flatPhases = useMemo(() => orderedPhases(phases), [phases])
+  const completedCount = activities.filter((activity) => completedActivityIds.has(activity.id)).length
   const rootPhaseNumberById = useMemo(() => new Map(flatPhases
     .filter((phase) => phase.depth === 0)
     .map((phase, index) => [phase.id, index + 1])), [flatPhases])
@@ -159,8 +161,8 @@ export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, o
       .sort((left, right) => Number(left.order) - Number(right.order)))
     .map((activity, index) => [activity.id, index + 1])), [activities, flatPhases])
   const orderedActivities = useMemo(() => flatPhases.flatMap((phase) => activities
-    .filter((activity) => activity.phaseId === phase.id)
-    .sort((left, right) => Number(left.order) - Number(right.order))), [activities, flatPhases])
+    .filter((activity) => activity.phaseId === phase.id && (showCompleted || !completedActivityIds.has(activity.id)))
+    .sort((left, right) => Number(left.order) - Number(right.order))), [activities, completedActivityIds, flatPhases, showCompleted])
   const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
@@ -206,6 +208,13 @@ export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, o
           <div className="contextual-section-title"><h3>Seqüència d’activitats</h3><ContextualHelp title="Seqüència d’activitats">Ordena les activitats, indicacions i transicions tal com es treballaran. La temporització servirà després per distribuir-les a l’Agenda.</ContextualHelp></div>
         </div>
         <div className="planning-sequence-tools">
+          {completedActivitiesLoading && <span className="planning-completed-loading">Comprovant activitats fetes…</span>}
+          {!completedActivitiesLoading && completedCount > 0 && (
+            <button className="secondary-action compact" onClick={() => setShowCompleted((current) => !current)} type="button">
+              {showCompleted ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showCompleted ? 'Amagar fetes' : `Mostrar fetes (${completedCount})`}
+            </button>
+          )}
           <button className="secondary-action compact" onClick={onAddPhase} type="button"><Plus size={15} />Afegir fase</button>
           <div className="planning-budget-summary">
             <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}>
@@ -218,9 +227,13 @@ export function PlanningActivitySequence({ activities, onAdd, onAddChildPhase, o
 
       <div className="planning-sequence-list">
         {flatPhases.map((phase) => {
-          const phaseActivities = activities
+          const allPhaseActivities = activities
             .filter((activity) => activity.phaseId === phase.id)
             .sort((left, right) => Number(left.order) - Number(right.order))
+          const phaseActivities = showCompleted
+            ? allPhaseActivities
+            : allPhaseActivities.filter((activity) => !completedActivityIds.has(activity.id))
+          if (!showCompleted && allPhaseActivities.length > 0 && phaseActivities.length === 0) return null
           return (
             <section className={`planning-sequence-phase ${phase.kind} ${phase.depth === 0 ? 'root-phase' : 'subphase'}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
               <header>

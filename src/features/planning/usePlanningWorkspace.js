@@ -33,6 +33,7 @@ import {
   getPlanningUnitsForClass,
 } from '../../domain/planning/classPlanning'
 import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
+import { summarizeCompletedActivityIds } from '../../domain/planning/scheduler'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 
 const EMPTY_SYNC = {
@@ -1125,6 +1126,37 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     }))
   }, [activePlanningUnit, repository, user, userEmail])
 
+  const loadCompletedActivityIds = useCallback(async () => {
+    if (!repository || !activePlanningUnit || !activeApplication) return []
+    const temporalUnit = temporalUnits.find((item) => item.id === activePlanningUnit.temporalUnitId)
+    const sessionResult = await repository.loadScope(
+      `application:${activeApplication.id}:sessions`,
+      () => loadPlanningSessions({
+        applicationId: activeApplication.id,
+        from: temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00',
+        maxItems: 500,
+        planningUnitId: activePlanningUnit.id,
+        to: temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59',
+      }),
+      { completeSnapshot: true },
+    )
+    const sessions = [...sessionResult.entities]
+    const detailResults = await Promise.all(sessions.map((session) => repository.loadScope(
+      `session:${session.id}:detail`,
+      async () => {
+        const detail = await loadPlanningSessionDetail(activePlanningUnit.id, activeApplication.id, session.id, { session })
+        return [detail.session, ...detail.items, ...detail.results]
+      },
+      { completeSnapshot: true },
+    )))
+    const bundles = sessions.map((session, index) => ({
+      items: detailResults[index].entities.filter((entity) => entity.entityType === 'sessionItem'),
+      results: detailResults[index].entities.filter((entity) => entity.entityType === 'activityResult'),
+      session,
+    }))
+    return [...summarizeCompletedActivityIds(bundles)]
+  }, [activeApplication, activePlanningUnit, repository, temporalUnits])
+
   return {
     accessGrants,
     academicYears,
@@ -1157,6 +1189,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     loading: loading || sharedLoading || applicationsLoading || activityOverridesLoading,
     loadHistoricalUnits,
     loadHistoricalUnitStructure,
+    loadCompletedActivityIds,
     loadTemporalUnitsForYear,
     loadApplicationOverview,
     phases,

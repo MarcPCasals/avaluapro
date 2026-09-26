@@ -186,17 +186,28 @@ export function summarizeAssignedActivityProgress(sessionBundles = []) {
  * que encara resten per fer.
  */
 export function summarizeCompletedActivityIds(sessionBundles = []) {
-  const completedSourceActivityIds = new Set()
+  const completedItemIds = new Set()
+  const terminalItemsBySourceActivityId = new Map()
   for (const bundle of sessionBundles) {
     if (!bundle?.session || ['cancelled', 'notHeld'].includes(bundle.session.status)) continue
-    const completedItemIds = new Set((bundle.results || [])
+    ;(bundle.results || [])
       .filter((result) => result.status === 'completed')
-      .map((result) => result.sessionItemId))
+      .forEach((result) => completedItemIds.add(result.sessionItemId))
     for (const item of bundle.items || []) {
-      if (!item.sourceActivityId || !completedItemIds.has(item.id)) continue
+      if (!item.sourceActivityId) continue
       const segmentIndex = Math.max(1, Number(item.segmentIndex) || 1)
       const segmentCount = Math.max(1, Number(item.segmentCount) || 1)
-      if (segmentIndex >= segmentCount) completedSourceActivityIds.add(item.sourceActivityId)
+      if (segmentIndex < segmentCount) continue
+      terminalItemsBySourceActivityId.set(item.sourceActivityId, [
+        ...(terminalItemsBySourceActivityId.get(item.sourceActivityId) || []),
+        item.id,
+      ])
+    }
+  }
+  const completedSourceActivityIds = new Set()
+  for (const [sourceActivityId, terminalItemIds] of terminalItemsBySourceActivityId) {
+    if (terminalItemIds.length > 0 && terminalItemIds.every((itemId) => completedItemIds.has(itemId))) {
+      completedSourceActivityIds.add(sourceActivityId)
     }
   }
   return completedSourceActivityIds
