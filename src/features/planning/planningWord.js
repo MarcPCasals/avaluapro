@@ -20,6 +20,7 @@ import {
   parsePlanningWordHtml,
   PEDAGOGICAL_TYPE_LABELS,
 } from '../../domain/planning/documents'
+import { stripInlineFormatting } from '../../lib/formattedText'
 
 const PURPLE = '7C3AED'
 const PURPLE_DARK = '4C1D95'
@@ -177,7 +178,7 @@ function diversityText(measures = []) {
 
 function activityDescription(activity) {
   return [
-    activity.description ? `Activitat\n${activity.description}` : `Activitat\n${activity.title}`,
+    activity.description ? `Activitat\n${stripInlineFormatting(activity.description)}` : `Activitat\n${activity.title}`,
     `Atenció a la diversitat\n${diversityText(activity.diversityMeasures) || '—'}`,
     `Comentaris per a l’aplicació\n${activity.applicationComment || '—'}`,
   ].join('\n\n')

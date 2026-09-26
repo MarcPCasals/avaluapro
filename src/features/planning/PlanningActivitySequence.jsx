@@ -4,6 +4,7 @@ import {
   Plus, Trash2,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
+import { FormattedText } from '../../components/FormattedText'
 import {
   getPlanningTotals,
   getProgrammableMinutes,
@@ -86,7 +87,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
       <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
       <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
         <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}</strong>
-        {activity.description && <span>{activity.description}</span>}
+        {activity.description && <FormattedText as="span" text={activity.description} />}
         <small>
           {activity.grouping && <span>{activity.grouping}</span>}
           {activity.space && <span>{activity.space}</span>}

@@ -7,6 +7,7 @@ import {
   PEDAGOGICAL_TYPE_LABELS,
 } from '../../domain/planning/documents'
 import { downloadBlob, downloadJson } from '../../lib/downloads'
+import { FormattedText } from '../../components/FormattedText'
 
 const PHASE_LABELS = {
   closing: 'Tancament',
@@ -104,7 +105,7 @@ function SequenceDocument({ activities, phases, unit }) {
                   </td>
                   <td className="activity-copy">
                     <strong>{activity.title}</strong>
-                    {activity.description && <p>{activity.description}</p>}
+                    {activity.description && <FormattedText as="p" text={activity.description} />}
                     <div><b>Atenció a la diversitat</b><span>{diversityText(activity) || '—'}</span></div>
                     <div><b>Comentaris per a l’aplicació</b><span>{activity.applicationComment || '—'}</span></div>
                   </td>

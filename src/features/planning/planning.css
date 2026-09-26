@@ -193,8 +193,19 @@
 .planning-dialog-form input, .planning-dialog-form select, .planning-dialog-form textarea {
   width: 100%; border: 1px solid #dbe3ef; border-radius: 8px; padding: 9px 10px; color: #1e293b; background: white; font: inherit; font-size: 13px; font-weight: 700;
 }
-.planning-unit-editor textarea, .planning-dialog-form textarea { resize: vertical; line-height: 1.5; }
+.planning-unit-editor textarea, .planning-dialog-form textarea { resize: vertical; font-weight: 400; line-height: 1.5; }
 .planning-dialog-form .planning-autogrow-textarea { min-height: 140px; max-height: 440px; resize: vertical; }
+.planning-format-editor { overflow: hidden; border: 1px solid #dbe3ef; border-radius: 8px; background: white; }
+.planning-format-editor:focus-within { border-color: #a78bfa; outline: 3px solid #ede9fe; }
+.planning-format-editor .planning-autogrow-textarea { border: 0; border-radius: 0; outline: 0; }
+.planning-format-editor .planning-autogrow-textarea:focus { border: 0; outline: 0; }
+.planning-format-toolbar { min-height: 34px; display: flex; align-items: center; gap: 5px; border-bottom: 1px solid #e9edf3; padding: 4px 7px; background: #f8fafc; }
+.planning-format-toolbar button { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid #dbe3ef; border-radius: 6px; padding: 0; color: #475569; background: white; }
+.planning-format-toolbar button:hover { border-color: #c4b5fd; color: #6d28d9; background: #faf5ff; }
+.planning-format-toolbar span { margin-left: 3px; color: #94a3b8; font-size: 9px; font-weight: 650; }
+.planning-format-preview { display: grid; gap: 4px; border-top: 1px solid #e9edf3; padding: 9px 10px 11px; background: #fcfcff; }
+.planning-format-preview small { color: #8b5cf6; font-size: 9px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+.planning-format-preview p { margin: 0; color: #1e293b; font-size: 13px; line-height: 1.5; }
 .planning-unit-editor input:focus, .planning-unit-editor textarea:focus, .planning-unit-editor select:focus,
 .planning-dialog-form input:focus, .planning-dialog-form select:focus, .planning-dialog-form textarea:focus { border-color: #a78bfa; outline: 3px solid #ede9fe; }
 .planning-unit-editor input[readonly] { color: #64748b; background: #f8fafc; }
@@ -253,7 +264,7 @@
 .planning-activity-content { min-width: 0; display: grid; gap: 2px; border: 0; padding: 2px; color: #334155; background: transparent; text-align: left; }
 .planning-activity-content > strong, .planning-activity-content > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .planning-activity-content > strong { font-size: 12px; }
-.planning-activity-content > span { color: #64748b; font-size: 10px; font-weight: 650; }
+.planning-activity-content > span { color: #64748b; font-size: 10px; font-weight: 400; }
 .planning-activity-content small { display: flex; flex-wrap: wrap; gap: 5px; color: #94a3b8; font-size: 9px; font-weight: 800; }
 .planning-activity-content small span + span::before { content: '·'; margin-right: 5px; }
 .planning-activity-meta { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }

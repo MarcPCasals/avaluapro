@@ -14,6 +14,7 @@ import {
   getCorrectedActualMinutes,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { FormattedText } from '../../components/FormattedText'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
 import { getSessionPersonalReminders } from '../../lib/reminders'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
@@ -741,7 +742,7 @@ export function ClassroomMode({
               {currentResult?.actualMinutes && <span>{currentResult.actualMinutes} minuts reals registrats</span>}
             </div>
 
-            {currentDescription && <section className="classroom-activity-description"><strong>Descripció de l’activitat</strong><p>{currentDescription}</p></section>}
+            {currentDescription && <section className="classroom-activity-description"><strong>Descripció de l’activitat</strong><FormattedText as="p" text={currentDescription} /></section>}
 
             {diversityMeasures.length > 0 && <section className="classroom-adaptation-reminder"><ShieldCheck size={19} /><div><strong>Mesures previstes per a aquesta activitat</strong>{diversityMeasures.map((measure) => <p key={measure.id}><span>{measure.label}</span>{measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}</p>)}</div></section>}
 

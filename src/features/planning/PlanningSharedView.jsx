@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { ContextualTab } from '../../components/ContextualHelp'
+import { FormattedText } from '../../components/FormattedText'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
@@ -69,7 +70,7 @@ function SharedActivity({ activity }) {
       <div>
         <span>{activityKindLabel(activity.type)}</span>
         <strong>{activity.title}</strong>
-        {activity.description && <p>{activity.description}</p>}
+        {activity.description && <FormattedText as="p" text={activity.description} />}
       </div>
       <aside>
         {activity.plannedMinutes && <span><Clock3 size={13} />{activity.plannedMinutes} min</span>}

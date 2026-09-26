@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
+import { FormattedText } from '../../components/FormattedText'
 import { getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
@@ -131,7 +132,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
         {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
           const description = item.sourceActivity?.description?.trim()
-          return <li key={item.id}><span /><div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><p>{description}</p></details>}</div></li>
+          return <li key={item.id}><span /><div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><FormattedText as="p" text={description} /></details>}</div></li>
         })}</ol>}
       </div>
       <div className="agenda-session-materials">

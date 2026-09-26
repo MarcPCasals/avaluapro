@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Clock3, Copy, History, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
+import { Bold, Clock3, Copy, History, Italic, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
+import { FormattedText } from '../../components/FormattedText'
 import { Modal } from '../../components/Modal'
 import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
+import { stripInlineFormatting } from '../../lib/formattedText'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
-function AutoGrowTextarea({ className = '', value, ...props }) {
+function AutoGrowTextarea({ className = '', textareaRef: externalRef, value, ...props }) {
   const textareaRef = useRef(null)
   useEffect(() => {
     const textarea = textareaRef.current
@@ -14,7 +16,40 @@ function AutoGrowTextarea({ className = '', value, ...props }) {
     textarea.style.height = `${nextHeight}px`
     textarea.style.overflowY = textarea.scrollHeight > 440 ? 'auto' : 'hidden'
   }, [value])
-  return <textarea {...props} className={`planning-autogrow-textarea ${className}`.trim()} ref={textareaRef} value={value} />
+  const setTextareaRef = (node) => {
+    textareaRef.current = node
+    if (externalRef) externalRef.current = node
+  }
+  return <textarea {...props} className={`planning-autogrow-textarea ${className}`.trim()} ref={setTextareaRef} value={value} />
+}
+
+function FormattedTextarea({ onChange, value }) {
+  const textareaRef = useRef(null)
+  const applyFormat = (marker) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = value.slice(start, end)
+    const insertion = `${marker}${selected}${marker}`
+    onChange(`${value.slice(0, start)}${insertion}${value.slice(end)}`)
+    globalThis.requestAnimationFrame?.(() => {
+      textarea.focus()
+      const selectionStart = start + marker.length
+      textarea.setSelectionRange(selectionStart, selectionStart + selected.length)
+    })
+  }
+  return (
+    <div className="planning-format-editor">
+      <div aria-label="Format de la descripció" className="planning-format-toolbar" role="toolbar">
+        <button aria-label="Posar la selecció en negreta" onClick={() => applyFormat('**')} onMouseDown={(event) => event.preventDefault()} title="Negreta" type="button"><Bold size={15} /></button>
+        <button aria-label="Posar la selecció en cursiva" onClick={() => applyFormat('*')} onMouseDown={(event) => event.preventDefault()} title="Cursiva" type="button"><Italic size={15} /></button>
+        <span>Selecciona unes paraules i aplica-hi el format.</span>
+      </div>
+      <AutoGrowTextarea onChange={(event) => onChange(event.target.value)} rows="6" textareaRef={textareaRef} value={value} />
+      {value && <div className="planning-format-preview"><small>Vista prèvia</small><FormattedText as="p" text={value} /></div>}
+    </div>
+  )
 }
 
 function DialogActions({ busy, onClose, submitLabel }) {
@@ -253,7 +288,7 @@ export function ActivityDialog({ availableIndicators = [], classes = [], initial
         </select><small className="planning-field-help">Aquest tipus reservarà la icona oficial corresponent quan ens facilitis les imatges originals.</small></label>
       )}
       <label>Títol<input autoFocus required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
-      <label>Descripció<AutoGrowTextarea rows="6" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></label>
+      <label>Descripció<FormattedTextarea value={values.description} onChange={(description) => setValues({ ...values, description })} /></label>
       <div className="planning-timing-fields">
         <label className="planning-check-label"><input checked={values.hasTiming} onChange={(event) => setValues({ ...values, hasTiming: event.target.checked })} type="checkbox" />Té temporització</label>
         {values.hasTiming && <label>Minuts previstos<input min="1" required type="number" value={values.plannedMinutes} onChange={(event) => setValues({ ...values, plannedMinutes: event.target.value })} /></label>}
@@ -439,7 +474,7 @@ export function ActivityHistoryDialog({ loadStructure, loadUnits, onClose, onSav
             {loading ? <p><Loader2 className="spin" size={17} />Carregant activitats…</p> : visibleActivities.length === 0 ? <p>No s’ha trobat cap activitat.</p> : visibleActivities.map((activity) => (
               <button className={selectedActivityId === activity.id ? 'selected' : ''} key={activity.id} onClick={() => setSelectedActivityId(activity.id)} type="button">
                 <span><b>A{activity.sequenceNumber}</b>{activity.title}</span>
-                <small>{activity.description || 'Sense descripció'}</small>
+                <small>{stripInlineFormatting(activity.description) || 'Sense descripció'}</small>
                 <em><Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}</em>
               </button>
             ))}
