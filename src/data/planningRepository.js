@@ -14,6 +14,15 @@ const SHARED_SCOPE_FRESHNESS_MS = 30_000
 const sharedRepositories = new Map()
 
 /**
+ * Afegeix a una resposta remota el context de ruta que Firestore no desa dins
+ * dels documents fills. Així IndexedDB pot reconstruir la ruta completa sense
+ * contaminar l'entitat de domini amb identificadors redundants.
+ */
+export function withPlanningRemoteContext(entities = [], context = {}) {
+  return entities.map((entity) => ({ entity, context }))
+}
+
+/**
  * Fa de frontera única entre els futurs formularis i les dades. La interfície
  * escriu primer a IndexedDB i mai no ha d'esperar Firestore per conservar el
  * canvi; la xarxa només buida la cua persistent quan està disponible.

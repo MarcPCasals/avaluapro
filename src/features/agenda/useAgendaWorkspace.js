@@ -15,7 +15,7 @@ import {
   loadPlanningUnitStructure,
   loadSharedPlanningUnits,
 } from '../../data/cloud/planningFirestore'
-import { getSharedPlanningRepository } from '../../data/planningRepository'
+import { getSharedPlanningRepository, withPlanningRemoteContext } from '../../data/planningRepository'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import {
@@ -631,7 +631,10 @@ export function useAgendaWorkspace(user, classes = []) {
       ])).values())
       const overrideResults = await Promise.all(applicationRecords.map((record) => repository.loadScope(
         `application:${record.application.id}:overrides`,
-        () => loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
+        async () => withPlanningRemoteContext(
+          await loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
+          { applicationId: record.application.id, planningUnitId: record.planningUnit.id },
+        ),
         { completeSnapshot: true },
       )))
       const baseActivitiesByUnitId = new Map([
@@ -722,7 +725,10 @@ export function useAgendaWorkspace(user, classes = []) {
         ))),
         repository.loadScope(
           `application:${bundle.application.id}:overrides`,
-          () => loadPlanningActivityOverrides(bundle.planningUnit.id, bundle.application.id),
+          async () => withPlanningRemoteContext(
+            await loadPlanningActivityOverrides(bundle.planningUnit.id, bundle.application.id),
+            { applicationId: bundle.application.id, planningUnitId: bundle.planningUnit.id },
+          ),
           { completeSnapshot: true },
         ),
       ])
@@ -1089,7 +1095,10 @@ export function useAgendaWorkspace(user, classes = []) {
     const overrideResult = savedApplication
       ? await repository.loadScope(
           `application:${application.id}:overrides`,
-          () => loadPlanningActivityOverrides(planningUnitId, application.id),
+          async () => withPlanningRemoteContext(
+            await loadPlanningActivityOverrides(planningUnitId, application.id),
+            { applicationId: application.id, planningUnitId },
+          ),
           { completeSnapshot: true },
         )
       : { entities: [] }

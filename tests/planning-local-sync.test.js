@@ -18,6 +18,7 @@ import {
   clearSharedPlanningRepository,
   createPlanningRepository,
   getSharedPlanningRepository,
+  withPlanningRemoteContext,
 } from '../src/data/planningRepository.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
 import {
@@ -104,6 +105,38 @@ test('una entitat local i la cua sobreviuen el tancament de cada connexió Index
   assert.equal(reloaded[0].label, '2026-2027')
   assert.equal(pending.length, 1)
   assert.equal(pending[0].operation, 'upsert')
+})
+
+test('els ajustos remots del grup recuperen la ruta completa després de recarregar', async () => {
+  const uid = 'teacher-1'
+  const override = {
+    activityId: 'activity-1',
+    applicationId: 'application-1',
+    changeScope: 'groupOnly',
+    changes: { manuallyCompleted: true },
+    createdAt: '2026-09-26T17:41:00.000Z',
+    entityType: PLANNING_ENTITY_TYPES.ACTIVITY_OVERRIDE,
+    id: 'override-1',
+    ownerUid: uid,
+    proposalStatus: 'none',
+    schemaVersion: 1,
+    updatedAt: '2026-09-26T17:41:00.000Z',
+  }
+  const repository = createPlanningRepository({ uid })
+  const result = await repository.loadScope(
+    'application:application-1:overrides',
+    async () => withPlanningRemoteContext([override], {
+      applicationId: 'application-1',
+      planningUnitId: 'up-1',
+    }),
+    { completeSnapshot: true },
+  )
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.source, 'remote')
+  assert.equal(result.entities.length, 1)
+  assert.equal(result.entities[0].changes.manuallyCompleted, true)
+  assert.equal((await loadPlanningScope(uid, 'application:application-1:overrides')).length, 1)
 })
 
 test('horari, franges i excepcions es recuperen per abast després d’una recàrrega offline', async () => {

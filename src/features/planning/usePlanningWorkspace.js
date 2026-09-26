@@ -14,7 +14,7 @@ import {
   revokePlanningAccessGrant,
   savePlanningAccessGrant,
 } from '../../data/cloud/planningFirestore'
-import { getSharedPlanningRepository } from '../../data/planningRepository'
+import { getSharedPlanningRepository, withPlanningRemoteContext } from '../../data/planningRepository'
 import {
   copyPlanningActivityToPhase,
   copyPlanningUnitStructureToAcademicYear,
@@ -377,7 +377,10 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     queueMicrotask(() => !cancelled && setActivityOverridesLoading(true))
     repository.loadScope(
       `application:${activeApplication.id}:overrides`,
-      () => loadPlanningActivityOverrides(activePlanningUnitId, activeApplication.id),
+      async () => withPlanningRemoteContext(
+        await loadPlanningActivityOverrides(activePlanningUnitId, activeApplication.id),
+        { applicationId: activeApplication.id, planningUnitId: activePlanningUnitId },
+      ),
       { completeSnapshot: true },
     ).then((result) => {
       if (cancelled) return
