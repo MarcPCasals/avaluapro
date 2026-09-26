@@ -244,7 +244,7 @@
 .planning-activity-dropzone { display: grid; gap: 5px; min-height: 30px; }
 .planning-activity-dropzone.empty { min-height: 58px; place-items: center; border: 1px dashed #d8dee9; border-radius: 9px; background: white; }
 .planning-activity-dropzone.empty p { margin: 0; color: #94a3b8; font-size: 11px; font-weight: 750; }
-.planning-activity-content strong { display: flex; align-items: center; gap: 6px; }
+.planning-activity-content > strong { display: flex; align-items: center; gap: 6px; }
 .planning-sequence-code, .planning-history-results b { flex: 0 0 auto; border-radius: 5px; padding: 2px 5px; color: #6d28d9; background: #ede9fe; font-size: 9px; font-weight: 950; }
 .planning-activity-row {
   display: grid; grid-template-columns: 30px 30px minmax(0, 1fr) auto 60px; align-items: center; gap: 7px;
