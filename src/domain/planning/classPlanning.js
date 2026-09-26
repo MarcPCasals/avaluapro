@@ -103,3 +103,22 @@ export function applyPlanningActivityOverrides(activities = [], overrides = []) 
     }]
   })
 }
+
+/**
+ * Recupera les correccions manuals de finalització del grup. La darrera marca
+ * explícita de cada activitat és la que preval, sense barrejar-la amb els
+ * resultats reals que desa el Mode aula.
+ */
+export function getManuallyCompletedActivityIds(overrides = []) {
+  const completedByActivityId = new Map()
+  ;[...overrides]
+    .sort((left, right) => String(left.updatedAt || left.createdAt || '')
+      .localeCompare(String(right.updatedAt || right.createdAt || '')))
+    .forEach((override) => {
+      if (!override?.activityId || !Object.prototype.hasOwnProperty.call(override.changes || {}, 'manuallyCompleted')) return
+      completedByActivityId.set(override.activityId, override.changes.manuallyCompleted === true)
+    })
+  return new Set([...completedByActivityId]
+    .filter(([, completed]) => completed)
+    .map(([activityId]) => activityId))
+}

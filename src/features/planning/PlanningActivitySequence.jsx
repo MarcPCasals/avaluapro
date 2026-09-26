@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, BookOpenText, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Menu, Pencil,
-  Plus, Trash2,
+  ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
+  Plus, RotateCcw, Trash2,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
@@ -41,7 +41,7 @@ function openMaterialLinks(links) {
   links.forEach((material) => globalThis.open?.(material.url, '_blank', 'noopener,noreferrer'))
 }
 
-function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
+function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = materialLinks(activity)
@@ -108,6 +108,25 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
         </small>
       </button>
       <div className="planning-activity-meta">
+        {!isCompleted && (
+          <button
+            className="planning-completion-toggle"
+            disabled={completionBusy}
+            onClick={() => onSetManualCompletion(activity, true)}
+            title="Marcar manualment aquesta activitat com a feta per al grup actual"
+            type="button"
+          >{completionBusy ? <Loader2 className="spin" size={13} /> : <CheckCircle2 size={13} />}Fet</button>
+        )}
+        {isManuallyCompleted && (
+          <button
+            className="planning-completion-toggle completed"
+            disabled={completionBusy}
+            onClick={() => onSetManualCompletion(activity, false)}
+            title="Desfer la marca manual d’activitat feta"
+            type="button"
+          >{completionBusy ? <Loader2 className="spin" size={13} /> : <RotateCcw size={13} />}Desfer fet</button>
+        )}
+        {isCompleted && !isManuallyCompleted && <span className="planning-completion-status"><CheckCircle2 size={13} />Feta automàticament</span>}
         {activity.description && (
           <button
             aria-controls={`planning-description-${activity.id}`}
@@ -146,7 +165,7 @@ function ActivityRow({ activity, dragId, onDelete, onDragEnd, onDragStart, onDro
   )
 }
 
-export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, phases }) {
+export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, onSetManualCompletion, phases }) {
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
@@ -253,7 +272,10 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                 {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
                   <ActivityRow
                     activity={activity}
+                    completionBusy={completionBusyId === activity.id}
                     dragId={dragId}
+                    isCompleted={completedActivityIds.has(activity.id)}
+                    isManuallyCompleted={manuallyCompletedActivityIds.has(activity.id)}
                     key={activity.id}
                     onDelete={remove}
                     onDragEnd={() => setDragId('')}
@@ -261,6 +283,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                     onDrop={drop}
                     onEdit={onEdit}
                     onKeyboardMove={keyboardMove}
+                    onSetManualCompletion={onSetManualCompletion}
                     onTouchDrop={touchDrop}
                     programmableMinutes={programmableMinutes}
                     sequenceNumber={sequenceNumberById.get(activity.id)}

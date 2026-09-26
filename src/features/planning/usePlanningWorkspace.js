@@ -29,6 +29,7 @@ import {
 } from '../../domain/planning/model'
 import {
   applyPlanningActivityOverrides,
+  getManuallyCompletedActivityIds,
   getPlanningActivityOverrideSnapshot,
   getPlanningUnitsForClass,
 } from '../../domain/planning/classPlanning'
@@ -136,6 +137,10 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   const effectiveActivities = useMemo(
     () => applyPlanningActivityOverrides(activities, activityOverrides),
     [activities, activityOverrides],
+  )
+  const manuallyCompletedActivityIds = useMemo(
+    () => getManuallyCompletedActivityIds(activityOverrides),
+    [activityOverrides],
   )
 
   const refreshSync = useCallback(async (options = {}) => {
@@ -821,6 +826,26 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return nextEffectiveActivities.find((activity) => activity.id === staged.id)
   }, [activeApplication, activePlanningUnit, applications, effectiveActivities, persist, saveGroupActivitySnapshots])
 
+  const setActivityManualCompletion = useCallback(async (activity, completed) => {
+    if (!activeApplication || !activePlanningUnit) {
+      throw new Error('No s’ha trobat la connexió d’aquesta classe amb la UP.')
+    }
+    const now = new Date().toISOString()
+    const nextOverride = createGroupActivityOverride({
+      activityId: activity.id,
+      applicationId: activeApplication.id,
+      changeScope: 'groupOnly',
+      changes: { manuallyCompleted: Boolean(completed) },
+      ownerUid: activePlanningUnit.ownerUid,
+    }, { now })
+    await persist({
+      entity: nextOverride,
+      context: { applicationId: activeApplication.id, planningUnitId: activePlanningUnit.id },
+    })
+    setActivityOverrides((items) => [...items, nextOverride])
+    return nextOverride
+  }, [activeApplication, activePlanningUnit, persist])
+
   const moveActivityForActiveClass = useCallback(async (move) => {
     const result = movePlanningActivityInSequence(effectiveActivities, move, { now: new Date().toISOString() })
     if (result.changedActivities.length === 0) return result
@@ -1192,6 +1217,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     loadCompletedActivityIds,
     loadTemporalUnitsForYear,
     loadApplicationOverview,
+    manuallyCompletedActivityIds,
     phases,
     ownedPlanningUnits: planningUnits,
     planningUnits: allPlanningUnits,
@@ -1207,6 +1233,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     saveUnit,
     setActiveAcademicYearId,
     setActivePlanningUnitId,
+    setActivityManualCompletion,
     setError,
     sharedPlanningUnits,
     sync,

@@ -267,6 +267,12 @@
 .planning-activity-content small { display: flex; flex-wrap: wrap; gap: 5px; color: #94a3b8; font-size: 9px; font-weight: 800; }
 .planning-activity-content small span + span::before { content: '·'; margin-right: 5px; }
 .planning-activity-meta { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+.planning-completion-toggle, .planning-completion-status { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 5px 7px; font-size: 9px; font-weight: 850; white-space: nowrap; }
+.planning-completion-toggle { border: 1px solid #bbf7d0; color: #15803d; background: #f0fdf4; cursor: pointer; }
+.planning-completion-toggle:hover { border-color: #86efac; background: #dcfce7; }
+.planning-completion-toggle.completed { border-color: #cbd5e1; color: #475569; background: #f8fafc; }
+.planning-completion-toggle:disabled { cursor: wait; opacity: .65; }
+.planning-completion-status { color: #15803d; background: #f0fdf4; }
 .planning-open-links { width: 27px; height: 27px; display: grid; place-items: center; border: 0; border-radius: 7px; padding: 0; color: #6d28d9; background: #f5f3ff; cursor: pointer; }
 .planning-open-links:hover { color: #4c1d95; background: #ede9fe; }
 .planning-description-toggle { display: inline-flex; align-items: center; gap: 3px; border: 0; border-radius: 999px; padding: 5px 7px; color: #6d28d9; background: #f5f3ff; font-size: 9px; font-weight: 850; white-space: nowrap; }

@@ -4,6 +4,7 @@ import {
   applyPlanningActivityOverrides,
   getConnectablePlanningUnits,
   getConnectedClassIds,
+  getManuallyCompletedActivityIds,
   getPlanningActivityOverrideSnapshot,
   getPlanningUnitsForClass,
 } from '../src/domain/planning/classPlanning.js'
@@ -83,4 +84,15 @@ test('l’última excepció pot restaurar un camp i amagar una activitat només 
 
   assert.equal(visible[0].title, 'Títol base')
   assert.deepEqual(hidden, [])
+})
+
+test('la darrera correcció manual determina si una activitat consta com a feta', () => {
+  const overrides = [
+    { activityId: 'a', changes: { manuallyCompleted: true }, updatedAt: '2026-09-21T09:00:00.000Z' },
+    { activityId: 'b', changes: { manuallyCompleted: true }, updatedAt: '2026-09-21T09:10:00.000Z' },
+    { activityId: 'a', changes: { manuallyCompleted: false }, updatedAt: '2026-09-21T10:00:00.000Z' },
+    { activityId: 'c', changes: { title: 'Sense canvi de finalització' }, updatedAt: '2026-09-21T11:00:00.000Z' },
+  ]
+
+  assert.deepEqual([...getManuallyCompletedActivityIds(overrides)], ['b'])
 })

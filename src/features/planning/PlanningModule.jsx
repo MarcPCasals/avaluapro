@@ -139,11 +139,12 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
   const [completedActivitiesLoading, setCompletedActivitiesLoading] = useState(true)
+  const [completionBusyId, setCompletionBusyId] = useState('')
   useEffect(() => {
     let active = true
     Promise.resolve(loadCompletedActivityIds?.())
@@ -158,6 +159,20 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       })
     return () => { active = false }
   }, [loadCompletedActivityIds, unit.id])
+  const allCompletedActivityIds = useMemo(() => new Set([
+    ...completedActivityIds,
+    ...manuallyCompletedActivityIds,
+  ]), [completedActivityIds, manuallyCompletedActivityIds])
+  const setManualCompletion = async (activity, completed) => {
+    setCompletionBusyId(activity.id)
+    try {
+      await onSetActivityManualCompletion(activity, completed)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setCompletionBusyId('')
+    }
+  }
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
   const acceptImprovements = async (proposalIds) => {
     const result = await onAcceptImprovements(proposalIds)
@@ -252,8 +267,10 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       </details>
       <PlanningActivitySequence
         activities={activities}
-        completedActivityIds={completedActivityIds}
+        completedActivityIds={allCompletedActivityIds}
         completedActivitiesLoading={completedActivitiesLoading}
+        completionBusyId={completionBusyId}
+        manuallyCompletedActivityIds={manuallyCompletedActivityIds}
         onAdd={onAddActivity}
         onAddChildPhase={onAddChildPhase}
         onAddPhase={onAddPhase}
@@ -261,6 +278,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         onEdit={onEditActivity}
         onEditPhase={onEditPhase}
         onMove={onMoveActivity}
+        onSetManualCompletion={setManualCompletion}
         phases={phases}
       />
       <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
@@ -571,6 +589,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                 <UnitEditor
                   activities={workspace.activities}
                   loadCompletedActivityIds={workspace.loadCompletedActivityIds}
+                  manuallyCompletedActivityIds={workspace.manuallyCompletedActivityIds}
                   curriculumCatalog={curriculumCatalog}
                   key={`${workspace.activePlanningUnit.id}:${activeClassId}`}
                   canManageUnit={workspace.activeRole === 'owner'}
@@ -597,6 +616,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onOpenSharing={() => setDialog('sharing')}
                   onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
                   onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))}
+                  onSetActivityManualCompletion={workspace.setActivityManualCompletion}
                   phases={workspace.phases}
                   sourceYearLabel={sourceYearLabel}
                   temporalUnit={activeTemporalUnit}
