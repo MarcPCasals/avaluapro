@@ -68,8 +68,11 @@ export function AgendaSchedulingDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const unavailableActivityIds = setup?.unavailableSourceActivityIds
+    || setup?.scheduledSourceActivityIds
+    || []
   const remainingActivities = setup?.activities.filter((activity) =>
-    !setup.scheduledSourceActivityIds.includes(activity.id)) || []
+    !unavailableActivityIds.includes(activity.id)) || []
   const selectedClass = classes.find((item) => item.id === values.classId)
   const selectedUnit = availableUnits.find((item) => item.id === values.planningUnitId)
   const minimumStartDate = academicYear?.startsOn && academicYear.startsOn > today
@@ -90,8 +93,11 @@ export function AgendaSchedulingDialog({
     setError('')
     try {
       const nextSetup = await onLoadSetup(values)
+      const unavailableIds = nextSetup.unavailableSourceActivityIds
+        || nextSetup.scheduledSourceActivityIds
+        || []
       const remaining = nextSetup.activities.filter((activity) =>
-        !nextSetup.scheduledSourceActivityIds.includes(activity.id))
+        !unavailableIds.includes(activity.id))
       setSetup(nextSetup)
       if (values.mode === 'smart') {
         const smartStartDate = firstFuturePlannedDate(nextSetup, today, values.startDate)
@@ -186,7 +192,7 @@ export function AgendaSchedulingDialog({
           )}
           {setup && (
             <div className="agenda-activity-picker">
-              <header><div><strong>{values.mode === 'smart' ? 'Seqüència que es recalcularà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${setup.activities.length} activitats en l’ordre actual de la UP` : `${remainingActivities.length} per calendaritzar · ${setup.scheduledSourceActivityIds.length} ja assignades`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
+              <header><div><strong>{values.mode === 'smart' ? 'Seqüència que es recalcularà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${setup.activities.length} activitats en l’ordre actual de la UP` : `${remainingActivities.length} per calendaritzar · ${unavailableActivityIds.length} ja programades o fetes`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
               {values.mode !== 'smart' && remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{(values.mode === 'smart' ? setup.activities : remainingActivities).map((activity) => {
                 const remainingMinutes = setup.remainingMinutesByActivityId[activity.id]
                 const timeLabel = remainingMinutes && remainingMinutes !== activity.plannedMinutes

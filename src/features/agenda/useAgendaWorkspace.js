@@ -44,6 +44,7 @@ import {
   orderActivitiesForScheduling,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
+  summarizeCompletedActivityIds,
 } from '../../domain/planning'
 
 const EMPTY_SYNC = {
@@ -1141,10 +1142,16 @@ export function useAgendaWorkspace(user, classes = []) {
     const scheduledSourceActivityIds = activities
       .filter((activity) => remainingMinutesByActivityId[activity.id] === 0)
       .map((activity) => activity.id)
+    const completedSourceActivityIds = [...summarizeCompletedActivityIds(existingSessionBundles)]
+    const unavailableSourceActivityIds = [...new Set([
+      ...scheduledSourceActivityIds,
+      ...completedSourceActivityIds,
+    ])]
     return {
       activities,
       application,
       calendarEvents,
+      completedSourceActivityIds,
       existingSessions,
       existingSessionBundles,
       isNewApplication: !savedApplication,
@@ -1153,6 +1160,7 @@ export function useAgendaWorkspace(user, classes = []) {
       scheduledSourceActivityIds,
       slotsByTimetableId,
       timetables,
+      unavailableSourceActivityIds,
     }
   }, [activeAcademicYear, allPlanningUnits, calendarEvents, classes, repository, timetables, user, userEmail])
 
@@ -1209,7 +1217,7 @@ export function useAgendaWorkspace(user, classes = []) {
       existingSessionBundles: setup.existingSessionBundles.filter((bundle) =>
         String(bundle.session.startsAt).slice(0, 10) >= effectiveStartDate),
       options: { now: new Date().toISOString() },
-      scheduledSourceActivityIds: setup.scheduledSourceActivityIds,
+      scheduledSourceActivityIds: setup.unavailableSourceActivityIds,
     })
     const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date || effectiveStartDate
     return {

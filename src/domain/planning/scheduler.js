@@ -181,6 +181,28 @@ export function summarizeAssignedActivityProgress(sessionBundles = []) {
 }
 
 /**
+ * Una activitat es considera acabada quan el seu últim fragment té un
+ * resultat «completed». Completar una part intermèdia no amaga els fragments
+ * que encara resten per fer.
+ */
+export function summarizeCompletedActivityIds(sessionBundles = []) {
+  const completedSourceActivityIds = new Set()
+  for (const bundle of sessionBundles) {
+    if (!bundle?.session || ['cancelled', 'notHeld'].includes(bundle.session.status)) continue
+    const completedItemIds = new Set((bundle.results || [])
+      .filter((result) => result.status === 'completed')
+      .map((result) => result.sessionItemId))
+    for (const item of bundle.items || []) {
+      if (!item.sourceActivityId || !completedItemIds.has(item.id)) continue
+      const segmentIndex = Math.max(1, Number(item.segmentIndex) || 1)
+      const segmentCount = Math.max(1, Number(item.segmentCount) || 1)
+      if (segmentIndex >= segmentCount) completedSourceActivityIds.add(item.sourceActivityId)
+    }
+  }
+  return completedSourceActivityIds
+}
+
+/**
  * Converteix l'arbre de fases en una única seqüència pedagògica. Les subfases
  * apareixen just després de la fase mare i els elements orfes es conserven al
  * final, de manera que cap activitat queda fora d'una proposta per un canvi

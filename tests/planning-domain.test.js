@@ -44,6 +44,7 @@ import {
   getClassroomTimerState,
   getCorrectedActualMinutes,
   findTimetableSlotConflicts,
+  summarizeCompletedActivityIds,
   getProgrammableMinutes,
   getSessionLoad,
   movePlanningActivityInSequence,
@@ -798,6 +799,41 @@ test('una proposta divide una activitat llarga, manté indicacions i no duplica 
   assert.equal(result.scheduledMinutes, 120)
   assert.deepEqual(result.skippedAlreadyScheduled, ['already'])
   assert.deepEqual(result.unscheduled, [])
+})
+
+test('la selecció progressiva amaga només les activitats realment acabades', () => {
+  const session = createCalendarSession({
+    id: 'completed-session', ownerUid: 'teacher-1', applicationId: 'application-1', classId: 'class-1',
+    startsAt: '2026-09-25T09:30:00', durationMinutes: 60, status: 'held',
+  }, { now: NOW })
+  const firstPart = createSessionItem({
+    id: 'first-part', ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: session.id,
+    sourceActivityId: 'split-activity', title: 'Activitat dividida', type: 'activity', order: 0,
+    plannedMinutes: 10, segmentIndex: 1, segmentCount: 2,
+  }, { now: NOW })
+  const finished = createSessionItem({
+    id: 'finished', ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: session.id,
+    sourceActivityId: 'finished-activity', title: 'Activitat acabada', type: 'activity', order: 1,
+    plannedMinutes: 20, segmentIndex: 1, segmentCount: 1,
+  }, { now: NOW })
+  const completedIds = summarizeCompletedActivityIds([{
+    session,
+    items: [firstPart, finished],
+    results: [
+      createActivityResult({
+        id: 'result-first', ownerUid: 'teacher-1', applicationId: 'application-1',
+        sessionId: session.id, sessionItemId: firstPart.id, sourceActivityId: firstPart.sourceActivityId,
+        status: 'completed',
+      }, { now: NOW }),
+      createActivityResult({
+        id: 'result-finished', ownerUid: 'teacher-1', applicationId: 'application-1',
+        sessionId: session.id, sessionItemId: finished.id, sourceActivityId: finished.sourceActivityId,
+        status: 'completed',
+      }, { now: NOW }),
+    ],
+  }])
+
+  assert.deepEqual([...completedIds], ['finished-activity'])
 })
 
 test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar dues vegades la UP', () => {
