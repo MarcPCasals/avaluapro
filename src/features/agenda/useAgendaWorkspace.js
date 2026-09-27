@@ -1211,12 +1211,17 @@ export function useAgendaWorkspace(user, classes = []) {
         existingSessionBundles: setup.existingSessionBundles,
         fromDate: effectiveStartDate,
         options: { now: new Date().toISOString() },
+        reservedSessionCount,
       })
       const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date
         || String(distribution.removedSessions.at(-1)?.startsAt || effectiveStartDate).slice(0, 10)
       return {
         ...distribution,
         ...temporalProposal,
+        availability: {
+          ...distribution.availability,
+          horizonEnd,
+        },
         schedulingMode: mode,
         skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
         setup,
@@ -1281,7 +1286,7 @@ export function useAgendaWorkspace(user, classes = []) {
     if (!preview?.setup?.planningUnit?.id) {
       throw new Error('La proposta no és vàlida.')
     }
-    if (preview.unscheduled.length > 0 && preview.schedulingMode !== 'complete') {
+    if (preview.unscheduled.length > 0 && !['complete', 'smart'].includes(preview.schedulingMode)) {
       throw new Error('La proposta encara té activitats sense sessió.')
     }
     const now = new Date().toISOString()
@@ -1323,6 +1328,7 @@ export function useAgendaWorkspace(user, classes = []) {
         reflowed: true,
         replacedItemCount: preview.replacedItemCount,
         sessionCount: preview.sessions.length,
+        unscheduled: preview.unscheduled,
       }
     }
     await persist(entries)

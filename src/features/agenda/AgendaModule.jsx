@@ -123,10 +123,9 @@ function monthSessionRange(monthKey) {
 
 function schedulingSavedNotice(result) {
   const sessionCount = result.logicalSessionCount ?? result.sessionCount
-  if (result.reflowed) {
-    return `${sessionCount} ${sessionCount === 1 ? 'sessió futura reorganitzada' : 'sessions futures reorganitzades'} amb l’efecte dominó.`
-  }
-  const base = `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`
+  const base = result.reflowed
+    ? `${sessionCount} ${sessionCount === 1 ? 'sessió futura actualitzada' : 'sessions futures actualitzades'} amb la Programació actual.`
+    : `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`
   if (!result.unscheduled?.length) return base
   return `${base} ${result.unscheduled.length} ${result.unscheduled.length === 1 ? 'activitat queda' : 'activitats queden'} visible a la Programació però fora de la calendarització real.`
 }

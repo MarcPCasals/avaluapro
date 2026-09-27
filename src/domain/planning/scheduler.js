@@ -607,12 +607,29 @@ export function buildActivitySessionReflow({
   fromDate,
   marginMinutes = 5,
   options = {},
+  reservedSessionCount = 0,
 }) {
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const reflowableBundles = existingSessionBundles
     .filter((bundle) => canReflowSession(bundle, fromDate))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const lockedBundles = existingSessionBundles.filter((bundle) => !reflowableBundles.includes(bundle))
+  const capacityCandidates = [
+    ...reflowableBundles.map((bundle) => ({
+      date: String(bundle.session.startsAt).slice(0, 10),
+      existingSessionId: bundle.session.id,
+      parallelProgrammingKey: bundle.session.parallelProgrammingKey,
+      startsAt: bundle.session.startsAt,
+    })),
+    ...candidates,
+  ]
+  const availability = reserveLastLogicalSessionCandidates(capacityCandidates, reservedSessionCount)
+  const availableCandidateSet = new Set(availability.availableCandidates)
+  const availableExistingSessionIds = new Set(availability.availableCandidates
+    .map((candidate) => candidate.existingSessionId)
+    .filter(Boolean))
+  const availableReflowableBundles = reflowableBundles.filter((bundle) =>
+    availableExistingSessionIds.has(bundle.session.id))
   const { assignedMinutesByActivityId, assignedSourceActivityIds } =
     summarizeAssignedActivityProgress(lockedBundles)
   const completedActivityIds = new Set(completedSourceActivityIds)
@@ -638,8 +655,8 @@ export function buildActivitySessionReflow({
   const distribution = buildActivitySessionDistribution({
     activities: remainingActivities,
     application,
-    candidates,
-    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
+    candidates: candidates.filter((candidate) => availableCandidateSet.has(candidate)),
+    existingSessionBundles: availableReflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
     marginMinutes,
     options,
   })
@@ -662,6 +679,7 @@ export function buildActivitySessionReflow({
 
   return {
     ...distribution,
+    availability,
     kind: 'reflow',
     lockedSessionCount: lockedBundles.length,
     removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),

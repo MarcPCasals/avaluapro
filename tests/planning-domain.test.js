@@ -1152,6 +1152,38 @@ test('la reorganització no recupera una activitat marcada manualment com a feta
   assert.equal(result.removedItems[0].sourceActivityId, 'petjades')
 })
 
+test('la proposta intel·ligent reserva les últimes sessions i deixa visible el que no hi cap', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const candidates = ['2026-09-28', '2026-09-30', '2026-10-02'].map((date, index) => ({
+    date,
+    durationMinutes: 60,
+    startsAt: `${date}T09:30:00`,
+    timetableSlotId: `slot-${index + 1}`,
+  }))
+
+  const result = buildActivitySessionReflow({
+    activities: [
+      { id: 'a', title: 'A', type: 'activity', plannedMinutes: 55 },
+      { id: 'b', title: 'B', type: 'activity', plannedMinutes: 55 },
+      { id: 'c', title: 'C', type: 'activity', plannedMinutes: 55 },
+    ],
+    application,
+    candidates,
+    existingSessionBundles: [],
+    fromDate: '2026-09-27',
+    options: options(idFactory),
+    reservedSessionCount: 1,
+  })
+
+  assert.equal(result.availability.totalLogicalSessionCount, 3)
+  assert.equal(result.availability.reservedLogicalSessionCount, 1)
+  assert.equal(result.logicalSessionCount, 2)
+  assert.deepEqual(result.unscheduled.map((item) => item.activityId), ['c'])
+})
+
 test('recuperar una activitat anterior desplaça l’agenda futura sense tocar la UP', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({
