@@ -15,7 +15,7 @@ import {
   isNoClassCalendarEvent,
   startOfCalendarWeek,
 } from '../../lib/agendaCalendar'
-import { findNextTimetableOccurrence, getAgendaWeekTemporalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
+import { filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
@@ -157,12 +157,15 @@ export function AgendaTodayView({
   onOpenScheduling,
   onOpenTimetable,
   reminders,
+  selectedClassId,
   slots,
   timetable,
   today,
 }) {
   const [now, setNow] = useState(() => new Date())
-  const todayBundles = bundles.filter((bundle) => sessionDate(bundle) === today)
+  const classBundles = filterAgendaItemsForClass(bundles, selectedClassId)
+  const classSlots = filterAgendaItemsForClass(slots, selectedClassId)
+  const todayBundles = classBundles.filter((bundle) => sessionDate(bundle) === today)
   const nowTime = now.toTimeString().slice(0, 5)
   const nowMinutes = Number(nowTime.slice(0, 2)) * 60 + Number(nowTime.slice(3, 5))
   const currentBundle = todayBundles.find((bundle) => {
@@ -170,11 +173,11 @@ export function AgendaTodayView({
     const startsAtMinutes = Number(sessionTime(bundle).slice(0, 2)) * 60 + Number(sessionTime(bundle).slice(3, 5))
     return startsAtMinutes <= nowMinutes && startsAtMinutes + Number(bundle.session.durationMinutes || 0) > nowMinutes
   })
-  const automaticBundle = currentBundle || bundles.find((bundle) =>
+  const automaticBundle = currentBundle || classBundles.find((bundle) =>
     bundle.session.status === 'planned' && bundle.session.startsAt >= `${today}T${nowTime}`) || null
   const [selectedSessionId, setSelectedSessionId] = useState('')
-  const selectedBundle = bundles.find((bundle) => bundle.session.id === selectedSessionId) || automaticBundle
-  const nextTimetableOccurrence = findNextTimetableOccurrence(slots, today, nowTime, calendarEvents)
+  const selectedBundle = classBundles.find((bundle) => bundle.session.id === selectedSessionId) || automaticBundle
+  const nextTimetableOccurrence = findNextTimetableOccurrence(classSlots, today, nowTime, calendarEvents)
   const showTimetableFallback = !selectedSessionId
     && !currentBundle
     && nextTimetableOccurrence

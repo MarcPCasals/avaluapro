@@ -17,6 +17,16 @@ function timeToMinutes(value = '') {
 }
 
 /**
+ * Manté la portada d'Avui dins del mateix context de classe que la barra
+ * superior i la Cronologia. Admet tant sessions agrupades com franges
+ * d'horari perquè cap alternativa automàtica salti a un altre grup.
+ */
+export function filterAgendaItemsForClass(items = [], classId = '') {
+  if (!classId) return items
+  return items.filter((item) => (item?.session?.classId || item?.classId) === classId)
+}
+
+/**
  * Limita el resum d'Avui als recordatoris del dia actual i dels dies futurs
  * inclosos dins l'horitzó. Els pendents vençuts continuen existint a les seves
  * fonts, però no ocupen aquest bloc de preparació immediata.

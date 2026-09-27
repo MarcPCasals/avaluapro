@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getUpcomingAgendaReminders, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
+import { buildAgendaSessionItemUpdate, buildReminderSessionOptions, buildTimetableClassroomBundle, filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getUpcomingAgendaReminders, getWeekTimetableOccurrences, mergeAgendaClassCatalog } from '../src/lib/agendaToday.js'
 
 const slots = [
   { id: 'monday-first', classId: '1d', weekday: 1, startsAt: '08:30', durationMinutes: 60 },
@@ -31,6 +31,22 @@ test('el cap de setmana mostra la primera classe de dilluns', () => {
   const next = findNextTimetableOccurrence(slots, '2026-09-20', '09:00')
   assert.equal(next.date, '2026-09-21')
   assert.equal(next.slot.id, 'monday-first')
+})
+
+test('Avui conserva el mateix grup seleccionat que la Cronologia', () => {
+  const bundles = [
+    { session: { id: 'session-1d', classId: '1d' } },
+    { session: { id: 'session-1c', classId: '1c' } },
+  ]
+
+  assert.deepEqual(
+    filterAgendaItemsForClass(bundles, '1c').map((bundle) => bundle.session.id),
+    ['session-1c'],
+  )
+  assert.deepEqual(
+    filterAgendaItemsForClass(slots, '1c').map((slot) => slot.id),
+    ['monday-second'],
+  )
 })
 
 test('durant el dia ignora les franges que ja han acabat', () => {
