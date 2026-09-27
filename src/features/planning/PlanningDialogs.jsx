@@ -238,9 +238,28 @@ export function PhaseDialog({ initialValue, onClose, onSave, parentPhaseId = '' 
 }
 
 function materialDrafts(initialValue) {
-  const teacher = (initialValue?.teacherMaterials || []).map((material) => ({ ...material, audience: 'teacher' }))
-  const students = (initialValue?.studentMaterials || []).map((material) => ({ ...material, audience: 'students' }))
-  return [...teacher, ...students]
+  const teacherMaterials = initialValue?.teacherMaterials || []
+  const pairedTeacherIndexes = new Set()
+  const students = (initialValue?.studentMaterials || []).map((material) => {
+    if (material.kind !== 'link') return { ...material, audience: 'students' }
+    const matchingTeacherIndex = teacherMaterials.findIndex((candidate, index) => (
+      !pairedTeacherIndexes.has(index)
+      && candidate.kind === 'link'
+      && candidate.label?.trim().toLocaleLowerCase('ca') === material.label?.trim().toLocaleLowerCase('ca')
+    ))
+    if (matchingTeacherIndex >= 0) pairedTeacherIndexes.add(matchingTeacherIndex)
+    return {
+      ...material,
+      audience: 'students',
+      teacherUrl: material.teacherUrl || teacherMaterials[matchingTeacherIndex]?.url || '',
+    }
+  })
+  const remainingTeacher = teacherMaterials
+    .filter((_, index) => !pairedTeacherIndexes.has(index))
+    .map((material) => material.kind === 'link'
+      ? { ...material, audience: 'students', teacherUrl: material.url || '', url: '' }
+      : { ...material, audience: 'teacher' })
+  return [...students, ...remainingTeacher]
 }
 
 function ActivityCurriculumPicker({ competencies, onChange, selections }) {
@@ -346,23 +365,40 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
     itemIndex === index ? { ...item, [field]: value } : item
   )))
   const addMaterial = () => setMaterials((items) => [...items, {
-    audience: 'teacher',
+    audience: 'students',
     id: globalThis.crypto?.randomUUID?.() || `material-${Date.now()}`,
     kind: 'link',
     label: '',
     preparationKind: 'reference',
     reminderDaysBefore: 1,
+    teacherUrl: '',
     url: '',
   }])
   const save = () => {
-    const normalizedMaterials = materials.map((material) => ({
-      id: material.id,
-      kind: material.kind,
-      label: material.label,
-      preparationKind: material.kind === 'link' ? 'reference' : material.preparationKind || 'reference',
-      reminderDaysBefore: material.kind === 'link' ? 0 : Number(material.reminderDaysBefore ?? 1),
-      url: material.kind === 'link' ? material.url : '',
-    }))
+    const studentMaterials = []
+    const teacherMaterials = []
+    materials.forEach((material) => {
+      const normalizedMaterial = {
+        id: material.id,
+        kind: material.kind,
+        label: material.label,
+        preparationKind: material.kind === 'link' ? 'reference' : material.preparationKind || 'reference',
+        reminderDaysBefore: material.kind === 'link' ? 0 : Number(material.reminderDaysBefore ?? 1),
+        teacherUrl: material.kind === 'link' ? material.teacherUrl || '' : '',
+        url: material.kind === 'link' ? material.url || '' : '',
+      }
+      if (material.kind === 'link') {
+        if (normalizedMaterial.url) studentMaterials.push(normalizedMaterial)
+        else if (normalizedMaterial.teacherUrl) teacherMaterials.push({
+          ...normalizedMaterial,
+          teacherUrl: '',
+          url: normalizedMaterial.teacherUrl,
+        })
+        return
+      }
+      if (material.audience === 'students') studentMaterials.push(normalizedMaterial)
+      else teacherMaterials.push(normalizedMaterial)
+    })
     return onSave({
       ...values,
       evidenceMode: values.type === 'activity' ? values.evidenceMode : 'none',
@@ -371,8 +407,8 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       indicatorIds: initialValue?.indicatorIds || [],
       diversityMeasureIds: diversityMeasures.map((measure) => measure.id),
       diversityMeasures,
-      studentMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'students'),
-      teacherMaterials: normalizedMaterials.filter((_, index) => materials[index].audience === 'teacher'),
+      studentMaterials,
+      teacherMaterials,
     }, initialValue)
   }
 
@@ -415,20 +451,21 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
         <PlanningDiversityEditor classes={classes} measures={diversityMeasures} onChange={setDiversityMeasures} students={students} />
       )}
       <section className="planning-material-editor">
-        <div><div><strong>Materials</strong><span>Enllaços externs o referències físiques.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
+        <div><div><strong>Materials</strong><span>Un mateix material pot tenir recurs d’alumnat i recurs opcional del docent.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
         {materials.map((material, index) => (
           <div className={`planning-material-row ${material.kind}`} key={material.id || index}>
-            <select aria-label="Destinatari del material" value={material.audience} onChange={(event) => updateMaterial(index, 'audience', event.target.value)}>
-              <option value="teacher">Docent</option><option value="students">Alumnat</option>
-            </select>
             <select aria-label="Tipus de material" value={material.kind} onChange={(event) => updateMaterial(index, 'kind', event.target.value)}>
               <option value="link">Enllaç</option><option value="physical">Material físic</option>
             </select>
+            {material.kind === 'physical' && <select aria-label="Destinatari del material" value={material.audience} onChange={(event) => updateMaterial(index, 'audience', event.target.value)}>
+              <option value="teacher">Docent</option><option value="students">Alumnat</option>
+            </select>}
             {material.kind === 'physical' && <select aria-label="Funció del material" value={material.preparationKind || 'reference'} onChange={(event) => updateMaterial(index, 'preparationKind', event.target.value)}>
               <option value="reference">Consulta</option><option value="student">L’ha de portar l’alumnat</option><option value="teacher">Preparar</option><option value="print">Imprimir</option><option value="buy">Comprar</option><option value="reserve">Reservar espai</option>
             </select>}
             <input aria-label="Nom del material" placeholder="Nom" required value={material.label} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
-            {material.kind === 'link' && <input aria-label="Enllaç del material" placeholder="https://…" required type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} />}
+            {material.kind === 'link' && <label className="planning-material-link-field student"><span><Users size={13} />Recurs de l’alumnat</span><input aria-label="Enllaç del recurs de l’alumnat" placeholder="https://…" required={!material.teacherUrl} type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} /></label>}
+            {material.kind === 'link' && <label className="planning-material-link-field teacher"><span><Link2 size={13} />Recurs del docent <em>Opcional</em></span><input aria-label="Enllaç del recurs del docent" placeholder="https://…" required={!material.url} type="url" value={material.teacherUrl || ''} onChange={(event) => updateMaterial(index, 'teacherUrl', event.target.value)} /></label>}
             {material.kind === 'physical' && (material.preparationKind || 'reference') !== 'reference' && <label className="planning-material-reminder">Avisar<input aria-label="Dies d’antelació" min="0" onChange={(event) => updateMaterial(index, 'reminderDaysBefore', event.target.value)} type="number" value={material.reminderDaysBefore ?? 1} /><span>dies abans</span></label>}
             <button aria-label="Eliminar material" className="icon-action" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 size={15} /></button>
           </div>

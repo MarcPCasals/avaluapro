@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
+import { getActivityMaterialLinks, getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -106,11 +106,8 @@ function getTargetedCalendarEvent(events, dateKey, classId, target) {
 }
 
 function sessionMaterials(bundle) {
-  const materials = bundle.items.flatMap((item) => [
-    ...(item.sourceActivity?.teacherMaterials || []),
-    ...(item.sourceActivity?.studentMaterials || []),
-  ])
-  return [...new Map(materials.filter((item) => item?.url).map((item) => [item.url, item])).values()]
+  const materials = bundle.items.flatMap((item) => getActivityMaterialLinks(item.sourceActivity))
+  return [...new Map(materials.map((item) => [item.url, item])).values()]
 }
 
 function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onResolveGap }) {
@@ -137,7 +134,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       </div>
       <div className="agenda-session-materials">
         <div className="agenda-session-subheading"><ExternalLink size={16} /><strong>Materials</strong><span>{materials.length}</span></div>
-        {materials.length === 0 ? <p className="agenda-session-muted">No hi ha cap material enllaçat.</p> : <div>{materials.map((material) => <a href={material.url} key={material.url} rel="noreferrer" target="_blank"><ExternalLink size={13} /><span>{material.label || material.url}</span></a>)}</div>}
+        {materials.length === 0 ? <p className="agenda-session-muted">No hi ha cap material enllaçat.</p> : <div>{materials.map((material) => <a className={material.audience === 'teacher' ? 'teacher' : 'students'} href={material.url} key={material.url} rel="noreferrer" target="_blank"><ExternalLink size={13} /><span>{material.label || material.url}</span><em>{material.audience === 'teacher' ? 'Docent' : 'Alumnat'}</em></a>)}</div>}
       </div>
       <div className="agenda-session-actions">
         {onOpenClassroom && !blockingEvent && !['cancelled', 'notHeld'].includes(bundle.session.status) && <button className="primary-action compact" onClick={() => onOpenClassroom(bundle)} type="button"><Clock3 size={15} />{bundle.session.classroomOpenedAt ? 'Reobrir Mode aula' : 'Obrir Mode aula'}</button>}

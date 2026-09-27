@@ -43,6 +43,7 @@ import {
   getClassroomTrackingUtId,
   getClassroomTimerState,
   getCorrectedActualMinutes,
+  getActivityMaterialLinks,
   findTimetableSlotConflicts,
   summarizeCompletedActivityIds,
   getProgrammableMinutes,
@@ -119,6 +120,41 @@ test('els enllaços sempre són de consulta, encara que arribin amb una altra fu
   assert.equal(activity.teacherMaterials[0].kind, 'link')
   assert.equal(activity.teacherMaterials[0].preparationKind, 'reference')
   assert.equal(activity.teacherMaterials[0].reminderDaysBefore, 0)
+})
+
+test('un sol material pot obrir el recurs de l’alumnat i el recurs opcional del docent', () => {
+  const activity = createPlanningActivity({
+    ownerUid: 'teacher-1',
+    planningUnitId: 'up-1',
+    phaseId: 'phase-1',
+    title: 'Text i solucionari',
+    order: 0,
+    studentMaterials: [{
+      id: 'material-paired',
+      kind: 'link',
+      label: 'Model corpuscular',
+      teacherUrl: 'https://example.test/teacher',
+      url: 'https://example.test/students',
+    }],
+  }, options())
+
+  assert.equal(activity.studentMaterials[0].teacherUrl, 'https://example.test/teacher')
+  assert.deepEqual(getActivityMaterialLinks(activity).map(({ audience, label, url }) => ({ audience, label, url })), [
+    { audience: 'students', label: 'Model corpuscular', url: 'https://example.test/students' },
+    { audience: 'teacher', label: 'Model corpuscular', url: 'https://example.test/teacher' },
+  ])
+})
+
+test('els materials antics del docent i de l’alumnat continuen obrint-se', () => {
+  const links = getActivityMaterialLinks({
+    studentMaterials: [{ kind: 'link', label: 'Fitxa', url: 'https://example.test/students' }],
+    teacherMaterials: [{ kind: 'link', label: 'Solucionari', url: 'https://example.test/teacher' }],
+  })
+
+  assert.deepEqual(links.map(({ audience, url }) => ({ audience, url })), [
+    { audience: 'students', url: 'https://example.test/students' },
+    { audience: 'teacher', url: 'https://example.test/teacher' },
+  ])
 })
 
 test('una indicació queda dins la seqüència sense exigir temporització', () => {

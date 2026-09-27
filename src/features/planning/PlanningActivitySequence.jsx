@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
+import { getActivityMaterialLinks } from '../../domain/planning/materials'
 import {
   getPlanningTotals,
   getProgrammableMinutes,
@@ -32,11 +33,6 @@ function orderedPhases(phases) {
   return flattened
 }
 
-function materialLinks(activity) {
-  return [...(activity.teacherMaterials || []), ...(activity.studentMaterials || [])]
-    .filter((material) => material.kind === 'link' && material.url)
-}
-
 function openMaterialLinks(links) {
   links.forEach((material) => globalThis.open?.(material.url, '_blank', 'noopener,noreferrer'))
 }
@@ -44,7 +40,7 @@ function openMaterialLinks(links) {
 function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
-  const links = materialLinks(activity)
+  const links = getActivityMaterialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
   const competencyCount = activity.curriculumSelections?.length || 0
   const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)

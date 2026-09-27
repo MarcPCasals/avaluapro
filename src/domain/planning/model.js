@@ -206,6 +206,7 @@ function normalizeMaterials(materials) {
     )
     const preparationKind = kind === 'link' ? 'reference' : selectedPreparationKind
     const url = optionalText(material.url)
+    const teacherUrl = kind === 'link' ? optionalText(material.teacherUrl) : ''
     if (kind === 'link' && !url) throw new Error("Un material d'enllaç necessita una URL")
     return {
       id: optionalText(material.id),
@@ -215,6 +216,7 @@ function normalizeMaterials(materials) {
       reminderDaysBefore: preparationKind === 'reference'
         ? 0
         : Math.min(365, Math.max(0, Math.round(Number(material.reminderDaysBefore ?? 1) || 0))),
+      teacherUrl,
       url,
     }
   })

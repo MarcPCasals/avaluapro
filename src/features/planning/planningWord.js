@@ -167,7 +167,10 @@ function resourceTable(title, section) {
 }
 
 function materialText(materials = []) {
-  return materials.map((material) => material.url ? `${material.label} — ${material.url}` : material.label).filter(Boolean).join('\n')
+  return materials.flatMap((material) => [
+    material.url ? `${material.label} — ${material.url}` : material.label,
+    material.teacherUrl ? `${material.label} (docent) — ${material.teacherUrl}` : '',
+  ]).filter(Boolean).join('\n')
 }
 
 function diversityText(measures = []) {

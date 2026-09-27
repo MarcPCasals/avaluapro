@@ -365,6 +365,9 @@
 .agenda-session-materials > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .agenda-session-materials a { max-width: 100%; display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 7px 9px; overflow: hidden; color: #6d28d9; background: #f5f3ff; font-size: 9px; font-weight: 850; text-decoration: none; }
 .agenda-session-materials a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-session-materials a em { border-radius: 999px; padding: 2px 5px; color: #1d4ed8; background: #dbeafe; font-size: 7px; font-style: normal; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
+.agenda-session-materials a.teacher { color: #c2410c; background: #fff7ed; }
+.agenda-session-materials a.teacher em { color: #9a3412; background: #ffedd5; }
 .agenda-session-muted { margin: 0; color: #94a3b8; font-size: 10px; font-weight: 750; }
 .agenda-adjust-session { justify-self: start; }
 .agenda-session-actions { display: flex; flex-wrap: wrap; gap: 7px; }
