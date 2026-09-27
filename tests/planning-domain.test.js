@@ -1143,6 +1143,46 @@ test('afegir una activitat al mig reorganitza totes les sessions futures en cade
   assert.deepEqual(result.unscheduled, [])
 })
 
+test('obrir abans d’hora una sessió futura no la deixa fixada amb la programació antiga', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const monday = createCalendarSession({
+    id: 'session-monday', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T08:30:00', durationMinutes: 60, timetableSlotId: 'slot-monday',
+    classroomOpenedAt: '2026-09-27T17:00:00.000Z',
+    attendanceConfirmedAt: '2026-09-27T17:05:00.000Z',
+  }, options(idFactory))
+  const oldItem = createSessionItem({
+    id: 'old-item', ownerUid: 'teacher-1', applicationId: application.id, sessionId: monday.id,
+    type: 'activity', title: 'Programació antiga', order: 0, plannedMinutes: 10,
+    sourceActivityId: 'intro',
+  }, options(idFactory))
+  const technicalResult = createActivityResult({
+    id: 'technical-result', ownerUid: 'teacher-1', applicationId: application.id,
+    sessionId: monday.id, sessionItemId: oldItem.id, sourceActivityId: oldItem.sourceActivityId,
+    status: 'completed',
+  }, options(idFactory))
+
+  const result = buildActivitySessionReflow({
+    activities: [{ id: 'intro', title: 'Programació actualitzada', type: 'activity', plannedMinutes: 55 }],
+    application,
+    candidates: [{
+      date: '2026-09-30', startsAt: '2026-09-30T11:00:00', durationMinutes: 60,
+      timetableSlotId: 'slot-wednesday',
+    }],
+    existingSessionBundles: [{ items: [oldItem], results: [technicalResult], session: monday }],
+    fromDate: '2026-09-27',
+    options: options(idFactory),
+  })
+
+  assert.equal(result.sessions[0].session.id, monday.id)
+  assert.equal(result.sessions[0].items[0].title, 'Programació actualitzada')
+  assert.deepEqual(result.removedResults.map((item) => item.id), [technicalResult.id])
+  assert.equal(result.lockedSessionCount, 0)
+})
+
 test('la reorganització no recupera una activitat marcada manualment com a feta', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({

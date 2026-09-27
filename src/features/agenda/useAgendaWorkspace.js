@@ -1342,6 +1342,13 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     if (preview.kind === 'reflow') {
       if (!repository) throw new Error('Cal iniciar sessió abans de reorganitzar l’Agenda.')
+      for (const result of preview.removedResults || []) {
+        await repository.remove(result, {
+          applicationId: application.id,
+          planningUnitId,
+          sessionId: result.sessionId,
+        })
+      }
       for (const item of preview.removedItems) {
         await repository.remove(item, {
           applicationId: application.id,

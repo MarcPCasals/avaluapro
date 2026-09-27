@@ -603,12 +603,20 @@ export function buildActivitySessionDistribution({
   }
 }
 
-function canReflowSession(bundle, fromDate) {
+function canReflowSession(bundle, fromDate, now = new Date().toISOString()) {
   const session = bundle?.session
   if (!session || String(session.startsAt).slice(0, 10) < fromDate) return false
   if (session.status !== 'planned') return false
-  if (session.classroomOpenedAt || session.attendanceConfirmedAt || session.classroomClosedAt) return false
-  return !(bundle.results || []).length
+  const startsAt = new Date(session.startsAt).getTime()
+  const nowTime = new Date(now).getTime()
+  const isFutureSession = Number.isFinite(startsAt) && Number.isFinite(nowTime) && startsAt > nowTime
+  if (!isFutureSession && (
+    session.classroomOpenedAt
+    || session.attendanceConfirmedAt
+    || session.classroomClosedAt
+    || (bundle.results || []).length > 0
+  )) return false
+  return true
 }
 
 /**
@@ -631,7 +639,7 @@ export function buildActivitySessionReflow({
 }) {
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const reflowableBundles = existingSessionBundles
-    .filter((bundle) => canReflowSession(bundle, fromDate))
+    .filter((bundle) => canReflowSession(bundle, fromDate, options.now))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const lockedBundles = existingSessionBundles.filter((bundle) => !reflowableBundles.includes(bundle))
   const capacityCandidates = [
@@ -703,6 +711,7 @@ export function buildActivitySessionReflow({
     kind: 'reflow',
     lockedSessionCount: lockedBundles.length,
     removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions,
     replacedItemCount: reflowableBundles.reduce((total, bundle) => total + (bundle.items || []).length, 0),
     reflowableSessionCount: reflowableBundles.length,
