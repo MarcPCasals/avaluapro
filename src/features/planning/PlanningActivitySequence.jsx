@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
-  Plus, RotateCcw, Trash2,
+  AlertTriangle, ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
+  Plus, RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { getActivityMaterialLinks } from '../../domain/planning/materials'
+import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
   getPlanningTotals,
   getProgrammableMinutes,
@@ -33,12 +34,9 @@ function orderedPhases(phases) {
   return flattened
 }
 
-function openMaterialLinks(links) {
-  links.forEach((material) => globalThis.open?.(material.url, '_blank', 'noopener,noreferrer'))
-}
-
 function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [blockedLinks, setBlockedLinks] = useState([])
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
   const links = getActivityMaterialLinks(activity)
   const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
@@ -139,7 +137,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
           <button
             aria-label={links.length === 1 ? `Obrir ${links[0].label}` : `Obrir els ${links.length} enllaços de ${activity.title}`}
             className="planning-open-links"
-            onClick={() => openMaterialLinks(links)}
+            onClick={() => setBlockedLinks(openExternalLinks(links))}
             title={links.length === 1 ? 'Obrir l’enllaç' : `Obrir ${links.length} enllaços en pestanyes noves`}
             type="button"
           ><ExternalLink size={14} /></button>
@@ -156,6 +154,13 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
           id={`planning-description-${activity.id}`}
           text={activity.description}
         />
+      )}
+      {blockedLinks.length > 0 && (
+        <div className="planning-blocked-material-links" role="status">
+          <AlertTriangle aria-hidden="true" size={17} />
+          <div><strong>El navegador ha bloquejat {blockedLinks.length === 1 ? 'un material' : `${blockedLinks.length} materials`}</strong><span>{blockedLinks.length === 1 ? 'Obre’l' : 'Obre’ls'} des d’aquí o permet les finestres emergents d’AvaluaPro per obrir-los tots amb un sol clic.</span><div>{blockedLinks.map((material) => <a className={material.audience === 'teacher' ? 'teacher' : 'students'} href={material.url} key={`${material.audience}:${material.url}`} rel="noreferrer" target="_blank"><ExternalLink size={12} />{material.label}<em>{material.audience === 'teacher' ? 'Docent' : 'Alumnat'}</em></a>)}</div></div>
+          <button aria-label="Tancar l’avís de materials bloquejats" onClick={() => setBlockedLinks([])} type="button"><X size={15} /></button>
+        </div>
       )}
     </article>
   )

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { openExternalLinks } from '../src/lib/openExternalLinks.js'
 import {
   PLANNING_ENTITY_TYPES,
   PLANNING_SCHEMA_VERSION,
@@ -155,6 +156,25 @@ test('els materials antics del docent i de l’alumnat continuen obrint-se', () 
     { audience: 'students', url: 'https://example.test/students' },
     { audience: 'teacher', url: 'https://example.test/teacher' },
   ])
+})
+
+test('si el navegador bloqueja el segon material queda disponible com a alternativa visible', () => {
+  const calls = []
+  const firstWindow = { opener: {} }
+  const blocked = openExternalLinks([
+    { audience: 'students', label: 'Fitxa', url: 'https://example.test/students' },
+    { audience: 'teacher', label: 'Solucionari', url: 'https://example.test/teacher' },
+  ], (url, target) => {
+    calls.push({ target, url })
+    return calls.length === 1 ? firstWindow : null
+  })
+
+  assert.equal(firstWindow.opener, null)
+  assert.deepEqual(calls, [
+    { target: '_blank', url: 'https://example.test/students' },
+    { target: '_blank', url: 'https://example.test/teacher' },
+  ])
+  assert.deepEqual(blocked.map((material) => material.audience), ['teacher'])
 })
 
 test('una indicació queda dins la seqüència sense exigir temporització', () => {
