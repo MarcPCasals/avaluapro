@@ -1603,6 +1603,13 @@ export function useAgendaWorkspace(user, classes = []) {
   const persistAgendaReflowPreview = useCallback(async (preview) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
     const planningUnitId = preview.setup.planningUnit.id
+    for (const result of preview.removedResults || []) {
+      await repository.remove(result, {
+        applicationId: preview.setup.application.id,
+        planningUnitId,
+        sessionId: result.sessionId,
+      })
+    }
     for (const item of preview.removedItems) {
       await repository.remove(item, {
         applicationId: preview.setup.application.id,
@@ -1674,6 +1681,8 @@ export function useAgendaWorkspace(user, classes = []) {
       },
     ]))
     const removedSessionIds = new Set(preview.removedSessions.map((session) => session.id))
+    const removedItemIds = new Set(preview.removedItems.map((item) => item.id))
+    const removedResultIds = new Set((preview.removedResults || []).map((result) => result.id))
     setSessionBundles((currentBundles) => {
       const next = currentBundles
         .filter((current) => !removedSessionIds.has(current.session.id))
@@ -1683,10 +1692,15 @@ export function useAgendaWorkspace(user, classes = []) {
           const changedResults = changedResultsBySessionId.get(current.session.id) || []
           return {
             ...current,
-            items: current.items.map((item) => changedById.has(item.id)
-              ? { ...changedById.get(item.id), sourceActivity: item.sourceActivity }
-              : item),
-            results: changedResults.reduce((results, result) => replaceById(results, result), current.results),
+            items: current.items
+              .filter((item) => !removedItemIds.has(item.id))
+              .map((item) => changedById.has(item.id)
+                ? { ...changedById.get(item.id), sourceActivity: item.sourceActivity }
+                : item),
+            results: changedResults.reduce(
+              (results, result) => replaceById(results, result),
+              current.results.filter((result) => !removedResultIds.has(result.id)),
+            ),
           }
         })
       const knownIds = new Set(next.map((current) => current.session.id))
@@ -1856,8 +1870,12 @@ export function useAgendaWorkspace(user, classes = []) {
       activityMinutesById: activityMinutesById(setup.activities),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) => candidate.startsAt > bundle.session.startsAt),
+      continuationMinutes: Number(minutes),
       existingSessionBundles: setup.existingSessionBundles,
+      moveFromTarget: bundle.session.status === 'planned'
+        && new Date(bundle.session.startsAt).getTime() > Date.now(),
       options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      targetItemId: item.id,
       targetSessionId: bundle.session.id,
     }
     let preview = buildAgendaContinuationReflow(reflowInput)
@@ -1872,7 +1890,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     const now = new Date().toISOString()
     const existingResult = bundle.results.find((result) => result.sessionItemId === item.id)
-    const sourceResult = createActivityResult({
+    const sourceResult = preview.movedFromTarget ? null : createActivityResult({
       ...existingResult,
       applicationId: bundle.application.id,
       ownerUid: bundle.session.ownerUid,
@@ -1885,7 +1903,7 @@ export function useAgendaWorkspace(user, classes = []) {
     return {
       ...preview,
       bundle,
-      changedTargetResults: [sourceResult],
+      changedTargetResults: sourceResult ? [sourceResult] : [],
       item,
       minutes: Number(minutes),
       setup,

@@ -1552,6 +1552,69 @@ test('continuar fusiona fragments repetits i no supera la durada original de la 
   assert.equal(result.removedItems.length, 2)
 })
 
+test('traslladar minuts d’una sessió futura provoca l’efecte dominó sense duplicar temps', () => {
+  const application = createGroupApplication({
+    id: 'application-domino', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const makeSession = (id, startsAt) => createCalendarSession({
+    id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt, durationMinutes: 60, status: 'planned',
+  }, { now: NOW })
+  const monday = makeSession('domino-monday', '2026-09-28T08:30:00')
+  const wednesday = makeSession('domino-wednesday', '2026-09-30T11:00:00')
+  const friday = makeSession('domino-friday', '2026-10-02T08:30:00')
+  const makeItem = (id, session, sourceActivityId, title, plannedMinutes, order) => createSessionItem({
+    id, ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+    sourceActivityId, title, type: 'activity', order, plannedMinutes,
+  }, { now: NOW })
+  const mondayGame = makeItem('domino-game-monday', monday, 'game', 'Joc dels estats de la matèria', 10, 0)
+
+  const result = buildAgendaContinuationReflow({
+    additionalActivities: [{
+      plannedMinutes: 10,
+      sourceActivityId: 'game',
+      sourcePlanningUnitId: 'up-1',
+      title: 'Joc dels estats de la matèria',
+      type: 'activity',
+    }],
+    activityMinutesById: { game: 35, worksheet: 85 },
+    application,
+    candidates: [{ startsAt: '2026-10-05T08:30:00', durationMinutes: 60 }],
+    continuationMinutes: 10,
+    existingSessionBundles: [
+      { session: monday, items: [mondayGame], results: [] },
+      { session: wednesday, items: [
+        makeItem('domino-game-wednesday', wednesday, 'game', 'Joc dels estats de la matèria', 25, 0),
+        makeItem('domino-worksheet-wednesday', wednesday, 'worksheet', 'Fitxa teoria corpuscular', 30, 1),
+      ], results: [] },
+      { session: friday, items: [
+        makeItem('domino-worksheet-friday', friday, 'worksheet', 'Fitxa teoria corpuscular', 55, 0),
+      ], results: [] },
+    ],
+    moveFromTarget: true,
+    options: options(sequenceIdFactory()),
+    targetItemId: mondayGame.id,
+    targetSessionId: monday.id,
+  })
+
+  assert.equal(result.movedFromTarget, true)
+  assert.ok(result.removedItems.some((item) => item.id === mondayGame.id))
+  assert.deepEqual(result.sessions.map((bundle) => bundle.items.map((item) => [
+    item.sourceActivityId,
+    item.plannedMinutes,
+  ])), [
+    [['game', 35], ['worksheet', 20]],
+    [['worksheet', 55]],
+    [['worksheet', 10]],
+  ])
+  const allItems = result.sessions.flatMap((bundle) => bundle.items)
+  assert.equal(allItems.filter((item) => item.sourceActivityId === 'game')
+    .reduce((total, item) => total + item.plannedMinutes, 0), 35)
+  assert.equal(allItems.filter((item) => item.sourceActivityId === 'worksheet')
+    .reduce((total, item) => total + item.plannedMinutes, 0), 85)
+})
+
 test('si el docent ho confirma la compactació evita avançar un fragment de només cinc minuts', () => {
   const application = createGroupApplication({
     id: 'application-small-fragment', ownerUid: 'teacher-1', academicYearId: 'year-1',

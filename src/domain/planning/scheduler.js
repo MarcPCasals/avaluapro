@@ -1128,6 +1128,7 @@ function buildAgendaItemsReflow({
     changedTargetResults: [],
     editedItem: targetItem,
     removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions: reflowableBundles.map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
     replacedItemCount: reflowableBundles.reduce((total, bundle) =>
@@ -1153,6 +1154,63 @@ export function buildAgendaSessionCompaction(input) {
  * supera els minuts definits a la Programació.
  */
 export function buildAgendaContinuationReflow(input) {
+  if (input.moveFromTarget) {
+    const applicationBundles = (input.existingSessionBundles || [])
+      .filter((bundle) => bundle?.session?.applicationId === input.application?.id)
+    const targetBundle = applicationBundles.find((bundle) => bundle.session.id === input.targetSessionId)
+    const targetGroup = groupParallelSessionBundles(applicationBundles).find((group) =>
+      group.bundles.some((bundle) => bundle.session.id === input.targetSessionId))
+    const physicalTarget = targetGroup?.bundles.find((bundle) => bundle.session.id === input.targetSessionId)
+      || targetBundle
+    const targetItemIndex = physicalTarget?.items.findIndex((item) => item.id === input.targetItemId) ?? -1
+    const targetItem = targetItemIndex >= 0 ? physicalTarget.items[targetItemIndex] : null
+    const movedMinutes = Number(input.continuationMinutes)
+    if (!targetItem || !Number.isFinite(movedMinutes) || movedMinutes <= 0) {
+      throw new Error('No s’ha trobat el fragment que vols continuar.')
+    }
+    if (movedMinutes > Number(targetItem.plannedMinutes)) {
+      throw new Error('No pots traslladar més minuts dels que té el fragment actual.')
+    }
+    const targetSessionIds = new Set((targetGroup?.bundles || [targetBundle]).map((bundle) => bundle.session.id))
+    const changedTargetItems = []
+    const removedTargetItems = []
+    const removedTargetResults = []
+    const adjustedBundles = (input.existingSessionBundles || []).map((bundle) => {
+      if (!targetSessionIds.has(bundle.session.id)) return bundle
+      const physicalItem = bundle.items?.[targetItemIndex]
+      if (!physicalItem || physicalItem.sourceActivityId !== targetItem.sourceActivityId) return bundle
+      const remainingMinutes = Number(physicalItem.plannedMinutes) - movedMinutes
+      if (remainingMinutes > 0) {
+        const adjustedItem = createSessionItem({ ...physicalItem, plannedMinutes: remainingMinutes }, input.options)
+        changedTargetItems.push(adjustedItem)
+        return {
+          ...bundle,
+          items: bundle.items.map((item) => item.id === physicalItem.id ? adjustedItem : item),
+        }
+      }
+      removedTargetItems.push(physicalItem)
+      removedTargetResults.push(...(bundle.results || []).filter((result) => result.sessionItemId === physicalItem.id))
+      return {
+        ...bundle,
+        items: bundle.items.filter((item) => item.id !== physicalItem.id),
+        results: (bundle.results || []).filter((result) => result.sessionItemId !== physicalItem.id),
+      }
+    })
+    const result = buildAgendaItemsReflow({
+      ...input,
+      existingSessionBundles: adjustedBundles,
+      startAfterTarget: true,
+      targetItemId: '',
+    })
+    return {
+      ...result,
+      changedLockedItems: [...result.changedLockedItems, ...changedTargetItems],
+      kind: 'agenda-continuation',
+      movedFromTarget: true,
+      removedItems: [...result.removedItems, ...removedTargetItems],
+      removedResults: [...result.removedResults, ...removedTargetResults],
+    }
+  }
   return {
     ...buildAgendaItemsReflow({ ...input, startAfterTarget: true }),
     kind: 'agenda-continuation',
