@@ -74,6 +74,9 @@ export function AgendaSchedulingDialog({
     || []
   const remainingActivities = setup?.activities.filter((activity) =>
     !unavailableActivityIds.includes(activity.id)) || []
+  const completedActivityIds = setup?.completedSourceActivityIds || []
+  const smartActivities = setup?.activities.filter((activity) =>
+    !completedActivityIds.includes(activity.id)) || []
   const selectedClass = classes.find((item) => item.id === values.classId)
   const selectedUnit = availableUnits.find((item) => item.id === values.planningUnitId)
   const minimumStartDate = academicYear?.startsOn && academicYear.startsOn > today
@@ -112,7 +115,9 @@ export function AgendaSchedulingDialog({
         setValues((current) => ({ ...current, startDate: smartStartDate }))
       }
       setSelectedActivityIds(values.mode === 'smart'
-        ? nextSetup.activities.map((activity) => activity.id)
+        ? nextSetup.activities
+          .filter((activity) => !(nextSetup.completedSourceActivityIds || []).includes(activity.id))
+          .map((activity) => activity.id)
         : values.mode === 'complete'
         ? remaining.map((activity) => activity.id)
         : remaining.slice(0, 1).map((activity) => activity.id))
@@ -132,7 +137,7 @@ export function AgendaSchedulingDialog({
     setPreview(null)
     if (!setup) return
     setSelectedActivityIds(mode === 'smart'
-      ? setup.activities.map((activity) => activity.id)
+      ? smartActivities.map((activity) => activity.id)
       : mode === 'complete'
       ? remainingActivities.map((activity) => activity.id)
       : remainingActivities.slice(0, 1).map((activity) => activity.id))
@@ -194,9 +199,9 @@ export function AgendaSchedulingDialog({
           <label>Començar a partir de<input min={minimumStartDate} max={academicYear?.endsOn} type="date" value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }} /></label>
           <fieldset className="agenda-schedule-modes">
             <legend>Com vols avançar?</legend>
-            <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Tria ara només les pròximes activitats.</small></span></label>
-            <label className={values.mode === 'complete' ? 'selected' : ''}><input checked={values.mode === 'complete'} name="schedule-mode" onChange={() => changeMode('complete')} type="radio" /><span><strong>Proposta completa</strong><small>Distribueix tota la UP pendent fins al final de la UT.</small></span></label>
-            <label className={values.mode === 'smart' ? 'selected' : ''}><input checked={values.mode === 'smart'} name="schedule-mode" onChange={() => changeMode('smart')} type="radio" /><span><strong>Reorganització intel·ligent</strong><small>Refà les sessions futures i desplaça la resta en cadena.</small></span></label>
+            <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Afegeix només les pendents que triïs, sense refer les sessions futures.</small></span></label>
+            <label className={values.mode === 'complete' ? 'selected' : ''}><input checked={values.mode === 'complete'} name="schedule-mode" onChange={() => changeMode('complete')} type="radio" /><span><strong>Proposta completa</strong><small>Afegeix totes les pendents encara no programades fins al final de la UT.</small></span></label>
+            <label className={values.mode === 'smart' ? 'selected' : ''}><input checked={values.mode === 'smart'} name="schedule-mode" onChange={() => changeMode('smart')} type="radio" /><span><strong>Reorganització intel·ligent</strong><small>Refà les sessions futures només amb activitats pendents de fer.</small></span></label>
           </fieldset>
           {values.mode === 'complete' && (
             <label className="agenda-reserved-sessions">
@@ -212,8 +217,8 @@ export function AgendaSchedulingDialog({
           )}
           {setup && (
             <div className="agenda-activity-picker">
-              <header><div><strong>{values.mode === 'smart' ? 'Seqüència que es recalcularà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${setup.activities.length} activitats en l’ordre actual de la UP` : `${remainingActivities.length} per calendaritzar · ${unavailableActivityIds.length} ja programades o fetes`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
-              {values.mode !== 'smart' && remainingActivities.length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />Tota la UP ja està assignada a aquest grup.</div> : <div>{(values.mode === 'smart' ? setup.activities : remainingActivities).map((activity) => {
+              <header><div><strong>{values.mode === 'smart' ? 'Activitats pendents que es recalcularan' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${smartActivities.length} pendents · ${completedActivityIds.length} fetes queden fora` : `${remainingActivities.length} per calendaritzar · ${unavailableActivityIds.length} ja programades o fetes`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>
+              {(values.mode === 'smart' ? smartActivities : remainingActivities).length === 0 ? <div className="agenda-all-scheduled"><CheckCircle2 size={18} />No queda cap activitat pendent per calendaritzar.</div> : <div>{(values.mode === 'smart' ? smartActivities : remainingActivities).map((activity) => {
                 const remainingMinutes = setup.remainingMinutesByActivityId[activity.id]
                 const timeLabel = remainingMinutes && remainingMinutes !== activity.plannedMinutes
                   ? `${remainingMinutes} de ${activity.plannedMinutes} min pendents`
@@ -242,7 +247,7 @@ export function AgendaSchedulingDialog({
                 const freeMinutes = Math.max(0, bundle.programmableMinutes - assignedMinutes)
                 return <article className={`${isParallel ? 'parallel' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={group.map((item) => item.session.id).join(':')}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{isParallel ? 'Mitjos grups' : bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{!isParallel && bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{!isParallel && bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? (preview.kind === 'reflow' ? ' · reorganitzada' : ' · ja creada') : ''}</small>{freeMinutes > 0 && <em><AlertTriangle size={12} />{freeMinutes} min lliures</em>}{isParallel && <div className="agenda-parallel-slots">{group.map((item) => <span key={item.session.id}>{item.candidate.startsAt.slice(11, 16)} · {item.candidate.subgroupId}{item.candidate.space ? ` · ${item.candidate.space}` : ''}</span>)}</div>}</div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}{isParallel ? ' · es duplica als dos mitjos grups' : ''}</small></li>)}</ol></article>
               })}</div>
-              {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning agenda-overflow-warning"><AlertTriangle size={18} /><div><strong>{firstOverflowIsPartial ? `«${firstOverflow.title}» només hi cap en part` : `A partir de «${firstOverflow.title}» ja no hi ha prou sessions`}</strong><p>La part que hi cap es pot confirmar. La resta continuarà visible a la Programació, però no es crearà a la calendarització real.</p><ol>{preview.unscheduled.map((item, index) => <li key={item.activityId}><span>{item.title}</span><small>{index === 0 && firstOverflowIsPartial ? `${item.remainingMinutes} min queden fora` : item.remainingMinutes ? `${item.remainingMinutes} min · fora de la calendarització` : 'Fora de la calendarització'}</small></li>)}</ol></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
+              {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning agenda-overflow-warning"><AlertTriangle size={18} /><div><strong>{firstOverflowIsPartial ? `«${firstOverflow.title}» només hi cap en part` : `A partir de «${firstOverflow.title}» ja no hi ha prou sessions`}</strong><p>{preview.schedulingMode === 'complete' ? 'La part que hi cap es pot confirmar. La resta continuarà visible a la Programació, però no es crearà a la calendarització real.' : 'Cal deixar més sessions disponibles o ajustar les activitats abans de confirmar la reorganització.'}</p><ol>{preview.unscheduled.map((item, index) => <li key={item.activityId}><span>{item.title}</span><small>{index === 0 && firstOverflowIsPartial ? `${item.remainingMinutes} min queden fora` : item.remainingMinutes ? `${item.remainingMinutes} min · fora de la calendarització` : 'Fora de la calendarització'}</small></li>)}</ol></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
             </div>
           )}
         </section>

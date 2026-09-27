@@ -602,6 +602,7 @@ export function buildActivitySessionReflow({
   activities = [],
   application,
   candidates = [],
+  completedSourceActivityIds = [],
   existingSessionBundles = [],
   fromDate,
   marginMinutes = 5,
@@ -614,7 +615,9 @@ export function buildActivitySessionReflow({
   const lockedBundles = existingSessionBundles.filter((bundle) => !reflowableBundles.includes(bundle))
   const { assignedMinutesByActivityId, assignedSourceActivityIds } =
     summarizeAssignedActivityProgress(lockedBundles)
+  const completedActivityIds = new Set(completedSourceActivityIds)
   const remainingActivities = activities.flatMap((activity) => {
+    if (completedActivityIds.has(activity.id)) return []
     const plannedMinutes = Number(activity.plannedMinutes)
     if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
       return assignedSourceActivityIds.has(activity.id) ? [] : [activity]

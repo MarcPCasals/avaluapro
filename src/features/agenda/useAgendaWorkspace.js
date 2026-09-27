@@ -39,6 +39,7 @@ import {
   createTimetableSlot,
   createTimetableVersion,
   findTimetableSlotConflicts,
+  getManuallyCompletedActivityIds,
   getSessionCandidateKey,
   moveTimetableSlot,
   orderActivitiesForScheduling,
@@ -1153,7 +1154,11 @@ export function useAgendaWorkspace(user, classes = []) {
     const scheduledSourceActivityIds = activities
       .filter((activity) => remainingMinutesByActivityId[activity.id] === 0)
       .map((activity) => activity.id)
-    const completedSourceActivityIds = [...summarizeCompletedActivityIds(existingSessionBundles)]
+    const manuallyCompletedSourceActivityIds = getManuallyCompletedActivityIds(overrideResult.entities)
+    const completedSourceActivityIds = [...new Set([
+      ...summarizeCompletedActivityIds(existingSessionBundles),
+      ...manuallyCompletedSourceActivityIds,
+    ])]
     const unavailableSourceActivityIds = [...new Set([
       ...scheduledSourceActivityIds,
       ...completedSourceActivityIds,
@@ -1202,6 +1207,7 @@ export function useAgendaWorkspace(user, classes = []) {
         activities: setup.activities,
         application: setup.application,
         candidates: temporalProposal.candidates,
+        completedSourceActivityIds: setup.completedSourceActivityIds,
         existingSessionBundles: setup.existingSessionBundles,
         fromDate: effectiveStartDate,
         options: { now: new Date().toISOString() },
@@ -1211,6 +1217,7 @@ export function useAgendaWorkspace(user, classes = []) {
       return {
         ...distribution,
         ...temporalProposal,
+        schedulingMode: mode,
         skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
         setup,
       }

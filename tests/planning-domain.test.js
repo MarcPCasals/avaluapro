@@ -1119,6 +1119,39 @@ test('afegir una activitat al mig reorganitza totes les sessions futures en cade
   assert.deepEqual(result.unscheduled, [])
 })
 
+test('la reorganització no recupera una activitat marcada manualment com a feta', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const futureSession = createCalendarSession({
+    id: 'session-future', ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt: '2026-09-28T09:30:00', durationMinutes: 60, timetableSlotId: 'slot-1',
+  }, options(idFactory))
+  const completedItem = createSessionItem({
+    ownerUid: 'teacher-1', applicationId: application.id, sessionId: futureSession.id,
+    type: 'activity', title: 'Petjades Misterioses', order: 0, plannedMinutes: 55,
+    sourceActivityId: 'petjades',
+  }, options(idFactory))
+
+  const result = buildActivitySessionReflow({
+    activities: [
+      { id: 'petjades', title: 'Petjades Misterioses', type: 'activity', plannedMinutes: 180 },
+      { id: 'investigar', title: 'Què necessitem investigar?', type: 'activity', plannedMinutes: 10 },
+    ],
+    application,
+    candidates: [],
+    completedSourceActivityIds: ['petjades'],
+    existingSessionBundles: [{ items: [completedItem], results: [], session: futureSession }],
+    fromDate: '2026-09-27',
+    options: options(idFactory),
+  })
+
+  assert.deepEqual(result.sessions.flatMap((bundle) => bundle.items.map((item) => item.sourceActivityId)), ['investigar'])
+  assert.deepEqual(result.unscheduled, [])
+  assert.equal(result.removedItems[0].sourceActivityId, 'petjades')
+})
+
 test('recuperar una activitat anterior desplaça l’agenda futura sense tocar la UP', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({
