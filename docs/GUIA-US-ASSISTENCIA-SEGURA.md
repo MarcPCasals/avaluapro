@@ -6,7 +6,7 @@ Marc continua veient els noms i les dades reals dins el seu AvaluaPro habitual. 
 
 El paquet segur és una excepció per reproduir una incidència que no apareix amb la demostració integrada. No és una còpia de seguretat, no conserva els perfils reals i no es pot restaurar a AvaluaPro.
 
-> **Situació actual:** aquesta funció està preparada i comprovada localment, però encara no està publicada. No apareixerà a l’AvaluaPro que utilitza Marc fins que es faci un desplegament separat i explícit.
+> **Situació actual:** l’exportador segur ja està publicat a l’AvaluaPro habitual. L’entorn **AvaluaPro Assistència** continua sent local i separat; no és una ruta de l’aplicació real.
 
 ## Cas normal: no generar cap fitxer
 

@@ -15,7 +15,8 @@ test('la guia diferencia clarament el compte real de l’entorn fictici', async 
 
   assert.match(guide, /Marc continua veient els noms i les dades reals/)
   assert.match(guide, /assistent tècnic només ha de treballar.*alumnes ficticis/s)
-  assert.match(guide, /encara no està publicada/)
+  assert.match(guide, /exportador segur ja està publicat/)
+  assert.match(guide, /continua sent local i separat/)
 })
 
 test('la guia identifica les dues frases i l’únic fitxer admès', async () => {
@@ -36,12 +37,13 @@ test('la guia reserva la pantalla real a Marc i limita l’assistent als comanda
   assert.match(guide, /no entra al compte real/)
 })
 
-test('l’auditoria manté visibles els riscos residuals i bloqueja una publicació implícita', async () => {
+test('l’auditoria manté visibles els riscos residuals i documenta la publicació explícita', async () => {
   const audit = await readProjectFile('docs/AUDITORIA-FINAL-ASSISTENCIA-SEGURA.md')
 
   assert.match(audit, /Riscos residuals/)
   assert.match(audit, /Error humà en triar l’adjunt/)
-  assert.match(audit, /Verificació real pendent/)
+  assert.match(audit, /Verificació autenticada pendent/)
   assert.match(audit, /petició explícita i separada de Marc/)
-  assert.match(audit, /cap commit i cap desplegament/)
+  assert.match(audit, /commit selectiu `71d0004`/)
+  assert.match(audit, /desplegament exclusiu de Firebase Hosting/)
 })

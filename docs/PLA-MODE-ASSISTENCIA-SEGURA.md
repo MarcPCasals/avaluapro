@@ -1,7 +1,7 @@
 # Pla del mode d’assistència segura d’AvaluaPro
 
-**Estat:** arquitectura acordada; frontera funcional i operativa d’assistència implementada localment
-**Data:** 26 de setembre de 2026
+**Estat:** exportador segur publicat; entorn d’assistència implementat localment i separat
+**Data:** 27 de setembre de 2026
 **Objectiu:** permetre desenvolupar, provar i verificar AvaluaPro amb Codex o altres assistents tècnics sense exposar dades reals d’alumnes.
 
 ## 1. Decisió principal
@@ -1108,3 +1108,25 @@ Conclusió:
 - la publicació continua bloquejada fins que Marc la demani de manera explícita i separada;
 - després de publicar, la comprovació dins el compte real l’haurà de fer Marc sense compartir pantalla ni dades;
 - no s’ha obert el compte real, no s’han inspeccionat dades d’alumnat, no s’ha creat cap commit i no s’ha desplegat res.
+
+### Iteració 19 · Publicació controlada de l’exportador segur
+
+**Estat:** publicada i verificada estàticament; comprovació autenticada pendent de Marc.
+
+S’ha fet:
+
+- petició explícita i separada de Marc per publicar;
+- repetició de les 79 proves d’assistència i les 309 proves totals de seguretat;
+- lint, compilació d’assistència, compilació Firebase i comprovació de diferències superats;
+- commit selectiu `71d0004`, amb les captures i els fitxers temporals exclosos;
+- enviament del commit a `main`;
+- desplegament exclusiu de Firebase Hosting, sense desplegar regles ni modificar dades;
+- comparació criptogràfica de l’HTML i dels quatre recursos principals publicats amb la compilació local, tots idèntics.
+
+Límits mantinguts:
+
+- l’assistent no ha obert el domini de producció ni ha iniciat sessió;
+- no s’ha inspeccionat el compte real ni cap dada d’alumnat;
+- l’entorn d’assistència continua sent local i no forma part del Hosting real;
+- l’auditoria administrativa remota no s’ha repetit: la sessió havia caducat i el protocol exclou la lectura de Firestore real;
+- Marc ha de comprovar personalment `Dades i Compte → Còpies i estat` abans d’enviar cap paquet.

@@ -2,13 +2,13 @@
 
 **Versió de l’esquema:** 1
 **Versió de la política:** 1
-**Estat actual:** recorregut complet implementat localment: validador, regeneració, revisió, exportació controlada i importació exclusiva a l’entorn d’assistència. Encara no està publicat.
+**Estat actual:** exportació controlada publicada a l’AvaluaPro habitual; validador, regeneració i importació exclusiva disponibles a l’entorn local d’assistència.
 
 ## Finalitat
 
 El paquet segur servirà només per reproduir una incidència que no es pugui reproduir amb el conjunt sintètic general. No és una còpia anonimitzada d’AvaluaPro ni una còpia de seguretat.
 
-El paquet només pot arribar a l’entorn d’assistència després que l’eina local, utilitzada directament per Marc, hagi regenerat la informació i el validador l’hagi acceptada. La pantalla de preparació i exportació existeix dins `Dades i Compte → Còpies i estat`, i la càrrega només existeix dins l’entorn aïllat. Cap d’aquests canvis està publicat encara.
+El paquet només pot arribar a l’entorn d’assistència després que l’eina, utilitzada directament per Marc, hagi regenerat la informació i el validador l’hagi acceptada. La pantalla publicada de preparació i exportació existeix dins `Dades i Compte → Còpies i estat`, i la càrrega només existeix dins l’entorn local aïllat.
 
 ## Principi de llista tancada
 

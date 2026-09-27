@@ -1,14 +1,14 @@
 # Auditoria final del mode d’assistència segura
 
 **Data:** 27 de setembre de 2026
-**Abast:** codi local, paquet compilat d’assistència, proves automatitzades i recorregut visual amb dades sintètiques.
-**Fora d’abast:** compte real autenticat, dades d’alumnat, dominis de producció i desplegament.
+**Abast:** codi local, paquet compilat d’assistència, proves automatitzades, recorregut visual amb dades sintètiques i verificació dels recursos estàtics publicats.
+**Fora d’abast:** compte real autenticat, dades d’alumnat i comprovació funcional amb informació real.
 
 ## Conclusió
 
 No s’ha detectat cap via directa perquè l’entorn d’assistència iniciï sessió, consulti Firebase, obri IndexedDB real, utilitzi l’emmagatzematge del navegador o restauri el paquet a l’aplicació real.
 
-El recorregut local està preparat per a una futura publicació, però encara no està publicat. Després d’un desplegament explícit, Marc haurà de comprovar personalment la pantalla d’exportació dins el seu compte; aquesta verificació autenticada no correspon a l’assistent.
+L’exportador segur s’ha publicat a l’AvaluaPro habitual després de la petició explícita de Marc. L’entorn d’assistència continua separat i local. Marc haurà de comprovar personalment la pantalla d’exportació dins el seu compte; aquesta verificació autenticada no correspon a l’assistent.
 
 ## Fronteres comprovades
 
@@ -58,18 +58,18 @@ El paquet no conté dades reals segons l’esquema, però continua sent recomana
 
 El protocol, el llançador i les barreres del navegador protegeixen el flux normal. No constitueixen un aïllament absolut davant un procés deliberadament maliciós amb accés complet al sistema operatiu.
 
-### 4. Verificació real pendent
+### 4. Verificació autenticada pendent
 
-La compilació demostra que el codi és vàlid, però no que la pantalla publicada funcioni correctament amb el compte de Marc. Aquesta comprovació només es podrà fer després d’una publicació autoritzada i l’haurà de fer Marc sense compartir la pantalla ni les dades.
+La compilació i els recursos publicats demostren que s’ha servit el paquet previst, però no que la pantalla funcioni correctament amb el compte de Marc. Aquesta comprovació l’ha de fer Marc sense compartir la pantalla ni les dades.
 
-## Criteris abans de publicar
+## Criteris de publicació aplicats
 
 - petició explícita i separada de Marc;
 - commit selectiu que exclogui captures, fitxers temporals i canvis aliens;
 - repetició de les proves de seguretat i de les dues compilacions;
 - revisió dels recursos públics desplegats sense iniciar sessió;
-- comprovació manual de Marc dins `Dades i Compte → Còpies i estat`;
-- prova de Marc que el fitxer creat té el nom fix i que el resum no mostra identitats;
+- comprovació manual de Marc dins `Dades i Compte → Còpies i estat`, pendent;
+- prova de Marc que el fitxer creat té el nom fix i que el resum no mostra identitats, pendent;
 - cap enviament del fitxer fins que aquesta comprovació manual sigui satisfactòria.
 
 ## Evidència actual
@@ -79,4 +79,8 @@ La compilació demostra que el codi és vàlid, però no que la pantalla publica
 - compilació de l’entorn d’assistència superada;
 - compilació estàtica d’AvaluaPro superada;
 - prova visual d’exportació i importació feta només amb dades sintètiques;
-- cap accés al compte real, cap commit i cap desplegament.
+- commit selectiu `71d0004` enviat a `main`;
+- desplegament exclusiu de Firebase Hosting completat;
+- HTML i recursos principals publicats idèntics a la compilació local;
+- cap accés al compte real ni a dades d’alumnat;
+- auditoria administrativa remota no repetida perquè la sessió havia caducat i el protocol exclou la lectura de Firestore real; no s’han modificat regles ni dades.
