@@ -60,6 +60,7 @@ export function AgendaSchedulingDialog({
     classId: initialClassId || classes[0]?.id || '',
     mode: 'progressive',
     planningUnitId: initialPlanningUnitId || availableUnits[0]?.id || '',
+    reservedSessionCount: 0,
     startDate: initialStartDate(academicYear, today),
   }))
   const [setup, setSetup] = useState(null)
@@ -79,6 +80,13 @@ export function AgendaSchedulingDialog({
     ? academicYear.startsOn
     : today
   const previewSessionGroups = groupPreviewSessions(preview?.sessions)
+  const firstOverflow = preview?.unscheduled?.[0] || null
+  const firstOverflowIsPartial = Boolean(firstOverflow && preview.scheduledActivityIds?.includes(firstOverflow.activityId))
+  const canConfirmPartial = Boolean(
+    preview?.schedulingMode === 'complete'
+    && preview.sessions.length > 0
+    && preview.unscheduled.length > 0,
+  )
 
   const resetProposal = (changes) => {
     setValues((current) => ({ ...current, ...changes }))
@@ -140,7 +148,12 @@ export function AgendaSchedulingDialog({
   const buildPreview = () => {
     setError('')
     try {
-      setPreview(onBuildPreview(setup, { mode: values.mode, selectedActivityIds, startDate: values.startDate }))
+      setPreview(onBuildPreview(setup, {
+        mode: values.mode,
+        reservedSessionCount: Number(values.reservedSessionCount) || 0,
+        selectedActivityIds,
+        startDate: values.startDate,
+      }))
     } catch (previewError) {
       setError(previewError.message || 'No s’ha pogut preparar la proposta.')
     }
@@ -182,9 +195,16 @@ export function AgendaSchedulingDialog({
           <fieldset className="agenda-schedule-modes">
             <legend>Com vols avançar?</legend>
             <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Tria ara només les pròximes activitats.</small></span></label>
-            <label className={values.mode === 'complete' ? 'selected' : ''}><input checked={values.mode === 'complete'} name="schedule-mode" onChange={() => changeMode('complete')} type="radio" /><span><strong>Proposta completa</strong><small>Distribueix tota la UP pendent fins al final de curs.</small></span></label>
+            <label className={values.mode === 'complete' ? 'selected' : ''}><input checked={values.mode === 'complete'} name="schedule-mode" onChange={() => changeMode('complete')} type="radio" /><span><strong>Proposta completa</strong><small>Distribueix tota la UP pendent fins al final de la UT.</small></span></label>
             <label className={values.mode === 'smart' ? 'selected' : ''}><input checked={values.mode === 'smart'} name="schedule-mode" onChange={() => changeMode('smart')} type="radio" /><span><strong>Reorganització intel·ligent</strong><small>Refà les sessions futures i desplaça la resta en cadena.</small></span></label>
           </fieldset>
+          {values.mode === 'complete' && (
+            <label className="agenda-reserved-sessions">
+              Sessions reservades dins la UT
+              <input min="0" onChange={(event) => { setValues({ ...values, reservedSessionCount: event.target.value }); setPreview(null) }} step="1" type="number" value={values.reservedSessionCount} />
+              <small>Per exemple, escriu 3 per apartar dues sessions de prova competencial i una de metacognició. S’apartaran les darreres sessions disponibles de la UT.</small>
+            </label>
+          )}
           {!setup ? (
             <button className="primary-action agenda-schedule-load" disabled={busy || !values.classId || !values.planningUnitId} onClick={loadSequence} type="button">{busy ? <Loader2 className="spin" size={17} /> : <Layers3 size={17} />}Carregar la seqüència</button>
           ) : (
@@ -211,6 +231,7 @@ export function AgendaSchedulingDialog({
             <div className="agenda-preview-result">
               <header><div><span>Proposta</span><h3>{preview.logicalSessionCount ?? preview.sessions.length} {(preview.logicalSessionCount ?? preview.sessions.length) === 1 ? 'sessió de la UP' : 'sessions de la UP'}</h3></div><button onClick={() => setPreview(null)} type="button">Modificar</button></header>
               <div className="agenda-preview-summary"><span><CalendarCheck2 size={15} />{preview.scheduledActivityIds.length} activitats</span><span><Clock3 size={15} />{preview.scheduledMinutes} min</span><span><Layers3 size={15} />{preview.skippedDates.length} dates saltades</span>{preview.physicalSessionCount > preview.logicalSessionCount && <span><Layers3 size={15} />{preview.physicalSessionCount} franges reals amb mitjos grups</span>}</div>
+              {preview.availability && <div className="agenda-capacity-summary"><CalendarCheck2 size={18} /><div><strong>Capacitat real fins al final de la UT</strong><p><b>{preview.availability.totalLogicalSessionCount}</b> sessions disponibles − <b>{preview.availability.reservedLogicalSessionCount}</b> reservades = <b>{preview.availability.availableLogicalSessionCount}</b> sessions per a les activitats.</p>{preview.availability.reservedLogicalSessionCount > 0 && <small>Les sessions reservades queden lliures de les activitats de la seqüència.</small>}</div></div>}
               {preview.kind === 'reflow' && <div className="agenda-reflow-summary"><Sparkles size={18} /><div><strong>Reorganització en cadena</strong><p>{preview.replacedItemCount} fragments previstos es substituiran · {preview.lockedSessionCount} sessions impartides o amb dades quedaran intactes.</p></div></div>}
               {preview.skippedDates.length > 0 && <div className="agenda-skipped-dates"><strong>Calendari respectat</strong><p>{preview.skippedDates.map((item) => `${formatDate(item.date)} · ${item.titles.join(', ')}`).join(' · ')}</p></div>}
               <div className="agenda-proposed-sessions">{previewSessionGroups.map((group) => {
@@ -221,7 +242,7 @@ export function AgendaSchedulingDialog({
                 const freeMinutes = Math.max(0, bundle.programmableMinutes - assignedMinutes)
                 return <article className={`${isParallel ? 'parallel' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={group.map((item) => item.session.id).join(':')}><div className="agenda-proposed-date"><span>{formatDate(bundle.candidate.date)}</span><strong>{isParallel ? 'Mitjos grups' : bundle.candidate.startsAt.slice(11, 16)}</strong><small>{bundle.session.durationMinutes} min · {bundle.programmableMinutes} programables{!isParallel && bundle.candidate.subgroupId ? ` · ${bundle.candidate.subgroupId}` : ''}{!isParallel && bundle.candidate.space ? ` · ${bundle.candidate.space}` : ''}{bundle.isExisting ? (preview.kind === 'reflow' ? ' · reorganitzada' : ' · ja creada') : ''}</small>{freeMinutes > 0 && <em><AlertTriangle size={12} />{freeMinutes} min lliures</em>}{isParallel && <div className="agenda-parallel-slots">{group.map((item) => <span key={item.session.id}>{item.candidate.startsAt.slice(11, 16)} · {item.candidate.subgroupId}{item.candidate.space ? ` · ${item.candidate.space}` : ''}</span>)}</div>}</div><ol>{bundle.existingItems.map((item) => <li className="existing" key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'} · ja assignada</small></li>)}{bundle.items.map((item) => <li key={item.id}><span>{item.title}</span><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}{isParallel ? ' · es duplica als dos mitjos grups' : ''}</small></li>)}</ol></article>
               })}</div>
-              {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning"><AlertTriangle size={18} /><div><strong>Falten sessions a l’horari</strong><p>{preview.unscheduled.map((item) => `${item.title}${item.remainingMinutes ? ` (${item.remainingMinutes} min pendents)` : ''}`).join(' · ')}</p></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
+              {preview.unscheduled.length > 0 ? <div className="agenda-preview-warning agenda-overflow-warning"><AlertTriangle size={18} /><div><strong>{firstOverflowIsPartial ? `«${firstOverflow.title}» només hi cap en part` : `A partir de «${firstOverflow.title}» ja no hi ha prou sessions`}</strong><p>La part que hi cap es pot confirmar. La resta continuarà visible a la Programació, però no es crearà a la calendarització real.</p><ol>{preview.unscheduled.map((item, index) => <li key={item.activityId}><span>{item.title}</span><small>{index === 0 && firstOverflowIsPartial ? `${item.remainingMinutes} min queden fora` : item.remainingMinutes ? `${item.remainingMinutes} min · fora de la calendarització` : 'Fora de la calendarització'}</small></li>)}</ol></div></div> : <div className="agenda-preview-ready"><CheckCircle2 size={18} /><div><strong>Proposta completa</strong><p>No s’ha perdut ni duplicat cap activitat seleccionada.</p></div></div>}
             </div>
           )}
         </section>
@@ -229,7 +250,7 @@ export function AgendaSchedulingDialog({
       </div>
       <div className="modal-actions">
         <button className="secondary-action" disabled={busy} onClick={onClose} type="button">Cancel·lar</button>
-        <button className="primary-action" disabled={busy || !preview || preview.unscheduled.length > 0 || (preview.kind !== 'reflow' && preview.sessions.length === 0)} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}{preview?.kind === 'reflow' ? 'Confirmar reorganització' : 'Confirmar i crear les sessions'}</button>
+        <button className="primary-action" disabled={busy || !preview || (preview.unscheduled.length > 0 && !canConfirmPartial) || (preview.kind !== 'reflow' && preview.sessions.length === 0)} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}{preview?.kind === 'reflow' ? 'Confirmar reorganització' : canConfirmPartial ? 'Confirmar fins on arriba' : 'Confirmar i crear les sessions'}</button>
       </div>
     </Modal>
   )

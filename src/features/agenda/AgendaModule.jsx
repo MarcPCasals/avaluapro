@@ -121,6 +121,16 @@ function monthSessionRange(monthKey) {
   }
 }
 
+function schedulingSavedNotice(result) {
+  const sessionCount = result.logicalSessionCount ?? result.sessionCount
+  if (result.reflowed) {
+    return `${sessionCount} ${sessionCount === 1 ? 'sessió futura reorganitzada' : 'sessions futures reorganitzades'} amb l’efecte dominó.`
+  }
+  const base = `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`
+  if (!result.unscheduled?.length) return base
+  return `${base} ${result.unscheduled.length} ${result.unscheduled.length === 1 ? 'activitat queda' : 'activitats queden'} visible a la Programació però fora de la calendarització real.`
+}
+
 function SyncBadge({ isOnline, sync }) {
   const Icon = !isOnline ? CloudOff : sync.state === 'saving' ? Loader2 : sync.state === 'saved' ? Check : Cloud
   return (
@@ -940,7 +950,7 @@ export default function AgendaModule() {
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'reminders' && <RemindersModal focusedReminderIds={focusedReminderIds} onClose={() => { setDialog(null); setFocusedReminderIds([]) }} sessionOptions={reminderSessionOptions} sessionOptionsLoading={workspace.sessionsLoading} />}
-      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { const sessionCount = result.logicalSessionCount ?? result.sessionCount; setScheduleNotice(result.reflowed ? `${sessionCount} ${sessionCount === 1 ? 'sessió futura reorganitzada' : 'sessions futures reorganitzades'} amb l’efecte dominó.` : `${sessionCount} ${sessionCount === 1 ? 'sessió de la UP afectada' : 'sessions de la UP afectades'} i vinculades amb l’Agenda.`); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
+      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(schedulingSavedNotice(result)); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} onResolveGap={resolveSessionGap} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>

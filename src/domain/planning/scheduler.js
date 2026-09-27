@@ -359,6 +359,43 @@ export function buildTimetableSessionCandidates({
 }
 
 /**
+ * Aparta les últimes sessions lògiques d'una proposta. Dues franges de mig
+ * grup que comparteixen programació compten com una sola sessió, igual que a
+ * la resta del planificador.
+ */
+export function reserveLastLogicalSessionCandidates(candidates = [], requestedCount = 0) {
+  const ordered = [...candidates].sort((left, right) =>
+    String(left.startsAt || '').localeCompare(String(right.startsAt || '')))
+  const groups = []
+  const byKey = new Map()
+  ordered.forEach((candidate, index) => {
+    const date = candidate.date || String(candidate.startsAt || '').slice(0, 10)
+    const key = candidate.parallelProgrammingKey
+      ? `parallel:${date}:${candidate.parallelProgrammingKey}`
+      : `single:${index}`
+    let group = byKey.get(key)
+    if (!group) {
+      group = []
+      byKey.set(key, group)
+      groups.push(group)
+    }
+    group.push(candidate)
+  })
+  const reservedLogicalSessionCount = Math.min(
+    groups.length,
+    Math.max(0, Math.floor(Number(requestedCount) || 0)),
+  )
+  const availableGroupCount = groups.length - reservedLogicalSessionCount
+  return {
+    availableCandidates: groups.slice(0, availableGroupCount).flat(),
+    availableLogicalSessionCount: availableGroupCount,
+    reservedCandidates: groups.slice(availableGroupCount).flat(),
+    reservedLogicalSessionCount,
+    totalLogicalSessionCount: groups.length,
+  }
+}
+
+/**
  * Reparteix la seqüència seleccionada sense tocar la UP. Primer construeix una
  * proposta completa en memòria. Pot afegir elements als minuts lliures d'una
  * sessió prevista, però la capa d'interfície no desa res fins que el docent ho

@@ -42,6 +42,7 @@ import {
   getSessionCandidateKey,
   moveTimetableSlot,
   orderActivitiesForScheduling,
+  reserveLastLogicalSessionCandidates,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   summarizeCompletedActivityIds,
@@ -1074,6 +1075,7 @@ export function useAgendaWorkspace(user, classes = []) {
     ])
     const planningUnit = structureResult.entities.find((item) => item.entityType === 'planningUnit')
     if (!planningUnit) throw new Error('No s’ha pogut obrir aquesta UP.')
+    const temporalUnit = temporalUnits.find((item) => item.id === planningUnit.temporalUnitId) || null
     const phases = structureResult.entities.filter((item) => item.entityType === 'planningPhase')
     const baseActivities = structureResult.entities.filter((item) => item.entityType === 'planningActivity')
     const applications = applicationResult.entities
@@ -1168,12 +1170,13 @@ export function useAgendaWorkspace(user, classes = []) {
       remainingMinutesByActivityId,
       scheduledSourceActivityIds,
       slotsByTimetableId,
+      temporalUnit,
       timetables,
       unavailableSourceActivityIds,
     }
-  }, [activeAcademicYear, allPlanningUnits, calendarEvents, classes, repository, timetables, user, userEmail])
+  }, [activeAcademicYear, allPlanningUnits, calendarEvents, classes, repository, temporalUnits, timetables, user, userEmail])
 
-  const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
+  const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', reservedSessionCount = 0, selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
     // Una reorganització mai no pot reescriure una sessió d'un dia anterior.
     // Les sessions passades formen l'històric i es conserven intactes.
@@ -1184,6 +1187,7 @@ export function useAgendaWorkspace(user, classes = []) {
       startsAt: session.startsAt,
       timetableSlotId: session.timetableSlotId,
     }))
+    const horizonEnd = setup.temporalUnit?.endsOn || activeAcademicYear.endsOn
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
@@ -1191,7 +1195,7 @@ export function useAgendaWorkspace(user, classes = []) {
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
       timetables: setup.timetables,
-      to: activeAcademicYear.endsOn,
+      to: horizonEnd,
     })
     if (mode === 'smart') {
       const distribution = buildActivitySessionReflow({
@@ -1219,12 +1223,33 @@ export function useAgendaWorkspace(user, classes = []) {
         plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
       }))
     if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
+    const futureExistingBundles = setup.existingSessionBundles.filter((bundle) => {
+      const date = String(bundle.session.startsAt).slice(0, 10)
+      return bundle.session.status === 'planned' && date >= effectiveStartDate && date <= horizonEnd
+    })
+    const capacityCandidates = [
+      ...futureExistingBundles.map((bundle) => ({
+        date: String(bundle.session.startsAt).slice(0, 10),
+        existingSessionId: bundle.session.id,
+        parallelProgrammingKey: bundle.session.parallelProgrammingKey,
+        startsAt: bundle.session.startsAt,
+      })),
+      ...temporalProposal.candidates,
+    ]
+    const availability = reserveLastLogicalSessionCandidates(
+      capacityCandidates,
+      mode === 'complete' ? reservedSessionCount : 0,
+    )
+    const availableCandidateSet = new Set(availability.availableCandidates)
+    const availableExistingSessionIds = new Set(availability.availableCandidates
+      .map((candidate) => candidate.existingSessionId)
+      .filter(Boolean))
     const distribution = buildActivitySessionDistribution({
       activities,
       application: setup.application,
-      candidates: temporalProposal.candidates,
-      existingSessionBundles: setup.existingSessionBundles.filter((bundle) =>
-        String(bundle.session.startsAt).slice(0, 10) >= effectiveStartDate),
+      candidates: temporalProposal.candidates.filter((candidate) => availableCandidateSet.has(candidate)),
+      existingSessionBundles: futureExistingBundles.filter((bundle) =>
+        availableExistingSessionIds.has(bundle.session.id)),
       options: { now: new Date().toISOString() },
       scheduledSourceActivityIds: setup.unavailableSourceActivityIds,
     })
@@ -1232,13 +1257,24 @@ export function useAgendaWorkspace(user, classes = []) {
     return {
       ...distribution,
       ...temporalProposal,
+      availability: {
+        availableLogicalSessionCount: availability.availableLogicalSessionCount,
+        horizonEnd,
+        reservedCandidates: availability.reservedCandidates,
+        reservedLogicalSessionCount: availability.reservedLogicalSessionCount,
+        totalLogicalSessionCount: availability.totalLogicalSessionCount,
+      },
+      schedulingMode: mode,
       skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
       setup,
     }
   }, [activeAcademicYear, today])
 
   const confirmSchedulingPreview = useCallback(async (preview) => {
-    if (!preview?.setup?.planningUnit?.id || preview.unscheduled.length > 0) {
+    if (!preview?.setup?.planningUnit?.id) {
+      throw new Error('La proposta no és vàlida.')
+    }
+    if (preview.unscheduled.length > 0 && preview.schedulingMode !== 'complete') {
       throw new Error('La proposta encara té activitats sense sessió.')
     }
     const now = new Date().toISOString()
@@ -1288,6 +1324,7 @@ export function useAgendaWorkspace(user, classes = []) {
       logicalSessionCount: preview.logicalSessionCount ?? preview.sessions.length,
       physicalSessionCount: preview.sessions.length,
       sessionCount: preview.sessions.length,
+      unscheduled: preview.unscheduled,
     }
   }, [persist, refreshSync, repository, synchronize])
 

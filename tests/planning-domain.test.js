@@ -52,6 +52,7 @@ import {
   orderActivitiesForScheduling,
   planActivityChange,
   resolveTutorialPlanningContext,
+  reserveLastLogicalSessionCandidates,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   updatePlanningActivity,
@@ -965,6 +966,26 @@ test('la previsualització avisa si el calendari no té prou sessions i no perd 
 
   assert.equal(result.sessions[0].items[0].plannedMinutes, 55)
   assert.deepEqual(result.unscheduled, [{ activityId: 'long', remainingMinutes: 25, title: 'Projecte' }])
+})
+
+test('reservar tres de setze sessions deixa tretze sessions reals i agrupa els mitjos grups', () => {
+  const candidates = Array.from({ length: 15 }, (_, index) => ({
+    date: `2026-10-${String(index + 1).padStart(2, '0')}`,
+    startsAt: `2026-10-${String(index + 1).padStart(2, '0')}T09:00:00`,
+    timetableSlotId: `slot-${index + 1}`,
+  }))
+  candidates.push(
+    { date: '2026-10-16', startsAt: '2026-10-16T09:00:00', parallelProgrammingKey: 'halves', subgroupId: 'A' },
+    { date: '2026-10-16', startsAt: '2026-10-16T10:00:00', parallelProgrammingKey: 'halves', subgroupId: 'B' },
+  )
+
+  const result = reserveLastLogicalSessionCandidates(candidates, 3)
+
+  assert.equal(result.totalLogicalSessionCount, 16)
+  assert.equal(result.reservedLogicalSessionCount, 3)
+  assert.equal(result.availableLogicalSessionCount, 13)
+  assert.equal(result.availableCandidates.length, 13)
+  assert.equal(result.reservedCandidates.length, 4)
 })
 
 test('la incorporació progressiva omple primer una sessió ja creada amb minuts lliures', () => {
