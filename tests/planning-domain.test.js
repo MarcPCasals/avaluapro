@@ -57,6 +57,7 @@ import {
   reserveLastLogicalSessionCandidates,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
+  summarizeUnscheduledPlanningActivities,
   updatePlanningActivity,
 } from '../src/domain/planning/index.js'
 
@@ -113,6 +114,29 @@ test('els identificadors es mantenen quan una activitat es revisa o es reordena'
   assert.equal(revised.title, 'Escolta en parelles')
   assert.equal(revised.teacherMaterials[0].preparationKind, 'reference')
   assert.equal(revised.teacherMaterials[0].reminderDaysBefore, 0)
+})
+
+test('la cronologia resumeix només les activitats pendents sense data', () => {
+  const activities = [
+    { id: 'done', order: 1, plannedMinutes: 20, title: 'Ja feta' },
+    { id: 'scheduled', order: 2, plannedMinutes: 30, title: 'Ja calendaritzada' },
+    { id: 'partial', order: 3, plannedMinutes: 45, title: 'Parcial' },
+    { id: 'new', order: 4, plannedMinutes: 15, title: 'Sense data' },
+    { id: 'untimed', order: 5, plannedMinutes: null, title: 'Sense temps' },
+  ]
+
+  assert.deepEqual(
+    summarizeUnscheduledPlanningActivities({
+      activities,
+      remainingMinutesByActivityId: { done: 20, scheduled: 0, partial: 10, new: 15, untimed: null },
+      unavailableSourceActivityIds: ['done', 'scheduled'],
+    }).map(({ id, remainingMinutes }) => ({ id, remainingMinutes })),
+    [
+      { id: 'partial', remainingMinutes: 10 },
+      { id: 'new', remainingMinutes: 15 },
+      { id: 'untimed', remainingMinutes: null },
+    ],
+  )
 })
 
 test('els enllaços sempre són de consulta, encara que arribin amb una altra funció', () => {

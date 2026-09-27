@@ -47,6 +47,7 @@ import {
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   summarizeCompletedActivityIds,
+  summarizeUnscheduledPlanningActivities,
 } from '../../domain/planning'
 
 const EMPTY_SYNC = {
@@ -516,6 +517,43 @@ export function useAgendaWorkspace(user, classes = []) {
    * sota cada UP, per això primer es resolen aquestes relacions i després es
    * carreguen les sessions i els seus elements concrets.
    */
+  const loadAccessiblePlanningApplications = useCallback(async ({ classId = '', temporalUnitId = '' } = {}) => {
+    if (!repository) return []
+    const visibleUnits = allPlanningUnits.filter((unit) => (
+      unit.status !== 'archived'
+      && (!temporalUnitId || unit.temporalUnitId === temporalUnitId)
+    ))
+    const applicationGroups = await Promise.all(visibleUnits.map(async (unit) => {
+      const isOwner = unit.ownerUid === user?.uid
+      const role = unit.accessByEmail?.[userEmail]?.role || ''
+      if ((!isOwner && role === 'tutoringCollaborator') || (isOwner && unit.tutoringSpaceId)) {
+        const result = await repository.loadScope(
+          `planningUnit:${unit.id}:applications:manager:${user.uid}`,
+          () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
+          { completeSnapshot: true },
+        )
+        return result.entities
+          .filter((application) => !classId || application.classId === classId)
+          .filter((application) => application.status !== 'archived')
+          .map((application) => ({ application, planningUnit: unit }))
+      }
+      const allowedClassIds = isOwner
+        ? (classId ? [classId] : [null])
+        : (unit.accessByEmail?.[userEmail]?.classIds || []).filter((allowedId) => !classId || allowedId === classId)
+      const results = await Promise.all(allowedClassIds.map((allowedClassId) => repository.loadScope(
+        `planningUnit:${unit.id}:applications${allowedClassId ? `:${allowedClassId}` : ''}`,
+        () => loadPlanningApplications(unit.id, allowedClassId || undefined, 100),
+        { completeSnapshot: true },
+      )))
+      return results.flatMap((result) => result.entities
+        .filter((application) => application.planningUnitId === unit.id)
+        .filter((application) => !classId || application.classId === classId)
+        .filter((application) => application.status !== 'archived')
+        .map((application) => ({ application, planningUnit: unit })))
+    }))
+    return applicationGroups.flat()
+  }, [allPlanningUnits, repository, user, userEmail])
+
   const loadSessionRange = useCallback(async ({
     classId = '',
     from,
@@ -526,36 +564,7 @@ export function useAgendaWorkspace(user, classes = []) {
     if (!repository || !from || !to) return []
     setSessionsLoading(true)
     try {
-      const visibleUnits = allPlanningUnits.filter((unit) => unit.status !== 'archived')
-      const applicationGroups = await Promise.all(visibleUnits.map(async (unit) => {
-        const isOwner = unit.ownerUid === user?.uid
-        const role = unit.accessByEmail?.[userEmail]?.role || ''
-        if ((!isOwner && role === 'tutoringCollaborator') || (isOwner && unit.tutoringSpaceId)) {
-          const result = await repository.loadScope(
-            `planningUnit:${unit.id}:applications:manager:${user.uid}`,
-            () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
-            { completeSnapshot: true },
-          )
-          return result.entities
-            .filter((application) => !classId || application.classId === classId)
-            .filter((application) => application.status !== 'archived')
-            .map((application) => ({ application, planningUnit: unit }))
-        }
-        const allowedClassIds = isOwner
-          ? (classId ? [classId] : [null])
-          : (unit.accessByEmail?.[userEmail]?.classIds || []).filter((allowedId) => !classId || allowedId === classId)
-        const results = await Promise.all(allowedClassIds.map((allowedClassId) => repository.loadScope(
-          `planningUnit:${unit.id}:applications${allowedClassId ? `:${allowedClassId}` : ''}`,
-          () => loadPlanningApplications(unit.id, allowedClassId || undefined, 100),
-          { completeSnapshot: true },
-        )))
-        return results.flatMap((result) => result.entities
-          .filter((application) => application.planningUnitId === unit.id)
-          .filter((application) => !classId || application.classId === classId)
-          .filter((application) => application.status !== 'archived')
-          .map((application) => ({ application, planningUnit: unit })))
-      }))
-      const applications = applicationGroups.flat()
+      const applications = await loadAccessiblePlanningApplications({ classId })
       const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) =>
         repository.loadScope(
           `application:${application.id}:sessions`,
@@ -684,7 +693,7 @@ export function useAgendaWorkspace(user, classes = []) {
     } finally {
       setSessionsLoading(false)
     }
-  }, [allPlanningUnits, repository, user?.uid, userEmail])
+  }, [allPlanningUnits, loadAccessiblePlanningApplications, repository, user?.uid])
 
   /**
    * Completa una única sessió quan el docent l'obre des del calendari o la
@@ -1180,6 +1189,31 @@ export function useAgendaWorkspace(user, classes = []) {
       unavailableSourceActivityIds,
     }
   }, [activeAcademicYear, allPlanningUnits, calendarEvents, classes, repository, temporalUnits, timetables, user, userEmail])
+
+  const loadUnscheduledPlanningActivities = useCallback(async ({ classId, temporalUnitId = '' }) => {
+    if (!classId) return { activities: [], hasApplications: false }
+    const applicationRecords = await loadAccessiblePlanningApplications({ classId, temporalUnitId })
+    const uniqueApplications = Array.from(new Map(applicationRecords.map((record) => [
+      record.application.id,
+      record,
+    ])).values())
+    const setups = await Promise.all(uniqueApplications.map(({ application, planningUnit }) =>
+      loadSchedulingSetup({
+        applicationId: application.id,
+        classId,
+        planningUnitId: planningUnit.id,
+      })))
+    const activities = setups.flatMap((setup) => summarizeUnscheduledPlanningActivities(setup).map((activity) => ({
+      ...activity,
+      planningUnitCode: setup.planningUnit.code,
+      planningUnitId: setup.planningUnit.id,
+      planningUnitTitle: setup.planningUnit.title,
+    })))
+    return {
+      activities,
+      hasApplications: uniqueApplications.length > 0,
+    }
+  }, [loadAccessiblePlanningApplications, loadSchedulingSetup])
 
   const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', reservedSessionCount = 0, selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
@@ -1884,6 +1918,7 @@ export function useAgendaWorkspace(user, classes = []) {
     loadClassroomPrivateNotes,
     loadSessionDetails,
     loadSessionRange,
+    loadUnscheduledPlanningActivities,
     loadTodaySessions,
     moveSlot,
     ownedPlanningUnits: planningUnits,

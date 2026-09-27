@@ -439,6 +439,44 @@ function TimelineRows({ calendarEvents, groups, onOpenSession }) {
   }))}</div>
 }
 
+function TimelineUnscheduledActivities({ activities = [], hasApplications = false, loading = false }) {
+  if (!hasApplications && !loading) return null
+  const groups = Array.from(activities.reduce((byUnit, activity) => {
+    const key = activity.planningUnitId
+    if (!byUnit.has(key)) byUnit.set(key, {
+      activities: [],
+      code: activity.planningUnitCode,
+      id: key,
+      title: activity.planningUnitTitle,
+    })
+    byUnit.get(key).activities.push(activity)
+    return byUnit
+  }, new Map()).values())
+  return (
+    <section className="agenda-timeline-unscheduled">
+      <header>
+        <span><AlertTriangle size={18} /></span>
+        <div><strong>Activitats fora de la calendarització</strong><small>Continuen visibles a Programació, però no tenen cap data assignada.</small></div>
+        {!loading && <em>{activities.length}</em>}
+      </header>
+      {loading ? <div className="agenda-timeline-unscheduled-loading"><Loader2 className="spin" size={16} />Comprovant les activitats pendents…</div> : activities.length === 0 ? <p className="agenda-timeline-unscheduled-complete"><ListChecks size={16} />Totes les activitats pendents d’aquesta UT tenen data.</p> : <div className="agenda-timeline-unscheduled-groups">{groups.map((group) => (
+        <article key={group.id}>
+          <h3><span>{group.code}</span>{group.title}</h3>
+          <ol>{group.activities.map((activity) => {
+            const remainingMinutes = Number(activity.remainingMinutes)
+            const plannedMinutes = Number(activity.plannedMinutes)
+            const isPartial = Number.isFinite(remainingMinutes) && Number.isFinite(plannedMinutes) && remainingMinutes < plannedMinutes
+            const timing = Number.isFinite(remainingMinutes) && remainingMinutes > 0
+              ? `${remainingMinutes} min${isPartial ? ` pendents de ${plannedMinutes}` : ''}`
+              : 'Sense temps assignat'
+            return <li key={activity.id}><span /><div><strong>{activity.title}</strong><small>{timing}</small></div>{isPartial && <em>Parcialment calendaritzada</em>}</li>
+          })}</ol>
+        </article>
+      ))}</div>}
+    </section>
+  )
+}
+
 export function AgendaTimelineView({
   activeTemporalUnit,
   bundles,
@@ -454,6 +492,9 @@ export function AgendaTimelineView({
   selectedClassId,
   temporalUnitProgress,
   today = new Date().toISOString().slice(0, 10),
+  unscheduledActivities = [],
+  unscheduledHasApplications = false,
+  unscheduledLoading = false,
 }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -476,11 +517,14 @@ export function AgendaTimelineView({
         <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{selectedClass && <ContextualHelp title="Cronologia del grup">Primer es mostren les sessions pendents; les sessions anteriors es conserven plegades dins l’històric.</ContextualHelp>}{loading && <Loader2 className="spin" size={16} />}</div></div>
         <div className="agenda-timeline-toolbar-actions"><TemporalUnitCountdown progress={temporalUnitProgress} temporalUnit={activeTemporalUnit} type="sessions" />{onSchedule && <button className="primary-action compact" onClick={onSchedule} type="button"><Plus size={16} />Calendaritzar UP</button>}</div>
       </header>
-      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <div className="agenda-timeline-sections">
-        {upcomingGroups.length > 0 ? <TimelineRows calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}
-        {hasLater && <div className="agenda-timeline-pager future"><button disabled={loading} onClick={onLoadLater} type="button">Veure 8 setmanes següents<ArrowRight size={14} /></button></div>}
-        {archivedGroups.length > 0 && <details className="agenda-timeline-archive"><summary><span><History size={16} />Sessions anteriors</span><small>{archivedGroups.length} {archivedGroups.length === 1 ? 'sessió arxivada' : 'sessions arxivades'}</small><ChevronDown size={16} /></summary><TimelineRows calendarEvents={calendarEvents} groups={archivedGroups} onOpenSession={onOpenSession} /></details>}
-        {hasEarlier && <div className="agenda-timeline-pager past"><button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />Veure 8 setmanes anteriors</button></div>}
+      {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : <div className="agenda-timeline-sections">
+        {classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <>
+          {upcomingGroups.length > 0 ? <TimelineRows calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}
+          {hasLater && <div className="agenda-timeline-pager future"><button disabled={loading} onClick={onLoadLater} type="button">Veure 8 setmanes següents<ArrowRight size={14} /></button></div>}
+          {archivedGroups.length > 0 && <details className="agenda-timeline-archive"><summary><span><History size={16} />Sessions anteriors</span><small>{archivedGroups.length} {archivedGroups.length === 1 ? 'sessió arxivada' : 'sessions arxivades'}</small><ChevronDown size={16} /></summary><TimelineRows calendarEvents={calendarEvents} groups={archivedGroups} onOpenSession={onOpenSession} /></details>}
+          {hasEarlier && <div className="agenda-timeline-pager past"><button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />Veure 8 setmanes anteriors</button></div>}
+        </>}
+        <TimelineUnscheduledActivities activities={unscheduledActivities} hasApplications={unscheduledHasApplications} loading={unscheduledLoading} />
       </div>}
     </section>
   )

@@ -181,6 +181,26 @@ export function summarizeAssignedActivityProgress(sessionBundles = []) {
 }
 
 /**
+ * Retorna les activitats que continuen pendents a Programació però que encara
+ * no tenen tota la durada assignada a sessions reals.
+ */
+export function summarizeUnscheduledPlanningActivities({
+  activities = [],
+  remainingMinutesByActivityId = {},
+  unavailableSourceActivityIds = [],
+} = {}) {
+  const unavailableIds = new Set(unavailableSourceActivityIds)
+  return activities
+    .filter((activity) => !unavailableIds.has(activity.id))
+    .map((activity) => ({
+      ...activity,
+      remainingMinutes: Object.prototype.hasOwnProperty.call(remainingMinutesByActivityId, activity.id)
+        ? remainingMinutesByActivityId[activity.id]
+        : (Number(activity.plannedMinutes) > 0 ? Number(activity.plannedMinutes) : null),
+    }))
+}
+
+/**
  * Una activitat es considera acabada quan el seu últim fragment té un
  * resultat «completed». Completar una part intermèdia no amaga els fragments
  * que encara resten per fer.
