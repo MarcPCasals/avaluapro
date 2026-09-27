@@ -1215,7 +1215,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }
   }, [loadAccessiblePlanningApplications, loadSchedulingSetup])
 
-  const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', reservedSessionCount = 0, selectedActivityIds, startDate }) => {
+  const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
     // Una reorganització mai no pot reescriure una sessió d'un dia anterior.
     // Les sessions passades formen l'històric i es conserven intactes.
@@ -1245,7 +1245,7 @@ export function useAgendaWorkspace(user, classes = []) {
         existingSessionBundles: setup.existingSessionBundles,
         fromDate: effectiveStartDate,
         options: { now: new Date().toISOString() },
-        reservedSessionCount,
+        reservedSessionCount: 0,
       })
       const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date
         || String(distribution.removedSessions.at(-1)?.startsAt || effectiveStartDate).slice(0, 10)
@@ -1284,7 +1284,7 @@ export function useAgendaWorkspace(user, classes = []) {
     ]
     const availability = reserveLastLogicalSessionCandidates(
       capacityCandidates,
-      mode === 'complete' ? reservedSessionCount : 0,
+      0,
     )
     const availableCandidateSet = new Set(availability.availableCandidates)
     const availableExistingSessionIds = new Set(availability.availableCandidates

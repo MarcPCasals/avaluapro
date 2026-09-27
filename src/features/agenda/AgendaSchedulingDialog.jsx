@@ -60,13 +60,13 @@ export function AgendaSchedulingDialog({
     classId: initialClassId || classes[0]?.id || '',
     mode: 'progressive',
     planningUnitId: initialPlanningUnitId || availableUnits[0]?.id || '',
-    reservedSessionCount: 0,
     startDate: initialStartDate(academicYear, today),
   }))
   const [setup, setSetup] = useState(null)
   const [selectedActivityIds, setSelectedActivityIds] = useState([])
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
 
   const unavailableActivityIds = setup?.unavailableSourceActivityIds
@@ -151,7 +151,6 @@ export function AgendaSchedulingDialog({
     try {
       setPreview(onBuildPreview(setup, {
         mode: values.mode,
-        reservedSessionCount: Number(values.reservedSessionCount) || 0,
         selectedActivityIds,
         startDate: values.startDate,
       }))
@@ -162,6 +161,7 @@ export function AgendaSchedulingDialog({
 
   const confirm = async () => {
     setBusy(true)
+    setConfirming(true)
     setError('')
     try {
       const result = await onConfirm(preview)
@@ -170,13 +170,18 @@ export function AgendaSchedulingDialog({
     } catch (saveError) {
       setError(saveError.message || 'No s’ha pogut desar la calendarització.')
     } finally {
+      setConfirming(false)
       setBusy(false)
     }
   }
 
+  const closeDialog = () => {
+    if (!busy) onClose()
+  }
+
   if (availableUnits.length === 0) {
     return (
-      <Modal onClose={onClose} panelClassName="agenda-dialog agenda-scheduling-dialog" size="lg" title="Calendaritzar una UP">
+      <Modal onClose={closeDialog} panelClassName="agenda-dialog agenda-scheduling-dialog" size="lg" title="Calendaritzar una UP">
         <div className="agenda-schedule-empty"><Layers3 size={30} /><strong>Encara no hi ha cap UP disponible</strong><p>Crea la programació i les seves activitats abans de connectar-la amb un grup.</p></div>
         <div className="modal-actions"><button className="primary-action" onClick={onClose} type="button">Entesos</button></div>
       </Modal>
@@ -184,7 +189,7 @@ export function AgendaSchedulingDialog({
   }
 
   return (
-    <Modal onClose={onClose} panelClassName="agenda-dialog agenda-scheduling-dialog" size="xl" title="Calendaritzar una UP">
+    <Modal onClose={closeDialog} panelClassName="agenda-dialog agenda-scheduling-dialog" size="xl" title="Calendaritzar una UP">
       <div className="agenda-schedule-body">
         <section className="agenda-schedule-config">
           <div className="agenda-schedule-intro"><Sparkles size={19} /><div><strong>De la seqüència ideal a les dates reals</strong><p>Primer revises la proposta. Les sessions només es creen quan la confirmes.</p></div></div>
@@ -198,13 +203,6 @@ export function AgendaSchedulingDialog({
             <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Afegeix només les pendents que triïs, sense refer les sessions futures.</small></span></label>
             <label className={values.mode === 'smart' ? 'selected' : ''}><input checked={values.mode === 'smart'} name="schedule-mode" onChange={() => changeMode('smart')} type="radio" /><span><strong>Proposta completa intel·ligent</strong><small>Crea o actualitza tota la planificació futura amb la Programació actual.</small></span></label>
           </fieldset>
-          {values.mode === 'smart' && (
-            <label className="agenda-reserved-sessions">
-              Sessions reservades dins la UT
-              <input min="0" onChange={(event) => { setValues({ ...values, reservedSessionCount: event.target.value }); setPreview(null) }} step="1" type="number" value={values.reservedSessionCount} />
-              <small>Per exemple, escriu 3 per apartar dues sessions de prova competencial i una de metacognició. S’apartaran les darreres sessions disponibles de la UT.</small>
-            </label>
-          )}
           {!setup ? (
             <button className="primary-action agenda-schedule-load" disabled={busy || !values.classId || !values.planningUnitId} onClick={loadSequence} type="button">{busy ? <Loader2 className="spin" size={17} /> : <Layers3 size={17} />}Carregar la seqüència</button>
           ) : (
@@ -231,7 +229,7 @@ export function AgendaSchedulingDialog({
             <div className="agenda-preview-result">
               <header><div><span>Proposta</span><h3>{preview.logicalSessionCount ?? preview.sessions.length} {(preview.logicalSessionCount ?? preview.sessions.length) === 1 ? 'sessió de la UP' : 'sessions de la UP'}</h3></div><button onClick={() => setPreview(null)} type="button">Modificar</button></header>
               <div className="agenda-preview-summary"><span><CalendarCheck2 size={15} />{preview.scheduledActivityIds.length} activitats</span><span><Clock3 size={15} />{preview.scheduledMinutes} min</span><span><Layers3 size={15} />{preview.skippedDates.length} dates saltades</span>{preview.physicalSessionCount > preview.logicalSessionCount && <span><Layers3 size={15} />{preview.physicalSessionCount} franges reals amb mitjos grups</span>}</div>
-              {preview.availability && <div className="agenda-capacity-summary"><CalendarCheck2 size={18} /><div><strong>Capacitat real fins al final de la UT</strong><p><b>{preview.availability.totalLogicalSessionCount}</b> sessions disponibles − <b>{preview.availability.reservedLogicalSessionCount}</b> reservades = <b>{preview.availability.availableLogicalSessionCount}</b> sessions per a les activitats.</p>{preview.availability.reservedLogicalSessionCount > 0 && <small>Les sessions reservades queden lliures de les activitats de la seqüència.</small>}</div></div>}
+              {preview.availability && <div className="agenda-capacity-summary"><CalendarCheck2 size={18} /><div><strong>Capacitat real fins al final de la UT</strong><p><b>{preview.availability.availableLogicalSessionCount}</b> sessions disponibles per a les activitats de la Programació.</p></div></div>}
               {preview.kind === 'reflow' && <div className="agenda-reflow-summary"><Sparkles size={18} /><div><strong>Planificació futura actualitzada</strong><p>{preview.replacedItemCount} fragments previstos es substituiran · {preview.lockedSessionCount} sessions impartides o amb dades quedaran intactes.</p></div></div>}
               {preview.skippedDates.length > 0 && <div className="agenda-skipped-dates"><strong>Calendari respectat</strong><p>{preview.skippedDates.map((item) => `${formatDate(item.date)} · ${item.titles.join(', ')}`).join(' · ')}</p></div>}
               <div className="agenda-proposed-sessions">{previewSessionGroups.map((group) => {
@@ -248,9 +246,10 @@ export function AgendaSchedulingDialog({
         </section>
         {error && <p className="agenda-inline-error agenda-schedule-error">{error}</p>}
       </div>
+      {confirming && <div aria-live="polite" className="agenda-schedule-syncing" role="status"><Loader2 className="spin" size={19} /><div><strong>Sincronitzant la programació amb la teva Agenda…</strong><span>Estem creant i actualitzant totes les sessions. Pot trigar uns instants.</span></div></div>}
       <div className="modal-actions">
         <button className="secondary-action" disabled={busy} onClick={onClose} type="button">Cancel·lar</button>
-        <button className="primary-action" disabled={busy || !preview || (preview.unscheduled.length > 0 && !canConfirmPartial) || (preview.kind !== 'reflow' && preview.sessions.length === 0)} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}{canConfirmPartial ? 'Confirmar fins on arriba' : preview?.kind === 'reflow' ? 'Confirmar proposta intel·ligent' : 'Confirmar i crear les sessions'}</button>
+        <button className="primary-action" disabled={busy || !preview || (preview.unscheduled.length > 0 && !canConfirmPartial) || (preview.kind !== 'reflow' && preview.sessions.length === 0)} onClick={confirm} type="button">{busy ? <Loader2 className="spin" size={17} /> : <CalendarCheck2 size={17} />}{confirming ? 'Sincronitzant…' : canConfirmPartial ? 'Confirmar fins on arriba' : preview?.kind === 'reflow' ? 'Confirmar proposta intel·ligent' : 'Confirmar i crear les sessions'}</button>
       </div>
     </Modal>
   )
