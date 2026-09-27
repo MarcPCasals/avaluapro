@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle,
   Bell,
-  BookOpen,
-  CalendarClock,
-  CheckCircle2,
   Clock3,
   Clipboard,
-  MessageCircle,
   Search,
   Skull,
   Target,
   Trash2,
-  Triangle,
   Users,
   XCircle,
 } from 'lucide-react'
-import { getDominantDiagnosis } from '../../data/studentAnnotations'
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -26,14 +19,8 @@ import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { NewTaskModal } from './NewTaskModal'
+import { TrackingTable } from './TrackingTable'
 import { loadNextClassSessions } from './loadNextClassSessions'
-
-const statusButtons = [
-  { id: 'DONE', label: 'Fet', icon: CheckCircle2 },
-  { id: 'LATE', label: 'Tard', icon: Clock3 },
-  { id: 'MISSING', label: 'No fet', icon: XCircle },
-  { id: 'EXEMPT', label: 'Exempt', icon: Triangle },
-]
 
 const interventionFilters = [
   { id: 'all', label: 'Tots' },
@@ -109,12 +96,6 @@ function getRedPointCount(student, missingTasks, trackingAgendaNotes = []) {
   const activeMissingTasks = getActiveMissingTasks(missingTasks, trackingAgendaNotes)
   const legacyCount = Math.max((student.legacyTrackingPenaltyCount || 0) - getAgendaRedResetCount(trackingAgendaNotes), 0)
   return Math.max(activeMissingTasks.length, legacyCount)
-}
-
-function getStudentRowClass(dominantDiagnosis) {
-  return [dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '']
-    .filter(Boolean)
-    .join(' ')
 }
 
 function buildTrackingAgendaText({ blackPointCount, missingTasks, redPointCount, student }) {
@@ -457,101 +438,6 @@ function RedPointsModal({ missingTasks, onClose, student }) {
   )
 }
 
-function EditableTaskDate({ nextSession, task, onChangeDate }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const formattedDate = new Date(task.date).toLocaleDateString('ca-ES', { day: '2-digit', month: 'short' })
-
-  if (isEditing) {
-    return (
-      <div className="task-date-editor">
-        <input
-          autoFocus
-          className="task-date-input"
-          onBlur={() => setIsEditing(false)}
-          onChange={async (event) => {
-            await onChangeDate(task.id, event.target.value)
-            setIsEditing(false)
-          }}
-          type="date"
-          value={task.date}
-        />
-        {nextSession && <button
-          aria-label="Posar la data de la propera sessió"
-          onClick={async () => {
-            await onChangeDate(task.id, nextSession.date)
-            setIsEditing(false)
-          }}
-          onMouseDown={(event) => event.preventDefault()}
-          title={`Proper sessió: ${nextSession.date} · ${nextSession.startsAt.slice(11, 16)}`}
-          type="button"
-        ><CalendarClock size={13} />Proper sessió</button>}
-      </div>
-    )
-  }
-
-  return (
-    <button className="task-date-button" onClick={() => setIsEditing(true)} title="Canviar data" type="button">
-      {formattedDate}
-    </button>
-  )
-}
-
-function EditableTaskTitle({ task, onChangeTitle }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [title, setTitle] = useState(task.title)
-
-  const saveTitle = async () => {
-    const cleanTitle = title.trim()
-    if (cleanTitle && cleanTitle !== task.title) {
-      await onChangeTitle(task.id, cleanTitle)
-    }
-    setIsEditing(false)
-  }
-
-  if (isEditing) {
-    return (
-      <input
-        autoFocus
-        className="task-title-input"
-        onBlur={saveTitle}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') saveTitle()
-          if (event.key === 'Escape') {
-            setTitle(task.title)
-            setIsEditing(false)
-          }
-        }}
-        value={title}
-      />
-    )
-  }
-
-  return (
-    <button className="task-title-button" onClick={() => setIsEditing(true)} title="Canviar nom" type="button">
-      {task.title}
-    </button>
-  )
-}
-
-function TaskCompletionSummary({ students, task, taskRecords }) {
-  const visibleStudentIds = new Set(students.map((student) => student.id))
-  const scopedRecords = taskRecords.filter(
-    (record) => record.taskId === task.id && visibleStudentIds.has(record.studentId),
-  )
-  const done = scopedRecords.filter((record) => record.status === 'DONE').length
-  const late = scopedRecords.filter((record) => record.status === 'LATE').length
-  const exempt = scopedRecords.filter((record) => record.status === 'EXEMPT').length
-  const total = Math.max(students.length - exempt, 0)
-
-  return (
-    <div className="task-completion-summary">
-      <span className="done">{done}/{total}</span>
-      {late > 0 && <span className="late">{late} incompleta</span>}
-    </div>
-  )
-}
-
 function TaskNoteModal({ draft, onClose, onSave }) {
   const [text, setText] = useState(draft.record?.note || '')
   const title = draft.student ? `Informació de la tasca: ${draft.student.name}` : 'Informació general de la tasca'
@@ -774,6 +660,32 @@ export function TrackingView() {
       ? students
       : students.filter((student) => insightByStudentId.get(student.id)?.level === interventionFilter))
       .filter((student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter)
+  const trackingRows = filteredStudents.map((student) => {
+    const incidentsCount = behaviorEvents.filter(
+      (event) => event.studentId === student.id && event.type === 'incident',
+    ).length
+    const positivesCount = behaviorEvents.filter(
+      (event) => event.studentId === student.id && event.type === 'positive',
+    ).length
+    const missingTasks = getMissingTasksForStudent(student.id, taskRecords, tasks)
+    const trackingAgendaNotes = getTrackingAgendaNotes(student.id, agendaNotes, activeClassId)
+    const studentNotes = agendaNotes.filter(
+      (note) => note.studentId === student.id && note.classId === activeClassId,
+    )
+    const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
+    const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
+
+    return {
+      incidentsCount,
+      interventionInsight: insightByStudentId.get(student.id),
+      noteState: hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty',
+      positivesCount,
+      redPointCount: getRedPointCount(student, missingTasks, trackingAgendaNotes),
+      stats: getStudentTrackingStats(student.id, taskRecords, tasks),
+      student,
+      trackingAgendaNotesCount: trackingAgendaNotes.length,
+    }
+  })
   const trackingOverview = useMemo(() => {
     const rows = students.map((student) => {
       const stats = getStudentTrackingStats(student.id, taskRecords, tasks)
@@ -1331,237 +1243,31 @@ export function TrackingView() {
           </article>
         </section>
       ) : (
-      <div className="grid-scroll" data-tour="tracking-table" ref={tableWrapRef}>
-        <table className="tracking-table">
-          <thead>
-            <tr>
-              <th className="sticky-student tracking-student-header">
-                <span>Alumne</span>
-                <button
-                  className="note-signal"
-                  onClick={() => setShowRemindersModal(true)}
-                  title="Recordatoris del grup"
-                  type="button"
-                >
-                  <Bell size={19} />
-                </button>
-              </th>
-              {visibleTasks.map((task, taskIndex) => (
-                <th className="task-header" key={task.id}>
-                  <EditableTaskTitle task={task} onChangeTitle={(taskId, title) => updateTask(taskId, { title })} />
-                  <TaskCompletionSummary students={filteredStudents} task={task} taskRecords={taskRecords} />
-                  <EditableTaskDate nextSession={nextClassSession} task={task} onChangeDate={(taskId, date) => updateTask(taskId, { date })} />
-                  <button
-                    className="task-header-action done-all"
-                    data-tour={taskIndex === 0 ? 'task-done-all' : undefined}
-                    onClick={() => markVisibleStudentsDone(task.id)}
-                    title="Marcar tots els alumnes visibles com a fets"
-                    type="button"
-                  >
-                    <CheckCircle2 size={16} />
-                  </button>
-                  <button
-                    className="task-header-action reminder"
-                    data-tour={taskIndex === 0 ? 'task-reminder-all' : undefined}
-                    onClick={() => setReminderDraft({ task })}
-                    title="Programar recordatori de la tasca"
-                    type="button"
-                  >
-                    <Bell size={15} />
-                  </button>
-                  <button
-                    className={`task-header-action info ${task.note ? 'active' : ''}`}
-                    data-tour={taskIndex === 0 ? 'task-info-all' : undefined}
-                    onClick={() => setTaskNoteDraft({ task })}
-                    title="Afegir informació general de la tasca"
-                    type="button"
-                  >
-                    i
-                  </button>
-                  <button
-                    className="task-delete-button"
-                    onClick={() => setDeleteTaskDraft(task)}
-                    title="Eliminar tasca"
-                    type="button"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </th>
-              ))}
-              <th className="summary-header">Constància</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student, studentIndex) => {
-              const stats = getStudentTrackingStats(student.id, taskRecords, tasks)
-              const interventionInsight = insightByStudentId.get(student.id)
-              const incidents = behaviorEvents.filter(
-                (event) => event.studentId === student.id && event.type === 'incident',
-              )
-              const positives = behaviorEvents.filter(
-                (event) => event.studentId === student.id && event.type === 'positive',
-              )
-              const missingTasks = getMissingTasksForStudent(student.id, taskRecords, tasks)
-              const trackingAgendaNotes = getTrackingAgendaNotes(student.id, agendaNotes, activeClassId)
-              const redPointCount = getRedPointCount(student, missingTasks, trackingAgendaNotes)
-              const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
-              const studentNotes = agendaNotes.filter(
-                (note) => note.studentId === student.id && note.classId === activeClassId,
-              )
-              const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
-              const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
-              const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
-              const isDemoMarti = student.id === 'student_6'
-              const isDemoJoel = student.id === 'student_12'
-
-              return (
-                <tr
-                  className={getStudentRowClass(dominantDiagnosis)}
-                  data-student-row={student.id}
-                  data-tour={isDemoMarti ? 'demo-marti-tracking-row' : isDemoJoel ? 'demo-joel-tracking-row' : undefined}
-                  key={student.id}
-                >
-                  <td className="sticky-student tracking-student-cell">
-                    <div className="tracking-student-row">
-                      <div className="tracking-student-main">
-                        <button
-                          className={`student-note-button ${noteState}`}
-                          onClick={() => setAnnotationsStudentId(student.id)}
-                          title="Resum i anotacions per reunió"
-                          type="button"
-                        >
-                          <MessageCircle size={17} />
-                        </button>
-                        <AbsenceToggle classId={activeClassId} studentId={student.id} />
-                        <button
-                          className="tracking-student-name"
-                          onClick={() => setProfileStudentId(student.id)}
-                          type="button"
-                        >
-                          <strong>{student.name}</strong>
-                          <span className="student-list-meta">
-                            {student.halfGroup && <small>{student.halfGroup}</small>}
-                            {student.isSkiStudyStudent && (
-                              <span className="student-ee-badge" title="Esquí Estudi">EE</span>
-                            )}
-                          </span>
-                        </button>
-                      </div>
-                      <div className="student-flags" data-tour={studentIndex === 0 ? 'tracking-student-actions' : undefined}>
-                        <button
-                          className={`red-point-stack ${redPointCount >= 3 ? 'warning' : ''}`}
-                          disabled={redPointCount === 0}
-                          onClick={() => setRedDetailStudentId(student.id)}
-                          title="Punts vermells per tasques no fetes"
-                          type="button"
-                        >
-                          {Array.from({ length: Math.min(redPointCount, 4) }).map((_, pointIndex) => (
-                            <i key={pointIndex} />
-                          ))}
-                          {redPointCount > 4 && <b>+{redPointCount - 4}</b>}
-                        </button>
-                        <button
-                          className="black-point-button"
-                          onClick={() => setBehaviorDraft({ student, type: 'incident' })}
-                          title="Afegir negatiu de comportament"
-                          type="button"
-                        >
-                          <AlertTriangle size={15} />
-                          {incidents.length}
-                        </button>
-                        <button
-                          className="diary-button"
-                          onClick={() => setBehaviorDraft({ student, type: 'positive' })}
-                          title="Afegir entrada de diari"
-                          type="button"
-                        >
-                          <BookOpen size={15} />
-                          {positives.length}
-                        </button>
-                        <button
-                          className={`agenda-note-chip ${trackingAgendaNotes.length > 0 ? 'active' : ''}`}
-                          onClick={() => setAgendaDetailStudentId(student.id)}
-                          title={
-                            trackingAgendaNotes.length > 0
-                              ? 'Veure o afegir notes a l’agenda'
-                              : 'Afegir nota directa a l’agenda'
-                          }
-                          type="button"
-                        >
-                          <Skull size={13} />
-                          {trackingAgendaNotes.length}
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                  {visibleTasks.map((task, taskIndex) => {
-                    const record = getRecord(taskRecords, student.id, task.id)
-                    return (
-                      <td className="task-cell" key={`${student.id}_${task.id}`}>
-                        <button
-                          className={`task-cell-info ${record?.note ? 'active' : ''}`}
-                          data-tour={studentIndex === 0 && taskIndex === 0 ? 'task-info-individual' : undefined}
-                          onClick={() => setTaskNoteDraft({ task, student, record })}
-                          title="Afegir informació de la tasca"
-                          type="button"
-                        >
-                          i
-                        </button>
-                        <div className="status-group">
-                          {statusButtons.map((status) => {
-                            const Icon = status.icon
-                            const active = record?.status === status.id
-                            return (
-                              <button
-                                className={`status-button ${status.id.toLowerCase()} ${active ? 'active' : ''}`}
-                                data-tour={
-                                  status.id === 'MISSING' && isDemoMarti && task.id === 'task_1'
-                                    ? 'demo-marti-missing-button'
-                                    : status.id === 'MISSING' && isDemoJoel && task.id === 'task_4'
-                                      ? 'demo-joel-missing-button'
-                                      : undefined
-                                }
-                                key={status.id}
-                                onClick={() => handleTaskStatus(student, task.id, status.id)}
-                                title={status.label}
-                                type="button"
-                              >
-                                <Icon size={16} />
-                              </button>
-                            )
-                          })}
-                        </div>
-                        <button
-                          className={`cell-note ${record?.reminder ? 'active' : ''}`}
-                          onClick={() => setReminderDraft({ task, student, record })}
-                          title="Programar recordatori individual"
-                          type="button"
-                        >
-                          <Bell size={13} />
-                        </button>
-                      </td>
-                    )
-                  })}
-                  <td className="tracking-summary">
-                    {interventionInsight && (
-                      <span className={`intervention-badge ${interventionInsight.level}`}>
-                        {interventionInsight.label}
-                      </span>
-                    )}
-                    <div className="progress-line">
-                      <span style={{ width: `${stats.consistency}%` }} />
-                    </div>
-                    <strong>{stats.consistency}%</strong>
-                    <small>
-                      {stats.done} fetes · {stats.missing} no fetes
-                    </small>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <TrackingTable
+        nextClassSession={nextClassSession}
+        onAddBehavior={(student, type) => setBehaviorDraft({ student, type })}
+        onChangeTaskDate={(taskId, date) => updateTask(taskId, { date })}
+        onChangeTaskTitle={(taskId, title) => updateTask(taskId, { title })}
+        onDeleteTask={setDeleteTaskDraft}
+        onMarkVisibleStudentsDone={markVisibleStudentsDone}
+        onOpenAgendaDetail={setAgendaDetailStudentId}
+        onOpenAnnotations={setAnnotationsStudentId}
+        onOpenProfile={setProfileStudentId}
+        onOpenRecordNote={setTaskNoteDraft}
+        onOpenRecordReminder={setReminderDraft}
+        onOpenRedPoints={setRedDetailStudentId}
+        onOpenReminders={() => setShowRemindersModal(true)}
+        onOpenTaskNote={(task) => setTaskNoteDraft({ task })}
+        onOpenTaskReminder={(task) => setReminderDraft({ task })}
+        onSetTaskStatus={handleTaskStatus}
+        renderAbsenceControl={(student) => (
+          <AbsenceToggle classId={activeClassId} studentId={student.id} />
+        )}
+        rows={trackingRows}
+        tableWrapRef={tableWrapRef}
+        taskRecords={taskRecords}
+        tasks={visibleTasks}
+      />
       )}
     </section>
   )

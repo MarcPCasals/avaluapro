@@ -21,6 +21,7 @@ import { COLLECTIONS } from '../../data/seedData'
 import { buildBackupStatusMessage, summarizeBackup } from '../../lib/backupDiagnostics'
 import { downloadJson, getTodaySlug } from '../../lib/downloads'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
+import { SafeAssistanceExportPanel } from './SafeAssistanceExportPanel'
 
 const CONTACT_EMAIL = 'mperezc@educand.ad'
 
@@ -726,6 +727,8 @@ export function DataSafetyModal({ initialSection = '', onClose }) {
             </p>
           </div>
         </section>
+
+        <SafeAssistanceExportPanel state={state} />
 
         <section className="cloud-backup-panel">
           <div className="cloud-backup-heading">

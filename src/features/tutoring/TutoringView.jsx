@@ -93,9 +93,11 @@ import {
   formatCooperativeStudentName,
 } from './cooperativeGroupOutputUtils'
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
+import { SociometricSummaryPanel } from './SociometricSummaryPanel'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
 import { StudentProfileSurveyPanel } from './StudentProfileSurveyPanel'
 import { TutoringCoordinationPanel } from './TutoringCoordinationPanel'
+import { TutorialProfileList } from './TutorialProfileList'
 import {
   getSavedSeatingAssignments,
   getUnseatedStudentIds,
@@ -5894,6 +5896,23 @@ export function TutoringView() {
       tutorialSummary.studentProfiles,
     ],
   )
+  const tutorialProfileRows = filteredTutorialProfiles.map((profile) => {
+    const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
+    const priority = getTutorialProfilePriority(profile, recordRow)
+    return {
+      academicSourceLabel: profile.academicSourceLabel,
+      notDevelopedCount: profile.notDevelopedCount,
+      priority,
+      profile,
+      reportStatus: profile.student.tutorialReportUpdatedAt
+        ? 'En preparació'
+        : priority > 0
+          ? 'Cal revisar'
+          : 'No iniciat',
+      student: profile.student,
+      trackingCount: recordRow?.total || 0,
+    }
+  })
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
   const familyInterviewActive = recordForm.type === 'family-contact' && recordForm.familyInterviewEnabled
   const preparedRecordNote = familyInterviewActive
@@ -8507,31 +8526,10 @@ export function TutoringView() {
               </form>
             </article>
 
-            <div className="sociometric-results-preview">
-              <header>
-                <div>
-                  <span className="section-kicker">
-                    <BarChart3 size={17} />
-                    Lectura ràpida
-                  </span>
-                  <h3>Indicadors sociomètrics actuals</h3>
-                </div>
-                <div className="sociometric-metric-strip">
-                  <span>Densitat {sociometricMetrics.density}%</span>
-                  <span>Inclusió {sociometricMetrics.inclusion}%</span>
-                  <span>Positivitat {sociometricMetrics.positivity}%</span>
-                  <span>Moreno {sociometricMetrics.moreno}%</span>
-                </div>
-              </header>
-              <div className="sociometric-classification-grid">
-                {sociometricMetrics.categoryCounts.map((item) => (
-                  <article key={item.category}>
-                    <span>{item.category}</span>
-                    <strong>{item.count}</strong>
-                  </article>
-                ))}
-              </div>
-            </div>
+            <SociometricSummaryPanel
+              categoryRows={sociometricMetrics.categoryCounts}
+              metrics={sociometricMetrics}
+            />
 
           </section>
 
@@ -12634,41 +12632,13 @@ export function TutoringView() {
             </div>
             {tutorialSummary.studentProfiles.length === 0 ? (
               <div className="empty-state compact">Afegeix alumnes per començar a preparar informes tutorials.</div>
-            ) : filteredTutorialProfiles.length === 0 ? (
-              <div className="empty-state compact">Aquest filtre no té cap alumne ara mateix.</div>
             ) : (
-              <div className="tutorial-student-profile-list">
-                {filteredTutorialProfiles.map((profile) => {
-                  const recordRow = tutorialRecordRowsByStudent.get(profile.student.id)
-                  const trackingCount = recordRow?.total || 0
-                  const priority = getTutorialProfilePriority(profile, recordRow)
-                  const reportStatus = profile.student.tutorialReportUpdatedAt
-                    ? 'En preparació'
-                    : priority > 0
-                      ? 'Cal revisar'
-                      : 'No iniciat'
-                  return (
-                    <button
-                      className={`tutorial-student-profile-row ${
-                        priority > 0 ? 'risk' : ''
-                      }`}
-                      key={profile.student.id}
-                      onClick={() => setSelectedTutorialProfileId(profile.student.id)}
-                      type="button"
-                    >
-                      <div>
-                        <strong>{profile.student.name}</strong>
-                        <small>
-                          {profile.notDevelopedCount} no assolides · {trackingCount} registres ·{' '}
-                          {profile.academicSourceLabel}
-                        </small>
-                      </div>
-                      <span className="tutorial-report-row-status">{reportStatus}</span>
-                      <em>Preparar</em>
-                    </button>
-                  )
-                })}
-              </div>
+              <TutorialProfileList
+                emptyText="Aquest filtre no té cap alumne ara mateix."
+                onSelectProfile={(row) => setSelectedTutorialProfileId(row.student.id)}
+                rows={tutorialProfileRows}
+                selectedStudentId={selectedTutorialProfileId}
+              />
             )}
           </article>
         </section>

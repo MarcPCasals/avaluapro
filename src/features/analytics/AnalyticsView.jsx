@@ -10,8 +10,6 @@ import {
   CircleHelp,
   FileClock,
   Layers,
-  ListFilter,
-  LineChart,
   MessageSquareText,
   Radar,
   Target,
@@ -34,6 +32,7 @@ import {
 } from '../../lib/attendance'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
+import { CrossAnalysisTable } from './CrossAnalysisTable'
 
 const insightCopy = {
   dashboard: {
@@ -2855,6 +2854,35 @@ export function AnalyticsView() {
   const priorityProfiles = sortProfilesByTeachingPriority(crossProfiles)
   const alphabeticalProfiles = [...crossProfiles].sort((a, b) => a.student.name.localeCompare(b.student.name))
   const visibleProfiles = profileSortMode === 'alphabetical' ? alphabeticalProfiles : priorityProfiles
+  const crossAnalysisRows = visibleProfiles.map((profile) => {
+    const decision = getGlobalDecision(profile)
+    const absenceRecords = getStudentAbsenceRecords(
+      state.absenceRecords,
+      profile.student.id,
+      activeClassId,
+    )
+    return {
+      absenceHours: getStudentAbsenceHours(state.absenceRecords, profile.student.id, activeClassId),
+      absenceRecords,
+      decision,
+      evaluationGrade: profile.evaluation.grade,
+      evidence: buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents),
+      incidents: profile.incidents,
+      lowConsistency: hasLowConsistency(profile),
+      profile,
+      redPointCount: profile.redPointCount,
+      rowTone:
+        decision.tone === 'danger' || decision.tone === 'warning'
+          ? 'risk'
+          : decision.tone === 'invisible'
+            ? 'student-invisible'
+            : decision.tone === 'stable'
+              ? 'stable'
+              : 'monitor',
+      student: profile.student,
+      tracking: profile.tracking,
+    }
+  })
   const topPriority = priorityProfiles.find((profile) => getDecisionPriority(profile) <= 1)
   const topPriorityDecision = topPriority ? getGlobalDecision(topPriority) : null
   const changeRows = buildStudentChangeRows(state, students, classUts)
@@ -3220,143 +3248,18 @@ export function AnalyticsView() {
 
       {dashboardScope === 'cross' && (
         <>
-          <div className="profile-table-wrap full-width-analysis" data-tour="stats-cross">
-          <div className="section-heading">
-            <LineChart size={20} />
-            <div>
-              <h3>Anàlisi creuada</h3>
-              <p>Rendiment acadèmic, hàbits de treball, absències i comportament vistos conjuntament.</p>
-            </div>
-            <div className="profile-sort-toggle" aria-label="Ordenar alumnes">
-              <ListFilter size={16} />
-              <button
-                className={profileSortMode === 'intervention' ? 'active' : ''}
-                onClick={() => setProfileSortMode('intervention')}
-                type="button"
-              >
-                Intervenció
-              </button>
-              <button
-                className={profileSortMode === 'alphabetical' ? 'active' : ''}
-                onClick={() => setProfileSortMode('alphabetical')}
-                type="button"
-              >
-                A-Z
-              </button>
-            </div>
-            <InfoButton
-              label="Anàlisi creuada"
-              onOpen={() => setSelectedInfo({ title: 'Anàlisi creuada', text: chartHelp.crossAnalysis })}
-            />
-          </div>
-          <table className="profile-table">
-            <thead>
-              <tr>
-                <th>Alumne</th>
-                <th>Rendiment</th>
-                <th>Constància</th>
-                <th>Absències</th>
-                <th>Punts vermells</th>
-                <th>Punts negres</th>
-                <th>Perfil</th>
-                <th>Acció</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleProfiles.map((profile, index) => {
-                const decision = getGlobalDecision(profile)
-                const evidence = buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents)
-                const absenceRecords = getStudentAbsenceRecords(
-                  state.absenceRecords,
-                  profile.student.id,
-                  activeClassId,
-                )
-                const absenceHours = getStudentAbsenceHours(
-                  state.absenceRecords,
-                  profile.student.id,
-                  activeClassId,
-                )
-                return (
-                  <tr
-                    className={`profile-analysis-row ${
-                      decision.tone === 'danger' || decision.tone === 'warning'
-                        ? 'risk'
-                        : decision.tone === 'invisible'
-                          ? 'student-invisible'
-                          : decision.tone === 'stable'
-                            ? 'stable'
-                            : 'monitor'
-                    }`}
-                    key={profile.student.id}
-                  >
-                    <td>
-                      <strong>{profile.student.name}</strong>
-                      <small>{profile.student.halfGroup}</small>
-                    </td>
-                    <td>
-                      <div className="evaluation-cell-actions">
-                        <span className={`grade grade-${profile.evaluation.grade || 'empty'}`}>
-                          {profile.evaluation.grade || '-'}
-                        </span>
-                        <button
-                          className="mini-detail-button"
-                          data-tour={index === 0 ? 'stats-performance-detail' : undefined}
-                          onClick={() => setSelectedEvolutionStudent(profile.student)}
-                          title="Veure evolució individual"
-                          type="button"
-                        >
-                          <LineChart size={15} />
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={`progress-line compact ${hasLowConsistency(profile) ? 'low' : ''}`}>
-                        <span style={{ width: `${profile.tracking.hasTrackingData ? profile.tracking.consistency : 0}%` }} />
-                      </div>
-                      <b className={`consistency-badge ${profile.tracking.hasTrackingData ? '' : 'empty'}`}>
-                        {getConsistencyLabel(profile.tracking)}
-                      </b>
-                    </td>
-                    <td>
-                      <button
-                        className={`data-pill clickable absence ${absenceHours > 0 ? 'has-absence' : 'ok'}`}
-                        onClick={() => setSelectedAbsence({ profile, records: absenceRecords })}
-                        title={`Veure les dates exactes de les absències de ${profile.student.name}`}
-                        type="button"
-                      >
-                        {formatAbsenceHours(absenceHours)}
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        className={`data-pill clickable ${profile.redPointCount > 0 ? 'danger' : 'ok'}`}
-                        onClick={() => setSelectedTrackingEvidence({ profile, ...evidence })}
-                        type="button"
-                      >
-                        {profile.redPointCount}
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        className={`data-pill clickable ${profile.incidents > 0 ? 'dark' : 'ok'}`}
-                        onClick={() => setSelectedTrackingEvidence({ profile, ...evidence })}
-                        type="button"
-                      >
-                        {profile.incidents}
-                      </button>
-                    </td>
-                    <td>
-                      <span className={`decision-pill ${getToneClassName(decision.tone)}`}>{decision.label}</span>
-                    </td>
-                    <td>
-                      <span className="decision-text">{decision.text}</span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-      </div>
+          <CrossAnalysisTable
+            onOpenAbsences={(row) => setSelectedAbsence({ profile: row.profile, records: row.absenceRecords })}
+            onOpenEvolution={(row) => setSelectedEvolutionStudent(row.student)}
+            onOpenInfo={() => setSelectedInfo({ title: 'Anàlisi creuada', text: chartHelp.crossAnalysis })}
+            onOpenTrackingEvidence={(row) => setSelectedTrackingEvidence({
+              profile: row.profile,
+              ...row.evidence,
+            })}
+            onSortModeChange={setProfileSortMode}
+            rows={crossAnalysisRows}
+            sortMode={profileSortMode}
+          />
 
           <ScatterCard
             onSelectProfile={setSelectedScatterProfile}

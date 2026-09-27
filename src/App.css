@@ -24398,6 +24398,7 @@ button.profile-followup-card:focus-visible {
 .data-safety-actions,
 .data-safety-delete-zone,
 .data-safety-cleanup-zone,
+.safe-assistance-export,
 .backup-loaded-card,
 .backup-diagnosis-card,
 .collection-summary,
@@ -24408,6 +24409,143 @@ button.profile-followup-card:focus-visible {
   border-radius: 8px;
   padding: 14px;
   background: white;
+}
+
+.safe-assistance-export {
+  display: grid;
+  gap: 14px;
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.safe-assistance-export-heading,
+.safe-assistance-export-ok,
+.safe-assistance-export-guard {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.safe-assistance-export-heading > svg,
+.safe-assistance-export-ok > svg {
+  flex: 0 0 auto;
+  color: #0f766e;
+}
+
+.safe-assistance-export-heading h3,
+.safe-assistance-export-heading p,
+.safe-assistance-export-guard p {
+  margin: 0;
+}
+
+.safe-assistance-export-heading h3 {
+  color: #134e4a;
+}
+
+.safe-assistance-export-heading p,
+.safe-assistance-export-ok span,
+.safe-assistance-export-guard p {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.safe-assistance-export-guard {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff7ed;
+}
+
+.safe-assistance-export-guard > svg {
+  flex: 0 0 auto;
+  color: #ea580c;
+}
+
+.safe-assistance-export-review {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #99f6e4;
+  padding-top: 13px;
+}
+
+.safe-assistance-export-ok strong,
+.safe-assistance-export-ok span {
+  display: block;
+}
+
+.safe-assistance-export-ok strong {
+  color: #115e59;
+}
+
+.safe-assistance-export-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.safe-assistance-export-summary span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #ccfbf1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #475569;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.safe-assistance-export-summary strong {
+  color: #0f766e;
+}
+
+.safe-assistance-export-confirmation {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.safe-assistance-export-confirmation input {
+  width: 100%;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #0f172a;
+  background: #fff;
+  font: inherit;
+}
+
+.safe-assistance-export-confirmation input:focus {
+  border-color: #0f766e;
+  outline: 3px solid rgb(13 148 136 / 18%);
+}
+
+.safe-assistance-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.safe-assistance-export-status {
+  color: #115e59;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .safe-assistance-export-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .safe-assistance-export-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
 }
 
 .storage-meter-card {

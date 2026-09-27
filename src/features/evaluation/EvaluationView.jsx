@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, BookOpen, Download, FileSpreadsheet, MapPinned, MessageCircle, Users } from 'lucide-react'
-import { getDominantDiagnosis } from '../../data/studentAnnotations'
+import { Download, FileSpreadsheet, MapPinned, Users } from 'lucide-react'
 import { getSubjectStructure } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
-import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades'
+import { calculateGrade } from '../../lib/grades'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { AbsenceToggle } from '../attendance/AbsenceToggle'
@@ -12,6 +11,7 @@ import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { EditStructureModal } from './EditStructureModal'
+import { EvaluationTable } from './EvaluationTable'
 import { ImportExcelModal } from './ImportExcelModal'
 import { RubricModal } from './RubricModal'
 import { SeatingChartsModal } from './SeatingChartsModal'
@@ -57,19 +57,6 @@ function getCompetencyGrade(marks, studentId, competency) {
   return calculateGrade(grades)
 }
 
-function isCompetencyModified(marks, studentId, competencyId) {
-  return marks.some(
-    (mark) =>
-      mark.type === 'competency-modification' &&
-      mark.studentId === studentId &&
-      mark.competencyId === competencyId,
-  )
-}
-
-function hasStudentModifiedCompetencies(marks, studentId) {
-  return marks.some((mark) => mark.type === 'competency-modification' && mark.studentId === studentId)
-}
-
 function escapeCell(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -100,12 +87,6 @@ function getEmptyStateCopy(activeClass, subjectStructure) {
     body: 'Activa les competències que treballaràs en aquesta UT. Els criteris vindran sempre amb la competència.',
     action: 'Activar competències',
   }
-}
-
-function getStudentRowClass(dominantDiagnosis) {
-  return [dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : '']
-    .filter(Boolean)
-    .join(' ')
 }
 
 export function EvaluationView() {
@@ -141,30 +122,8 @@ export function EvaluationView() {
   const filteredStudents = students.filter(
     (student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter,
   )
-  const studentOrder = new Map(filteredStudents.map((student, index) => [student.id, index]))
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
-  const criterionOrder = new Map(flatCriteria.map((criterion, index) => [criterion.id, index]))
   const classSeatingCharts = seatingCharts.filter((chart) => chart.classId === activeClassId)
-  const getEvaluationTabIndex = (studentId, criterionId) => {
-    const studentIndex = studentOrder.get(studentId) ?? 0
-    const criterionIndex = criterionOrder.get(criterionId) ?? 0
-
-    return studentIndex * flatCriteria.length + criterionIndex + 1
-  }
-  const focusNextEvaluationSelect = (studentId, criterionId) => {
-    const studentIndex = studentOrder.get(studentId) ?? 0
-    const criterionIndex = criterionOrder.get(criterionId) ?? 0
-    const currentFlatIndex = studentIndex * flatCriteria.length + criterionIndex
-    const nextFlatIndex = currentFlatIndex + 1
-    const nextStudent = filteredStudents[Math.floor(nextFlatIndex / flatCriteria.length)]
-    const nextCriterion = flatCriteria[nextFlatIndex % flatCriteria.length]
-    if (!nextStudent || !nextCriterion) return
-
-    const nextSelect = document.querySelector(
-      `[data-evaluation-select="${nextStudent.id}_${nextCriterion.id}"]`,
-    )
-    nextSelect?.focus()
-  }
 
   const handleExportActiveUtExcel = () => {
     if (!activeClass || !activeUt || competencies.length === 0) {
@@ -346,147 +305,22 @@ export function EvaluationView() {
           </div>
         </section>
       ) : (
-      <div className="grid-scroll" data-tour="evaluation-table">
-        <table className="evaluation-table">
-          <thead>
-            <tr>
-              <th className="sticky-student header-student" rowSpan="2">
-                <span>
-                  <Users size={22} />
-                  Alumnes
-                </span>
-                <button
-                  className="note-signal"
-                  onClick={() => setShowRemindersModal(true)}
-                  title="Recordatoris del grup"
-                  type="button"
-                >
-                  <Bell size={20} />
-                </button>
-              </th>
-              {competencies.map((competency) => {
-                const colSpan = competency.criteria.length + 1
-                return (
-                  <th className={`competency-header ${competency.color}`} colSpan={colSpan} key={competency.id}>
-                    {competency.name}
-                  </th>
-                )
-              })}
-            </tr>
-            <tr>
-              {competencies.flatMap((competency) => [
-                ...competency.criteria.map((criterion) => (
-                  <th className="criterion-header criterion-direct" key={criterion.id}>
-                    <button
-                      className="criterion-rubric-button"
-                      onClick={() => setRubricCriterionId(criterion.id)}
-                      title="Veure o editar rúbrica"
-                      type="button"
-                    >
-                      <span>{criterion.name}</span>
-                      <BookOpen size={14} />
-                    </button>
-                  </th>
-                )),
-                <th className="final-header" key={`${competency.id}_final`}>
-                  Nota
-                </th>,
-              ])}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student, index) => {
-              const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
-              const studentNotes = agendaNotes.filter(
-                (note) => note.studentId === student.id && note.classId === activeClassId,
-              )
-              const hasTeamNotes = studentNotes.some((note) => note.type === 'team')
-              const hasTutoringNotes = studentNotes.some((note) => note.type === 'tutoring')
-              const noteState = hasTeamNotes ? 'team' : hasTutoringNotes ? 'tutoring' : 'empty'
-
-              return (
-              <tr className={getStudentRowClass(dominantDiagnosis)} key={student.id}>
-                <td className="sticky-student student-cell">
-                  <span className="student-index">{index + 1}.</span>
-                  <button
-                    className={`student-note-button ${noteState}`}
-                    data-tour={index === 0 ? 'student-comments' : undefined}
-                    onClick={() => setAnnotationsStudentId(student.id)}
-                    title="Resum i anotacions per reunió"
-                    type="button"
-                  >
-                    <MessageCircle size={17} />
-                  </button>
-                  <AbsenceToggle classId={activeClassId} studentId={student.id} />
-                  <button
-                    className="student-name student-profile-trigger"
-                    data-tour={index === 0 ? 'student-name-open' : undefined}
-                    onClick={() => setProfileStudentId(student.id)}
-                    type="button"
-                  >
-                    {student.name}
-                    <span className="student-list-meta">
-                      {student.halfGroup && <small>{student.halfGroup}</small>}
-                      {student.isSkiStudyStudent && (
-                        <span className="student-ee-badge" title="Esquí Estudi">EE</span>
-                      )}
-                    </span>
-                  </button>
-                </td>
-                {competencies.flatMap((competency) => [
-                  ...competency.criteria.map((criterion) => {
-                    const value = getCriterionMark(marks, student.id, criterion.id)
-                    return (
-                      <td className="mark-cell criterion-mark-cell" key={`${student.id}_${criterion.id}`}>
-                        <select
-                          className={gradeTextClassName(value)}
-                          data-evaluation-select={`${student.id}_${criterion.id}`}
-                          onChange={(event) => updateMark(student.id, criterion.id, event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Tab' || event.shiftKey) return
-                            event.preventDefault()
-                            focusNextEvaluationSelect(student.id, criterion.id)
-                          }}
-                          tabIndex={getEvaluationTabIndex(student.id, criterion.id)}
-                          value={value}
-                        >
-                          {GRADE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option || '-'}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    )
-                  }),
-                  <td
-                    className={`aggregate-cell final ${
-                      isCompetencyModified(marks, student.id, competency.id) ? 'modified-competency-cell' : ''
-                    }`}
-                    key={`${student.id}_${competency.id}_grade`}
-                  >
-                    {hasStudentModifiedCompetencies(marks, student.id) && (
-                      <button
-                        className={`modified-competency-toggle ${
-                          isCompetencyModified(marks, student.id, competency.id) ? 'active' : ''
-                        }`}
-                        onClick={() => toggleCompetencyModification(student.id, competency.id)}
-                        title="Marcar competència modificada: el balanç estàndard comptarà com a D"
-                        type="button"
-                      >
-                        M
-                      </button>
-                    )}
-                    <span className={gradeClassName(getCompetencyGrade(marks, student.id, competency))}>
-                      {getCompetencyGrade(marks, student.id, competency) || '-'}
-                    </span>
-                  </td>,
-                ])}
-              </tr>
-            )})}
-          </tbody>
-        </table>
-      </div>
+      <EvaluationTable
+        activeClassId={activeClassId}
+        agendaNotes={agendaNotes}
+        competencies={competencies}
+        marks={marks}
+        onOpenAnnotations={setAnnotationsStudentId}
+        onOpenProfile={setProfileStudentId}
+        onOpenReminders={() => setShowRemindersModal(true)}
+        onOpenRubric={setRubricCriterionId}
+        onToggleCompetencyModification={toggleCompetencyModification}
+        onUpdateMark={updateMark}
+        renderAbsenceControl={(student) => (
+          <AbsenceToggle classId={activeClassId} studentId={student.id} />
+        )}
+        students={filteredStudents}
+      />
       )}
     </section>
   )
