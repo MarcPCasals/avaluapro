@@ -139,8 +139,17 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function TransversalMaterialsEditor({ materials = [], onChange }) {
-  const addMaterial = () => onChange([...materials, {
+function TransversalMaterialsEditor({ materials = [], onChange, onError, onSave }) {
+  const sectionRef = useRef(null)
+  const [dirty, setDirty] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const changeMaterials = (nextMaterials) => {
+    setDirty(true)
+    setSaved(false)
+    onChange(nextMaterials)
+  }
+  const addMaterial = () => changeMaterials([...materials, {
     id: globalThis.crypto?.randomUUID?.() || `transversal-material-${Date.now()}`,
     kind: 'link',
     label: '',
@@ -149,13 +158,32 @@ function TransversalMaterialsEditor({ materials = [], onChange }) {
     teacherUrl: '',
     url: '',
   }])
-  const updateMaterial = (index, field, value) => onChange(materials.map((material, materialIndex) => (
+  const updateMaterial = (index, field, value) => changeMaterials(materials.map((material, materialIndex) => (
     materialIndex === index ? { ...material, [field]: value } : material
   )))
-  const removeMaterial = (index) => onChange(materials.filter((_, materialIndex) => materialIndex !== index))
+  const removeMaterial = (index) => changeMaterials(materials.filter((_, materialIndex) => materialIndex !== index))
+  const saveMaterials = async () => {
+    const invalidInput = [...(sectionRef.current?.querySelectorAll('input') || [])]
+      .find((input) => !input.checkValidity())
+    if (invalidInput) {
+      invalidInput.reportValidity()
+      return
+    }
+    setSaving(true)
+    try {
+      const result = await onSave(materials)
+      if (result === false) return
+      setDirty(false)
+      setSaved(true)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <section className="planning-editor-section planning-transversal-materials">
+    <section className="planning-editor-section planning-transversal-materials" ref={sectionRef}>
       <div className="planning-transversal-materials-heading">
         <div>
           <strong>Materials transversals</strong>
@@ -173,6 +201,15 @@ function TransversalMaterialsEditor({ materials = [], onChange }) {
           <button aria-label={`Eliminar el material transversal ${material.label || index + 1}`} className="icon-action danger" onClick={() => removeMaterial(index)} type="button"><Trash2 size={15} /></button>
         </div>
       ))}
+      <div className="planning-transversal-materials-save">
+        <span aria-live="polite" className={saved ? 'saved' : dirty ? 'pending' : ''} role="status">
+          {saved ? 'Materials desats. Ja no es perdran en refrescar.' : dirty ? 'Hi ha canvis pendents de desar.' : ''}
+        </span>
+        <button className="primary-action compact" disabled={!dirty || saving} onClick={saveMaterials} type="button">
+          {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
+          {saving ? 'Desant…' : 'Desar materials'}
+        </button>
+      </div>
     </section>
   )
 }
@@ -229,6 +266,21 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       await onSave(unit, values)
     } catch (error) {
       onError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const handleSaveTransversalMaterials = async (materials) => {
+    setBusy(true)
+    try {
+      const result = await onSave(unit, { transversalMaterials: materials })
+      if (result === false) return false
+      setValues((current) => ({
+        ...current,
+        transversalMaterials: result?.transversalMaterials || materials,
+        updatedAt: result?.updatedAt || current.updatedAt,
+      }))
+      return result || true
     } finally {
       setBusy(false)
     }
@@ -301,7 +353,12 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
             <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
           </section>
-          <TransversalMaterialsEditor materials={values.transversalMaterials || []} onChange={(materials) => update('transversalMaterials', materials)} />
+          <TransversalMaterialsEditor
+            materials={values.transversalMaterials || []}
+            onChange={(materials) => update('transversalMaterials', materials)}
+            onError={onError}
+            onSave={handleSaveTransversalMaterials}
+          />
         </div>
       </details>
       <PlanningActivitySequence

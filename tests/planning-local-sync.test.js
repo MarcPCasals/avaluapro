@@ -34,6 +34,7 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createPlanningUnit,
   createPlanningPrivateNote,
   createSessionItem,
   createTimetableSlot,
@@ -105,6 +106,35 @@ test('una entitat local i la cua sobreviuen el tancament de cada connexió Index
   assert.equal(reloaded[0].label, '2026-2027')
   assert.equal(pending.length, 1)
   assert.equal(pending[0].operation, 'upsert')
+})
+
+test('els materials transversals desats sobreviuen una recàrrega de la planificació', async () => {
+  const uid = 'teacher-1'
+  const unit = createPlanningUnit({
+    academicYearId: 'year-2026',
+    code: 'UP-01',
+    id: 'up-materials-reload',
+    level: '2n ESO',
+    ownerUid: uid,
+    temporalUnitId: 'ut-1',
+    title: 'Projecte científic',
+    transversalMaterials: [{
+      id: 'material-transversal-1',
+      kind: 'link',
+      label: 'Guia de treball',
+      teacherUrl: 'https://example.test/docent',
+      url: 'https://example.test/alumnat',
+    }],
+  }, { now: '2026-09-30T08:00:00.000Z' })
+
+  await savePlanningEntityLocally(uid, unit)
+
+  const reloaded = await loadPlanningScope(uid, 'academicYear:year-2026:planningUnits')
+  assert.equal(reloaded.length, 1)
+  assert.equal(reloaded[0].transversalMaterials.length, 1)
+  assert.equal(reloaded[0].transversalMaterials[0].label, 'Guia de treball')
+  assert.equal(reloaded[0].transversalMaterials[0].url, 'https://example.test/alumnat')
+  assert.equal((await loadPlanningOutbox(uid))[0].value.transversalMaterials[0].teacherUrl, 'https://example.test/docent')
 })
 
 test('els ajustos remots del grup recuperen la ruta completa després de recarregar', async () => {

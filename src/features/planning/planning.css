@@ -452,6 +452,10 @@
 .planning-transversal-materials-heading span { color: #64748b; font-size: 10px; font-weight: 750; }
 .planning-transversal-materials-empty { margin: 0; border: 1px dashed #c4b5fd; border-radius: 10px; padding: 12px; color: #6d28d9; background: #fff; font-size: 10px; font-weight: 750; }
 .planning-transversal-material-row { grid-template-columns: minmax(130px, .8fr) minmax(190px, 1fr) minmax(190px, 1fr) 30px; border: 1px solid #ddd6fe; border-radius: 11px; padding: 10px; background: #fff; }
+.planning-transversal-materials-save { min-height: 32px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.planning-transversal-materials-save > span { margin-right: auto; color: #64748b; font-size: 10px; font-weight: 800; }
+.planning-transversal-materials-save > span.pending { color: #a16207; }
+.planning-transversal-materials-save > span.saved { color: #15803d; }
 
 .planning-dialog-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 28px; background: rgba(15, 23, 42, .54); backdrop-filter: blur(7px); }
 .planning-connected-change-dialog { position: relative; width: min(560px, 100%); display: grid; gap: 20px; border: 1px solid #e5e7eb; border-radius: 22px; padding: 28px; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
@@ -786,6 +790,9 @@
   .planning-material-row.link.planning-transversal-material-row > input,
   .planning-material-row.link.planning-transversal-material-row .planning-material-link-field { grid-column: 1 / 2; }
   .planning-material-row.link.planning-transversal-material-row .icon-action { grid-column: 2; }
+  .planning-transversal-materials-save { align-items: stretch; flex-direction: column; }
+  .planning-transversal-materials-save > span { min-height: 14px; }
+  .planning-transversal-materials-save > button { justify-content: center; }
   .planning-indicator-picker > div, .planning-student-picker > div { grid-template-columns: 1fr; }
   .planning-criterion-picker { grid-template-columns: 1fr; padding-left: 11px; }
   .planning-reminders-list article { grid-template-columns: 1fr auto; }
