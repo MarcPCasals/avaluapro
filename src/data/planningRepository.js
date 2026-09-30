@@ -36,6 +36,7 @@ export function createPlanningRepository({
   if (!uid) throw new Error('Cal un usuari per obrir la planificació')
 
   const freshScopes = new Map()
+  const appliedRefreshTokens = new Map()
   const pendingScopeLoads = new Map()
 
   function invalidateLoadedScopes() {
@@ -49,7 +50,9 @@ export function createPlanningRepository({
         return { entities: cached, source: 'local' }
       }
       const requestKey = `${scopeKey}:${options.completeSnapshot === true ? 'complete' : 'partial'}`
-      if (options.forceRemote !== true && Number(freshScopes.get(requestKey)) > Date.now()) {
+      const refreshTokenPending = options.refreshToken !== undefined
+        && appliedRefreshTokens.get(requestKey) !== options.refreshToken
+      if (options.forceRemote !== true && !refreshTokenPending && Number(freshScopes.get(requestKey)) > Date.now()) {
         return { entities: cached, source: 'memory' }
       }
       if (pendingScopeLoads.has(requestKey)) {
@@ -64,6 +67,7 @@ export function createPlanningRepository({
         const remoteDescriptors = await loadRemote()
         const entities = await mergePlanningRemoteScope(uid, scopeKey, remoteDescriptors, options)
         if (freshForMs > 0) freshScopes.set(requestKey, Date.now() + freshForMs)
+        if (options.refreshToken !== undefined) appliedRefreshTokens.set(requestKey, options.refreshToken)
         return entities
       })()
       pendingScopeLoads.set(requestKey, remoteLoad)

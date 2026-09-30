@@ -936,7 +936,7 @@ export default function AgendaModule() {
           {workspace.academicYears.length > 0 ? <label>Curs<select value={workspace.activeAcademicYearId} onChange={(event) => workspace.setActiveAcademicYearId(event.target.value)}>{workspace.academicYears.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}</select></label> : <button className="secondary-action compact" onClick={() => setDialog('academic-year')} type="button"><CalendarPlus size={15} />Configurar curs</button>}
           <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
           {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
-          <button aria-label="Sincronitzar Agenda" className="agenda-refresh" onClick={() => workspace.synchronize()} title="Sincronitzar ara" type="button"><RotateCcw size={15} /></button>
+          <button aria-label="Actualitzar Agenda" className="agenda-refresh" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut actualitzar l’Agenda.'))} title="Pujar canvis pendents i recuperar Firebase" type="button"><RotateCcw size={15} /></button>
         </div>
       </header>
 
@@ -948,6 +948,16 @@ export default function AgendaModule() {
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
+      {workspace.sync.message && workspace.sync.state !== 'review' && <div className="agenda-sync-message"><span>{workspace.sync.message}</span></div>}
+      {workspace.sync.state === 'review' && (
+        <div className="agenda-sync-message conflict">
+          <span>Hi ha versions diferents en dos dispositius.</span>
+          <div>
+            <button onClick={() => globalThis.confirm?.('Es conservaran els canvis d’aquest dispositiu i substituiran la versió de Firebase. Vols continuar?') && workspace.resolveConflicts('local').catch((conflictError) => workspace.setError(conflictError.message || 'No s’ha pogut resoldre la diferència.'))} type="button">Conservar aquest dispositiu</button>
+            <button onClick={() => globalThis.confirm?.('Es descartaran els canvis pendents d’aquest dispositiu i es recuperarà la versió de Firebase. Vols continuar?') && workspace.resolveConflicts('remote').catch((conflictError) => workspace.setError(conflictError.message || 'No s’ha pogut resoldre la diferència.'))} type="button">Recuperar Firebase</button>
+          </div>
+        </div>
+      )}
       {scheduleNotice && <div className="agenda-success"><span>{scheduleNotice}</span><button onClick={() => setScheduleNotice('')} type="button">Tancar</button></div>}
 
       {workspace.loading && !hasAgendaWorkspace ? (

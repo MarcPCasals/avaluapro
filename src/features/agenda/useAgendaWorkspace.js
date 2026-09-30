@@ -16,8 +16,13 @@ import {
   loadSharedPlanningUnits,
 } from '../../data/cloud/planningFirestore'
 import { getSharedPlanningRepository, withPlanningRemoteContext } from '../../data/planningRepository'
+import {
+  loadPlanningConflicts,
+  resolvePlanningConflict,
+} from '../../data/local/planningIndexedDb'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
+import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 import {
   copyTimetableVersionStructure,
   buildAgendaContinuationReflow,
@@ -134,6 +139,7 @@ export function useAgendaWorkspace(user, classes = []) {
   const [sharedLoading, setSharedLoading] = useState(true)
   const [error, setError] = useState('')
   const [sync, setSync] = useState(EMPTY_SYNC)
+  const [refreshRevision, setRefreshRevision] = useState(0)
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
   const today = localDateKey()
   const repository = useMemo(() => user?.uid
@@ -165,6 +171,27 @@ export function useAgendaWorkspace(user, classes = []) {
     setSync(summary)
     return summary
   }, [repository])
+
+  const refreshFromCloud = useCallback(async () => {
+    if (!repository) return EMPTY_SYNC
+    const summary = await synchronize()
+    setRefreshRevision((current) => current + 1)
+    return summary
+  }, [repository, synchronize])
+
+  const resolveConflicts = useCallback(async (strategy) => {
+    if (!repository || !user?.uid) return EMPTY_SYNC
+    const conflicts = await loadPlanningConflicts(user.uid)
+    for (const conflict of conflicts) {
+      await resolvePlanningConflict(user.uid, conflict.path, strategy)
+    }
+    const summary = strategy === 'local'
+      ? await repository.synchronize()
+      : await repository.status()
+    setSync(summary)
+    setRefreshRevision((current) => current + 1)
+    return summary
+  }, [repository, user])
 
   const persist = useCallback(async (entries) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de desar l’Agenda.')
@@ -203,10 +230,23 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [isOnline, refreshSync, repository])
 
   useEffect(() => {
+    if (!repository) return undefined
+    const handleCrossDeviceRefresh = () => {
+      refreshFromCloud().catch(() => refreshSync({ error: 'planning/sync-error' }))
+    }
+    globalThis.addEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+    return () => globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+  }, [refreshFromCloud, refreshSync, repository])
+
+  useEffect(() => {
     let cancelled = false
     if (!repository || !user?.uid) return undefined
     queueMicrotask(() => !cancelled && setLoading(true))
-    repository.loadScope('academicYears', () => loadPlanningAcademicYears(user.uid), { completeSnapshot: true })
+    repository.loadScope(
+      'academicYears',
+      () => loadPlanningAcademicYears(user.uid),
+      { completeSnapshot: true, refreshToken: refreshRevision },
+    )
       .then((result) => {
         if (cancelled) return
         const years = [...result.entities].sort((left, right) => right.startsOn.localeCompare(left.startsOn))
@@ -219,7 +259,7 @@ export function useAgendaWorkspace(user, classes = []) {
       .catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar els cursos.'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [repository, today, user])
+  }, [refreshRevision, repository, today, user])
 
   useEffect(() => {
     let cancelled = false
@@ -239,7 +279,7 @@ export function useAgendaWorkspace(user, classes = []) {
       repository.loadScope(
         `academicYear:${activeAcademicYear.id}:planningTimetables`,
         () => loadPlanningTimetables(user.uid, activeAcademicYear.id),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
       repository.loadScope(
         `academicYear:${activeAcademicYear.id}:planningCalendarEvents`,
@@ -249,17 +289,17 @@ export function useAgendaWorkspace(user, classes = []) {
           activeAcademicYear.startsOn,
           activeAcademicYear.endsOn,
         ),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
       repository.loadScope(
         `academicYear:${activeAcademicYear.id}:planningUnits`,
         () => loadOwnedPlanningUnits(user.uid, { academicYearId: activeAcademicYear.id }),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
       repository.loadScope(
         `academicYear:${activeAcademicYear.id}:planningTemporalUnits`,
         () => loadPlanningTemporalUnits(user.uid, activeAcademicYear.id),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
     ]).then(([timetableResult, eventResult, unitResult, temporalUnitResult]) => {
       if (cancelled) return
@@ -279,7 +319,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir l’Agenda del curs.'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [activeAcademicYear, repository, today, user?.uid])
+  }, [activeAcademicYear, refreshRevision, repository, today, user?.uid])
 
   /**
    * L'Agenda també pot iniciar el curs acadèmic. Això evita obligar un docent
@@ -308,7 +348,7 @@ export function useAgendaWorkspace(user, classes = []) {
     repository.loadScope(
       `sharedAgendaPlanningUnits:${userEmail}`,
       () => loadSharedPlanningUnits(userEmail, { maxItems: 100 }),
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ).then(async (result) => {
       if (cancelled) return
       const sharedUnits = result.entities
@@ -323,7 +363,7 @@ export function useAgendaWorkspace(user, classes = []) {
           return [repository.loadScope(
             `planningUnit:${unit.id}:applications:manager:${user.uid}`,
             () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
-            { completeSnapshot: true },
+            { completeSnapshot: true, refreshToken: refreshRevision },
           ).then((applicationResult) => applicationResult.entities.map((application) => ({
             id: application.classId,
             name: application.classLabel || classes.find((item) => item.id === application.classId)?.name || 'Tutoria',
@@ -333,7 +373,7 @@ export function useAgendaWorkspace(user, classes = []) {
           const applicationResult = await repository.loadScope(
             `planningUnit:${unit.id}:applications:${classId}`,
             () => loadPlanningApplications(unit.id, classId, 20),
-            { completeSnapshot: true },
+            { completeSnapshot: true, refreshToken: refreshRevision },
           )
           const application = applicationResult.entities.find((item) => item.classId === classId)
           return {
@@ -351,7 +391,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar les Agendes compartides.'))
       .finally(() => !cancelled && setSharedLoading(false))
     return () => { cancelled = true }
-  }, [classes, repository, user?.uid, userEmail])
+  }, [classes, refreshRevision, repository, user?.uid, userEmail])
 
   useEffect(() => {
     let cancelled = false
@@ -362,14 +402,14 @@ export function useAgendaWorkspace(user, classes = []) {
     repository.loadScope(
       `timetable:${activeTimetableId}:slots`,
       () => loadPlanningTimetableSlots(user.uid, activeTimetableId),
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ).then((result) => {
       if (cancelled) return
       setSlots(sortSlots(result.entities))
       if (result.error) setError('L’horari mostra la còpia local perquè Firebase no ha respost.')
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar les franges.'))
     return () => { cancelled = true }
-  }, [activeTimetableId, repository, user?.uid])
+  }, [activeTimetableId, refreshRevision, repository, user?.uid])
 
   useEffect(() => {
     let cancelled = false
@@ -380,7 +420,7 @@ export function useAgendaWorkspace(user, classes = []) {
     Promise.all(timetables.map((timetable) => repository.loadScope(
       `timetable:${timetable.id}:slots`,
       () => loadPlanningTimetableSlots(user.uid, timetable.id),
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ))).then((results) => {
       if (cancelled) return
       setSlotsByTimetableId(Object.fromEntries(timetables.map((timetable, index) => [
@@ -392,7 +432,7 @@ export function useAgendaWorkspace(user, classes = []) {
       // mostrar-la encara que una versió històrica no s'hagi pogut carregar.
     })
     return () => { cancelled = true }
-  }, [repository, timetables, user?.uid])
+  }, [refreshRevision, repository, timetables, user?.uid])
 
   const createTimetable = useCallback(async (values) => {
     if (!activeAcademicYear) throw new Error('Cal seleccionar un curs acadèmic.')
@@ -531,8 +571,9 @@ export function useAgendaWorkspace(user, classes = []) {
         const result = await repository.loadScope(
           `planningUnit:${unit.id}:applications:manager:${user.uid}`,
           () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
-          { completeSnapshot: true },
+          { completeSnapshot: true, refreshToken: refreshRevision },
         )
+        if (result.error) throw result.error
         return result.entities
           .filter((application) => !classId || application.classId === classId)
           .filter((application) => application.status !== 'archived')
@@ -544,8 +585,10 @@ export function useAgendaWorkspace(user, classes = []) {
       const results = await Promise.all(allowedClassIds.map((allowedClassId) => repository.loadScope(
         `planningUnit:${unit.id}:applications${allowedClassId ? `:${allowedClassId}` : ''}`,
         () => loadPlanningApplications(unit.id, allowedClassId || undefined, 100),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       )))
+      const failed = results.find((result) => result.error)
+      if (failed) throw failed.error
       return results.flatMap((result) => result.entities
         .filter((application) => application.planningUnitId === unit.id)
         .filter((application) => !classId || application.classId === classId)
@@ -553,7 +596,7 @@ export function useAgendaWorkspace(user, classes = []) {
         .map((application) => ({ application, planningUnit: unit })))
     }))
     return applicationGroups.flat()
-  }, [allPlanningUnits, repository, user, userEmail])
+  }, [allPlanningUnits, refreshRevision, repository, user, userEmail])
 
   const loadSessionRange = useCallback(async ({
     classId = '',
@@ -576,7 +619,10 @@ export function useAgendaWorkspace(user, classes = []) {
             planningUnitId: planningUnit.id,
             to: `${to}T23:59:59`,
           }),
+          { completeSnapshot: true, refreshToken: refreshRevision },
         )))
+      const failedSessionLoad = sessionResults.find((result) => result.error)
+      if (failedSessionLoad) throw failedSessionLoad.error
       const sessionRecords = sessionResults.flatMap((result, index) => result.entities
         .filter((session) => String(session.startsAt).slice(0, 10) >= from && String(session.startsAt).slice(0, 10) <= to)
         .filter((session) => !classId || session.classId === classId)
@@ -607,7 +653,7 @@ export function useAgendaWorkspace(user, classes = []) {
             const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id, { session })
             return [detail.session, ...detail.items, ...detail.results]
           },
-          { completeSnapshot: true },
+          { completeSnapshot: true, refreshToken: refreshRevision },
         )))
       const unitIds = [...new Set(sessionRecords.map((record) => record.planningUnit.id))]
       const declaredSourceUnitIds = detailResults.flatMap((result) => result.entities
@@ -627,7 +673,7 @@ export function useAgendaWorkspace(user, classes = []) {
           const structure = await loadPlanningUnitStructure(planningUnitId)
           return [structure.planningUnit, ...structure.phases, ...structure.activities]
         },
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       )))
       // Les recuperacions creades abans de guardar sourcePlanningUnitId poden
       // aprofitar estructures ja presents a la còpia local, sense generar
@@ -647,7 +693,7 @@ export function useAgendaWorkspace(user, classes = []) {
           await loadPlanningActivityOverrides(record.planningUnit.id, record.application.id),
           { applicationId: record.application.id, planningUnitId: record.planningUnit.id },
         ),
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       )))
       const baseActivitiesByUnitId = new Map([
         ...sourceUnitIds.map((planningUnitId, index) => [
@@ -694,7 +740,7 @@ export function useAgendaWorkspace(user, classes = []) {
     } finally {
       setSessionsLoading(false)
     }
-  }, [allPlanningUnits, loadAccessiblePlanningApplications, repository, user?.uid])
+  }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, user?.uid])
 
   /**
    * Completa una única sessió quan el docent l'obre des del calendari o la
@@ -716,7 +762,7 @@ export function useAgendaWorkspace(user, classes = []) {
           )
           return [detail.session, ...detail.items, ...detail.results]
         },
-        { completeSnapshot: true },
+        { completeSnapshot: true, refreshToken: refreshRevision },
       )
       if (detailResult.error && detailResult.entities.length === 0) {
         throw detailResult.error
@@ -733,7 +779,7 @@ export function useAgendaWorkspace(user, classes = []) {
             const structure = await loadPlanningUnitStructure(planningUnitId)
             return [structure.planningUnit, ...structure.phases, ...structure.activities]
           },
-          { completeSnapshot: true },
+          { completeSnapshot: true, refreshToken: refreshRevision },
         ))),
         repository.loadScope(
           `application:${bundle.application.id}:overrides`,
@@ -741,7 +787,7 @@ export function useAgendaWorkspace(user, classes = []) {
             await loadPlanningActivityOverrides(bundle.planningUnit.id, bundle.application.id),
             { applicationId: bundle.application.id, planningUnitId: bundle.planningUnit.id },
           ),
-          { completeSnapshot: true },
+          { completeSnapshot: true, refreshToken: refreshRevision },
         ),
       ])
       const legacySourceUnitIds = allPlanningUnits
@@ -783,7 +829,7 @@ export function useAgendaWorkspace(user, classes = []) {
     } finally {
       setSessionsLoading(false)
     }
-  }, [allPlanningUnits, repository, user?.uid])
+  }, [allPlanningUnits, refreshRevision, repository, user?.uid])
 
   /**
    * La portada d'Agenda només obre el tram necessari per a avui i la setmana
@@ -817,7 +863,7 @@ export function useAgendaWorkspace(user, classes = []) {
       })
     })
     return () => { cancelled = true }
-  }, [allPlanningUnits.length, loadTodaySessions])
+  }, [allPlanningUnits.length, loadTodaySessions, refreshRevision])
 
   const saveSessionStatus = useCallback(async (bundle, status) => {
     const now = new Date().toISOString()
@@ -1949,6 +1995,8 @@ export function useAgendaWorkspace(user, classes = []) {
     loadTodaySessions,
     moveSlot,
     ownedPlanningUnits: planningUnits,
+    refreshFromCloud,
+    resolveConflicts,
     removeCalendarEvent,
     removeSlot,
     saveCalendarEvent,

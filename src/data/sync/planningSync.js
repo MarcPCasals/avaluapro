@@ -67,11 +67,18 @@ export async function getPlanningSyncSummary(uid, options = {}) {
     pendingCount: pending.length,
     syncing: options.syncing,
   })
+  const message = state === PLANNING_SYNC_STATES.REVIEW
+    ? 'Hi ha canvis diferents en aquest dispositiu i a Firebase. Tria quina versió vols conservar abans de continuar.'
+    : state === PLANNING_SYNC_STATES.ERROR
+      ? 'El canvi està desat en aquest dispositiu, però Firebase encara no l’ha confirmat. Torna a actualitzar abans de canviar de dispositiu.'
+      : state === PLANNING_SYNC_STATES.PENDING
+        ? 'Hi ha canvis desats en aquest dispositiu pendents de confirmar a Firebase.'
+        : ''
   return {
     conflictCount: conflicts.length,
     errorKind: '',
     label: PLANNING_SYNC_LABELS[state],
-    message: '',
+    message,
     pendingCount: pending.length,
     retryAvailableAt: '',
     state,

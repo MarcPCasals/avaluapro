@@ -44,6 +44,9 @@
 .agenda-main { padding: 18px 22px 28px; }
 .agenda-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 22px 0; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; color: #991b1b; background: #fff1f2; font-size: 12px; font-weight: 800; }
 .agenda-error button { border: 0; color: inherit; background: transparent; font-weight: 900; }
+.agenda-sync-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 22px 0; border: 1px solid #fed7aa; border-radius: 10px; padding: 10px 12px; color: #9a3412; background: #fff7ed; font-size: 12px; font-weight: 800; }
+.agenda-sync-message > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.agenda-sync-message button { border: 1px solid #fdba74; border-radius: 8px; padding: 7px 9px; color: inherit; background: #fff; font-weight: 900; cursor: pointer; }
 .agenda-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 22px 0; border: 1px solid #bbf7d0; border-radius: 10px; padding: 10px 12px; color: #166534; background: #f0fdf4; font-size: 12px; font-weight: 850; }
 .agenda-success button { border: 0; color: inherit; background: transparent; font-weight: 900; }
 

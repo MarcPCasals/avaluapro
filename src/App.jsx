@@ -15,6 +15,10 @@ import {
   isReleaseAcknowledged,
 } from './lib/preUpdateRelease'
 import { useAvaluaproStore } from './store/useAvaluaproStore'
+import {
+  CROSS_DEVICE_REFRESH_EVENT,
+  shouldRefreshCrossDevice,
+} from './lib/crossDeviceRefresh'
 import './App.css'
 
 const AgendaModule = lazy(() => import('./features/agenda/AgendaModule'))
@@ -219,6 +223,7 @@ function App() {
   const sociometricAccessToken = publicParams.get('token')
   const studentProfileSurveyId = publicParams.get('student-profile')
   const initialize = useAvaluaproStore((state) => state.initialize)
+  const refreshCloudWorkspace = useAvaluaproStore((state) => state.refreshCloudWorkspace)
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
   const cloud = useAvaluaproStore((state) => state.cloud)
@@ -263,6 +268,45 @@ function App() {
     if (sociometricSurveyId || studentProfileSurveyId) return
     initialize()
   }, [initialize, sociometricSurveyId, studentProfileSurveyId])
+
+  useEffect(() => {
+    if (sociometricSurveyId || studentProfileSurveyId || !cloud.user?.uid) return undefined
+    // La càrrega inicial ja sincronitza el compte; evitem repetir-la si el focus
+    // o la visibilitat canvien immediatament mentre s'obre l'aplicació.
+    let lastRequestedAt = Date.now()
+    let inFlight = false
+
+    const refresh = async () => {
+      const now = Date.now()
+      if (inFlight || !shouldRefreshCrossDevice({
+        isOnline: globalThis.navigator?.onLine !== false,
+        isVisible: globalThis.document?.visibilityState !== 'hidden',
+        lastRequestedAt,
+        now,
+      })) return
+      inFlight = true
+      lastRequestedAt = now
+      try {
+        await refreshCloudWorkspace()
+      } finally {
+        globalThis.dispatchEvent?.(new CustomEvent(CROSS_DEVICE_REFRESH_EVENT))
+        inFlight = false
+      }
+    }
+    const handleVisibility = () => {
+      if (globalThis.document?.visibilityState === 'visible') refresh().catch(() => {})
+    }
+    const handleFocus = () => refresh().catch(() => {})
+    const handleOnline = () => refresh().catch(() => {})
+    globalThis.addEventListener?.('focus', handleFocus)
+    globalThis.addEventListener?.('online', handleOnline)
+    globalThis.document?.addEventListener?.('visibilitychange', handleVisibility)
+    return () => {
+      globalThis.removeEventListener?.('focus', handleFocus)
+      globalThis.removeEventListener?.('online', handleOnline)
+      globalThis.document?.removeEventListener?.('visibilitychange', handleVisibility)
+    }
+  }, [cloud.user?.uid, refreshCloudWorkspace, sociometricSurveyId, studentProfileSurveyId])
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId) return

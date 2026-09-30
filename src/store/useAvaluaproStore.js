@@ -26,6 +26,8 @@ import {
 import { COLLECTIONS, EMPTY_DATASET, seedDataset } from '../data/seedData'
 import { clearPlanningLocalData } from '../data/local/planningIndexedDb'
 import { clearSharedPlanningRepository } from '../data/planningRepository'
+import { applyPlanningCloudOperation } from '../data/cloud/planningFirestore'
+import { flushPlanningOutbox } from '../data/sync/planningSync'
 import {
   canonicalizeSubjectName,
   canonicalizeSubjectScopedKey,
@@ -1396,6 +1398,13 @@ async function synchronizeAfterSignIn(set, get, uid) {
   return cloudStartupPromise
 }
 
+async function synchronizePlanningAfterResume(uid) {
+  if (!uid) return null
+  return flushPlanningOutbox(uid, applyPlanningCloudOperation, {
+    isOnline: globalThis.navigator?.onLine !== false,
+  })
+}
+
 function getDatasetFromState(state) {
   return COLLECTIONS.reduce(
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] || [] }),
@@ -2015,6 +2024,7 @@ export const useAvaluaproStore = create((set, get) => ({
           if (user) {
             setTimeout(() => {
               synchronizeAfterSignIn(set, get, user.uid)
+              synchronizePlanningAfterResume(user.uid).catch(() => {})
               get().loadCloudBackups()
               get().loadReceivedTeacherGradePackages()
               get().loadSentTeacherGradePackages()
@@ -2074,6 +2084,17 @@ export const useAvaluaproStore = create((set, get) => ({
         },
       }))
     }
+  },
+
+  refreshCloudWorkspace: async () => {
+    const uid = get().cloud.user?.uid
+    if (!uid || globalThis.navigator?.onLine === false) return null
+    const [workspaceResult, planningResult] = await Promise.allSettled([
+      synchronizeAfterSignIn(set, get, uid),
+      synchronizePlanningAfterResume(uid),
+    ])
+    if (workspaceResult.status === 'rejected') throw workspaceResult.reason
+    return planningResult.status === 'fulfilled' ? planningResult.value : null
   },
 
   signOutFromGoogle: async () => {

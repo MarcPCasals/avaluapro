@@ -16,6 +16,10 @@ import {
 } from '../../data/cloud/planningFirestore'
 import { getSharedPlanningRepository, withPlanningRemoteContext } from '../../data/planningRepository'
 import {
+  loadPlanningConflicts,
+  resolvePlanningConflict,
+} from '../../data/local/planningIndexedDb'
+import {
   copyPlanningActivityToPhase,
   copyPlanningUnitStructureToAcademicYear,
   createAccessGrant,
@@ -36,6 +40,7 @@ import {
 import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
 import { summarizeCompletedActivityIds } from '../../domain/planning/scheduler'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
+import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 
 const EMPTY_SYNC = {
   conflictCount: 0,
@@ -99,6 +104,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   const [sharedLoading, setSharedLoading] = useState(true)
   const [error, setError] = useState('')
   const [sync, setSync] = useState(EMPTY_SYNC)
+  const [refreshRevision, setRefreshRevision] = useState(0)
   const [isOnline, setIsOnline] = useState(() => globalThis.navigator?.onLine !== false)
   const repository = useMemo(() => user?.uid
     ? getSharedPlanningRepository({
@@ -158,6 +164,27 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return summary
   }, [repository])
 
+  const refreshFromCloud = useCallback(async () => {
+    if (!repository) return EMPTY_SYNC
+    const summary = await synchronize()
+    setRefreshRevision((current) => current + 1)
+    return summary
+  }, [repository, synchronize])
+
+  const resolveConflicts = useCallback(async (strategy) => {
+    if (!repository || !user?.uid) return EMPTY_SYNC
+    const conflicts = await loadPlanningConflicts(user.uid)
+    for (const conflict of conflicts) {
+      await resolvePlanningConflict(user.uid, conflict.path, strategy)
+    }
+    const summary = strategy === 'local'
+      ? await repository.synchronize()
+      : await repository.status()
+    setSync(summary)
+    setRefreshRevision((current) => current + 1)
+    return summary
+  }, [repository, user])
+
   const persist = useCallback(async (entitiesWithContext) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de desar la programació.')
     const entries = Array.isArray(entitiesWithContext) ? entitiesWithContext : [entitiesWithContext]
@@ -189,6 +216,15 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   }, [isOnline, refreshSync, repository])
 
   useEffect(() => {
+    if (!repository) return undefined
+    const handleCrossDeviceRefresh = () => {
+      refreshFromCloud().catch(() => refreshSync({ error: 'planning/sync-error' }))
+    }
+    globalThis.addEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+    return () => globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+  }, [refreshFromCloud, refreshSync, repository])
+
+  useEffect(() => {
     const retryAt = Date.parse(sync.retryAvailableAt || '')
     if (!repository || !Number.isFinite(retryAt)) return undefined
     const timer = globalThis.setTimeout?.(() => {
@@ -201,7 +237,11 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     let cancelled = false
     if (!repository || !user?.uid) return undefined
     queueMicrotask(() => !cancelled && setLoading(true))
-    repository.loadScope('academicYears', () => loadPlanningAcademicYears(user.uid))
+    repository.loadScope(
+      'academicYears',
+      () => loadPlanningAcademicYears(user.uid),
+      { completeSnapshot: true, refreshToken: refreshRevision },
+    )
       .then((result) => {
         if (cancelled) return
         const years = [...result.entities].sort((first, second) => second.startsOn.localeCompare(first.startsOn))
@@ -212,7 +252,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       .catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar els cursos.'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [repository, user])
+  }, [refreshRevision, repository, user])
 
   useEffect(() => {
     let cancelled = false
@@ -222,10 +262,12 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       repository.loadScope(
         `academicYear:${activeAcademicYearId}:planningTemporalUnits`,
         () => loadPlanningTemporalUnits(user.uid, activeAcademicYearId),
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
       repository.loadScope(
         `academicYear:${activeAcademicYearId}:planningUnits`,
         () => loadOwnedPlanningUnits(user.uid, { academicYearId: activeAcademicYearId }),
+        { completeSnapshot: true, refreshToken: refreshRevision },
       ),
     ]).then(([utResult, unitResult]) => {
       if (cancelled) return
@@ -240,7 +282,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquest curs.'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [activeAcademicYearId, repository, user?.uid])
+  }, [activeAcademicYearId, refreshRevision, repository, user?.uid])
 
   useEffect(() => {
     let cancelled = false
@@ -252,7 +294,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     repository.loadScope(
       `sharedPlanningUnits:${userEmail}`,
       () => loadSharedPlanningUnits(userEmail, { maxItems: 100 }),
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ).then((result) => {
       if (cancelled) return
       const shared = result.entities
@@ -266,7 +308,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’han pogut carregar les programacions compartides.'))
       .finally(() => !cancelled && setSharedLoading(false))
     return () => { cancelled = true }
-  }, [repository, user?.uid, userEmail])
+  }, [refreshRevision, repository, user?.uid, userEmail])
 
   const applicationUnitKey = useMemo(
     () => allPlanningUnits.map((unit) => `${unit.id}:${unit.ownerUid}`).sort().join('|'),
@@ -301,21 +343,24 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
         const result = await repository.loadScope(
           `planningUnit:${unit.id}:applications:manager:${user.uid}`,
           () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
-          { completeSnapshot: true },
+          { completeSnapshot: true, refreshToken: refreshRevision },
         )
+        if (result.error) throw result.error
         return result.entities
       }
       const results = allowedClassIds.length > 0
         ? await Promise.all(allowedClassIds.map((classId) => repository.loadScope(
             `planningUnit:${unit.id}:applications:${classId}`,
             () => loadPlanningApplications(unit.id, classId, 100),
-            { completeSnapshot: true },
+            { completeSnapshot: true, refreshToken: refreshRevision },
           )))
         : [await repository.loadScope(
             `planningUnit:${unit.id}:applications`,
             () => loadPlanningApplications(unit.id, undefined, 100),
-            { completeSnapshot: true },
+            { completeSnapshot: true, refreshToken: refreshRevision },
           )]
+      const failed = results.find((result) => result.error)
+      if (failed) throw failed.error
       return results.flatMap((result) => result.entities)
     })).then((groups) => {
       if (cancelled) return
@@ -327,7 +372,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   // Només recarreguem quan canvia el conjunt de UP; les edicions internes no
   // han de provocar consultes repetides de totes les connexions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicationUnitKey, repository, user?.uid, userEmail])
+  }, [applicationUnitKey, refreshRevision, repository, user?.uid, userEmail])
 
   useEffect(() => {
     if (applicationsLoading) return
@@ -349,7 +394,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
           ...structure.activities,
         ]
       },
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ).then((result) => {
       if (cancelled) return
       const unit = result.entities.find((item) => item.entityType === 'planningUnit')
@@ -362,7 +407,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       if (result.error) setError('La UP mostra la còpia local perquè Firebase no ha respost.')
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquesta UP.'))
     return () => { cancelled = true }
-  }, [activePlanningUnitId, repository, user?.uid])
+  }, [activePlanningUnitId, refreshRevision, repository, user?.uid])
 
   useEffect(() => {
     let cancelled = false
@@ -381,7 +426,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
         await loadPlanningActivityOverrides(activePlanningUnitId, activeApplication.id),
         { applicationId: activeApplication.id, planningUnitId: activePlanningUnitId },
       ),
-      { completeSnapshot: true },
+      { completeSnapshot: true, refreshToken: refreshRevision },
     ).then((result) => {
       if (cancelled) return
       setActivityOverrides(result.entities)
@@ -390,7 +435,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       if (!cancelled) setError(loadError.message || 'No s’han pogut carregar els canvis propis d’aquest grup.')
     }).finally(() => !cancelled && setActivityOverridesLoading(false))
     return () => { cancelled = true }
-  }, [activeApplication?.id, activePlanningUnitId, repository])
+  }, [activeApplication?.id, activePlanningUnitId, refreshRevision, repository])
 
   useEffect(() => {
     let cancelled = false
@@ -402,7 +447,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       .then((grants) => !cancelled && setAccessGrants(grants))
       .catch(() => !cancelled && setError('No s’han pogut carregar els accessos d’aquesta UP.'))
     return () => { cancelled = true }
-  }, [activePlanningUnit, user?.uid])
+  }, [activePlanningUnit, refreshRevision, user?.uid])
 
   const createYear = useCallback(async (values) => {
     const year = createAcademicYear({ ...values, ownerUid: user.uid })
@@ -1260,6 +1305,8 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     removeActivity,
     removeActivityForActiveClass,
     removePhase,
+    refreshFromCloud,
+    resolveConflicts,
     saveActivity,
     saveActivityForActiveClass,
     saveAccessGrant,

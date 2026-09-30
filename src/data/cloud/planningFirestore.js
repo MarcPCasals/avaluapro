@@ -6,8 +6,8 @@ import {
   deleteField,
   doc,
   FieldPath,
-  getDoc,
-  getDocs,
+  getDocFromServer,
+  getDocsFromServer,
   limit,
   orderBy,
   query,
@@ -88,13 +88,16 @@ function mapSnapshot(snapshot) {
 }
 
 async function readPlanningQuery(scope, reference) {
-  const snapshot = await getDocs(reference)
+  // IndexedDB ja és la còpia local-first de Programació. Quan el repositori
+  // demana Firebase necessitem una resposta real del servidor, no una segona
+  // memòria cau del SDK que podria correspondre a un altre dispositiu.
+  const snapshot = await getDocsFromServer(reference)
   recordFirestoreQuerySnapshot(`planning.${scope}`, snapshot)
   return snapshot
 }
 
 async function readPlanningDocument(scope, reference) {
-  const snapshot = await getDoc(reference)
+  const snapshot = await getDocFromServer(reference)
   recordFirestoreLookup(`planning.${scope}`)
   return snapshot
 }

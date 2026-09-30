@@ -538,6 +538,43 @@ test('una validació recent s’aprofita fins que hi ha una edició local', asyn
   assert.equal(remoteLoads, 2)
 })
 
+test('una actualització entre dispositius força Firebase encara que la còpia recent sigui vigent', async () => {
+  let remoteLoads = 0
+  let remoteYear = academicYear('teacher-1')
+  const repository = getSharedPlanningRepository({
+    applyRemoteOperation: async () => ({ applied: true }),
+    isOnline: () => true,
+    uid: 'teacher-1',
+  })
+  const loadRemote = async () => {
+    remoteLoads += 1
+    return [remoteYear]
+  }
+
+  await repository.loadScope('academicYears', loadRemote, { completeSnapshot: true, refreshToken: 0 })
+  remoteYear = academicYear('teacher-1', {
+    label: 'Canvi fet a l’altre dispositiu',
+    updatedAt: '2026-09-18T10:00:00.000Z',
+  })
+  const cached = await repository.loadScope('academicYears', loadRemote, {
+    completeSnapshot: true,
+    refreshToken: 0,
+  })
+  const refreshed = await repository.loadScope('academicYears', loadRemote, {
+    completeSnapshot: true,
+    refreshToken: 1,
+  })
+  const deduplicated = await repository.loadScope('academicYears', loadRemote, {
+    completeSnapshot: true,
+    refreshToken: 1,
+  })
+
+  assert.equal(cached.entities[0].label, '2026-2027')
+  assert.equal(refreshed.entities[0].label, 'Canvi fet a l’altre dispositiu')
+  assert.equal(deduplicated.source, 'memory')
+  assert.equal(remoteLoads, 2)
+})
+
 test('el tancament de sessió neteja la còpia local però protegeix canvis pendents', async () => {
   const operation = await savePlanningEntityLocally('teacher-1', academicYear('teacher-1'))
   await assert.rejects(clearPlanningLocalData('teacher-1'), { code: 'planning/pending-logout' })

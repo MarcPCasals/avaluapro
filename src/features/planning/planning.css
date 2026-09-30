@@ -96,6 +96,10 @@
 .planning-message.warning { justify-content: flex-start; border: 1px solid #fed7aa; color: #9a3412; background: #fff7ed; }
 .planning-message.warning svg { flex: 0 0 auto; }
 .planning-message button { border: 0; color: inherit; background: transparent; font-weight: 900; }
+.planning-conflict-message { align-items: center; justify-content: space-between; }
+.planning-conflict-message > div { display: flex; align-items: center; gap: 8px; }
+.planning-conflict-actions { flex-wrap: wrap; justify-content: flex-end; }
+.planning-conflict-actions button { border: 1px solid #fdba74; border-radius: 8px; padding: 7px 9px; background: #fff; cursor: pointer; }
 
 .planning-ut-manager { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-radius: 12px; padding: 13px 15px; }
 .planning-ut-manager > div:first-child { gap: 9px; color: var(--planning-accent); }

@@ -416,6 +416,18 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
     setConnectedDecision(null)
     resolve?.(scope)
   }
+  const resolveSyncConflict = async (strategy) => {
+    const keepLocal = strategy === 'local'
+    const confirmed = globalThis.confirm?.(keepLocal
+      ? 'Es conservaran els canvis d’aquest dispositiu i substituiran la versió de Firebase. Vols continuar?'
+      : 'Es descartaran els canvis pendents d’aquest dispositiu i es recuperarà la versió de Firebase. Vols continuar?')
+    if (!confirmed) return
+    try {
+      await workspace.resolveConflicts(strategy)
+    } catch (conflictError) {
+      workspace.setError(conflictError.message || 'No s’ha pogut resoldre la diferència entre dispositius.')
+    }
+  }
   const withConnectedConfirmation = async (allClassesAction, currentClassAction = null) => {
     const scope = await requestConnectedScope(Boolean(currentClassAction))
     if (scope === 'cancel') return false
@@ -526,11 +538,21 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
             </button>
           )}
           <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
+          <button aria-label="Actualitzar Programació" className="secondary-action compact" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut actualitzar la Programació.'))} title="Pujar canvis pendents i recuperar Firebase" type="button"><RotateCcw size={15} />Actualitzar</button>
         </div>
       </header>
 
       {workspace.error && <div className="planning-message error"><strong>{workspace.error}</strong><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
-      {workspace.sync.message && <div className="planning-message warning"><Cloud size={18} /><strong>{workspace.sync.message}</strong></div>}
+      {workspace.sync.message && workspace.sync.state !== 'review' && <div className="planning-message warning"><Cloud size={18} /><strong>{workspace.sync.message}</strong></div>}
+      {workspace.sync.state === 'review' && (
+        <div className="planning-message warning planning-conflict-message">
+          <div><Cloud size={18} /><strong>Hi ha versions diferents en dos dispositius.</strong></div>
+          <div className="planning-conflict-actions">
+            <button onClick={() => resolveSyncConflict('local')} type="button">Conservar aquest dispositiu</button>
+            <button onClick={() => resolveSyncConflict('remote')} type="button">Recuperar Firebase</button>
+          </div>
+        </div>
+      )}
 
       {showUtManager && workspace.activeAcademicYear && (
         <section className="planning-ut-manager">
