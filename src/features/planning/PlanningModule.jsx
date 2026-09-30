@@ -139,17 +139,11 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function TransversalMaterialsEditor({ materials = [], onChange, onError, onSave }) {
-  const sectionRef = useRef(null)
-  const [dirty, setDirty] = useState(false)
-  const [saved, setSaved] = useState(false)
+function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
+  const dialogRef = useDialogAccessibility(onClose)
+  const [materials, setMaterials] = useState(unit.transversalMaterials || [])
   const [saving, setSaving] = useState(false)
-  const changeMaterials = (nextMaterials) => {
-    setDirty(true)
-    setSaved(false)
-    onChange(nextMaterials)
-  }
-  const addMaterial = () => changeMaterials([...materials, {
+  const addMaterial = () => setMaterials((current) => [...current, {
     id: globalThis.crypto?.randomUUID?.() || `transversal-material-${Date.now()}`,
     kind: 'link',
     label: '',
@@ -158,23 +152,17 @@ function TransversalMaterialsEditor({ materials = [], onChange, onError, onSave 
     teacherUrl: '',
     url: '',
   }])
-  const updateMaterial = (index, field, value) => changeMaterials(materials.map((material, materialIndex) => (
+  const updateMaterial = (index, field, value) => setMaterials((current) => current.map((material, materialIndex) => (
     materialIndex === index ? { ...material, [field]: value } : material
   )))
-  const removeMaterial = (index) => changeMaterials(materials.filter((_, materialIndex) => materialIndex !== index))
-  const saveMaterials = async () => {
-    const invalidInput = [...(sectionRef.current?.querySelectorAll('input') || [])]
-      .find((input) => !input.checkValidity())
-    if (invalidInput) {
-      invalidInput.reportValidity()
-      return
-    }
+  const removeMaterial = (index) => setMaterials((current) => current.filter((_, materialIndex) => materialIndex !== index))
+  const saveMaterials = async (event) => {
+    event.preventDefault()
     setSaving(true)
     try {
-      const result = await onSave(materials)
+      const result = await onSave(unit, { transversalMaterials: materials })
       if (result === false) return
-      setDirty(false)
-      setSaved(true)
+      onClose()
     } catch (error) {
       onError(error)
     } finally {
@@ -183,34 +171,42 @@ function TransversalMaterialsEditor({ materials = [], onChange, onError, onSave 
   }
 
   return (
-    <section className="planning-editor-section planning-transversal-materials" ref={sectionRef}>
-      <div className="planning-transversal-materials-heading">
-        <div>
-          <strong>Materials transversals</strong>
-          <span>S’afegeixen automàticament a totes les activitats i sessions de la UP.</span>
+    <div className="planning-dialog-backdrop">
+      <form aria-labelledby="planning-transversal-materials-title" aria-modal="true" className="planning-transversal-materials-dialog" onSubmit={saveMaterials} ref={dialogRef} role="dialog" tabIndex="-1">
+        <button aria-label="Tancar materials transversals" className="planning-preview-close" onClick={onClose} type="button"><X size={18} /></button>
+        <header>
+          <span><Link2 size={20} /></span>
+          <div>
+            <p>{unit.code} · {unit.title}</p>
+            <h2 id="planning-transversal-materials-title">Materials transversals</h2>
+            <small>Aquests materials apareixeran automàticament a totes les activitats i sessions de la UP.</small>
+          </div>
+        </header>
+        <div className="planning-transversal-materials-toolbar">
+          <strong>{materials.length === 0 ? 'Encara no hi ha cap material' : `${materials.length} ${materials.length === 1 ? 'material' : 'materials'}`}</strong>
+          <button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir material</button>
         </div>
-        <button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir material</button>
-      </div>
-      {materials.length === 0 ? (
-        <p className="planning-transversal-materials-empty">Encara no n’hi ha cap. En pots afegir un o diversos i els tindràs sempre disponibles a l’aula.</p>
-      ) : materials.map((material, index) => (
-        <div className="planning-material-row link planning-transversal-material-row" key={material.id || index}>
-          <input aria-label={`Nom del material transversal ${index + 1}`} placeholder="Nom del material" required value={material.label || ''} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
-          <label className="planning-material-link-field student"><span><Users size={13} />Recurs de l’alumnat</span><input aria-label={`Enllaç de l’alumnat del material transversal ${index + 1}`} placeholder="https://…" required={!material.teacherUrl} type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} /></label>
-          <label className="planning-material-link-field teacher"><span><Link2 size={13} />Recurs del docent <em>Opcional</em></span><input aria-label={`Enllaç del docent del material transversal ${index + 1}`} placeholder="https://…" required={!material.url} type="url" value={material.teacherUrl || ''} onChange={(event) => updateMaterial(index, 'teacherUrl', event.target.value)} /></label>
-          <button aria-label={`Eliminar el material transversal ${material.label || index + 1}`} className="icon-action danger" onClick={() => removeMaterial(index)} type="button"><Trash2 size={15} /></button>
+        <div className="planning-transversal-materials-list">
+          {materials.length === 0 ? (
+            <p className="planning-transversal-materials-empty">Afegeix el primer material per tenir-lo sempre disponible durant les sessions a l’aula.</p>
+          ) : materials.map((material, index) => (
+            <div className="planning-material-row link planning-transversal-material-row" key={material.id || index}>
+              <input aria-label={`Nom del material transversal ${index + 1}`} placeholder="Nom del material" required value={material.label || ''} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
+              <label className="planning-material-link-field student"><span><Users size={13} />Recurs de l’alumnat</span><input aria-label={`Enllaç de l’alumnat del material transversal ${index + 1}`} placeholder="https://…" required={!material.teacherUrl} type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} /></label>
+              <label className="planning-material-link-field teacher"><span><Link2 size={13} />Recurs del docent <em>Opcional</em></span><input aria-label={`Enllaç del docent del material transversal ${index + 1}`} placeholder="https://…" required={!material.url} type="url" value={material.teacherUrl || ''} onChange={(event) => updateMaterial(index, 'teacherUrl', event.target.value)} /></label>
+              <button aria-label={`Eliminar el material transversal ${material.label || index + 1}`} className="icon-action danger" onClick={() => removeMaterial(index)} type="button"><Trash2 size={15} /></button>
+            </div>
+          ))}
         </div>
-      ))}
-      <div className="planning-transversal-materials-save">
-        <span aria-live="polite" className={saved ? 'saved' : dirty ? 'pending' : ''} role="status">
-          {saved ? 'Materials desats. Ja no es perdran en refrescar.' : dirty ? 'Hi ha canvis pendents de desar.' : ''}
-        </span>
-        <button className="primary-action compact" disabled={!dirty || saving} onClick={saveMaterials} type="button">
-          {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
-          {saving ? 'Desant…' : 'Desar materials'}
-        </button>
-      </div>
-    </section>
+        <footer>
+          <button className="secondary-action" disabled={saving} onClick={onClose} type="button">Cancel·lar</button>
+          <button className="primary-action" disabled={saving} type="submit">
+            {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
+            {saving ? 'Desant…' : 'Desar materials'}
+          </button>
+        </footer>
+      </form>
+    </div>
   )
 }
 
@@ -266,21 +262,6 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       await onSave(unit, values)
     } catch (error) {
       onError(error)
-    } finally {
-      setBusy(false)
-    }
-  }
-  const handleSaveTransversalMaterials = async (materials) => {
-    setBusy(true)
-    try {
-      const result = await onSave(unit, { transversalMaterials: materials })
-      if (result === false) return false
-      setValues((current) => ({
-        ...current,
-        transversalMaterials: result?.transversalMaterials || materials,
-        updatedAt: result?.updatedAt || current.updatedAt,
-      }))
-      return result || true
     } finally {
       setBusy(false)
     }
@@ -353,12 +334,6 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
             <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
           </section>
-          <TransversalMaterialsEditor
-            materials={values.transversalMaterials || []}
-            onChange={(materials) => update('transversalMaterials', materials)}
-            onError={onError}
-            onSave={handleSaveTransversalMaterials}
-          />
         </div>
       </details>
       <PlanningActivitySequence
@@ -688,6 +663,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
               </label>
               <div>
                 {!isTutorialPlanning && <button className="secondary-action compact" onClick={() => setDialog('connect')} type="button"><Link2 size={15} />Connectar</button>}
+                {workspace.activePlanningUnit && workspace.canEditActiveUnit && <button className="secondary-action compact" onClick={() => setDialog('transversalMaterials')} type="button"><BookOpenText size={15} />Materials transversals</button>}
                 <button className="secondary-action compact" disabled={workspace.temporalUnits.length === 0 || !workspace.activeAcademicYear} onClick={() => setDialog('unit')} type="button"><Plus size={15} />Nova UP</button>
                 <button className={`secondary-action compact ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived((value) => !value)} type="button">
                   <Archive size={14} />{showArchived ? 'Amagar arxivades' : 'Arxivades'}
@@ -772,6 +748,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'ut' && <TemporalUnitDialog initialValue={editingUt} onClose={() => { setDialog(null); setEditingUt(null) }} onSave={(values) => editingUt ? workspace.saveTemporalUnit(editingUt, values) : workspace.createTemporalUnit(values)} />}
       {dialog === 'unit' && <PlanningUnitDialog onClose={() => setDialog(null)} onSave={(values) => workspace.createUnit(values, { classId: activeClassId, classLabel: activeClass?.name })} temporalUnits={workspace.temporalUnits} />}
       {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
+      {dialog === 'transversalMaterials' && workspace.activePlanningUnit && <TransversalMaterialsDialog onClose={() => setDialog(null)} onError={(error) => workspace.setError(error.message || 'No s’han pogut desar els materials transversals.')} onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))} unit={workspace.activePlanningUnit} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
       {dialog === 'activity' && <ActivityDialog availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
         () => workspace.saveActivity(values, current),
