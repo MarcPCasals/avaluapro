@@ -277,6 +277,10 @@ export function createPlanningUnit(input, options = {}) {
     indicatorIds: curriculumSourceIds('indicators', input.indicatorIds),
     specificResources: textList(input.specificResources),
     transversalResources: textList(input.transversalResources),
+    // Aquests enllaços pertanyen a la UP i s'hereten en temps de lectura.
+    // No es copien dins de cada activitat, de manera que editar-los una sola
+    // vegada actualitza Programació, Agenda i Mode aula.
+    transversalMaterials: normalizeMaterials(input.transversalMaterials),
     factsAndConcepts: textList(input.factsAndConcepts),
     procedures: textList(input.procedures),
     attitudesAndValues: textList(input.attitudesAndValues),

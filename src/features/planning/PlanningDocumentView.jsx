@@ -53,8 +53,8 @@ function ResourceDocument({ label, value }) {
   )
 }
 
-function materialsText(activity) {
-  return [...(activity.teacherMaterials || []), ...(activity.studentMaterials || [])]
+function materialsText(activity, unit) {
+  return [...(activity.teacherMaterials || []), ...(activity.studentMaterials || []), ...(unit.transversalMaterials || [])]
     .map((material) => material.label)
     .filter(Boolean)
     .join(' · ')
@@ -111,7 +111,7 @@ function SequenceDocument({ activities, phases, unit }) {
                     <div><b>Comentaris per a l’aplicació</b><span>{activity.applicationComment || '—'}</span></div>
                   </td>
                   <td className="number">{activity.plannedMinutes ?? '—'}</td>
-                  <td>{materialsText(activity) || '—'}</td>
+                  <td>{materialsText(activity, unit) || '—'}</td>
                   <td>{[activity.grouping, activity.space].filter(Boolean).join(' · ') || '—'}</td>
                   <td>{activityCurriculumText(activity) || (activity.indicatorIds || []).map((id) => indicatorsById.get(id)).filter(Boolean).join(' · ') || '—'}</td>
                 </tr>

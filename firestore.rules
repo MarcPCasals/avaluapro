@@ -1331,6 +1331,7 @@ service cloud.firestore {
           'status',
           'temporalUnitId',
           'title',
+          'transversalMaterials',
           'transversalResources',
           'tutoringSpaceId',
           'updatedAt',
@@ -1391,6 +1392,13 @@ service cloud.firestore {
           )
         )
         && (
+          !('transversalMaterials' in request.resource.data)
+          || (
+            request.resource.data.transversalMaterials is list
+            && request.resource.data.transversalMaterials.size() <= 30
+          )
+        )
+        && (
           !('improvementProposals' in request.resource.data)
           || (
             request.resource.data.improvementProposals is list
@@ -1430,6 +1438,7 @@ service cloud.firestore {
           'specificResources',
           'status',
           'title',
+          'transversalMaterials',
           'transversalResources',
           'updatedAt',
           'vehicularLanguage'

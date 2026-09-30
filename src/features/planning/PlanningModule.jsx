@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown,
   Cloud, CloudOff, Copy, Eye, History, Lightbulb, Loader2,
-  FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Users, X,
+  FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Trash2, Users, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -139,6 +139,44 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
+function TransversalMaterialsEditor({ materials = [], onChange }) {
+  const addMaterial = () => onChange([...materials, {
+    id: globalThis.crypto?.randomUUID?.() || `transversal-material-${Date.now()}`,
+    kind: 'link',
+    label: '',
+    preparationKind: 'reference',
+    reminderDaysBefore: 0,
+    teacherUrl: '',
+    url: '',
+  }])
+  const updateMaterial = (index, field, value) => onChange(materials.map((material, materialIndex) => (
+    materialIndex === index ? { ...material, [field]: value } : material
+  )))
+  const removeMaterial = (index) => onChange(materials.filter((_, materialIndex) => materialIndex !== index))
+
+  return (
+    <section className="planning-editor-section planning-transversal-materials">
+      <div className="planning-transversal-materials-heading">
+        <div>
+          <strong>Materials transversals</strong>
+          <span>S’afegeixen automàticament a totes les activitats i sessions de la UP.</span>
+        </div>
+        <button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir material</button>
+      </div>
+      {materials.length === 0 ? (
+        <p className="planning-transversal-materials-empty">Encara no n’hi ha cap. En pots afegir un o diversos i els tindràs sempre disponibles a l’aula.</p>
+      ) : materials.map((material, index) => (
+        <div className="planning-material-row link planning-transversal-material-row" key={material.id || index}>
+          <input aria-label={`Nom del material transversal ${index + 1}`} placeholder="Nom del material" required value={material.label || ''} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
+          <label className="planning-material-link-field student"><span><Users size={13} />Recurs de l’alumnat</span><input aria-label={`Enllaç de l’alumnat del material transversal ${index + 1}`} placeholder="https://…" required={!material.teacherUrl} type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} /></label>
+          <label className="planning-material-link-field teacher"><span><Link2 size={13} />Recurs del docent <em>Opcional</em></span><input aria-label={`Enllaç del docent del material transversal ${index + 1}`} placeholder="https://…" required={!material.url} type="url" value={material.teacherUrl || ''} onChange={(event) => updateMaterial(index, 'teacherUrl', event.target.value)} /></label>
+          <button aria-label={`Eliminar el material transversal ${material.label || index + 1}`} className="icon-action danger" onClick={() => removeMaterial(index)} type="button"><Trash2 size={15} /></button>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
@@ -263,6 +301,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
             <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
           </section>
+          <TransversalMaterialsEditor materials={values.transversalMaterials || []} onChange={(materials) => update('transversalMaterials', materials)} />
         </div>
       </details>
       <PlanningActivitySequence
@@ -281,6 +320,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         onMove={onMoveActivity}
         onSetManualCompletion={setManualCompletion}
         phases={phases}
+        planningUnit={values}
       />
       <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
       <ImprovementPanel onAccept={acceptImprovements} onError={onError} proposals={values.improvementProposals} />

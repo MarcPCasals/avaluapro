@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getActivityMaterialLinks, getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
+import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -106,7 +106,10 @@ function getTargetedCalendarEvent(events, dateKey, classId, target) {
 }
 
 function sessionMaterials(bundle) {
-  const materials = bundle.items.flatMap((item) => getActivityMaterialLinks(item.sourceActivity))
+  const materials = bundle.items.flatMap((item) => getEffectiveActivityMaterialLinks(item.sourceActivity, bundle.planningUnit))
+  if (bundle.items.length === 0) {
+    materials.push(...getEffectiveActivityMaterialLinks({}, bundle.planningUnit))
+  }
   return [...new Map(materials.map((item) => [item.url, item])).values()]
 }
 

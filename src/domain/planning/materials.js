@@ -30,3 +30,23 @@ export function getActivityMaterialLinks(activity = {}) {
 
   return [...new Map(links.map((material) => [material.url, material])).values()]
 }
+
+/**
+ * Combina els materials propis d'una activitat amb els que s'han configurat
+ * una sola vegada per a tota la UP. La deduplicació per URL evita obrir dues
+ * vegades un recurs que també s'hagi afegit expressament a una activitat.
+ */
+export function getEffectiveActivityMaterialLinks(activity = {}, planningUnit = {}) {
+  const transversalActivity = {
+    studentMaterials: planningUnit.transversalMaterials || [],
+    teacherMaterials: [],
+  }
+  const links = [
+    ...getActivityMaterialLinks(activity),
+    ...getActivityMaterialLinks(transversalActivity).map((material) => ({
+      ...material,
+      transversal: true,
+    })),
+  ]
+  return [...new Map(links.map((material) => [material.url, material])).values()]
+}

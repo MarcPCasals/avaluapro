@@ -223,6 +223,7 @@ function activityTable({ activities, blankActivityRow = false, phase, unit }) {
           cell(paragraph([
             materialText(activity.teacherMaterials),
             materialText(activity.studentMaterials),
+            materialText(unit.transversalMaterials),
           ].filter(Boolean).join('\n'), { run: { size: 14 } })),
           cell(paragraph([activity.grouping, activity.space].filter(Boolean).join('\n'), { run: { size: 14 } })),
           cell(paragraph(activityCurriculumText(activity) || (activity.indicatorIds || []).map((id) => allIndicators.get(id)).filter(Boolean).join('\n'), { run: { size: 14 } })),

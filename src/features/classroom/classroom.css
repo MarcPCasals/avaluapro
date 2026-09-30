@@ -203,6 +203,18 @@
 .classroom-review-dialog legend { padding: 0 4px; color: #64748b; font-size: 8px; font-weight: 900; }
 .classroom-review-dialog fieldset label { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 8px; color: #475569; background: #f8fafc; font-size: 8px; font-weight: 800; }
 .classroom-review-error { margin: 0; color: #b91c1c; font-size: 9px; font-weight: 850; }
+.classroom-activity-materials { display: grid; gap: 8px; border-left: 3px solid #60a5fa; border-radius: 0 11px 11px 0; padding: 11px 12px; background: #eff6ff; }
+.classroom-activity-materials > div:first-child { display: flex; align-items: center; gap: 7px; color: #2563eb; }
+.classroom-activity-materials > div:first-child strong { color: #334155; font-size: 11px; }
+.classroom-activity-materials > div:first-child span { min-width: 19px; border-radius: 999px; padding: 2px 5px; color: #1d4ed8; background: #dbeafe; font-size: 8px; font-weight: 950; text-align: center; }
+.classroom-activity-materials > div:nth-child(2) { display: flex; flex-wrap: wrap; gap: 6px; }
+.classroom-activity-materials a { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #bfdbfe; border-radius: 8px; padding: 7px 9px; color: #1d4ed8; background: #fff; font-size: 9px; font-weight: 850; text-decoration: none; }
+.classroom-activity-materials a.teacher { border-color: #fed7aa; color: #c2410c; background: #fff7ed; }
+.classroom-activity-materials a small, .classroom-activity-materials a em { border-radius: 999px; padding: 2px 5px; font-size: 7px; font-style: normal; }
+.classroom-activity-materials a small { color: #6d28d9; background: #ede9fe; }
+.classroom-activity-materials a em { color: #64748b; background: #f1f5f9; }
+.classroom-activity-materials > button { justify-self: start; }
+.classroom-activity-materials > p { margin: 0; color: #b45309; font-size: 9px; font-weight: 800; }
 
 .classroom-recovery-dialog { width: min(900px, calc(100vw - 34px)); max-height: min(880px, calc(100vh - 34px)); display: grid; gap: 14px; overflow: auto; border-radius: 18px; padding: 22px; background: white; box-shadow: 0 28px 80px rgb(15 23 42 / 24%); }
 .classroom-recovery-dialog > header { display: flex; align-items: center; gap: 11px; }

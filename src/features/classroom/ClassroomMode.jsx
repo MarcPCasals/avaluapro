@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
-  Copy, DoorOpen, Loader2, Mail, MessageSquarePlus,
+  Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus,
   Pause, PencilLine, Play, Projector, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
   Users, UserX, X,
 } from 'lucide-react'
@@ -12,6 +12,7 @@ import {
   getClassroomStudents,
   getClassroomTimerState,
   getCorrectedActualMinutes,
+  getEffectiveActivityMaterialLinks,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
 import { FormattedText } from '../../components/FormattedText'
@@ -19,6 +20,7 @@ import { getClassroomSessionTasks } from '../../lib/classroomTracking'
 import { getSessionPersonalReminders } from '../../lib/reminders'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
+import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
   buildRecoveryEmail,
   getRecoverableClassroomItems,
@@ -340,6 +342,7 @@ export function ClassroomMode({
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [blockedMaterialLinks, setBlockedMaterialLinks] = useState([])
   const classItem = classes.find((item) => item.id === currentBundle.session.classId)
   const visibleStudents = useMemo(
     () => getClassroomStudents(students, currentBundle.session.classId, currentBundle.session.subgroupId)
@@ -391,6 +394,7 @@ export function ClassroomMode({
   })
   const diversityMeasures = (currentItem?.sourceActivity?.diversityMeasures || [])
     .filter((measure) => !measure.classId || measure.classId === currentBundle.session.classId)
+  const currentMaterials = getEffectiveActivityMaterialLinks(currentItem?.sourceActivity, currentBundle.planningUnit)
 
   useEffect(() => {
     if (!timerStartedAt || timerStoppedAt) return undefined
@@ -743,6 +747,13 @@ export function ClassroomMode({
             </div>
 
             {currentDescription && <section className="classroom-activity-description"><strong>Descripció de l’activitat</strong><FormattedText as="p" text={currentDescription} /></section>}
+
+            {currentMaterials.length > 0 && <section className="classroom-activity-materials" aria-label="Materials de l’activitat">
+              <div><ExternalLink size={18} /><strong>Materials</strong><span>{currentMaterials.length}</span></div>
+              <div>{currentMaterials.map((material) => <a className={material.audience === 'teacher' ? 'teacher' : 'students'} href={material.url} key={`${material.audience}:${material.url}`} rel="noreferrer" target="_blank"><ExternalLink size={13} /><span>{material.label || material.url}</span>{material.transversal && <small>Transversal</small>}<em>{material.audience === 'teacher' ? 'Docent' : 'Alumnat'}</em></a>)}</div>
+              {currentMaterials.length > 1 && <button className="secondary-action compact" onClick={() => setBlockedMaterialLinks(openExternalLinks(currentMaterials))} type="button"><ExternalLink size={14} />Obrir-los tots</button>}
+              {blockedMaterialLinks.length > 0 && <p role="status">El navegador n’ha bloquejat {blockedMaterialLinks.length}. Els pots obrir individualment des de la llista.</p>}
+            </section>}
 
             {diversityMeasures.length > 0 && <section className="classroom-adaptation-reminder"><ShieldCheck size={19} /><div><strong>Mesures previstes per a aquesta activitat</strong>{diversityMeasures.map((measure) => <p key={measure.id}><span>{measure.label}</span>{measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}</p>)}</div></section>}
 

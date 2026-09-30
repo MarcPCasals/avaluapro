@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getActivityMaterialLinks } from '../../domain/planning/materials'
+import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
 import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
   getPlanningTotals,
@@ -34,12 +34,14 @@ function orderedPhases(phases) {
   return flattened
 }
 
-function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, programmableMinutes, sequenceNumber, sessionDuration }) {
+function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [blockedLinks, setBlockedLinks] = useState([])
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
-  const links = getActivityMaterialLinks(activity)
-  const materialCount = (activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)
+  const links = getEffectiveActivityMaterialLinks(activity, planningUnit)
+  const materialCount = (activity.teacherMaterials?.length || 0)
+    + (activity.studentMaterials?.length || 0)
+    + (planningUnit?.transversalMaterials?.length || 0)
   const competencyCount = activity.curriculumSelections?.length || 0
   const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)
   const load = activity.plannedMinutes ? getSessionLoad([activity], sessionDuration) : null
@@ -166,7 +168,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
   )
 }
 
-export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onSetManualCompletion, phases }) {
+export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onSetManualCompletion, phases, planningUnit }) {
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
@@ -318,6 +320,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                     onKeyboardMove={keyboardMove}
                     onSetManualCompletion={onSetManualCompletion}
                     onTouchDrop={touchDrop}
+                    planningUnit={planningUnit}
                     programmableMinutes={programmableMinutes}
                     sequenceNumber={sequenceNumberById.get(activity.id)}
                     sessionDuration={sessionDuration}

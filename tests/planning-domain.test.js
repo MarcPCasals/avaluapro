@@ -45,6 +45,7 @@ import {
   getClassroomTimerState,
   getCorrectedActualMinutes,
   getActivityMaterialLinks,
+  getEffectiveActivityMaterialLinks,
   findTimetableSlotConflicts,
   summarizeCompletedActivityIds,
   getProgrammableMinutes,
@@ -181,6 +182,43 @@ test('els materials antics del docent i de l’alumnat continuen obrint-se', () 
     { audience: 'students', url: 'https://example.test/students' },
     { audience: 'teacher', url: 'https://example.test/teacher' },
   ])
+})
+
+test('els materials transversals de la UP s’hereten a totes les activitats sense duplicar-los', () => {
+  const unit = createPlanningUnit({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-2026',
+    temporalUnitId: 'ut-1',
+    code: 'UP1',
+    level: '1r ESO',
+    title: 'El paisatge sonor',
+    transversalMaterials: [{
+      id: 'transversal-1',
+      kind: 'link',
+      label: 'Aula virtual',
+      teacherUrl: 'https://example.test/teacher',
+      url: 'https://example.test/students',
+    }],
+  }, options())
+  const activity = createPlanningActivity({
+    ownerUid: 'teacher-1',
+    planningUnitId: unit.id,
+    phaseId: 'phase-1',
+    title: 'Escolta guiada',
+    order: 0,
+    studentMaterials: [{ kind: 'link', label: 'Fitxa', url: 'https://example.test/activity' }],
+  }, options())
+
+  assert.equal(unit.transversalMaterials.length, 1)
+  assert.deepEqual(
+    getEffectiveActivityMaterialLinks(activity, unit).map(({ label, transversal, url }) => ({ label, transversal: Boolean(transversal), url })),
+    [
+      { label: 'Fitxa', transversal: false, url: 'https://example.test/activity' },
+      { label: 'Aula virtual', transversal: true, url: 'https://example.test/students' },
+      { label: 'Aula virtual', transversal: true, url: 'https://example.test/teacher' },
+    ],
+  )
+  assert.equal(activity.studentMaterials.length, 1)
 })
 
 test('si el navegador bloqueja el segon material queda disponible com a alternativa visible', () => {

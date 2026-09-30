@@ -377,6 +377,15 @@ describe('Planificació compartida', () => {
         transversal: { attitudesAndValues: ['Constància'], factsAndConcepts: [], procedures: [] },
       },
       title: 'Títol revisat',
+      transversalMaterials: [{
+        id: 'transversal-material-1',
+        kind: 'link',
+        label: 'Aula virtual',
+        preparationKind: 'reference',
+        reminderDaysBefore: 0,
+        teacherUrl: '',
+        url: 'https://example.test/aula',
+      }],
       updatedAt: NOW,
     }))
     await assertSucceeds(updateDoc(
