@@ -139,10 +139,78 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
+function MaterialLinkControl({ field, index, label, onChange, optional = false, tone, value = '' }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [error, setError] = useState('')
+  const openEditor = () => {
+    setDraft(value)
+    setError('')
+    setEditing(true)
+  }
+  const confirmLink = () => {
+    const nextValue = draft.trim()
+    if (!nextValue) {
+      setError('Enganxa un enllaç abans de continuar.')
+      return
+    }
+    try {
+      const parsed = new URL(nextValue)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol')
+    } catch {
+      setError('L’enllaç ha de començar per http:// o https://')
+      return
+    }
+    onChange(index, field, nextValue)
+    setEditing(false)
+    setError('')
+  }
+  const removeLink = () => {
+    onChange(index, field, '')
+    setDraft('')
+    setEditing(false)
+    setError('')
+  }
+
+  return (
+    <div className={`planning-material-link-control ${tone}`}>
+      <button className={`planning-material-link-button ${value ? 'linked' : ''}`} onClick={openEditor} type="button">
+        <Link2 size={15} />
+        <span>{label}</span>
+        {optional && <em>Opcional</em>}
+        <small>{value ? 'Enllaç afegit' : 'Afegir enllaç'}</small>
+      </button>
+      {editing && (
+        <div className="planning-material-link-popover">
+          <input
+            aria-label={`Enllaç de ${label.toLocaleLowerCase('ca')} del material transversal ${index + 1}`}
+            autoFocus
+            onChange={(event) => { setDraft(event.target.value); setError('') }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') { event.preventDefault(); confirmLink() }
+              if (event.key === 'Escape') setEditing(false)
+            }}
+            placeholder="Enganxa aquí l’enllaç"
+            type="url"
+            value={draft}
+          />
+          {error && <span role="alert">{error}</span>}
+          <div>
+            {value && <button className="planning-link-remove" onClick={removeLink} type="button">Eliminar</button>}
+            <button className="secondary-action compact" onClick={() => setEditing(false)} type="button">Cancel·lar</button>
+            <button className="primary-action compact" onClick={confirmLink} type="button"><Check size={14} />Fet</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   const dialogRef = useDialogAccessibility(onClose)
   const [materials, setMaterials] = useState(unit.transversalMaterials || [])
   const [saving, setSaving] = useState(false)
+  const [validationError, setValidationError] = useState('')
   const addMaterial = () => setMaterials((current) => [...current, {
     id: globalThis.crypto?.randomUUID?.() || `transversal-material-${Date.now()}`,
     kind: 'link',
@@ -152,12 +220,20 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
     teacherUrl: '',
     url: '',
   }])
-  const updateMaterial = (index, field, value) => setMaterials((current) => current.map((material, materialIndex) => (
-    materialIndex === index ? { ...material, [field]: value } : material
-  )))
+  const updateMaterial = (index, field, value) => {
+    setValidationError('')
+    setMaterials((current) => current.map((material, materialIndex) => (
+      materialIndex === index ? { ...material, [field]: value } : material
+    )))
+  }
   const removeMaterial = (index) => setMaterials((current) => current.filter((_, materialIndex) => materialIndex !== index))
   const saveMaterials = async (event) => {
     event.preventDefault()
+    if (materials.some((material) => !material.url && !material.teacherUrl)) {
+      setValidationError('Cada material necessita almenys un enllaç: de l’alumnat o del docent.')
+      return
+    }
+    setValidationError('')
     setSaving(true)
     try {
       const result = await onSave(unit, { transversalMaterials: materials })
@@ -192,17 +268,18 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
           ) : materials.map((material, index) => (
             <div className="planning-material-row link planning-transversal-material-row" key={material.id || index}>
               <input aria-label={`Nom del material transversal ${index + 1}`} placeholder="Nom del material" required value={material.label || ''} onChange={(event) => updateMaterial(index, 'label', event.target.value)} />
-              <label className="planning-material-link-field student"><span><Users size={13} />Recurs de l’alumnat</span><input aria-label={`Enllaç de l’alumnat del material transversal ${index + 1}`} placeholder="https://…" required={!material.teacherUrl} type="url" value={material.url || ''} onChange={(event) => updateMaterial(index, 'url', event.target.value)} /></label>
-              <label className="planning-material-link-field teacher"><span><Link2 size={13} />Recurs del docent <em>Opcional</em></span><input aria-label={`Enllaç del docent del material transversal ${index + 1}`} placeholder="https://…" required={!material.url} type="url" value={material.teacherUrl || ''} onChange={(event) => updateMaterial(index, 'teacherUrl', event.target.value)} /></label>
+              <MaterialLinkControl field="url" index={index} label="Recurs de l’alumnat" onChange={updateMaterial} tone="student" value={material.url} />
+              <MaterialLinkControl field="teacherUrl" index={index} label="Recurs del docent" onChange={updateMaterial} optional tone="teacher" value={material.teacherUrl} />
               <button aria-label={`Eliminar el material transversal ${material.label || index + 1}`} className="icon-action danger" onClick={() => removeMaterial(index)} type="button"><Trash2 size={15} /></button>
             </div>
           ))}
         </div>
         <footer>
+          {validationError && <span className="planning-transversal-validation" role="alert">{validationError}</span>}
           <button className="secondary-action" disabled={saving} onClick={onClose} type="button">Cancel·lar</button>
           <button className="primary-action" disabled={saving} type="submit">
             {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
-            {saving ? 'Desant…' : 'Desar materials'}
+            {saving ? 'Desant…' : 'Desar i tancar'}
           </button>
         </footer>
       </form>

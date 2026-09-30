@@ -446,7 +446,22 @@
 .planning-material-reminder { display: grid; grid-template-columns: auto 48px auto; gap: 4px; align-items: center; color: #64748b; font-size: 9px; font-weight: 800; }
 .planning-material-reminder input { min-width: 0; padding-inline: 6px; }
 .planning-transversal-materials-empty { margin: 0; border: 1px dashed #c4b5fd; border-radius: 10px; padding: 12px; color: #6d28d9; background: #fff; font-size: 10px; font-weight: 750; }
-.planning-transversal-material-row { grid-template-columns: minmax(130px, .8fr) minmax(190px, 1fr) minmax(190px, 1fr) 30px; border: 1px solid #ddd6fe; border-radius: 11px; padding: 10px; background: #fff; }
+.planning-transversal-material-row { grid-template-columns: minmax(150px, .8fr) minmax(170px, 1fr) minmax(170px, 1fr) 30px; align-items: start; border: 1px solid #ddd6fe; border-radius: 11px; padding: 10px; background: #fff; }
+.planning-material-link-control { position: relative; min-width: 0; }
+.planning-material-link-button { width: 100%; min-height: 42px; display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; align-items: center; gap: 1px 7px; border: 1px solid #bfdbfe; border-radius: 9px; padding: 7px 10px; color: #2563eb; background: #eff6ff; text-align: left; }
+.planning-material-link-button:hover { border-color: #60a5fa; background: #dbeafe; }
+.planning-material-link-button > svg { grid-row: 1 / 3; }
+.planning-material-link-button > span { font-size: 11px; font-weight: 900; }
+.planning-material-link-button > small { grid-column: 2 / 4; color: #64748b; font-size: 9px; font-weight: 750; }
+.planning-material-link-button > em { border-radius: 999px; padding: 2px 5px; color: #9a3412; background: #ffedd5; font-size: 7px; font-style: normal; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.planning-material-link-button.linked > small { color: #15803d; }
+.planning-material-link-control.teacher .planning-material-link-button { border-color: #fed7aa; color: #c2410c; background: #fff7ed; }
+.planning-material-link-control.teacher .planning-material-link-button:hover { border-color: #fb923c; background: #ffedd5; }
+.planning-material-link-popover { width: 100%; display: grid; gap: 7px; margin-top: 6px; border: 1px solid #c4b5fd; border-radius: 11px; padding: 10px; background: #fff; box-shadow: 0 8px 20px rgb(51 65 85 / 12%); }
+.planning-material-link-popover input { width: 100%; min-width: 0; }
+.planning-material-link-popover > span { color: #b91c1c; font-size: 9px; font-weight: 800; }
+.planning-material-link-popover > div { display: flex; justify-content: flex-end; gap: 6px; }
+.planning-material-link-popover .planning-link-remove { margin-right: auto; border: 0; color: #b91c1c; background: transparent; font-size: 10px; font-weight: 850; }
 .planning-transversal-materials-dialog { position: relative; width: min(920px, 100%); max-height: min(760px, calc(100vh - 40px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 18px; border-radius: 22px; padding: 24px; background: #faf5ff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
 .planning-transversal-materials-dialog > header { display: flex; align-items: flex-start; gap: 12px; padding-right: 40px; }
 .planning-transversal-materials-dialog > header > span { width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 12px; color: #6d28d9; background: #ede9fe; }
@@ -456,7 +471,8 @@
 .planning-transversal-materials-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .planning-transversal-materials-toolbar strong { color: #5b21b6; font-size: 12px; }
 .planning-transversal-materials-list { min-height: 90px; display: grid; align-content: start; gap: 10px; overflow-y: auto; }
-.planning-transversal-materials-dialog > footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+.planning-transversal-materials-dialog > footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+.planning-transversal-validation { margin-right: auto; color: #b91c1c; font-size: 10px; font-weight: 800; }
 
 .planning-dialog-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 28px; background: rgba(15, 23, 42, .54); backdrop-filter: blur(7px); }
 .planning-connected-change-dialog { position: relative; width: min(560px, 100%); display: grid; gap: 20px; border: 1px solid #e5e7eb; border-radius: 22px; padding: 28px; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
@@ -789,11 +805,12 @@
   .planning-material-row .icon-action { grid-column: 3; grid-row: 1; }
   .planning-material-row.link.planning-transversal-material-row { grid-template-columns: 1fr 30px; }
   .planning-material-row.link.planning-transversal-material-row > input,
-  .planning-material-row.link.planning-transversal-material-row .planning-material-link-field { grid-column: 1 / 2; }
+  .planning-material-row.link.planning-transversal-material-row .planning-material-link-control { grid-column: 1 / 2; }
   .planning-material-row.link.planning-transversal-material-row .icon-action { grid-column: 2; }
   .planning-transversal-materials-dialog { max-height: calc(100vh - 20px); padding: 18px; }
   .planning-transversal-materials-toolbar { align-items: stretch; flex-direction: column; }
   .planning-transversal-materials-dialog > footer { display: grid; grid-template-columns: 1fr 1fr; }
+  .planning-transversal-validation { grid-column: 1 / -1; margin: 0; }
   .planning-indicator-picker > div, .planning-student-picker > div { grid-template-columns: 1fr; }
   .planning-criterion-picker { grid-template-columns: 1fr; padding-left: 11px; }
   .planning-reminders-list article { grid-template-columns: 1fr auto; }
