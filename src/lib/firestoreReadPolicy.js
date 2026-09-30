@@ -6,6 +6,7 @@
 export const FIRESTORE_QUERY_LIMITS = Object.freeze({
   feedbackMessages: 100,
   internalAnnouncements: 50,
+  internalMessageDirectory: 100,
   internalMessages: 200,
   teacherGradePackages: 20,
   tutoringInvitations: 20,

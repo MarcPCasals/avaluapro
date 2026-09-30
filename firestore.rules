@@ -1835,6 +1835,36 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Directori mínim i optatiu per trobar altres docents d'Educand a la
+    // missatgeria. No comparteix cap dada del quadern ni dels alumnes.
+    match /internalMessageDirectory/{userId} {
+      function verifiedInstitutionalUser() {
+        return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email is string
+          && request.auth.token.email.matches('.*@educand[.]ad');
+      }
+
+      function validOwnDirectoryEntry() {
+        return verifiedInstitutionalUser()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly([
+            'displayName', 'email', 'emailLower', 'uid', 'updatedAt'
+          ])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.emailLower == request.auth.token.email
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 1
+          && request.resource.data.displayName.size() <= 100
+          && request.resource.data.updatedAt == request.time;
+      }
+
+      allow read: if verifiedInstitutionalUser();
+      allow create, update: if validOwnDirectoryEntry();
+      allow delete: if verifiedInstitutionalUser() && request.auth.uid == userId;
+    }
+
     match /internalAnnouncements/{announcementId} {
       function verifiedAnnouncementUser() {
         return signedIn()

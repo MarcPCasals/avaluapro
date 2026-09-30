@@ -25263,6 +25263,7 @@ button.profile-followup-card:focus-visible {
 }
 
 .internal-recipient-field {
+  position: relative;
   display: grid;
   gap: 5px;
   border-bottom: 1px solid #dbe3ee;
@@ -25272,6 +25273,63 @@ button.profile-followup-card:focus-visible {
   font-size: 12px;
   font-weight: 900;
 }
+
+.internal-recipient-suggestions {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% - 7px);
+  right: 16px;
+  left: 16px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 5px;
+  background: white;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+}
+
+.internal-recipient-suggestions > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.internal-recipient-suggestions > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #334155;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.internal-recipient-suggestions > button:hover,
+.internal-recipient-suggestions > button:focus-visible {
+  outline: none;
+  background: #eff6ff;
+}
+
+.internal-recipient-suggestions strong,
+.internal-recipient-suggestions small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.internal-recipient-suggestions strong { color: #1f2937; font-size: 12px; }
+.internal-recipient-suggestions small { margin-top: 2px; color: #64748b; font-size: 11px; }
 
 .internal-recipient-field input {
   min-height: 40px;

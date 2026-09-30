@@ -1241,6 +1241,42 @@ describe('Internal messaging', () => {
     }
   }
 
+  function directoryEntry(uid, email, displayName = 'Docent') {
+    return {
+      displayName,
+      email,
+      emailLower: email,
+      uid,
+      updatedAt: serverTimestamp(),
+    }
+  }
+
+  test('verified Educand users publish only their own minimal directory entry and can list colleagues', async () => {
+    const teacherDb = messagingDb('teacher', 'teacher@educand.ad')
+    const cotutorDb = messagingDb('cotutor', 'cotutor@educand.ad')
+    await assertSucceeds(setDoc(
+      doc(teacherDb, 'internalMessageDirectory', 'teacher'),
+      directoryEntry('teacher', 'teacher@educand.ad', 'Teacher'),
+    ))
+    await assertSucceeds(getDocs(collection(cotutorDb, 'internalMessageDirectory')))
+    await assertFails(setDoc(
+      doc(teacherDb, 'internalMessageDirectory', 'cotutor'),
+      directoryEntry('cotutor', 'cotutor@educand.ad'),
+    ))
+    await assertFails(setDoc(
+      doc(teacherDb, 'internalMessageDirectory', 'teacher-extra'),
+      { ...directoryEntry('teacher-extra', 'teacher@educand.ad'), unexpected: true },
+    ))
+    await assertFails(getDocs(collection(
+      messagingDb('personal', 'personal@example.org'),
+      'internalMessageDirectory',
+    )))
+    await assertFails(getDocs(collection(
+      messagingDb('teacher-unverified', 'teacher@educand.ad', false),
+      'internalMessageDirectory',
+    )))
+  })
+
   test('participants can read a direct message and only the recipient can mark it read', async () => {
     const senderDb = messagingDb('teacher', 'teacher@educand.ad')
     const recipientDb = messagingDb('cotutor', 'cotutor@educand.ad')

@@ -38,6 +38,7 @@ import { TeacherProfileModal } from '../features/profile/TeacherProfileModal'
 import { buildBackupStatusMessage, summarizeBackup } from '../lib/backupDiagnostics'
 import { downloadJson, getTodaySlug } from '../lib/downloads'
 import {
+  ensureInternalMessageDirectoryProfile,
   loadInternalMessageAttentionSummary,
   subscribeInternalAnnouncements,
   subscribeInternalMessages,
@@ -249,6 +250,14 @@ export function TopBar() {
   const unreadInternalMessageCount = hasCompleteInternalMessagingSnapshot
     ? snapshotUnreadInternalMessageCount
     : summaryUnreadInternalMessageCount
+
+  useEffect(() => {
+    ensureInternalMessageDirectoryProfile({
+      uid: cloud.user?.uid,
+      email: cloud.user?.email,
+      displayName: cloud.user?.displayName,
+    }).catch(() => {})
+  }, [cloud.user?.displayName, cloud.user?.email, cloud.user?.uid])
 
   useEffect(() => {
     if (!cloud.user?.uid || !cloud.user?.email) return undefined

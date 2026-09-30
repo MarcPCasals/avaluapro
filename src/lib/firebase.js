@@ -183,6 +183,10 @@ function getInternalMessageStateDocRef(uid) {
   return doc(db, 'users', uid, 'messageState', 'inbox')
 }
 
+function getInternalMessageDirectoryDocRef(uid) {
+  return doc(db, 'internalMessageDirectory', uid)
+}
+
 function getTutoringInvitationCollectionRef(recipientEmail) {
   return collection(db, 'tutoringInvitationInbox', normalizeEmail(recipientEmail), 'items')
 }
@@ -2272,6 +2276,33 @@ export function subscribeInternalMessages(userEmail, callback, onError) {
     },
     onError,
   )
+}
+
+export async function ensureInternalMessageDirectoryProfile(user) {
+  const emailLower = normalizeEmail(user?.email)
+  if (!user?.uid || !emailLower.endsWith('@educand.ad')) return false
+
+  await setDoc(getInternalMessageDirectoryDocRef(user.uid), cleanForFirestore({
+    displayName: String(user.displayName || emailLower.split('@')[0]).trim().slice(0, 100),
+    email: user.email,
+    emailLower,
+    uid: user.uid,
+    updatedAt: serverTimestamp(),
+  }), { merge: true })
+  return true
+}
+
+export async function loadInternalMessageDirectory(user) {
+  const registered = await ensureInternalMessageDirectoryProfile(user)
+  if (!registered) return []
+
+  const snapshot = await getDocsFromServer(query(
+    collection(db, 'internalMessageDirectory'),
+    orderBy('displayName'),
+    limit(FIRESTORE_QUERY_LIMITS.internalMessageDirectory),
+  ))
+  recordFirestoreQuerySnapshot('messages.internalMessageDirectory', snapshot)
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
 }
 
 export function subscribeInternalAnnouncements(callback, onError) {

@@ -14,9 +14,11 @@ import { Modal } from '../../components/Modal'
 import {
   markInternalAnnouncementsRead,
   markInternalMessagesRead,
+  loadInternalMessageDirectory,
   sendInternalAnnouncement,
   sendInternalMessage,
 } from '../../lib/firebase'
+import { buildInternalRecipientContacts, filterInternalRecipientContacts } from './recipientSuggestions'
 
 const ADMIN_EMAIL = 'mperezc@educand.ad'
 const ANNOUNCEMENTS_KEY = '__announcements__'
@@ -123,6 +125,9 @@ export function InternalMessagingModal({
     firstUnread || (unreadAnnouncements > 0 ? ANNOUNCEMENTS_KEY : conversations[0]?.email || ANNOUNCEMENTS_KEY),
   )
   const [recipientEmail, setRecipientEmail] = useState('')
+  const [directory, setDirectory] = useState([])
+  const [directoryLoading, setDirectoryLoading] = useState(ownEmail.endsWith('@educand.ad'))
+  const [recipientFocused, setRecipientFocused] = useState(false)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState('')
@@ -131,6 +136,30 @@ export function InternalMessagingModal({
   const isAnnouncements = activeKey === ANNOUNCEMENTS_KEY
   const isNew = activeKey === NEW_MESSAGE_KEY
   const targetEmail = isNew ? normalizeEmail(recipientEmail) : activeConversation?.email || activeKey
+  const recipientContacts = useMemo(() => buildInternalRecipientContacts({
+    conversations,
+    cotutors,
+    directory,
+    ownEmail,
+  }), [conversations, cotutors, directory, ownEmail])
+  const recipientSuggestions = useMemo(
+    () => filterInternalRecipientContacts(recipientContacts, recipientEmail),
+    [recipientContacts, recipientEmail],
+  )
+
+  useEffect(() => {
+    let active = true
+    if (!user?.uid || !ownEmail.endsWith('@educand.ad')) return undefined
+    loadInternalMessageDirectory({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+    })
+      .then((items) => { if (active) setDirectory(items) })
+      .catch(() => { if (active) setDirectory([]) })
+      .finally(() => { if (active) setDirectoryLoading(false) })
+    return () => { active = false }
+  }, [ownEmail, user?.displayName, user?.email, user?.uid])
 
   useEffect(() => {
     if (!user?.uid) return
@@ -266,16 +295,42 @@ export function InternalMessagingModal({
           </header>
 
           {isNew && (
-            <label className="internal-recipient-field">
-              Correu del destinatari
+            <div className="internal-recipient-field">
+              <label htmlFor="internal-message-recipient">Nom o correu del destinatari</label>
               <input
-                autoComplete="email"
+                autoComplete="off"
+                id="internal-message-recipient"
+                onBlur={() => window.setTimeout(() => setRecipientFocused(false), 120)}
                 onChange={(event) => setRecipientEmail(event.target.value)}
-                placeholder="usuari@educand.ad"
-                type="email"
+                onFocus={() => setRecipientFocused(true)}
+                placeholder="Cerca una companya o escriu el correu"
+                type="text"
                 value={recipientEmail}
               />
-            </label>
+              {recipientFocused && (
+                <div className="internal-recipient-suggestions">
+                  {directoryLoading && recipientContacts.length === 0 ? (
+                    <span><Loader2 className="spin" size={14} />Carregant contactes…</span>
+                  ) : recipientSuggestions.length > 0 ? recipientSuggestions.map((contact) => (
+                    <button
+                      key={contact.email}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setRecipientEmail(contact.email)
+                        setRecipientFocused(false)
+                        setStatus('')
+                      }}
+                      type="button"
+                    >
+                      <UserRound size={16} />
+                      <span><strong>{contact.label}</strong><small>{contact.email}</small></span>
+                    </button>
+                  )) : (
+                    <span>No s’ha trobat cap compte. Pots escriure el correu complet.</span>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="internal-message-stream" aria-live="polite">
