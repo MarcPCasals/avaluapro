@@ -4,6 +4,7 @@ import {
   Loader2, Sparkles,
 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
+import { buildTimetableSessionCandidates } from '../../domain/planning'
 
 function formatDate(dateKey) {
   return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'short', weekday: 'short' })
@@ -33,6 +34,24 @@ function groupPreviewSessions(sessions = []) {
     group.push(bundle)
   }
   return groups
+}
+
+function getAvailableStartDates(setup, academicYear) {
+  if (!setup || !academicYear) return []
+  const proposal = buildTimetableSessionCandidates({
+    calendarEvents: setup.calendarEvents,
+    classId: setup.application.classId,
+    from: academicYear.startsOn,
+    slotsByTimetableId: setup.slotsByTimetableId,
+    timetables: setup.timetables,
+    to: setup.temporalUnit?.endsOn || academicYear.endsOn,
+  })
+  const timesByDate = new Map()
+  for (const candidate of proposal.candidates) {
+    const times = timesByDate.get(candidate.date) || []
+    timesByDate.set(candidate.date, [...new Set([...times, candidate.startsAt.slice(11, 16)])])
+  }
+  return [...timesByDate].map(([date, times]) => ({ date, times }))
 }
 
 export function AgendaSchedulingDialog({
@@ -72,7 +91,10 @@ export function AgendaSchedulingDialog({
     !completedActivityIds.includes(activity.id)) || []
   const selectedClass = classes.find((item) => item.id === values.classId)
   const selectedUnit = availableUnits.find((item) => item.id === values.planningUnitId)
-  const minimumStartDate = academicYear?.startsOn
+  const availableStartDates = useMemo(
+    () => getAvailableStartDates(setup, academicYear),
+    [academicYear, setup],
+  )
   const previewSessionGroups = groupPreviewSessions(preview?.sessions)
   const firstOverflow = preview?.unscheduled?.[0] || null
   const firstOverflowIsPartial = Boolean(firstOverflow && preview.scheduledActivityIds?.includes(firstOverflow.activityId))
@@ -100,7 +122,16 @@ export function AgendaSchedulingDialog({
         || []
       const remaining = nextSetup.activities.filter((activity) =>
         !unavailableIds.includes(activity.id))
+      const nextStartDates = getAvailableStartDates(nextSetup, academicYear)
+      if (nextStartDates.length === 0) {
+        throw new Error('Aquest grup no té cap classe disponible a l’horari abans del final de la UT.')
+      }
       setSetup(nextSetup)
+      setValues((current) => ({
+        ...current,
+        startDate: nextStartDates.find((item) => item.date >= current.startDate)?.date
+          || nextStartDates[0].date,
+      }))
       setSelectedActivityIds(values.mode === 'smart'
         ? nextSetup.activities
           .filter((activity) => !(nextSetup.completedSourceActivityIds || []).includes(activity.id))
@@ -183,7 +214,6 @@ export function AgendaSchedulingDialog({
             <label>Programació<select disabled={Boolean(setup)} value={values.planningUnitId} onChange={(event) => resetProposal({ planningUnitId: event.target.value })}>{availableUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.title}</option>)}</select></label>
             <label>Grup<select disabled={Boolean(setup)} value={values.classId} onChange={(event) => resetProposal({ classId: event.target.value })}><option value="">Selecciona un grup</option>{classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}</select></label>
           </div>
-          <label>Data d’inici real de la programació<input min={minimumStartDate} max={academicYear?.endsOn} type="date" value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }} /><small>Pot ser anterior a avui si la programació ja havia començat.</small></label>
           <fieldset className="agenda-schedule-modes">
             <legend>Com vols avançar?</legend>
             <label className={values.mode === 'progressive' ? 'selected' : ''}><input checked={values.mode === 'progressive'} name="schedule-mode" onChange={() => changeMode('progressive')} type="radio" /><span><strong>Progressivament</strong><small>Afegeix només les pendents que triïs, sense refer les sessions futures.</small></span></label>
@@ -194,6 +224,7 @@ export function AgendaSchedulingDialog({
           ) : (
             <div className="agenda-schedule-context"><div><span>UP</span><strong>{selectedUnit?.code} · {selectedUnit?.title}</strong></div><div><span>Grup</span><strong>{selectedClass?.name}</strong></div><button onClick={() => resetProposal({})} type="button"><ArrowLeft size={14} />Canviar</button></div>
           )}
+          {setup && <label>Primera classe de la programació<select value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }}>{availableStartDates.map((item) => <option key={item.date} value={item.date}>{formatDate(item.date)} · {item.times.join(' i ')}</option>)}</select><small>Només es mostren dies en què aquest grup té classe; els festius i les anul·lacions queden exclosos.</small></label>}
           {setup && (
             <div className="agenda-activity-picker">
               <header><div><strong>{values.mode === 'smart' ? 'Seqüència futura que es crearà o actualitzarà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${smartActivities.length} pendents · ${completedActivityIds.length} fetes queden intactes` : `${remainingActivities.length} per calendaritzar · ${unavailableActivityIds.length} ja programades o fetes`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>

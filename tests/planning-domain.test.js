@@ -847,6 +847,29 @@ test('una programació carregada a l’octubre pot conservar l’inici real de s
   }), /posterior al curs acadèmic/)
 })
 
+test('si la data de referència no és lectiva, la proposta comença a la pròxima classe real del grup', () => {
+  const result = buildTimetableSessionCandidates({
+    classId: 'class-1',
+    from: '2026-09-16',
+    slotsByTimetableId: {
+      timetable: [{
+        id: 'monday-class',
+        classId: 'class-1',
+        weekday: 1,
+        startsAt: '10:30',
+        durationMinutes: 60,
+      }],
+    },
+    timetables: [{ id: 'timetable', effectiveFrom: '2026-09-01', effectiveTo: null }],
+    to: '2026-09-30',
+  })
+
+  assert.deepEqual(result.candidates.map((candidate) => candidate.date), [
+    '2026-09-21',
+    '2026-09-28',
+  ])
+})
+
 test('inhabilitar una franja concreta conserva les altres classes del mateix dia', () => {
   const result = buildTimetableSessionCandidates({
     calendarEvents: [{
