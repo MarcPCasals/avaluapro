@@ -99,6 +99,47 @@ test('the official Word table becomes a safe UP preview before saving', () => {
   assert.equal(parsed.activities[1].pedagogicalType, 'metacognition')
 })
 
+test('Word import preserves repeated subphase blocks and inherits blank subphase cells', () => {
+  const html = `
+    <table><tr><td><p><strong>UP1.1</strong></p><p><strong>1r curs</strong></p></td><td>SEQÜÈNCIA</td></tr></table>
+    <table><tr><td>INFORMACIÓ GENERAL</td></tr><tr><td><strong>Títol:</strong> La fórmula secreta</td></tr></table>
+    <table>
+      <tr><td>FASE DE RESOLUCIÓ</td></tr>
+      <tr><td>Núm</td><td>Subfase</td><td>Descriptiu activitat</td><td>Tps (min)</td><td>Material</td><td>Agrup. / Espai</td><td>IA</td></tr>
+      <tr><td>1.</td><td>R1</td><td>Activitat: Primera hipòtesi</td><td>30</td><td>Quadern</td><td>Individual</td><td></td></tr>
+      <tr><td>2</td><td></td><td>Activitat: Informe de la primera hipòtesi</td><td>20</td><td>Dossier</td><td>Parelles</td><td></td></tr>
+      <tr><td>3</td><td>R2</td><td>Activitat: Posada en comú</td><td>10</td><td>Pissarra</td><td>Gran grup</td><td></td></tr>
+      <tr><td>4</td><td>R1</td><td>Activitat: Segona hipòtesi</td><td>15</td><td>Quadern</td><td>Individual</td><td></td></tr>
+    </table>
+    <p>Total Temps (minuts) de les tres fases: 80</p>`
+  const parsed = parsePlanningWordHtml(html)
+  assert.deepEqual(parsed.phases.filter((phase) => phase.parentKey).map((phase) => phase.title), ['R1', 'R2', 'R1 (2)'])
+  assert.equal(parsed.activities[0].phaseKey, parsed.activities[1].phaseKey)
+  assert.notEqual(parsed.activities[0].phaseKey, parsed.activities[3].phaseKey)
+  assert.deepEqual(parsed.activities.map((activity) => activity.title), [
+    'Primera hipòtesi',
+    'Informe de la primera hipòtesi',
+    'Posada en comú',
+    'Segona hipòtesi',
+  ])
+  assert.equal(parsed.importSummary.calculatedTotalMinutes, 75)
+  assert.equal(parsed.importSummary.declaredTotalMinutes, 80)
+  assert.match(parsed.importSummary.warning, /declara 80 minuts.*sumen 75/)
+})
+
+test('Word import keeps only the final application comment after duplicated template labels', () => {
+  const html = `
+    <table><tr><td><p><strong>UP2</strong></p><p><strong>2n curs</strong></p></td><td>SEQÜÈNCIA</td></tr></table>
+    <table><tr><td>INFORMACIÓ GENERAL</td></tr><tr><td><strong>Títol:</strong> Matèria</td></tr></table>
+    <table>
+      <tr><td>FASE DE RESOLUCIÓ</td></tr>
+      <tr><td>1</td><td>R4</td><td><p>Activitat: Mesurar</p><p>Comentaris per a l'aplicació:</p><p>Atenció a la diversitat:</p><p>Suport visual</p><p>Comentaris per a l'aplicació, si s'escau:</p><p>Preparar la proveta</p></td><td>30</td><td>Proveta</td><td>Parelles</td><td></td></tr>
+    </table>`
+  const parsed = parsePlanningWordHtml(html)
+  assert.equal(parsed.activities[0].applicationComment, 'Preparar la proveta')
+  assert.equal(parsed.activities[0].diversityMeasures[0].label, 'Suport visual')
+})
+
 test('pedagogical moments prefer metacognition over incidental knowledge words', () => {
   assert.equal(inferPedagogicalType('Metacognició dels coneixements adquirits'), 'metacognition')
 })

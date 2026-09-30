@@ -8,6 +8,8 @@ import { PlanningDocumentView } from './PlanningDocumentView'
 
 function ImportPreview({ bundle }) {
   if (!bundle) return null
+  const totalMinutes = bundle.importSummary?.calculatedTotalMinutes
+    ?? bundle.activities.reduce((sum, activity) => sum + (Number(activity.plannedMinutes) || 0), 0)
   return (
     <section className="planning-import-preview">
       <div><span>UP detectada</span><strong>{bundle.unit.code} · {bundle.unit.title}</strong><small>{bundle.unit.level}</small></div>
@@ -15,8 +17,20 @@ function ImportPreview({ bundle }) {
         <div><dt>Fases</dt><dd>{bundle.phases.filter((phase) => !phase.parentKey).length}</dd></div>
         <div><dt>Subfases</dt><dd>{bundle.phases.filter((phase) => phase.parentKey).length}</dd></div>
         <div><dt>Activitats</dt><dd>{bundle.activities.length}</dd></div>
+        <div><dt>Temps detectat</dt><dd>{totalMinutes} min</dd></div>
       </dl>
       {bundle.importSummary?.warning && <p>{bundle.importSummary.warning}</p>}
+      <details>
+        <summary>Revisar les activitats detectades</summary>
+        <ol>
+          {bundle.activities.map((activity, index) => (
+            <li key={`${activity.phaseKey}:${activity.order}:${index}`}>
+              <span>{index + 1}</span>
+              <div><strong>{activity.title}</strong><small>{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}</small></div>
+            </li>
+          ))}
+        </ol>
+      </details>
     </section>
   )
 }

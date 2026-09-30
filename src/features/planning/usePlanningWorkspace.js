@@ -689,6 +689,37 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return next
   }, [activePlanningUnit, activePlanningUnitId, persist, phases.length, user])
 
+  const removePhase = useCallback(async (phase) => {
+    if (!repository) throw new Error('Cal iniciar sessió abans de modificar la programació.')
+    if (!phase?.id) throw new Error('No s’ha trobat la fase que es vol eliminar.')
+    const rootPhases = phases.filter((item) => !item.parentPhaseId)
+    if (!phase.parentPhaseId && rootPhases.length <= 1) {
+      throw new Error('La UP ha de conservar almenys una fase principal.')
+    }
+    const phaseIds = new Set([phase.id])
+    let foundDescendant = true
+    while (foundDescendant) {
+      foundDescendant = false
+      phases.forEach((item) => {
+        if (item.parentPhaseId && phaseIds.has(item.parentPhaseId) && !phaseIds.has(item.id)) {
+          phaseIds.add(item.id)
+          foundDescendant = true
+        }
+      })
+    }
+    const removedActivities = activities.filter((activity) => phaseIds.has(activity.phaseId))
+    const removedPhases = phases
+      .filter((item) => phaseIds.has(item.id))
+      .sort((left, right) => Number(Boolean(right.parentPhaseId)) - Number(Boolean(left.parentPhaseId)))
+    for (const activity of removedActivities) await repository.remove(activity)
+    for (const item of removedPhases) await repository.remove(item)
+    setActivities((items) => items.filter((item) => !phaseIds.has(item.phaseId)))
+    setPhases((items) => items.filter((item) => !phaseIds.has(item.id)))
+    await refreshSync()
+    await synchronize()
+    return { activityCount: removedActivities.length, phaseCount: removedPhases.length }
+  }, [activities, phases, refreshSync, repository, synchronize])
+
   const saveActivity = useCallback(async (values, current = null) => {
     const now = new Date().toISOString()
     if (current && values.phaseId !== current.phaseId) {
@@ -1228,6 +1259,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     moveActivityForActiveClass,
     removeActivity,
     removeActivityForActiveClass,
+    removePhase,
     saveActivity,
     saveActivityForActiveClass,
     saveAccessGrant,

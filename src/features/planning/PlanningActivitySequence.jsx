@@ -166,7 +166,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
   )
 }
 
-export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onEdit, onEditPhase, onMove, onSetManualCompletion, phases }) {
+export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onSetManualCompletion, phases }) {
   const [dragId, setDragId] = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
@@ -219,6 +219,30 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
     if (!globalThis.confirm?.(`Vols eliminar «${activity.title}» de la seqüència?`)) return
     await onDelete(activity)
   }
+  const removePhase = async (phase) => {
+    const phaseIds = new Set([phase.id])
+    let foundDescendant = true
+    while (foundDescendant) {
+      foundDescendant = false
+      phases.forEach((item) => {
+        if (item.parentPhaseId && phaseIds.has(item.parentPhaseId) && !phaseIds.has(item.id)) {
+          phaseIds.add(item.id)
+          foundDescendant = true
+        }
+      })
+    }
+    const activityCount = activities.filter((activity) => phaseIds.has(activity.phaseId)).length
+    const childCount = phaseIds.size - 1
+    const contents = [
+      childCount ? `${childCount} ${childCount === 1 ? 'subfase' : 'subfases'}` : '',
+      activityCount ? `${activityCount} ${activityCount === 1 ? 'activitat' : 'activitats'}` : '',
+    ].filter(Boolean).join(' i ')
+    const message = contents
+      ? `Vols eliminar «${phase.title}» i també ${contents}? Aquesta acció no es pot desfer.`
+      : `Vols eliminar «${phase.title}»?`
+    if (!globalThis.confirm?.(message)) return
+    await onDeletePhase(phase)
+  }
 
   return (
     <section className="planning-sequence-section">
@@ -261,6 +285,14 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                 <div className="planning-sequence-phase-actions">
                   <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChildPhase(phase.id)} title="Afegir subfase" type="button"><Plus size={15} /></button>
                   <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEditPhase(phase)} title="Editar fase" type="button"><Pencil size={15} /></button>
+                  <button
+                    aria-label={`Eliminar ${phase.title}`}
+                    className="icon-action danger"
+                    disabled={!phase.parentPhaseId && flatPhases.filter((item) => item.depth === 0).length <= 1}
+                    onClick={() => removePhase(phase)}
+                    title={!phase.parentPhaseId && flatPhases.filter((item) => item.depth === 0).length <= 1 ? 'La UP ha de conservar almenys una fase principal' : 'Eliminar fase i el seu contingut'}
+                    type="button"
+                  ><Trash2 size={15} /></button>
                   <button className="secondary-action compact" onClick={() => onAdd(phase.id)} type="button"><Plus size={15} />Afegir element</button>
                 </div>
               </header>

@@ -296,8 +296,12 @@ function parseResourceSection(tables, titlePattern) {
 function parseActivityContent(lines) {
   const cleaned = lines.map(text).filter(Boolean)
   const diversityIndex = cleaned.findIndex((line) => /^atenci[oó] a la diversitat\s*:?$/i.test(line))
-  const commentIndex = cleaned.findIndex((line) => /^comentaris? per a l['’]aplicaci[oó](?:, si s['’]escau)?\s*:?$/i.test(line))
-  const activityEnd = [diversityIndex, commentIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? cleaned.length
+  const commentIndexes = cleaned
+    .map((line, index) => /^comentaris? per a l['’]aplicaci[oó](?:, si s['’]escau)?\s*:?$/i.test(line) ? index : -1)
+    .filter((index) => index >= 0)
+  const firstCommentIndex = commentIndexes[0] ?? -1
+  const lastCommentIndex = commentIndexes.at(-1) ?? -1
+  const activityEnd = [diversityIndex, firstCommentIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? cleaned.length
   const activityLines = cleaned.slice(0, activityEnd)
   const firstLine = activityLines[0] || ''
   const inlineTitle = /^activitat\s*:\s*(.+)$/i.exec(firstLine)?.[1] || ''
@@ -307,9 +311,9 @@ function parseActivityContent(lines) {
   const title = text(inlineTitle || withoutLabel[0] || 'Activitat importada')
   const description = withoutLabel.slice(inlineTitle ? 0 : 1).join('\n')
   const diversityStart = diversityIndex >= 0 ? diversityIndex + 1 : -1
-  const diversityEnd = commentIndex >= 0 ? commentIndex : cleaned.length
+  const diversityEnd = commentIndexes.find((index) => index > diversityIndex) ?? cleaned.length
   const diversityText = diversityStart >= 0 ? cleaned.slice(diversityStart, diversityEnd).join('\n') : ''
-  const applicationComment = commentIndex >= 0 ? cleaned.slice(commentIndex + 1).join('\n') : ''
+  const applicationComment = lastCommentIndex >= 0 ? cleaned.slice(lastCommentIndex + 1).join('\n') : ''
   return { applicationComment, description, diversityText, title }
 }
 
@@ -392,13 +396,15 @@ export function parsePlanningWordHtml(html) {
 
   const phases = []
   const phaseKeyByKind = new Map()
-  const subphaseKeyBySignature = new Map()
+  const subphaseOccurrences = new Map()
   const activities = []
   let currentKind = 'custom'
+  let currentSubphaseKey = null
+  let currentSubphaseLabel = ''
   const ensureRootPhase = (kind) => {
     if (phaseKeyByKind.has(kind)) return phaseKeyByKind.get(kind)
     const key = `phase-${phases.length + 1}`
-    phases.push({ key, kind, order: phases.length, parentKey: null, title: PHASE_LABELS[kind] })
+    phases.push({ key, kind, order: phaseKeyByKind.size, parentKey: null, title: PHASE_LABELS[kind] })
     phaseKeyByKind.set(kind, key)
     return key
   }
@@ -410,28 +416,41 @@ export function parsePlanningWordHtml(html) {
     if (/fase de (preparaci|resoluci|tancament)/i.test(rowText)) {
       currentKind = phaseKindFromLabel(rowText)
       ensureRootPhase(currentKind)
+      currentSubphaseKey = null
+      currentSubphaseLabel = ''
       return
     }
-    if (!/^\d+$/.test(text(row[0]?.text)) || row.length < 3) return
+    if (!/^\d+\s*[.)-]?$/.test(text(row[0]?.text)) || row.length < 3) return
     const subphase = text(row[1]?.text)
     const rootKey = ensureRootPhase(currentKind)
-    const signature = `${currentKind}:${subphase || 'sense-subfase'}`
-    let phaseKey = rootKey
+    const parsedContent = parseActivityContent(row[2]?.lines || [])
     if (subphase) {
-      if (!subphaseKeyBySignature.has(signature)) {
+      // Una mateixa etiqueta (R1, R2...) pot aparèixer en trams diferents.
+      // Només agrupem files consecutives; així l'ordre original del Word no
+      // queda alterat quan comença una segona pregunta o un segon cicle didàctic.
+      if (!currentSubphaseKey || comparableImportedLabel(currentSubphaseLabel) !== comparableImportedLabel(subphase)) {
+        const signature = `${currentKind}:${comparableImportedLabel(subphase)}`
+        const occurrence = (subphaseOccurrences.get(signature) || 0) + 1
+        subphaseOccurrences.set(signature, occurrence)
         const key = `phase-${phases.length + 1}`
         phases.push({
           key,
           kind: currentKind,
           order: phases.filter((phase) => phase.parentKey === rootKey).length,
           parentKey: rootKey,
-          title: subphase,
+          title: occurrence === 1 ? subphase : `${subphase} (${occurrence})`,
         })
-        subphaseKeyBySignature.set(signature, key)
+        currentSubphaseKey = key
       }
-      phaseKey = subphaseKeyBySignature.get(signature)
+      currentSubphaseLabel = subphase
     }
-    const parsedContent = parseActivityContent(row[2]?.lines || [])
+    // Les plantilles oficials deixen sovint la subfase en blanc per indicar que
+    // l'activitat continua el mateix tram. En aquest cas l'heretem.
+    const phaseKey = currentSubphaseKey || rootKey
+    if (parsedContent.title.length > 120 && subphase && !/^[a-z]\d+$/i.test(subphase)) {
+      parsedContent.description = [parsedContent.title, parsedContent.description].filter(Boolean).join('\n')
+      parsedContent.title = subphase
+    }
     const indicatorLabels = hasActivityCurriculum ? [] : textList((row[6]?.lines || []).flatMap((line) => line.split(/[;,]/)))
     activities.push({
       ...parsedContent,
@@ -466,6 +485,16 @@ export function parsePlanningWordHtml(html) {
   const hasResources = Object.values(resourceSections).some((section) => (
     section.factsAndConcepts.length || section.procedures.length || section.attitudesAndValues.length
   ))
+  const calculatedTotalMinutes = activities.reduce((sum, activity) => sum + (Number(activity.plannedMinutes) || 0), 0)
+  const totalLine = htmlToLines(html).find((line) => /total\s+(?:de\s+)?temps.*tres fases/i.test(line)) || ''
+  const declaredTotalMinutes = parseMinutes(totalLine.replace(/^.*?:/, ''))
+  const warnings = []
+  if (!hasCurriculum || !hasResources) {
+    warnings.push('Aquest Word no conté els blocs curriculars complets; podràs acabar-los dins de la UP importada.')
+  }
+  if (declaredTotalMinutes != null && declaredTotalMinutes !== calculatedTotalMinutes) {
+    warnings.push(`El Word declara ${declaredTotalMinutes} minuts, però les activitats detectades en sumen ${calculatedTotalMinutes}.`)
+  }
   const title = field(/^t[ií]tol\s*:?/i) || 'UP importada'
   return {
     format: PLANNING_DOCUMENT_FORMAT,
@@ -485,12 +514,16 @@ export function parsePlanningWordHtml(html) {
     activities,
     importSummary: {
       activityCount: activities.length,
+      calculatedTotalMinutes,
+      declaredTotalMinutes,
       phaseCount: phases.filter((phase) => !phase.parentKey).length,
-      warning: !hasCurriculum || !hasResources
-        ? 'Aquest Word no conté els blocs curriculars complets; podràs acabar-los dins de la UP importada.'
-        : '',
+      warning: warnings.join(' '),
     },
   }
+}
+
+function comparableImportedLabel(value) {
+  return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca')
 }
 
 const TABLE_COLUMN_ALIASES = Object.freeze({

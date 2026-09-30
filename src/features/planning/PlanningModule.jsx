@@ -139,7 +139,7 @@ function ImprovementPanel({ onAccept, onError, proposals = [] }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
@@ -275,6 +275,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         onAddChildPhase={onAddChildPhase}
         onAddPhase={onAddPhase}
         onDelete={onDeleteActivity}
+        onDeletePhase={onDeletePhase}
         onEdit={onEditActivity}
         onEditPhase={onEditPhase}
         onMove={onMoveActivity}
@@ -601,6 +602,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onDeleteActivity={(activity) => handleActivityAction(() => withConnectedConfirmation(
                     () => workspace.removeActivity(activity),
                     () => workspace.removeActivityForActiveClass(activity),
+                  ))}
+                  onDeletePhase={(phase) => handleActivityAction(() => withConnectedConfirmation(
+                    () => workspace.removePhase(phase),
                   ))}
                   onDuplicate={() => setDialog('annualCopy')}
                   onEditActivity={(activity) => handleOpenActivity(activity)}
