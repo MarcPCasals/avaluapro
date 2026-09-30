@@ -612,13 +612,16 @@ export function useAgendaWorkspace(user, classes = []) {
       const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) =>
         repository.loadScope(
           `application:${application.id}:sessions`,
-          () => loadPlanningSessions({
-            applicationId: application.id,
-            from: `${from}T00:00:00`,
-            maxItems: 500,
-            planningUnitId: planningUnit.id,
-            to: `${to}T23:59:59`,
-          }),
+          async () => withPlanningRemoteContext(
+            await loadPlanningSessions({
+              applicationId: application.id,
+              from: `${from}T00:00:00`,
+              maxItems: 500,
+              planningUnitId: planningUnit.id,
+              to: `${to}T23:59:59`,
+            }),
+            { applicationId: application.id, planningUnitId: planningUnit.id },
+          ),
           { completeSnapshot: true, refreshToken: refreshRevision },
         )))
       const failedSessionLoad = sessionResults.find((result) => result.error)
@@ -651,7 +654,10 @@ export function useAgendaWorkspace(user, classes = []) {
           `session:${session.id}:detail`,
           async () => {
             const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id, { session })
-            return [detail.session, ...detail.items, ...detail.results]
+            return withPlanningRemoteContext(
+              [detail.session, ...detail.items, ...detail.results],
+              { applicationId: application.id, planningUnitId: planningUnit.id, sessionId: session.id },
+            )
           },
           { completeSnapshot: true, refreshToken: refreshRevision },
         )))
@@ -760,7 +766,14 @@ export function useAgendaWorkspace(user, classes = []) {
             bundle.session.id,
             { session: bundle.session },
           )
-          return [detail.session, ...detail.items, ...detail.results]
+          return withPlanningRemoteContext(
+            [detail.session, ...detail.items, ...detail.results],
+            {
+              applicationId: bundle.application.id,
+              planningUnitId: bundle.planningUnit.id,
+              sessionId: bundle.session.id,
+            },
+          )
         },
         { completeSnapshot: true, refreshToken: refreshRevision },
       )
@@ -1011,13 +1024,16 @@ export function useAgendaWorkspace(user, classes = []) {
       .map((application) => ({ application, planningUnit: visibleUnits[index] })))
     const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) => repository.loadScope(
       `application:${application.id}:sessions`,
-      () => loadPlanningSessions({
-        applicationId: application.id,
-        from: bundle.session.startsAt,
-        maxItems: 500,
-        planningUnitId: planningUnit.id,
-        to: '9999-12-31T23:59:59',
-      }),
+      async () => withPlanningRemoteContext(
+        await loadPlanningSessions({
+          applicationId: application.id,
+          from: bundle.session.startsAt,
+          maxItems: 500,
+          planningUnitId: planningUnit.id,
+          to: '9999-12-31T23:59:59',
+        }),
+        { applicationId: application.id, planningUnitId: planningUnit.id },
+      ),
     )))
     return sessionResults.flatMap((result) => result.entities)
       .filter(isNextValidSession)
@@ -1170,13 +1186,16 @@ export function useAgendaWorkspace(user, classes = []) {
     if (savedApplication) {
       const sessionResult = await repository.loadScope(
         `application:${application.id}:sessions`,
-        () => loadPlanningSessions({
-          applicationId: application.id,
-          from: `${activeAcademicYear.startsOn}T00:00:00`,
-          maxItems: 500,
-          planningUnitId,
-          to: `${activeAcademicYear.endsOn}T23:59:59`,
-        }),
+        async () => withPlanningRemoteContext(
+          await loadPlanningSessions({
+            applicationId: application.id,
+            from: `${activeAcademicYear.startsOn}T00:00:00`,
+            maxItems: 500,
+            planningUnitId,
+            to: `${activeAcademicYear.endsOn}T23:59:59`,
+          }),
+          { applicationId: application.id, planningUnitId },
+        ),
         { completeSnapshot: true },
       )
       existingSessions = sessionResult.entities
@@ -1184,7 +1203,10 @@ export function useAgendaWorkspace(user, classes = []) {
         `session:${session.id}:detail`,
         async () => {
           const detail = await loadPlanningSessionDetail(planningUnitId, application.id, session.id, { session })
-          return [detail.session, ...detail.items, ...detail.results]
+          return withPlanningRemoteContext(
+            [detail.session, ...detail.items, ...detail.results],
+            { applicationId: application.id, planningUnitId, sessionId: session.id },
+          )
         },
         { completeSnapshot: true },
       )))
@@ -1501,13 +1523,16 @@ export function useAgendaWorkspace(user, classes = []) {
       const activityById = new Map(activities.map((activity) => [activity.id, activity]))
       const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
         `application:${application.id}:sessions`,
-        () => loadPlanningSessions({
-          applicationId: application.id,
-          from: `${activeAcademicYear.startsOn}T00:00:00`,
-          maxItems: 500,
-          planningUnitId: unit.id,
-          to: bundle.session.startsAt,
-        }),
+        async () => withPlanningRemoteContext(
+          await loadPlanningSessions({
+            applicationId: application.id,
+            from: `${activeAcademicYear.startsOn}T00:00:00`,
+            maxItems: 500,
+            planningUnitId: unit.id,
+            to: bundle.session.startsAt,
+          }),
+          { applicationId: application.id, planningUnitId: unit.id },
+        ),
       )))
       const previousSessions = sessionResults.flatMap((result, index) => result.entities
         .filter((session) => session.startsAt < bundle.session.startsAt)
@@ -1518,7 +1543,10 @@ export function useAgendaWorkspace(user, classes = []) {
           `session:${session.id}:detail`,
           async () => {
             const detail = await loadPlanningSessionDetail(unit.id, application.id, session.id, { session })
-            return [detail.session, ...detail.items, ...detail.results]
+            return withPlanningRemoteContext(
+              [detail.session, ...detail.items, ...detail.results],
+              { applicationId: application.id, planningUnitId: unit.id, sessionId: session.id },
+            )
           },
           { completeSnapshot: true },
         )))

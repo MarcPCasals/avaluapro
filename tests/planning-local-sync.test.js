@@ -169,6 +169,64 @@ test('els ajustos remots del grup recuperen la ruta completa després de recarre
   assert.equal((await loadPlanningScope(uid, 'application:application-1:overrides')).length, 1)
 })
 
+test('les sessions remotes i el seu detall recuperen la ruta completa sense duplicar la UP als documents', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-09-30T18:00:00.000Z'
+  const session = createCalendarSession({
+    applicationId: 'application-1',
+    classId: 'class-sg',
+    durationMinutes: 60,
+    id: 'session-sg-1',
+    ownerUid: uid,
+    startsAt: '2026-10-01T09:00:00',
+  }, { now })
+  const item = createSessionItem({
+    applicationId: 'application-1',
+    id: 'item-sg-1',
+    order: 0,
+    ownerUid: uid,
+    plannedMinutes: 50,
+    sessionId: session.id,
+    sourceActivityId: 'activity-1',
+    title: 'Activitat de SG',
+    type: 'activity',
+  }, { now })
+  const result = createActivityResult({
+    applicationId: 'application-1',
+    id: 'result-sg-1',
+    ownerUid: uid,
+    sessionId: session.id,
+    sessionItemId: item.id,
+    status: 'completed',
+  }, { now })
+  const repository = createPlanningRepository({ uid })
+
+  const sessionLoad = await repository.loadScope(
+    'application:application-1:sessions',
+    async () => withPlanningRemoteContext([session], {
+      applicationId: 'application-1',
+      planningUnitId: 'up-sg',
+    }),
+    { completeSnapshot: true },
+  )
+  const detailLoad = await repository.loadScope(
+    `session:${session.id}:detail`,
+    async () => withPlanningRemoteContext([item, result], {
+      applicationId: 'application-1',
+      planningUnitId: 'up-sg',
+      sessionId: session.id,
+    }),
+    { completeSnapshot: true },
+  )
+
+  assert.equal(sessionLoad.error, undefined)
+  assert.equal(sessionLoad.entities[0].id, session.id)
+  assert.equal(detailLoad.error, undefined)
+  assert.deepEqual(detailLoad.entities.map((entity) => entity.id).sort(), [item.id, result.id].sort())
+  assert.equal((await loadPlanningScope(uid, 'application:application-1:sessions')).length, 1)
+  assert.equal((await loadPlanningScope(uid, `session:${session.id}:detail`)).length, 2)
+})
+
 test('horari, franges i excepcions es recuperen per abast després d’una recàrrega offline', async () => {
   const uid = 'teacher-1'
   const now = '2026-09-19T08:00:00.000Z'

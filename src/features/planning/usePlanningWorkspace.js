@@ -1198,13 +1198,16 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return Promise.all(applications.map(async (application) => {
       const sessionResult = await repository.loadScope(
         `application:${application.id}:sessions`,
-        () => loadPlanningSessions({
-          applicationId: application.id,
-          from: '0000-01-01T00:00:00',
-          maxItems: 500,
-          planningUnitId: planningUnit.id,
-          to: '9999-12-31T23:59:59',
-        }),
+        async () => withPlanningRemoteContext(
+          await loadPlanningSessions({
+            applicationId: application.id,
+            from: '0000-01-01T00:00:00',
+            maxItems: 500,
+            planningUnitId: planningUnit.id,
+            to: '9999-12-31T23:59:59',
+          }),
+          { applicationId: application.id, planningUnitId: planningUnit.id },
+        ),
         { completeSnapshot: true },
       )
       const sessions = [...sessionResult.entities]
@@ -1213,7 +1216,10 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
         `session:${session.id}:detail`,
         async () => {
           const detail = await loadPlanningSessionDetail(planningUnit.id, application.id, session.id, { session })
-          return [detail.session, ...detail.items, ...detail.results]
+          return withPlanningRemoteContext(
+            [detail.session, ...detail.items, ...detail.results],
+            { applicationId: application.id, planningUnitId: planningUnit.id, sessionId: session.id },
+          )
         },
         { completeSnapshot: true },
       )))
@@ -1235,13 +1241,16 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     const temporalUnit = temporalUnits.find((item) => item.id === activePlanningUnit.temporalUnitId)
     const sessionResult = await repository.loadScope(
       `application:${activeApplication.id}:sessions`,
-      () => loadPlanningSessions({
-        applicationId: activeApplication.id,
-        from: temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00',
-        maxItems: 500,
-        planningUnitId: activePlanningUnit.id,
-        to: temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59',
-      }),
+      async () => withPlanningRemoteContext(
+        await loadPlanningSessions({
+          applicationId: activeApplication.id,
+          from: temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00',
+          maxItems: 500,
+          planningUnitId: activePlanningUnit.id,
+          to: temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59',
+        }),
+        { applicationId: activeApplication.id, planningUnitId: activePlanningUnit.id },
+      ),
       { completeSnapshot: true },
     )
     const sessions = [...sessionResult.entities]
@@ -1249,7 +1258,14 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       `session:${session.id}:detail`,
       async () => {
         const detail = await loadPlanningSessionDetail(activePlanningUnit.id, activeApplication.id, session.id, { session })
-        return [detail.session, ...detail.items, ...detail.results]
+        return withPlanningRemoteContext(
+          [detail.session, ...detail.items, ...detail.results],
+          {
+            applicationId: activeApplication.id,
+            planningUnitId: activePlanningUnit.id,
+            sessionId: session.id,
+          },
+        )
       },
       { completeSnapshot: true },
     )))
