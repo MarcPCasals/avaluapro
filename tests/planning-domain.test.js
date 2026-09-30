@@ -221,6 +221,31 @@ test('els materials transversals de la UP s’hereten a totes les activitats sen
   assert.equal(activity.studentMaterials.length, 1)
 })
 
+test('un material transversal pot tenir només l’enllaç del docent', () => {
+  const unit = createPlanningUnit({
+    ownerUid: 'teacher-1',
+    academicYearId: 'year-2026',
+    temporalUnitId: 'ut-1',
+    code: 'UP1',
+    level: '1r ESO',
+    title: 'El paisatge sonor',
+    transversalMaterials: [{
+      id: 'transversal-teacher-only',
+      kind: 'link',
+      label: 'Presentació del docent',
+      teacherUrl: 'https://example.test/teacher-slides',
+      url: '',
+    }],
+  }, options())
+
+  assert.equal(unit.transversalMaterials[0].url, null)
+  assert.equal(unit.transversalMaterials[0].teacherUrl, 'https://example.test/teacher-slides')
+  assert.deepEqual(
+    getEffectiveActivityMaterialLinks({}, unit).map(({ audience, url }) => ({ audience, url })),
+    [{ audience: 'teacher', url: 'https://example.test/teacher-slides' }],
+  )
+})
+
 test('si el navegador bloqueja el segon material queda disponible com a alternativa visible', () => {
   const calls = []
   const firstWindow = { opener: {} }

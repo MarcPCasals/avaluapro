@@ -207,7 +207,7 @@ function normalizeMaterials(materials) {
     const preparationKind = kind === 'link' ? 'reference' : selectedPreparationKind
     const url = optionalText(material.url)
     const teacherUrl = kind === 'link' ? optionalText(material.teacherUrl) : ''
-    if (kind === 'link' && !url) throw new Error("Un material d'enllaç necessita una URL")
+    if (kind === 'link' && !url && !teacherUrl) throw new Error("Un material d'enllaç necessita almenys una URL")
     return {
       id: optionalText(material.id),
       kind,
