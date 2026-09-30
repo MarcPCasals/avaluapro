@@ -44,6 +44,7 @@ import {
   moveTimetableSlot,
   orderActivitiesForScheduling,
   reserveLastLogicalSessionCandidates,
+  resolveSchedulingStartDate,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   summarizeCompletedActivityIds,
@@ -1217,9 +1218,10 @@ export function useAgendaWorkspace(user, classes = []) {
 
   const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
-    // Una reorganització mai no pot reescriure una sessió d'un dia anterior.
-    // Les sessions passades formen l'històric i es conserven intactes.
-    const effectiveStartDate = startDate < today ? today : startDate
+    const effectiveStartDate = resolveSchedulingStartDate({
+      academicYear: activeAcademicYear,
+      startDate,
+    })
     const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
       date: String(session.startsAt).slice(0, 10),
       calendarEventId: session.calendarEventId,
@@ -1314,7 +1316,7 @@ export function useAgendaWorkspace(user, classes = []) {
       skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
       setup,
     }
-  }, [activeAcademicYear, today])
+  }, [activeAcademicYear])
 
   const confirmSchedulingPreview = useCallback(async (preview) => {
     if (!preview?.setup?.planningUnit?.id) {

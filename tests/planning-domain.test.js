@@ -55,6 +55,7 @@ import {
   planActivityChange,
   resolveTutorialPlanningContext,
   reserveLastLogicalSessionCandidates,
+  resolveSchedulingStartDate,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   summarizeUnscheduledPlanningActivities,
@@ -827,6 +828,23 @@ test('la proposta usa la versió d’horari vigent i salta festius, jornades esp
   ])
   assert.equal(result.candidates[1].calendarEventId, 'extra-class')
   assert.deepEqual(result.skippedDates.map((item) => item.date), ['2026-09-21', '2026-10-05', '2026-10-12'])
+})
+
+test('una programació carregada a l’octubre pot conservar l’inici real de setembre', () => {
+  const academicYear = { startsOn: '2026-09-01', endsOn: '2027-06-30' }
+
+  assert.equal(resolveSchedulingStartDate({
+    academicYear,
+    startDate: '2026-09-14',
+  }), '2026-09-14')
+  assert.throws(() => resolveSchedulingStartDate({
+    academicYear,
+    startDate: '2026-08-31',
+  }), /anterior al curs acadèmic/)
+  assert.throws(() => resolveSchedulingStartDate({
+    academicYear,
+    startDate: '2027-07-01',
+  }), /posterior al curs acadèmic/)
 })
 
 test('inhabilitar una franja concreta conserva les altres classes del mateix dia', () => {

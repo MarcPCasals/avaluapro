@@ -7,6 +7,22 @@ import { getProgrammableMinutes, selectEffectiveTimetable } from './rules.js'
 
 const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
+/**
+ * La data que tria el docent representa l'inici real de la programació, no el
+ * dia en què la incorpora a l'Agenda. Per això pot ser anterior a avui, però
+ * sempre ha de quedar dins del curs acadèmic actiu.
+ */
+export function resolveSchedulingStartDate({ academicYear, startDate }) {
+  if (!startDate) throw new Error('Cal indicar la data d’inici de la programació.')
+  if (academicYear?.startsOn && startDate < academicYear.startsOn) {
+    throw new Error('La data d’inici no pot ser anterior al curs acadèmic.')
+  }
+  if (academicYear?.endsOn && startDate > academicYear.endsOn) {
+    throw new Error('La data d’inici no pot ser posterior al curs acadèmic.')
+  }
+  return startDate
+}
+
 function compareOrder(left, right) {
   return Number(left.order) - Number(right.order) || String(left.id).localeCompare(String(right.id))
 }
