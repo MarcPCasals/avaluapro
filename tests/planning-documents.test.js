@@ -181,3 +181,43 @@ test('the new Word activity column restores competencies and optional assessment
   assert.equal(parsed.activities[0].curriculumSelections[0].assessmentCriteria[0].label, 'CA1: Rigor')
   assert.deepEqual(parsed.activities[0].indicatorLabels, [])
 })
+
+test('older SG Word variants keep merged curriculum cells and every phase table', () => {
+  const html = `
+    <table><tr><td><p><strong>UP1.1</strong></p><p><strong>1r curs</strong></p></td><td>SEQÜÈNCIA</td></tr></table>
+    <table><tr><td>INFORMACIÓ GENERAL</td></tr><tr><td><strong>Títol:</strong> Itinerari de natura</td></tr></table>
+    <table>
+      <tr><td>ÀREA</td><td>COMPETÈNCIA</td><td>APRENENTATGE ESPERAT</td><td>CRITERI D’AVALUACIÓ</td><td>INDICADOR D’AVALUACIÓ</td><td>ACTIVITAT</td></tr>
+      <tr><td rowspan="2">CAT</td><td rowspan="2">C3 Escriure textos</td><td rowspan="2">Elabora textos instructius</td><td>C3CA1 Adequació</td><td>CAT14 Adequa el text</td><td>2</td></tr>
+      <tr><td>C3CA2 Coherència</td><td>CAT16 Estructura el text</td><td>2,3</td></tr>
+    </table>
+    <table><tr><td>Recursos de competències específiques:</td></tr><tr><td>Fets i conceptes: Text instructiu</td></tr></table>
+    <table>
+      <tr><td colspan="8">FASE DE PREPARACIÓ</td></tr>
+      <tr><td>Núm.</td><td>Subfase</td><td>Descriptiu activitat</td><td>Recursos</td><td>Tps (min)</td><td>Material</td><td>Agrup. / Espai</td><td>IA</td></tr>
+      <tr><td>1</td><td>P1 Presentació</td><td>Activitat: Presentar els aprenentatges</td><td>TC2 Autoconeixement</td><td>20’</td><td>Portafolis</td><td>Gran grup</td><td></td></tr>
+    </table>
+    <table>
+      <tr><td colspan="8">FASE DE RESOLUCIÓ</td></tr>
+      <tr><td>Núm.</td><td>Subfase</td><td>Descriptiu activitat</td><td>Recursos</td><td>Tps (min)</td><td>Material</td><td>Agrup. / Espai</td><td>IA</td></tr>
+      <tr><td>2</td><td>R1 Propostes</td><td>Activitat: Formular propostes</td><td>TC1 Definició del problema</td><td>30</td><td>Quadern</td><td>Parelles</td><td>CAT14</td></tr>
+    </table>
+    <table>
+      <tr><td colspan="8">FASE D’INTEGRACIÓ</td></tr>
+      <tr><td>Núm.</td><td>Subfase</td><td>Descriptiu activitat</td><td>Recursos</td><td>Tps (min)</td><td>Material</td><td>Agrup. / Espai</td><td>IA</td></tr>
+      <tr><td>3</td><td>I1 Conclusions</td><td>Activitat: Revisar els aprenentatges</td><td>TC2 Metacognició</td><td>15</td><td>Portafolis</td><td>Individual</td><td>CAT16</td></tr>
+    </table>
+    <p>Total Temps (minuts) de les tres fases 65’</p>`
+  const parsed = parsePlanningWordHtml(html)
+  assert.equal(parsed.activities.length, 3)
+  assert.deepEqual(parsed.phases.filter((phase) => !phase.parentKey).map((phase) => phase.title), ['Preparació', 'Resolució', 'Integració'])
+  assert.deepEqual(parsed.activities.map((activity) => activity.plannedMinutes), [20, 30, 15])
+  assert.deepEqual(parsed.activities.map((activity) => activity.grouping), ['Gran grup', 'Parelles', 'Individual'])
+  assert.deepEqual(parsed.activities.map((activity) => activity.teacherMaterials[0].label), ['Portafolis', 'Quadern', 'Portafolis'])
+  assert.match(parsed.activities[0].description, /Recursos vinculats al document:\nTC2 Autoconeixement/)
+  assert.deepEqual(parsed.unit.curriculum.expectedLearnings.map((item) => item.label), ['Elabora textos instructius'])
+  assert.deepEqual(parsed.unit.curriculum.assessmentCriteria.map((item) => item.label), ['C3CA1 Adequació', 'C3CA2 Coherència'])
+  assert.deepEqual(parsed.unit.curriculum.indicators.map((item) => item.label), ['CAT14 Adequa el text', 'CAT16 Estructura el text', 'CAT14', 'CAT16'])
+  assert.equal(parsed.unit.curriculum.expectedLearnings.some((item) => /^\d/.test(item.label)), false)
+  assert.equal(parsed.importSummary.warning, '')
+})

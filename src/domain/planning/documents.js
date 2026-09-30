@@ -229,15 +229,45 @@ function htmlToLines(value) {
 }
 
 function extractHtmlTables(html) {
-  return [...String(html || '').matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)].map((tableMatch) => (
-    [...tableMatch[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((rowMatch) => (
-      [...rowMatch[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cellMatch) => ({
-        html: cellMatch[1],
-        lines: htmlToLines(cellMatch[1]),
-        text: htmlToLines(cellMatch[1]).join('\n'),
-      }))
-    ))
-  ))
+  return [...String(html || '').matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)].map((tableMatch) => {
+    const pendingRowspans = []
+    return [...tableMatch[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((rowMatch) => {
+      const row = []
+      let column = 0
+      const appendPendingCells = () => {
+        while (pendingRowspans[column]) {
+          const pending = pendingRowspans[column]
+          row[column] = pending.cell
+          pending.remaining -= 1
+          if (pending.remaining <= 0) pendingRowspans[column] = null
+          column += 1
+        }
+      }
+      appendPendingCells()
+      ;[...rowMatch[1].matchAll(/<t[dh]\b([^>]*)>([\s\S]*?)<\/t[dh]>/gi)].forEach((cellMatch) => {
+        appendPendingCells()
+        const attributes = cellMatch[1] || ''
+        const html = cellMatch[2]
+        const cell = {
+          html,
+          lines: htmlToLines(html),
+          text: htmlToLines(html).join('\n'),
+        }
+        const columnSpan = Math.max(1, Number(/\bcolspan=["']?(\d+)/i.exec(attributes)?.[1]) || 1)
+        const rowSpan = Math.max(1, Number(/\browspan=["']?(\d+)/i.exec(attributes)?.[1]) || 1)
+        for (let offset = 0; offset < columnSpan; offset += 1) {
+          row[column + offset] = cell
+          if (rowSpan > 1) pendingRowspans[column + offset] = { cell, remaining: rowSpan - 1 }
+        }
+        column += columnSpan
+      })
+      while (column < pendingRowspans.length) {
+        appendPendingCells()
+        if (!pendingRowspans[column]) column += 1
+      }
+      return row
+    })
+  })
 }
 
 function afterLabel(lines, labelPattern) {
@@ -326,8 +356,80 @@ function phaseKindFromLabel(value) {
   const normalized = text(value).toLocaleLowerCase('ca')
   if (normalized.includes('preparaci')) return 'preparation'
   if (normalized.includes('resoluci')) return 'resolution'
-  if (normalized.includes('tancament')) return 'closing'
+  if (normalized.includes('tancament') || normalized.includes('integraci')) return 'closing'
   return 'custom'
+}
+
+function phaseTitleFromLabel(value) {
+  const matched = text(value).match(/fase\s+(?:de|d['’])\s*(.+?)(?:\n|$)/i)
+  const title = text(matched?.[1]).replace(/[.:;]+$/, '')
+  if (!title) return ''
+  return title.charAt(0).toLocaleUpperCase('ca') + title.slice(1).toLocaleLowerCase('ca')
+}
+
+function sequenceColumnIndexes(row) {
+  const headers = row.map((cell) => normalizedHeader(cell?.text))
+  const find = (...patterns) => headers.findIndex((header) => patterns.some((pattern) => pattern.test(header)))
+  return {
+    activity: find(/^descriptiu activitat$/, /^activitat$/, /^descripcio/),
+    curriculum: find(/^competencies criteris/, /^competencia criteri/),
+    grouping: find(/^agrup/, /^agrupament/),
+    indicators: find(/^ia$/, /^indicador/),
+    materials: find(/^material/),
+    minutes: find(/^tps min$/, /^temps(?: min(?:uts)?)?$/, /^min(?:uts)?$/, /^durada/),
+    number: find(/^num$/, /^numero$/),
+    resources: find(/^recursos?$/),
+    space: find(/^espai$/, /^aula$/),
+    subphase: find(/^subfase$/),
+  }
+}
+
+function isSequenceHeader(row) {
+  const columns = sequenceColumnIndexes(row)
+  return columns.activity >= 0 && columns.number >= 0
+}
+
+function legacySequenceColumns() {
+  return {
+    activity: 2,
+    curriculum: -1,
+    grouping: 5,
+    indicators: 6,
+    materials: 4,
+    minutes: 3,
+    number: 0,
+    resources: -1,
+    space: -1,
+    subphase: 1,
+  }
+}
+
+function isSequenceTable(table) {
+  if (table.some(isSequenceHeader)) return true
+  const hasPhaseLabel = table.some((row) => row.some((cell) => phaseTitleFromLabel(cell?.text)))
+  const hasNumberedRow = table.some((row) => /^\d+\s*[.)-]?$/.test(text(row[0]?.text)) && row.length >= 7)
+  return hasPhaseLabel && hasNumberedRow
+}
+
+function cellLines(row, index) {
+  return index >= 0 ? row[index]?.lines || [] : []
+}
+
+function cellText(row, index) {
+  return index >= 0 ? text(row[index]?.text) : ''
+}
+
+function withImportedResources(description, resources) {
+  if (!resources) return description
+  return [description, `Recursos vinculats al document:\n${resources}`].filter(Boolean).join('\n\n')
+}
+
+function declaredSequenceMinutes(html) {
+  const line = htmlToLines(html).find((candidate) => /total\s+(?:de\s+)?temps.*tres fases/i.test(candidate)) || ''
+  const afterLabel = /tres fases\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i.exec(line)
+  if (afterLabel) return Number(afterLabel[1].replace(',', '.'))
+  const values = [...line.matchAll(/\d+(?:[.,]\d+)?/g)]
+  return values.length === 1 ? Number(values[0][0].replace(',', '.')) : null
 }
 
 function importedCurriculumKey(prefix, label, parentKey = '') {
@@ -391,82 +493,101 @@ export function parsePlanningWordHtml(html) {
     const row = generalLines.find((lines) => lines.some((line) => pattern.test(line))) || []
     return afterLabel(row, pattern)
   }
-  const sequenceTable = tables.find((table) => table.some((row) => row.some((cell) => /fase de (preparaci|resoluci|tancament)/i.test(cell.text))))
-  if (!sequenceTable) throw new Error('El Word no conté cap taula de seqüència reconeguda.')
+  const sequenceTables = tables.filter(isSequenceTable)
+  if (sequenceTables.length === 0) throw new Error('El Word no conté cap taula de seqüència reconeguda.')
 
   const phases = []
-  const phaseKeyByKind = new Map()
+  const phaseKeyBySignature = new Map()
   const subphaseOccurrences = new Map()
   const activities = []
+  const activityNumbers = []
   let currentKind = 'custom'
+  let currentRootKey = null
   let currentSubphaseKey = null
   let currentSubphaseLabel = ''
-  const ensureRootPhase = (kind) => {
-    if (phaseKeyByKind.has(kind)) return phaseKeyByKind.get(kind)
+  const ensureRootPhase = (kind, title = PHASE_LABELS[kind]) => {
+    const safeTitle = text(title) || PHASE_LABELS[kind] || 'Fase importada'
+    const signature = `${kind}:${comparableImportedLabel(safeTitle)}`
+    if (phaseKeyBySignature.has(signature)) return phaseKeyBySignature.get(signature)
     const key = `phase-${phases.length + 1}`
-    phases.push({ key, kind, order: phaseKeyByKind.size, parentKey: null, title: PHASE_LABELS[kind] })
-    phaseKeyByKind.set(kind, key)
+    phases.push({ key, kind, order: phases.filter((phase) => !phase.parentKey).length, parentKey: null, title: safeTitle })
+    phaseKeyBySignature.set(signature, key)
     return key
   }
   const parsedCurriculum = parseCurriculum(tables)
-  const sequenceHeader = sequenceTable.find((row) => row.some((cell) => normalizedHeader(cell.text) === 'descriptiu activitat')) || []
-  const hasActivityCurriculum = /competencies criteris/.test(normalizedHeader(sequenceHeader[6]?.text))
-  sequenceTable.forEach((row) => {
-    const rowText = row.map((cell) => cell.text).join(' ')
-    if (/fase de (preparaci|resoluci|tancament)/i.test(rowText)) {
-      currentKind = phaseKindFromLabel(rowText)
-      ensureRootPhase(currentKind)
-      currentSubphaseKey = null
-      currentSubphaseLabel = ''
-      return
-    }
-    if (!/^\d+\s*[.)-]?$/.test(text(row[0]?.text)) || row.length < 3) return
-    const subphase = text(row[1]?.text)
-    const rootKey = ensureRootPhase(currentKind)
-    const parsedContent = parseActivityContent(row[2]?.lines || [])
-    if (subphase) {
-      // Una mateixa etiqueta (R1, R2...) pot aparèixer en trams diferents.
-      // Només agrupem files consecutives; així l'ordre original del Word no
-      // queda alterat quan comença una segona pregunta o un segon cicle didàctic.
-      if (!currentSubphaseKey || comparableImportedLabel(currentSubphaseLabel) !== comparableImportedLabel(subphase)) {
-        const signature = `${currentKind}:${comparableImportedLabel(subphase)}`
-        const occurrence = (subphaseOccurrences.get(signature) || 0) + 1
-        subphaseOccurrences.set(signature, occurrence)
-        const key = `phase-${phases.length + 1}`
-        phases.push({
-          key,
-          kind: currentKind,
-          order: phases.filter((phase) => phase.parentKey === rootKey).length,
-          parentKey: rootKey,
-          title: occurrence === 1 ? subphase : `${subphase} (${occurrence})`,
-        })
-        currentSubphaseKey = key
+  sequenceTables.forEach((sequenceTable) => {
+    let columns = null
+    sequenceTable.forEach((row) => {
+      const phaseTitle = row.map((cell) => phaseTitleFromLabel(cell?.text)).find(Boolean) || ''
+      if (phaseTitle) {
+        currentKind = phaseKindFromLabel(phaseTitle)
+        currentRootKey = ensureRootPhase(currentKind, phaseTitle)
+        currentSubphaseKey = null
+        currentSubphaseLabel = ''
+        if (!columns) columns = legacySequenceColumns()
+        return
       }
-      currentSubphaseLabel = subphase
-    }
-    // Les plantilles oficials deixen sovint la subfase en blanc per indicar que
-    // l'activitat continua el mateix tram. En aquest cas l'heretem.
-    const phaseKey = currentSubphaseKey || rootKey
-    if (parsedContent.title.length > 120 && subphase && !/^[a-z]\d+$/i.test(subphase)) {
-      parsedContent.description = [parsedContent.title, parsedContent.description].filter(Boolean).join('\n')
-      parsedContent.title = subphase
-    }
-    const indicatorLabels = hasActivityCurriculum ? [] : textList((row[6]?.lines || []).flatMap((line) => line.split(/[;,]/)))
-    activities.push({
-      ...parsedContent,
-      curriculumSelections: hasActivityCurriculum ? parseActivityCurriculum(row[6]?.lines || [], parsedCurriculum) : [],
-      diversityMeasures: parsedContent.diversityText ? [{ label: parsedContent.diversityText, studentNames: [] }] : [],
-      evidenceMode: 'none',
-      grouping: text(row[5]?.text),
-      indicatorLabels,
-      order: activities.filter((activity) => activity.phaseKey === phaseKey).length,
-      pedagogicalType: inferPedagogicalType(`${subphase} ${parsedContent.title}`),
-      phaseKey,
-      plannedMinutes: parseMinutes(row[3]?.text),
-      space: '',
-      studentMaterials: [],
-      teacherMaterials: textList(row[4]?.lines).map(materialFromText),
-      type: 'activity',
+      if (isSequenceHeader(row)) {
+        columns = sequenceColumnIndexes(row)
+        return
+      }
+      if (!columns) return
+      const numberText = cellText(row, columns.number)
+      if (!/^\d+\s*[.)-]?$/.test(numberText)) return
+      const subphase = cellText(row, columns.subphase)
+      const rootKey = currentRootKey || ensureRootPhase(currentKind, PHASE_LABELS[currentKind])
+      const parsedContent = parseActivityContent(cellLines(row, columns.activity))
+      if (subphase) {
+        // Una mateixa etiqueta (R1, R2...) pot aparèixer en trams diferents.
+        // Només agrupem files consecutives; així l'ordre original del Word no
+        // queda alterat quan comença una segona pregunta o un segon cicle didàctic.
+        if (!currentSubphaseKey || comparableImportedLabel(currentSubphaseLabel) !== comparableImportedLabel(subphase)) {
+          const signature = `${rootKey}:${comparableImportedLabel(subphase)}`
+          const occurrence = (subphaseOccurrences.get(signature) || 0) + 1
+          subphaseOccurrences.set(signature, occurrence)
+          const key = `phase-${phases.length + 1}`
+          phases.push({
+            key,
+            kind: currentKind,
+            order: phases.filter((phase) => phase.parentKey === rootKey).length,
+            parentKey: rootKey,
+            title: occurrence === 1 ? subphase : `${subphase} (${occurrence})`,
+          })
+          currentSubphaseKey = key
+        }
+        currentSubphaseLabel = subphase
+      }
+      // Les plantilles oficials deixen sovint la subfase en blanc per indicar que
+      // l'activitat continua el mateix tram. En aquest cas l'heretem.
+      const phaseKey = currentSubphaseKey || rootKey
+      if (parsedContent.title.length > 120 && subphase && !/^[a-z]\d+$/i.test(subphase)) {
+        parsedContent.description = [parsedContent.title, parsedContent.description].filter(Boolean).join('\n')
+        parsedContent.title = subphase
+      }
+      parsedContent.description = withImportedResources(parsedContent.description, cellText(row, columns.resources))
+      const curriculumLines = cellLines(row, columns.curriculum)
+      const indicatorLines = cellLines(row, columns.indicators)
+      const hasActivityCurriculum = columns.curriculum >= 0
+      const indicatorLabels = hasActivityCurriculum
+        ? []
+        : textList(indicatorLines.flatMap((line) => line.split(/[;,]/)))
+      activityNumbers.push(Number(numberText.match(/\d+/)?.[0]))
+      activities.push({
+        ...parsedContent,
+        curriculumSelections: hasActivityCurriculum ? parseActivityCurriculum(curriculumLines, parsedCurriculum) : [],
+        diversityMeasures: parsedContent.diversityText ? [{ label: parsedContent.diversityText, studentNames: [] }] : [],
+        evidenceMode: 'none',
+        grouping: cellText(row, columns.grouping),
+        indicatorLabels,
+        order: activities.filter((activity) => activity.phaseKey === phaseKey).length,
+        pedagogicalType: inferPedagogicalType(`${subphase} ${parsedContent.title}`),
+        phaseKey,
+        plannedMinutes: parseMinutes(cellText(row, columns.minutes)),
+        space: cellText(row, columns.space),
+        studentMaterials: [],
+        teacherMaterials: textList(cellLines(row, columns.materials)).map(materialFromText),
+        type: 'activity',
+      })
     })
   })
   if (activities.length === 0) throw new Error('No s’ha trobat cap activitat numerada al Word.')
@@ -486,8 +607,7 @@ export function parsePlanningWordHtml(html) {
     section.factsAndConcepts.length || section.procedures.length || section.attitudesAndValues.length
   ))
   const calculatedTotalMinutes = activities.reduce((sum, activity) => sum + (Number(activity.plannedMinutes) || 0), 0)
-  const totalLine = htmlToLines(html).find((line) => /total\s+(?:de\s+)?temps.*tres fases/i.test(line)) || ''
-  const declaredTotalMinutes = parseMinutes(totalLine.replace(/^.*?:/, ''))
+  const declaredTotalMinutes = declaredSequenceMinutes(html)
   const warnings = []
   if (!hasCurriculum || !hasResources) {
     warnings.push('Aquest Word no conté els blocs curriculars complets; podràs acabar-los dins de la UP importada.')
@@ -495,6 +615,13 @@ export function parsePlanningWordHtml(html) {
   if (declaredTotalMinutes != null && declaredTotalMinutes !== calculatedTotalMinutes) {
     warnings.push(`El Word declara ${declaredTotalMinutes} minuts, però les activitats detectades en sumen ${calculatedTotalMinutes}.`)
   }
+  const missingMinutes = activities.filter((activity) => activity.plannedMinutes == null).length
+  if (missingMinutes > 0) warnings.push(`${missingMinutes} ${missingMinutes === 1 ? 'activitat no té' : 'activitats no tenen'} temporització.`)
+  const uniqueNumbers = [...new Set(activityNumbers)].sort((left, right) => left - right)
+  const missingNumbers = uniqueNumbers.length
+    ? Array.from({ length: uniqueNumbers.at(-1) }, (_, index) => index + 1).filter((number) => !uniqueNumbers.includes(number))
+    : []
+  if (missingNumbers.length > 0) warnings.push(`No s’han trobat les activitats ${missingNumbers.join(', ')} de la numeració del document.`)
   const title = field(/^t[ií]tol\s*:?/i) || 'UP importada'
   return {
     format: PLANNING_DOCUMENT_FORMAT,
@@ -516,7 +643,10 @@ export function parsePlanningWordHtml(html) {
       activityCount: activities.length,
       calculatedTotalMinutes,
       declaredTotalMinutes,
+      materialCount: activities.reduce((sum, activity) => sum + activity.teacherMaterials.length + activity.studentMaterials.length, 0),
+      missingMinutes,
       phaseCount: phases.filter((phase) => !phase.parentKey).length,
+      warnings,
       warning: warnings.join(' '),
     },
   }

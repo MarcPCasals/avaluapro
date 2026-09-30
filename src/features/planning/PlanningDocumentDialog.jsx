@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { ClipboardPaste, FileJson, FileText, Import, Loader2, Upload } from 'lucide-react'
+import { CircleHelp, ClipboardPaste, Download, FileJson, FileText, Import, Loader2, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { parsePlanningDocumentExport, parsePlanningTableText } from '../../domain/planning/documents'
+import { downloadBlob } from '../../lib/downloads'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
@@ -10,6 +11,9 @@ function ImportPreview({ bundle }) {
   if (!bundle) return null
   const totalMinutes = bundle.importSummary?.calculatedTotalMinutes
     ?? bundle.activities.reduce((sum, activity) => sum + (Number(activity.plannedMinutes) || 0), 0)
+  const warnings = bundle.importSummary?.warnings
+    || (bundle.importSummary?.warning ? [bundle.importSummary.warning] : [])
+  const phaseByKey = new Map(bundle.phases.map((phase) => [phase.key, phase]))
   return (
     <section className="planning-import-preview">
       <div><span>UP detectada</span><strong>{bundle.unit.code} · {bundle.unit.title}</strong><small>{bundle.unit.level}</small></div>
@@ -18,15 +22,16 @@ function ImportPreview({ bundle }) {
         <div><dt>Subfases</dt><dd>{bundle.phases.filter((phase) => phase.parentKey).length}</dd></div>
         <div><dt>Activitats</dt><dd>{bundle.activities.length}</dd></div>
         <div><dt>Temps detectat</dt><dd>{totalMinutes} min</dd></div>
+        <div><dt>Materials</dt><dd>{bundle.importSummary?.materialCount ?? 0}</dd></div>
       </dl>
-      {bundle.importSummary?.warning && <p>{bundle.importSummary.warning}</p>}
+      {warnings.length > 0 && <ul className="planning-import-warnings">{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       <details>
         <summary>Revisar les activitats detectades</summary>
         <ol>
           {bundle.activities.map((activity, index) => (
             <li key={`${activity.phaseKey}:${activity.order}:${index}`}>
               <span>{index + 1}</span>
-              <div><strong>{activity.title}</strong><small>{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}</small></div>
+              <div><strong>{activity.title}</strong><small>{[phaseByKey.get(activity.phaseKey)?.title, activity.plannedMinutes != null ? `${activity.plannedMinutes} min` : 'Sense temps', `${(activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)} materials`].filter(Boolean).join(' · ')}</small></div>
             </li>
           ))}
         </ol>
@@ -43,6 +48,7 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
   const [temporalUnitId, setTemporalUnitId] = useState(unit?.temporalUnitId || temporalUnits[0]?.id || '')
   const [targetPhaseId, setTargetPhaseId] = useState(phases[0]?.id || '')
   const [busy, setBusy] = useState(false)
+  const [templateBusy, setTemplateBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const wordInput = useRef(null)
@@ -74,6 +80,19 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
       setError(operationError.message || 'No s’ha pogut llegir el JSON.')
     } finally {
       setBusy(false)
+    }
+  }
+  const downloadTemplate = async () => {
+    setTemplateBusy(true)
+    setError('')
+    try {
+      const { buildPlanningWordTemplateBlob } = await import('./planningWord')
+      downloadBlob(await buildPlanningWordTemplateBlob(), 'plantilla-programacio-avaluapro.docx')
+      setSuccess('Plantilla Word descarregada. Les fases i subfases són orientatives i es poden canviar.')
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut crear la plantilla Word.')
+    } finally {
+      setTemplateBusy(false)
     }
   }
   const previewTable = () => {
@@ -129,9 +148,23 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
           <div className="planning-import-source-actions">
             <button className="secondary-action" disabled={busy} onClick={() => wordInput.current?.click()} type="button"><FileText size={17} />Seleccionar Word</button>
             <button className="secondary-action" disabled={busy} onClick={() => jsonInput.current?.click()} type="button"><FileJson size={17} />Seleccionar JSON</button>
+            <button className="secondary-action" disabled={templateBusy} onClick={downloadTemplate} type="button">{templateBusy ? <Loader2 className="spin" size={17} /> : <Download size={17} />}Descarregar plantilla Word</button>
             <input accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={(event) => readWord(event.target.files?.[0])} ref={wordInput} type="file" />
             <input accept=".json,application/json" hidden onChange={(event) => readJson(event.target.files?.[0])} ref={jsonInput} type="file" />
           </div>
+          <details className="planning-import-guide" open>
+            <summary><CircleHelp size={16} />Com preparar el Word</summary>
+            <div>
+              <p>La plantilla és recomanada, però el lector també accepta versions antigues amb una columna de Recursos.</p>
+              <ul>
+                <li>Posa cada activitat en una fila i identifica-la amb un número únic.</li>
+                <li>Conserva les capçaleres Núm., Subfase, Descriptiu activitat, Temps, Material i Agrupament.</li>
+                <li>Escriu la durada com 20, 20 min o 20’. Evita indicar-hi el nombre de sessions.</li>
+                <li>Pots afegir, canviar o eliminar fases i subfases. Escriu el nom de cada fase damunt de la seva taula.</li>
+                <li>Abans d’importar, revisa el recompte d’activitats, els minuts i els avisos de la previsualització.</li>
+              </ul>
+            </div>
+          </details>
           {busy && <p className="planning-import-loading"><Loader2 className="spin" size={17} />Llegint el fitxer…</p>}
           <ImportPreview bundle={bundle} />
           {bundle && <div className="planning-import-confirm"><label>Unitat temporal<select value={temporalUnitId} onChange={(event) => setTemporalUnitId(event.target.value)}>{temporalUnits.map((temporalUnit) => <option key={temporalUnit.id} value={temporalUnit.id}>{temporalUnit.label}</option>)}</select></label><button className="primary-action" disabled={busy || !temporalUnitId} onClick={importBundle} type="button">Crear la còpia importada</button></div>}

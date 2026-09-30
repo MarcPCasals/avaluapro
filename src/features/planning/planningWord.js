@@ -188,7 +188,7 @@ function activityDescription(activity) {
   ].join('\n\n')
 }
 
-function activityTable({ activities, phase, unit }) {
+function activityTable({ activities, blankActivityRow = false, phase, unit }) {
   const headerLabels = ['Núm.', 'Subfase', 'Descriptiu activitat', 'Min.', 'Materials', 'Agrup. / espai', 'Competències / criteris']
   const allIndicators = new Map((unit.curriculum?.indicators || []).map((indicator) => [indicator.id, indicator.label]))
   return new Table({
@@ -228,6 +228,17 @@ function activityTable({ activities, phase, unit }) {
           cell(paragraph(activityCurriculumText(activity) || (activity.indicatorIds || []).map((id) => allIndicators.get(id)).filter(Boolean).join('\n'), { run: { size: 14 } })),
         ],
       })),
+      ...(blankActivityRow && activities.length === 0 ? [new TableRow({
+        children: [
+          cell(paragraph('')),
+          cell(paragraph('')),
+          cell(paragraph('')),
+          cell(paragraph('')),
+          cell(paragraph('')),
+          cell(paragraph('')),
+          cell(paragraph('')),
+        ],
+      })] : []),
       new TableRow({
         children: [
           cell(paragraph(`Total fase de ${phase.title.toLocaleLowerCase('ca')}`, { run: { bold: true, size: 15 }, spacing: { after: 0 } }), { columnSpan: 3, fill: 'FAFAFA' }),
@@ -259,13 +270,14 @@ function orderedDocumentActivities(phases, activities) {
 }
 
 /** Crea un Word editable, en horitzontal, amb els mateixos blocs oficials. */
-export async function buildPlanningWordBlob({ activities = [], phases = [], unit }) {
+export async function buildPlanningWordBlob({ activities = [], blankActivityRows = false, phases = [], unit }) {
   const resources = normalizeResourceSections(unit.resourceSections, unit)
   const orderedActivities = orderedDocumentActivities(phases, activities)
   const rootPhases = phases.filter((phase) => !phase.parentPhaseId).sort((a, b) => a.order - b.order)
   const sequenceChildren = rootPhases.flatMap((phase) => [
     activityTable({
       activities: orderedActivities.filter((activity) => activity.rootPhaseId === phase.id),
+      blankActivityRow: blankActivityRows,
       phase,
       unit,
     }),
@@ -316,6 +328,32 @@ export async function buildPlanningWordBlob({ activities = [], phases = [], unit
     title: `${unit.code} · ${unit.title}`,
   })
   return Packer.toBlob(document)
+}
+
+/** Plantilla recomanada, editable i sense activitats d’exemple que es puguin importar per error. */
+export async function buildPlanningWordTemplateBlob() {
+  return buildPlanningWordBlob({
+    activities: [],
+    blankActivityRows: true,
+    phases: [
+      { id: 'template-preparation', kind: 'preparation', order: 0, parentPhaseId: null, title: 'Preparació' },
+      { id: 'template-resolution', kind: 'resolution', order: 1, parentPhaseId: null, title: 'Resolució' },
+      { id: 'template-closing', kind: 'closing', order: 2, parentPhaseId: null, title: 'Tancament' },
+    ],
+    unit: {
+      code: 'Codi de la UP',
+      complexSituation: '',
+      curriculum: { assessmentCriteria: [], competencies: [], expectedLearnings: [], indicators: [] },
+      expectedProduct: '',
+      level: 'Nivell',
+      resourceSections: {
+        specific: { attitudesAndValues: [], factsAndConcepts: [], procedures: [] },
+        transversal: { attitudesAndValues: [], factsAndConcepts: [], procedures: [] },
+      },
+      title: 'Títol de la unitat de programació',
+      vehicularLanguage: '',
+    },
+  })
 }
 
 /** Llegeix un Word local sense pujar-lo a cap servidor. */
