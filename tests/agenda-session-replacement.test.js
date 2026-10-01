@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAgendaSessionReplacement, createCalendarSession, createSessionItem, createBabeliumItem } from '../src/domain/planning/index.js'
+import { buildAgendaSessionReplacement, createCalendarSession, createSessionItem, createBabeliumItem, getAgendaReplacementActivityOptions } from '../src/domain/planning/index.js'
 
-const application = { id: 'application-fictional', ownerUid: 'teacher-fictional', classId: 'class-fictional' }
+const application = { id: 'application-fictional', ownerUid: 'teacher-fictional', classId: 'class-fictional', planningUnitId: 'up-fictional' }
 const options = { now: '2026-10-01T06:00:00.000Z' }
 function bundle(id, date, title, extras = {}) {
   const session = createCalendarSession({ id, ownerUid: application.ownerUid, applicationId: application.id,
@@ -75,4 +75,88 @@ test('els recordatoris sense minuts s’ajornen juntament amb les activitats', (
   data.existingSessionBundles[0].items[1].order = 1
   const preview = buildAgendaSessionReplacement(data)
   assert.ok(preview.sessions.slice(1).flatMap((b) => b.items).some((i) => i.title === 'Agafar la bata' && i.plannedMinutes === null))
+})
+
+function plannedActivity(id, plannedMinutes = 55) {
+  return { id, planningUnitId: application.planningUnitId, type: 'activity',
+    title: `Activitat ${id}`, plannedMinutes, availableMinutes: plannedMinutes,
+    description: 'Descripció fictícia', materialLinks: [{ label: 'Material fictici', teacherUrl: 'https://example.org/material' }] }
+}
+test('seleccionar una activitat futura trasllada els minuts i conserva el vincle a la Programació', () => {
+  const selected = plannedActivity('B')
+  const preview = buildAgendaSessionReplacement(input({ replacementActivity: selected }))
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.sourceActivityId)), [['B'], ['A']])
+  assert.equal(preview.sessions.flatMap((b) => b.items).filter((i) => i.sourceActivityId === 'B').reduce((sum, i) => sum + i.plannedMinutes, 0), 55)
+  assert.equal(preview.sessions[0].items[0].sourcePlanningUnitId, application.planningUnitId)
+  assert.equal(preview.sessions[0].items[0].title, selected.title)
+  assert.equal(preview.sessions[0].items[0].segmentCount, 1)
+})
+test('retirar el contingut anterior no duplica l’activitat seleccionada més endavant', () => {
+  const preview = buildAgendaSessionReplacement(input({ disposition: 'remove', replacementActivity: plannedActivity('B') }))
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.sourceActivityId)), [['B'], []])
+  assert.equal(preview.removedItems.filter((i) => i.id === 'item-second').length, 1)
+})
+test('traslladar només una part deixa la resta de minuts prevista i renumera els fragments', () => {
+  const preview = buildAgendaSessionReplacement(input({ plannedMinutes: 20, disposition: 'remove', replacementActivity: plannedActivity('B') }))
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.plannedMinutes)), [[20], [35]])
+  assert.deepEqual(preview.sessions.flatMap((b) => b.items).map((i) => [i.segmentIndex, i.segmentCount]), [[1, 2], [2, 2]])
+})
+test('l’activitat seleccionada pot estar pendent de calendaritzar', () => {
+  const preview = buildAgendaSessionReplacement(input({ replacementActivity: plannedActivity('A13') }))
+  assert.equal(preview.sessions[0].items[0].sourceActivityId, 'A13')
+  assert.deepEqual(preview.sessions.slice(1).map((b) => b.items[0].sourceActivityId), ['A', 'B'])
+})
+test('seleccionar la mateixa activitat de la sessió no n’afegeix una còpia', () => {
+  const preview = buildAgendaSessionReplacement(input({ replacementActivity: plannedActivity('A') }))
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.sourceActivityId)), [['A'], ['B']])
+})
+test('els codis A mantenen l’ordre original encara que hi hagi activitats fetes o indicacions', () => {
+  const data = input()
+  const choices = getAgendaReplacementActivityOptions({ ...data,
+    activities: [plannedActivity('A'), { ...plannedActivity('note'), type: 'indication' }, plannedActivity('B')],
+    completedSourceActivityIds: ['A'] })
+  assert.deepEqual(choices.map((a) => [a.code, a.availableMinutes]), [['A1', 0], ['A3', 55]])
+})
+test('els minuts de classes anteriors es reserven i no es tornen a programar', () => {
+  const data = input()
+  data.existingSessionBundles.unshift(bundle('past', '2026-09-29', 'B', { status: 'held' }))
+  const choices = getAgendaReplacementActivityOptions({ ...data, activities: [plannedActivity('B', 110)] })
+  assert.equal(choices[0].availableMinutes, 55)
+  const preview = buildAgendaSessionReplacement({ ...data, replacementActivity: choices[0] })
+  const total = [...preview.sessions, data.existingSessionBundles[0]].flatMap((b) => b.items)
+    .filter((i) => i.sourceActivityId === 'B').reduce((sum, i) => sum + i.plannedMinutes, 0)
+  assert.equal(total, 110)
+})
+test('no es pot seleccionar una activitat d’una altra UP ni superar els minuts pendents', () => {
+  assert.throws(() => buildAgendaSessionReplacement(input({ replacementActivity: { ...plannedActivity('B'), planningUnitId: 'other-up' } })), /disponibles/)
+  assert.throws(() => buildAgendaSessionReplacement(input({ replacementActivity: plannedActivity('B', 20) })), /disponibles/)
+})
+test('seleccionar des del segon mig grup trasllada una sola seqüència pedagògica', () => {
+  const data = input({ targetSessionId: 'paired', replacementActivity: plannedActivity('B'), existingSessionBundles: [
+    bundle('first', '2026-10-02', 'A', { subgroupId: 'A', parallelProgrammingKey: 'pair' }),
+    bundle('paired', '2026-10-02', 'A', { subgroupId: 'B', parallelProgrammingKey: 'pair', startsAt: '2026-10-02T11:00:00' }),
+    bundle('second', '2026-10-05', 'B'),
+  ] })
+  const choices = getAgendaReplacementActivityOptions({ ...data, activities: [plannedActivity('A'), plannedActivity('B')] })
+  assert.equal(choices[0].availableMinutes, 55)
+  const preview = buildAgendaSessionReplacement(data)
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.sourceActivityId)), [['B'], ['B'], ['A']])
+})
+test('seleccionar una activitat amb Babelium conserva la lectura i els minuts pendents', () => {
+  const preview = buildAgendaSessionReplacement(input({ disposition: 'remove', plannedMinutes: 25,
+    replacementActivity: plannedActivity('B'), existingSessionBundles: [
+      bundle('first', '2026-10-02', 'A', { babeliumEnabled: true }), bundle('second', '2026-10-05', 'B'),
+    ] }))
+  assert.deepEqual(preview.sessions.map((b) => b.items.map((i) => i.plannedMinutes)), [[30, 25], [30]])
+  assert.equal(preview.sessions[0].items[1].sourceActivityId, 'B')
+})
+test('el trasllat de mitjos grups amb lectura només en una franja no deixa còpies del fragment', () => {
+  const sourceA = bundle('source-a', '2026-10-05', 'B', { subgroupId: 'A', parallelProgrammingKey: 'source-pair', babeliumEnabled: true })
+  const sourceB = bundle('source-b', '2026-10-05', 'B', { subgroupId: 'B', parallelProgrammingKey: 'source-pair', startsAt: '2026-10-05T11:00:00' })
+  sourceB.items[0].plannedMinutes = 25
+  const preview = buildAgendaSessionReplacement(input({ disposition: 'remove', plannedMinutes: 25,
+    replacementActivity: plannedActivity('B', 25), existingSessionBundles: [bundle('first', '2026-10-02', 'A'), sourceA, sourceB] }))
+  assert.equal(preview.sessions.flatMap((b) => b.items).filter((i) => i.sourceActivityId === 'B').reduce((sum, i) => sum + i.plannedMinutes, 0), 25)
+  assert.equal(preview.removedItems.filter((i) => i.sourceActivityId === 'B').length, 2)
+  assert.equal(preview.sessions[1].items[0].id, 'babelium_source-a')
 })
