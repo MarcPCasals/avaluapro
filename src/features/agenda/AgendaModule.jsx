@@ -935,9 +935,13 @@ export default function AgendaModule() {
         <div className="agenda-brand"><span><CalendarDays size={21} /></span><div><small>Planificació diària</small><h1>Agenda</h1></div></div>
         <div className="agenda-course-controls">
           {workspace.academicYears.length > 0 ? <label>Curs<select value={workspace.activeAcademicYearId} onChange={(event) => workspace.setActiveAcademicYearId(event.target.value)}>{workspace.academicYears.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}</select></label> : <button className="secondary-action compact" onClick={() => setDialog('academic-year')} type="button"><CalendarPlus size={15} />Configurar curs</button>}
-          <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
+          <div className={`agenda-sync-recovery ${workspace.sync.state === 'error' ? 'error' : ''}`}>
+            <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
+            {workspace.sync.state === 'error' && (
+              <button aria-label="Reintentar la sincronització de l’Agenda" className="agenda-sync-retry" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut reintentar la sincronització de l’Agenda.'))} title="Tornar a enviar els canvis pendents a Firebase" type="button"><RotateCcw size={15} />Reintentar sincronització</button>
+            )}
+          </div>
           {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
-          <button aria-label="Actualitzar Agenda" className="agenda-refresh" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut actualitzar l’Agenda.'))} title="Pujar canvis pendents i recuperar Firebase" type="button"><RotateCcw size={15} /></button>
         </div>
       </header>
 
@@ -949,7 +953,14 @@ export default function AgendaModule() {
       </nav>
 
       {workspace.error && <div className="agenda-error"><span>{workspace.error}</span><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
-      {workspace.sync.message && workspace.sync.state !== 'review' && <div className="agenda-sync-message"><span>{workspace.sync.message}</span></div>}
+      {workspace.sync.message && workspace.sync.state !== 'review' && (
+        <div className="agenda-sync-message">
+          <span>{workspace.sync.message}</span>
+          {workspace.sync.state === 'error' && (
+            <button className="agenda-message-retry" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut reintentar la sincronització de l’Agenda.'))} type="button"><RotateCcw size={15} />Reintentar sincronització</button>
+          )}
+        </div>
+      )}
       {workspace.sync.state === 'review' && (
         <div className="agenda-sync-message conflict">
           <span>Hi ha versions diferents en dos dispositius.</span>

@@ -686,13 +686,25 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
               {planningReminderSummary.count > 0 && <span>{planningReminderSummary.count}</span>}
             </button>
           )}
-          <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
-          <button aria-label="Actualitzar Programació" className="secondary-action compact" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut actualitzar la Programació.'))} title="Pujar canvis pendents i recuperar Firebase" type="button"><RotateCcw size={15} />Actualitzar</button>
+          <div className={`planning-sync-recovery ${workspace.sync.state === 'error' ? 'error' : ''}`}>
+            <SyncBadge isOnline={workspace.isOnline} sync={workspace.sync} />
+            {workspace.sync.state === 'error' && (
+              <button aria-label="Reintentar la sincronització de Programació" className="planning-sync-retry" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut reintentar la sincronització de Programació.'))} title="Tornar a enviar els canvis pendents a Firebase" type="button"><RotateCcw size={15} />Reintentar sincronització</button>
+            )}
+          </div>
         </div>
       </header>
 
       {workspace.error && <div className="planning-message error"><strong>{workspace.error}</strong><button onClick={() => workspace.setError('')} type="button">Tancar</button></div>}
-      {workspace.sync.message && workspace.sync.state !== 'review' && <div className="planning-message warning"><Cloud size={18} /><strong>{workspace.sync.message}</strong></div>}
+      {workspace.sync.message && workspace.sync.state !== 'review' && (
+        <div className="planning-message warning">
+          <Cloud size={18} />
+          <strong>{workspace.sync.message}</strong>
+          {workspace.sync.state === 'error' && (
+            <button className="planning-message-retry" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut reintentar la sincronització de Programació.'))} type="button"><RotateCcw size={15} />Reintentar sincronització</button>
+          )}
+        </div>
+      )}
       {workspace.sync.state === 'review' && (
         <div className="planning-message warning planning-conflict-message">
           <div><Cloud size={18} /><strong>Hi ha versions diferents en dos dispositius.</strong></div>
