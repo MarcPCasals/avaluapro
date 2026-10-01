@@ -532,6 +532,26 @@ describe('Planificació compartida', () => {
     assert.equal((await getDoc(sessionRef(db))).data().status, 'held')
   })
 
+  test('la cua conserva la identitat remota d’un element tècnic reconstruït localment', async () => {
+    const db = authDb(AGENDA_EDITOR)
+    const recreatedAt = '2026-09-18T12:08:00.000Z'
+    const recreated = sessionItemData({
+      createdAt: recreatedAt,
+      title: 'Babèlium · Lectura autònoma',
+      updatedAt: recreatedAt,
+    })
+    const result = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(recreated, { planningUnitId: UP_ID }, NOW, AGENDA_EDITOR.uid),
+    )
+
+    assert.equal(result.applied, true)
+    const saved = (await getDoc(doc(sessionRef(db), 'items', recreated.id))).data()
+    assert.equal(saved.createdAt, NOW)
+    assert.equal(saved.updatedAt, recreatedAt)
+    assert.equal(saved.title, 'Babèlium · Lectura autònoma')
+  })
+
   test('l’aplicació de grup conserva un nom llegible sense ampliar els permisos', async () => {
     const ownerDb = authDb(OWNER)
     await assertSucceeds(setDoc(

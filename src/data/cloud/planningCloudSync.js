@@ -27,6 +27,31 @@ function cleanValue(value) {
   )
 }
 
+const IMMUTABLE_ENTITY_FIELDS = Object.freeze([
+  'createdAt',
+  'entityType',
+  'id',
+  'ownerUid',
+  'schemaVersion',
+])
+
+/**
+ * Una reconstrucció local pot tornar a crear un document tècnic amb el mateix
+ * identificador estable sense haver carregat encara la seva còpia remota. Si
+ * el document ja existeix, una actualització ha de conservar-ne la identitat
+ * original; les regles de Firestore bloquegen expressament qualsevol canvi en
+ * aquests camps.
+ */
+function withRemoteEntityIdentity(value, remoteValue) {
+  if (!remoteValue) return value
+  return {
+    ...value,
+    ...Object.fromEntries(IMMUTABLE_ENTITY_FIELDS
+      .filter((field) => remoteValue[field] !== undefined)
+      .map((field) => [field, remoteValue[field]])),
+  }
+}
+
 function isAccessGrantPath(pathParts) {
   return pathParts.length === 4 && pathParts[0] === 'planningUnits' && pathParts[2] === 'accessGrants'
 }
@@ -145,7 +170,7 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
     }
 
     if (operation.operation === 'delete') transaction.delete(reference)
-    else transaction.set(reference, cleanValue(operation.value), {
+    else transaction.set(reference, cleanValue(withRemoteEntityIdentity(operation.value, remoteValue)), {
       merge: pathParts.length === 2 && pathParts[0] === 'planningUnits',
     })
     return { applied: true, remoteUpdatedAt: operation.value?.updatedAt || '' }
