@@ -26,6 +26,7 @@ import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 import {
   buildSchedulingPersistenceEntries,
   requireConfirmedSchedulingSync,
+  selectCurrentPlanningApplicationRecords,
 } from './agendaSchedulingPersistence'
 import {
   copyTimetableVersionStructure,
@@ -601,7 +602,7 @@ export function useAgendaWorkspace(user, classes = []) {
         .filter((application) => application.status !== 'archived')
         .map((application) => ({ application, planningUnit: unit })))
     }))
-    return applicationGroups.flat()
+    return selectCurrentPlanningApplicationRecords(applicationGroups.flat())
   }, [allPlanningUnits, refreshRevision, repository, user, userEmail])
 
   const loadSessionRange = useCallback(async ({

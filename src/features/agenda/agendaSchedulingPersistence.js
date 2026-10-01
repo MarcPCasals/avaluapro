@@ -59,3 +59,27 @@ export function requireConfirmedSchedulingSync(summary) {
     + 'La finestra es manté oberta perquè no sembli que la sincronització ha acabat.',
   )
 }
+
+/**
+ * Una UP només té una aplicació vigent per grup. Els intents antics podien
+ * deixar més d'una aplicació activa amb sessions equivalents; la més recent
+ * és la que conté la reordenació confirmada i és l'única que s'ha de mostrar.
+ * En tutoria, cada gestor conserva la seva aplicació independent.
+ */
+export function selectCurrentPlanningApplicationRecords(records = []) {
+  const selected = new Map()
+  for (const record of records) {
+    const application = record?.application
+    const planningUnit = record?.planningUnit
+    if (!application?.id || !planningUnit?.id) continue
+    const managerKey = planningUnit.tutoringSpaceId ? application.managerUid || '' : ''
+    const key = `${planningUnit.id}:${application.classId || ''}:${managerKey}`
+    const current = selected.get(key)
+    const version = `${application.updatedAt || application.createdAt || ''}:${application.id}`
+    const currentVersion = current
+      ? `${current.application.updatedAt || current.application.createdAt || ''}:${current.application.id}`
+      : ''
+    if (!current || version > currentVersion) selected.set(key, record)
+  }
+  return [...selected.values()]
+}
