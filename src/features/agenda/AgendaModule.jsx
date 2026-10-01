@@ -23,6 +23,7 @@ import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTim
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { findCurrentTemporalUnit } from '../../lib/currentTemporalUnit'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
+import { consumeAgendaSchedulingRequest } from '../../lib/agendaSchedulingNavigation'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassroomMode } from '../classroom/ClassroomMode'
@@ -62,11 +63,6 @@ const AGENDA_VIEW_HELP = {
   timetable: 'Defineix les franges habituals de cada grup i conserva versions de l’horari perquè els canvis no reescriguin el passat.',
 }
 
-function consumeAgendaSchedulingRequest() {
-  const planningUnitId = globalThis.sessionStorage?.getItem('avaluapro:open-agenda-scheduling') || ''
-  if (planningUnitId) globalThis.sessionStorage?.removeItem('avaluapro:open-agenda-scheduling')
-  return planningUnitId
-}
 const GRID_START = 7 * 60 + 30
 const GRID_END = 17 * 60
 const GRID_STEP = 15
@@ -402,7 +398,7 @@ function TimetableView({ classes, onAdd, onAddClass, onCreateVersion, onDelete, 
 }
 
 export default function AgendaModule() {
-  const [initialSchedulingUnitId] = useState(consumeAgendaSchedulingRequest)
+  const [initialSchedulingRequest] = useState(() => consumeAgendaSchedulingRequest(globalThis.sessionStorage))
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
@@ -502,7 +498,7 @@ export default function AgendaModule() {
   const [weekStart, setWeekStart] = useState(() => getAgendaDefaultWeekStart(workspace.today))
   const [calendarMode, setCalendarMode] = useState('week')
   const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))
-  const [dialog, setDialog] = useState(() => initialSchedulingUnitId ? 'scheduling' : null)
+  const [dialog, setDialog] = useState(() => initialSchedulingRequest.planningUnitId ? 'scheduling' : null)
   const [focusedReminderIds, setFocusedReminderIds] = useState([])
   const [activeBundle, setActiveBundle] = useState(null)
   const [editingTimetable, setEditingTimetable] = useState(null)
@@ -512,7 +508,8 @@ export default function AgendaModule() {
   const [editingEvent, setEditingEvent] = useState(null)
   const [eventPreset, setEventPreset] = useState(null)
   const [scheduleNotice, setScheduleNotice] = useState('')
-  const [schedulingUnitId, setSchedulingUnitId] = useState(initialSchedulingUnitId)
+  const [schedulingUnitId, setSchedulingUnitId] = useState(initialSchedulingRequest.planningUnitId)
+  const [schedulingMode, setSchedulingMode] = useState(initialSchedulingRequest.mode)
   const [adjustInitialAction, setAdjustInitialAction] = useState('session')
   const [adjustItemId, setAdjustItemId] = useState('')
   const [classroomRevision, setClassroomRevision] = useState(0)
@@ -941,7 +938,7 @@ export default function AgendaModule() {
               <button aria-label="Reintentar la sincronització de l’Agenda" className="agenda-sync-retry" onClick={() => workspace.refreshFromCloud().catch((refreshError) => workspace.setError(refreshError.message || 'No s’ha pogut reintentar la sincronització de l’Agenda.'))} title="Tornar a enviar els canvis pendents a Firebase" type="button"><RotateCcw size={15} />Reintentar sincronització</button>
             )}
           </div>
-          {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
+          {hasOwnCalendar && <button className="secondary-action compact" onClick={() => { setSchedulingUnitId(''); setSchedulingMode('progressive'); setDialog('scheduling') }} type="button"><CalendarPlus size={15} />Organitzar sessions</button>}
         </div>
       </header>
 
@@ -993,7 +990,7 @@ export default function AgendaModule() {
       {dialog === 'slot' && <TimetableSlotDialog classes={classes} initialPosition={slotPosition} initialValue={editingSlot} onClose={() => setDialog(null)} onSave={workspace.saveSlot} slots={workspace.slots} />}
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'reminders' && <RemindersModal focusedReminderIds={focusedReminderIds} onClose={() => { setDialog(null); setFocusedReminderIds([]) }} sessionOptions={reminderSessionOptions} sessionOptionsLoading={workspace.sessionsLoading} />}
-      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId('') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(schedulingSavedNotice(result)); setTimelinePlanningRevision((revision) => revision + 1); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
+      {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialMode={schedulingMode} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId(''); setSchedulingMode('progressive') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(schedulingSavedNotice(result)); setTimelinePlanningRevision((revision) => revision + 1); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
       {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} onResolveGap={resolveSessionGap} />}
       {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>

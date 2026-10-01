@@ -7,6 +7,7 @@ import {
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
+import { saveAgendaSchedulingRequest } from '../../lib/agendaSchedulingNavigation'
 import {
   AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
   PlanningConnectionDialog, PlanningUnitDialog, TemporalUnitDialog,
@@ -640,7 +641,10 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       workspace.setError(agendaError.message || 'No s’ha pogut preparar aquesta UP per al teu horari.')
       return
     }
-    globalThis.sessionStorage?.setItem('avaluapro:open-agenda-scheduling', workspace.activePlanningUnit?.id || '')
+    saveAgendaSchedulingRequest(globalThis.sessionStorage, {
+      mode: 'smart',
+      planningUnitId: workspace.activePlanningUnit?.id,
+    })
     setActiveMode('agenda')
   }
 

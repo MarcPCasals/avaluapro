@@ -58,6 +58,7 @@ export function AgendaSchedulingDialog({
   academicYear,
   classes,
   initialClassId = '',
+  initialMode = 'progressive',
   initialPlanningUnitId = '',
   onBuildPreview,
   onClose,
@@ -70,7 +71,7 @@ export function AgendaSchedulingDialog({
   const availableUnits = useMemo(() => planningUnits.filter((item) => item.status !== 'archived'), [planningUnits])
   const [values, setValues] = useState(() => ({
     classId: initialClassId || classes[0]?.id || '',
-    mode: 'progressive',
+    mode: initialMode === 'smart' ? 'smart' : 'progressive',
     planningUnitId: initialPlanningUnitId || availableUnits[0]?.id || '',
     startDate: initialStartDate(academicYear, today),
   }))
@@ -209,7 +210,7 @@ export function AgendaSchedulingDialog({
     <Modal onClose={closeDialog} panelClassName="agenda-dialog agenda-scheduling-dialog" size="xl" title="Calendaritzar una UP">
       <div className="agenda-schedule-body">
         <section className="agenda-schedule-config">
-          <div className="agenda-schedule-intro"><Sparkles size={19} /><div><strong>De la seqüència ideal a les dates reals</strong><p>Primer revises la proposta. Les sessions només es creen quan la confirmes.</p></div></div>
+          <div className="agenda-schedule-intro"><Sparkles size={19} /><div><strong>De la seqüència ideal a les dates reals</strong><p>{values.mode === 'smart' ? 'Reorganitzarem només les sessions futures; les sessions impartides o amb dades es conservaran.' : 'Primer revises la proposta. Les sessions només es creen quan la confirmes.'}</p></div></div>
           <div className="agenda-form-row">
             <label>Programació<select disabled={Boolean(setup)} value={values.planningUnitId} onChange={(event) => resetProposal({ planningUnitId: event.target.value })}>{availableUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.title}</option>)}</select></label>
             <label>Grup<select disabled={Boolean(setup)} value={values.classId} onChange={(event) => resetProposal({ classId: event.target.value })}><option value="">Selecciona un grup</option>{classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}</select></label>
