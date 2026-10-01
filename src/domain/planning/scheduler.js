@@ -1037,7 +1037,7 @@ function buildAgendaItemsReflow({
     let activity = activityBySourceKey.get(sourceKey)
     if (!activity) {
       const key = `agenda-reflow:${sourceKey}`
-      activity = { id: key, plannedMinutes: 0, sourceKey, title, type }
+      activity = { id: key, plannedMinutes: 0, untimed: plannedMinutes == null, sourceKey, title, type }
       activityBySourceKey.set(sourceKey, activity)
       activitySequence.push(activity)
       activityMeta.set(key, { sourceActivityId, sourcePlanningUnitId, title, type })
@@ -1086,7 +1086,7 @@ function buildAgendaItemsReflow({
       ? Math.max(0, sourceMinutes - (lockedMinutesByActivityId[sourceActivityId] || 0))
       : Number.POSITIVE_INFINITY
     const plannedMinutes = Math.min(activity.plannedMinutes, remainingSourceMinutes)
-    if (plannedMinutes <= 0) return []
+    if (plannedMinutes <= 0) return activity.untimed ? [{ ...activity, plannedMinutes: null }] : []
     return [{
       ...activity,
       plannedMinutes,
@@ -1182,6 +1182,73 @@ function buildAgendaItemsReflow({
     sessions,
     targetBundle,
   }
+}
+
+/** Substitueix una sessió sense alterar la programació mestra ni l'historial. */
+export function buildAgendaSessionReplacement({
+  application, candidates = [], existingSessionBundles = [], options = {},
+  targetSessionId, title, plannedMinutes, disposition = 'postpone',
+}) {
+  const targetBundle = existingSessionBundles.find((bundle) =>
+    bundle.session.id === targetSessionId && bundle.session.applicationId === application?.id)
+  if (!targetBundle) throw new Error('No s’ha trobat la sessió que vols substituir.')
+  const targetDate = String(targetBundle.session.startsAt).slice(0, 10)
+  const now = options.now || new Date().toISOString()
+  const targets = groupParallelSessionBundles(existingSessionBundles
+    .filter((bundle) => bundle.session.applicationId === application.id))
+    .find((group) => group.bundles.some((bundle) => bundle.session.id === targetSessionId)).bundles
+  if (targets.some((bundle) => !canReflowSession(bundle, targetDate, now)
+    || new Date(bundle.session.startsAt).getTime() < new Date(now).getTime()
+    || bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
+    || bundle.session.classroomClosedAt || (bundle.results || []).length)) {
+    throw new Error('Només es poden substituir sessions futures sense dades de classe.')
+  }
+  if (!['postpone', 'remove'].includes(disposition)) throw new Error('Cal decidir què fer amb les activitats previstes.')
+  const minutes = Number(plannedMinutes)
+  const capacity = Math.min(...targets.map((bundle) =>
+    getProgrammableMinutes(bundle.session.durationMinutes, 5)
+      - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0)))
+  if (!String(title || '').trim() || !Number.isFinite(minutes) || minutes <= 0 || minutes > capacity) {
+    throw new Error(`Cal indicar un títol i una durada entre 1 i ${capacity} minuts.`)
+  }
+  const targetIds = new Set(targets.map((bundle) => bundle.session.id))
+  const originalItems = targets.flatMap((bundle) => bundle.items || [])
+  const replacementSessions = targets.map((bundle) => ({
+    isExisting: true,
+    session: bundle.session,
+    items: [
+      ...(bundle.items || []).filter(isBabeliumItem),
+      createSessionItem({
+        applicationId: application.id, ownerUid: application.ownerUid,
+        sessionId: bundle.session.id, type: 'activity', title: title.trim(),
+        plannedMinutes: minutes, order: (bundle.items || []).filter(isBabeliumItem).length,
+      }, options),
+    ],
+  }))
+  const base = {
+    changedLockedItems: [], changedTargetResults: [],
+    removedItems: [...originalItems.filter((item) => !isBabeliumItem(item)),
+      ...targets.flatMap((bundle) => bundle.removedBabeliumItems || [])],
+    removedResults: [], removedSessions: [], unscheduled: [], sessions: replacementSessions,
+  }
+  let reflow = base
+  if (disposition === 'postpone') {
+    // La pràctica ocupa aquesta classe sencera; el contingut anterior comença a la següent.
+    const lastStartsAt = targets.map((bundle) => bundle.session.startsAt).sort().at(-1)
+    reflow = buildAgendaItemsReflow({
+      application, candidates: candidates.filter((candidate) => candidate.startsAt > lastStartsAt), options,
+      existingSessionBundles: existingSessionBundles.map((bundle) => targetIds.has(bundle.session.id)
+        ? { ...bundle, items: [] } : bundle),
+      additionalActivities: (targetBundle.items || []).filter((item) => !isBabeliumItem(item)),
+      startAfterTarget: true, targetSessionId: targets.find((bundle) => bundle.session.startsAt === lastStartsAt).session.id,
+    })
+    reflow = {
+      ...reflow,
+      removedItems: [...base.removedItems, ...reflow.removedItems],
+      sessions: [...replacementSessions, ...reflow.sessions],
+    }
+  }
+  return { ...reflow, kind: 'agenda-replacement', disposition, targetBundle }
 }
 
 /** Substitueix un fragment futur i compacta tota la cronologia posterior. */

@@ -35,7 +35,7 @@
     "test:assistance-operational-guard": "node --test tests/assistance-operational-guard.test.js",
     "test:assistance-entry": "node --test tests/assistance-entry.test.js",
     "test:classroom": "node --test tests/attendance.test.js tests/classroom-tracking.test.js tests/classroom-recovery.test.js tests/agenda-today.test.js tests/agenda-calendar.test.js",
-    "test:planning-domain": "node --test tests/planning-domain.test.js tests/planning-babelium.test.js tests/planning-documents.test.js tests/planning-class-connections.test.js tests/planning-activity-curriculum.test.js tests/planning-session-occurrences.test.js",
+    "test:planning-domain": "node --test tests/planning-domain.test.js tests/agenda-session-replacement.test.js tests/planning-babelium.test.js tests/planning-documents.test.js tests/planning-class-connections.test.js tests/planning-activity-curriculum.test.js tests/planning-session-occurrences.test.js",
     "test:planning-sync": "node --test tests/planning-local-sync.test.js",
     "test:retention": "node --test tests/sociometric-retention.test.js",
     "test:rules": "bash scripts/run-firestore-rules-tests.sh",

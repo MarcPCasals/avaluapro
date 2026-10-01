@@ -33,6 +33,7 @@ import {
   buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
+  buildAgendaSessionReplacement,
   buildAgendaSessionCompaction,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
@@ -1708,6 +1709,54 @@ export function useAgendaWorkspace(user, classes = []) {
     return { ...preview, setup }
   }, [activeAcademicYear, loadSchedulingSetup])
 
+  const buildSessionReplacementPreview = useCallback(async (bundle, changes) => {
+    if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu.')
+    const setup = await loadSchedulingSetup({
+      applicationId: bundle.application.id, classId: bundle.session.classId,
+      planningUnitId: bundle.planningUnit.id,
+    })
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId, date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt, timetableSlotId: session.timetableSlotId,
+    }))
+    const proposal = buildTimetableSessionCandidates({
+      calendarEvents: setup.calendarEvents, classId: setup.application.classId,
+      from: String(bundle.session.startsAt).slice(0, 10), occupiedCandidateKeys,
+      slotsByTimetableId: setup.slotsByTimetableId, timetables: setup.timetables,
+      to: activeAcademicYear.endsOn,
+    })
+    const otherApplications = changes.disposition === 'postpone'
+      ? (await loadAccessiblePlanningApplications({ classId: bundle.session.classId }))
+          .filter(({ application }) => application.id !== setup.application.id)
+      : []
+    const otherSessionScopes = await Promise.all(otherApplications.map(({ application, planningUnit }) =>
+      repository.loadScope(`application:${application.id}:sessions`, async () => withPlanningRemoteContext(
+        await loadPlanningSessions({
+          applicationId: application.id, planningUnitId: planningUnit.id, maxItems: 500,
+          from: `${String(bundle.session.startsAt).slice(0, 10)}T00:00:00`,
+          to: `${activeAcademicYear.endsOn}T23:59:59`,
+        }), { applicationId: application.id, planningUnitId: planningUnit.id },
+      ))))
+    const failedScope = otherSessionScopes.find((scope) => scope.error)
+    if (failedScope) throw failedScope.error
+    const occupiedSessions = otherSessionScopes.flatMap((scope) => scope.entities)
+      .filter((session) => !['cancelled', 'notHeld'].includes(session.status))
+    const availableCandidates = proposal.candidates.filter((candidate) => !occupiedSessions.some((session) => {
+      if (session.subgroupId && candidate.subgroupId && session.subgroupId !== candidate.subgroupId) return false
+      const startsAt = new Date(candidate.startsAt).getTime()
+      const occupiedAt = new Date(session.startsAt).getTime()
+      return startsAt < occupiedAt + session.durationMinutes * 60_000
+        && occupiedAt < startsAt + candidate.durationMinutes * 60_000
+    }))
+    const preview = buildAgendaSessionReplacement({
+      application: setup.application, candidates: availableCandidates,
+      existingSessionBundles: setup.existingSessionBundles, options: { now: new Date().toISOString() },
+      targetSessionId: bundle.session.id, ...changes,
+    })
+    if (preview.unscheduled.length) throw new Error('No hi ha prou classes disponibles per ajornar tot el contingut. No s’ha desat cap canvi.')
+    return { ...preview, setup }
+  }, [activeAcademicYear, loadAccessiblePlanningApplications, loadSchedulingSetup, repository])
+
   /** Desa qualsevol reajustament en cadena només dins de l'Agenda del grup. */
   const persistAgendaReflowPreview = useCallback(async (preview) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
@@ -1821,6 +1870,21 @@ export function useAgendaWorkspace(user, classes = []) {
       sessionCount: preview.sessions.length,
     }
   }, [refreshSync, repository, synchronize])
+
+  const confirmSessionReplacementPreview = useCallback(async (preview) => {
+    const currentSetup = await loadSchedulingSetup({
+      applicationId: preview.setup.application.id, classId: preview.targetBundle.session.classId,
+      planningUnitId: preview.setup.planningUnit.id,
+    })
+    const snapshot = (bundles) => JSON.stringify(bundles
+      .map(({ session, items, results }) => ({ session, items, results }))
+      .sort((left, right) => left.session.id.localeCompare(right.session.id)))
+    if (snapshot(currentSetup.existingSessionBundles) !== snapshot(preview.setup.existingSessionBundles)
+      || new Date(preview.targetBundle.session.startsAt).getTime() <= Date.now()) {
+      throw new Error('La cronologia ha canviat. Torna a previsualitzar la substitució abans de confirmar-la.')
+    }
+    return persistAgendaReflowPreview(preview)
+  }, [loadSchedulingSetup, persistAgendaReflowPreview])
 
   const confirmAgendaRecoveryPreview = useCallback(
     (preview) => persistAgendaReflowPreview(preview),
@@ -2033,9 +2097,11 @@ export function useAgendaWorkspace(user, classes = []) {
     calendarEvents,
     buildSchedulingPreview,
     buildAgendaRecoveryPreview,
+    buildSessionReplacementPreview,
     buildContinuationPreview,
     compactAgendaSession,
     confirmAgendaRecoveryPreview,
+    confirmSessionReplacementPreview,
     confirmContinuationPreview,
     confirmSchedulingPreview,
     closeClassroomSession,
