@@ -301,12 +301,15 @@ service cloud.firestore {
         && request.resource.data.status == resource.data.status
         && request.resource.data.deletedAt == resource.data.deletedAt
         && request.resource.data.deletedByUid == resource.data.deletedByUid
-        && request.resource.data.dueAt == resource.data.dueAt
+        && (request.resource.data.dueAt == resource.data.dueAt
+          || (resource.data.kind == 'reminder' && resource.data.status == 'open'
+            && request.resource.data.dueAt is string && request.resource.data.dueAt.size() > 0))
         && request.resource.data.assigneeUid == resource.data.assigneeUid
         && request.resource.data.completedAt == resource.data.completedAt
         && request.resource.data.completedByUid == resource.data.completedByUid
         && request.resource.data.completedByEmail == resource.data.completedByEmail
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'dueAt',
           'studentId',
           'text',
           'updatedAt'

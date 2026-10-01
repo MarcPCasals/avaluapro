@@ -31424,3 +31424,8 @@ button.profile-followup-card:focus-visible {
   border-color: #d6a96e !important;
   box-shadow: 0 4px 0 #cbd5e1, 0 6px 9px rgba(15, 23, 42, 0.09) !important;
 }
+
+.reminder-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 720px) {
+  .reminder-row > .reminder-row-actions { grid-column: 2 / -1; }
+}

@@ -3623,7 +3623,7 @@ export const useAvaluaproStore = create((set, get) => ({
     await flushTutoringCoordinationOutbox(set, get)
   },
 
-  editTutoringCoordinationItem: async (itemId, { studentId = '', text = '' } = {}) => {
+  editTutoringCoordinationItem: async (itemId, { studentId = '', text = '', dueAt } = {}) => {
     const state = get()
     const user = state.cloud.user
     const currentItem = state.cloud.tutoringCoordinationItems.find((item) => item.id === itemId)
@@ -3634,12 +3634,18 @@ export const useAvaluaproStore = create((set, get) => ({
     if (currentItem.syncStatus === 'pending') throw new Error('Espera que el missatge s’hagi enviat.')
     if (!cleanText) throw new Error('El missatge no pot quedar buit.')
     if (cleanText.length > 1600) throw new Error('El missatge no pot superar els 1.600 caràcters.')
-    if (cleanText === currentItem.text && (studentId || '') === (currentItem.studentId || '')) return currentItem
+    if (dueAt !== undefined && (currentItem.kind !== 'reminder' || currentItem.status !== 'open'
+      || !dueAt || Number.isNaN(new Date(dueAt).getTime()))) {
+      throw new Error('Revisa la data i l’hora del recordatori pendent.')
+    }
+    if (cleanText === currentItem.text && (studentId || '') === (currentItem.studentId || '')
+      && (dueAt === undefined || dueAt === currentItem.dueAt)) return currentItem
 
     const updatedAt = new Date().toISOString()
     const item = {
       ...currentItem,
       studentId: studentId || '',
+      ...(dueAt !== undefined ? { dueAt: new Date(dueAt).toISOString() } : {}),
       syncStatus: 'pending',
       text: cleanText,
       updatedAt,

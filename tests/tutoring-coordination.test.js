@@ -184,3 +184,15 @@ describe('coordinacio de cotutoria', () => {
     assert.equal(isCoordinationItemInTutorialRecords(item.id, [record]), true)
   })
 })
+
+test('una nova data reactiva els avisos ja acceptats de la data anterior', () => {
+  const original = { ...items[1], dueAt: '2026-10-01T10:00:00.000Z' }
+  const states = [{ spaceId: original.spaceId, uid: 'tutor-a', reminderAcknowledgements: {
+    [`${original.id}:pre:${original.dueAt}`]: '2026-09-30T10:00:00.000Z',
+    [`${original.id}:due:${original.dueAt}`]: '2026-10-01T09:00:00.000Z',
+  } }]
+  assert.equal(hasTutoringReminderAcknowledgement(original, states, 'tutor-a'), true)
+  const rescheduled = { ...original, dueAt: '2026-10-02T10:00:00.000Z' }
+  assert.equal(hasTutoringReminderAcknowledgement(rescheduled, states, 'tutor-a'), false)
+  assert.equal(getPendingTutoringReminderAlerts([rescheduled], states, 'tutor-a', new Date('2026-10-02T09:00:00.000Z')).length, 1)
+})

@@ -50,6 +50,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const addTutoringCoordinationItem = useAvaluaproStore((state) => state.addTutoringCoordinationItem)
   const completeClassroomRecovery = useAvaluaproStore((state) => state.completeClassroomRecovery)
   const setCoordinationReminderCompleted = useAvaluaproStore((state) => state.setTutoringCoordinationReminderCompleted)
+  const editCoordinationItem = useAvaluaproStore((state) => state.editTutoringCoordinationItem)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
@@ -64,6 +65,8 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const [busy, setBusy] = useState(false)
   const [completingId, setCompletingId] = useState('')
   const [error, setError] = useState('')
+  const [rescheduling, setRescheduling] = useState(null)
+  const [savingDate, setSavingDate] = useState(false)
 
   const tutoringClasses = useMemo(
     () => classes.filter((classItem) => classItem.sharedTutoringSpaceId),
@@ -119,6 +122,46 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
       return
     }
     await updateTask(item.task.id, { reminder })
+  }
+
+  const startRescheduling = (item, shared = false) => {
+    const date = shared ? new Date(item.dueAt) : reminderDateTime(item.reminder)
+    const validDate = date && !Number.isNaN(date.getTime()) ? date : new Date()
+    const day = `${validDate.getFullYear()}-${String(validDate.getMonth() + 1).padStart(2, '0')}-${String(validDate.getDate()).padStart(2, '0')}`
+    const time = `${String(validDate.getHours()).padStart(2, '0')}:${String(validDate.getMinutes()).padStart(2, '0')}`
+    setError('')
+    setRescheduling({ item, shared, date: day, time })
+  }
+
+  const saveRescheduling = async (event) => {
+    event.preventDefault()
+    setSavingDate(true)
+    setError('')
+    try {
+      const { item, shared, date, time } = rescheduling
+      const dueAt = new Date(`${date}T${time || '00:00'}:00`)
+      if (!date || Number.isNaN(dueAt.getTime())) throw new Error('Revisa la data i l’hora del recordatori.')
+      if (shared) {
+        await editCoordinationItem(item.id, { text: item.text, studentId: item.studentId, dueAt: dueAt.toISOString() })
+      } else {
+        const reminder = { ...item.reminder, date, time, dismissedAt: '', snoozeUntil: '' }
+        if (item.note) {
+          await updateAgendaNote(item.note.id, {
+            reminder,
+            ...(item.kind === 'general' ? { sessionId: '', sessionStartsAt: '', timetableSlotId: '' } : {}),
+          })
+        } else if (item.kind === 'record') {
+          await updateTaskRecordMeta(item.student.id, item.task.id, { reminder })
+        } else {
+          await updateTask(item.task.id, { reminder })
+        }
+      }
+      setRescheduling(null)
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut reprogramar el recordatori.')
+    } finally {
+      setSavingDate(false)
+    }
   }
 
   const changeKind = (kind) => {
@@ -263,13 +306,27 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             placeholder={draft.kind === 'tutoring' ? 'Ex: reunió amb la família de…' : 'Ex: recordar que portin gots de plàstic…'}
             value={draft.text}
           />
-          {error && <p className="reminder-form-error" role="alert">{error}</p>}
           <button className="primary-action compact" disabled={busy || !draft.text.trim() || !draft.date || (draft.kind === 'tutoring' && !draft.classId)} onClick={addReminder} type="button">
             <Plus size={15} />
             {busy ? 'Desant…' : draft.kind === 'tutoring' ? 'Afegir recordatori de cotutoria' : 'Afegir recordatori'}
           </button>
         </section>}
 
+        {error && <p className="reminder-form-error" role="alert">{error}</p>}
+        {rescheduling && (
+          <form className="reminder-composer" onSubmit={saveRescheduling}>
+            <strong>Reprogramar: {rescheduling.shared ? rescheduling.item.text : rescheduling.item.title}</strong>
+            {rescheduling.shared && <p className="reminder-kind-help">La nova data es compartirà amb la cotutora i tornarà a activar els avisos.</p>}
+            <div className="reminder-form-grid">
+              <label>Data<input required type="date" value={rescheduling.date} disabled={savingDate} onChange={(event) => setRescheduling((current) => ({ ...current, date: event.target.value }))} /></label>
+              <label>Hora<input required type="time" value={rescheduling.time} disabled={savingDate} onChange={(event) => setRescheduling((current) => ({ ...current, time: event.target.value }))} /></label>
+            </div>
+            <div className="reminder-row-actions">
+              <button className="primary-action compact" disabled={savingDate} type="submit">{savingDate ? 'Desant…' : 'Desar nova data'}</button>
+              <button className="secondary-action compact" disabled={savingDate} onClick={() => setRescheduling(null)} type="button">Cancel·lar</button>
+            </div>
+          </form>
+        )}
         <section className={`reminder-list ${hasFocusedReminders ? 'focused' : ''}`}>
           <header>
             <strong>{hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
@@ -288,10 +345,13 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                     <small>{item.detail}</small>
                     {item.classItem && <small>{item.classItem.name}</small>}
                   </div>
-                  <button className="secondary-action compact" onClick={() => markDone(item)} type="button">
+                  <div className="reminder-row-actions">
+                  <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>
+                  <button className="secondary-action compact" disabled={savingDate} onClick={() => markDone(item)} type="button">
                     <CheckCircle2 size={15} />
                     Fet
                   </button>
+                  </div>
                 </article>
               ))}
               {visibleCoordinationReminders.map((item) => (
@@ -302,10 +362,13 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                     <span>{formatCoordinationDate(item.dueAt)}</span>
                     <small>Cotutoria · {classBySpaceId.get(item.spaceId)?.name || 'Tutoria compartida'}</small>
                   </div>
-                  <button className="secondary-action compact" disabled={item.syncStatus === 'pending' || completingId === item.id} onClick={() => completeCoordinationReminder(item.id)} type="button">
+                  <div className="reminder-row-actions">
+                  <button className="secondary-action compact" disabled={savingDate || item.syncStatus === 'pending' || completingId === item.id} onClick={() => startRescheduling(item, true)} type="button"><Clock3 size={15} />Reprogramar</button>
+                  <button className="secondary-action compact" disabled={savingDate || item.syncStatus === 'pending' || completingId === item.id} onClick={() => completeCoordinationReminder(item.id)} type="button">
                     <CheckCircle2 size={15} />
                     {completingId === item.id ? 'Desant…' : 'Fet'}
                   </button>
+                  </div>
                 </article>
               ))}
             </>

@@ -638,6 +638,18 @@ describe('cotutoria compartida', () => {
     )
   })
 
+  test('un cotutor pot reprogramar un recordatori pendent i cap tercer el pot modificar', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-date'),
+        tutoringCoordinationItemData({ id: 'coord-date', kind: 'reminder', status: 'open', dueAt: '2026-09-15T10:00:00.000Z' }))
+    })
+    const patch = { dueAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-01T09:00:00.000Z' }
+    await assertSucceeds(updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-date'), patch))
+    await assertFails(updateDoc(doc(authDb(THIRD), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-date'), patch))
+    await assertFails(updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-date'), { dueAt: '' }))
+    await assertFails(updateDoc(doc(authDb(COTUTOR), 'tutoringSpaces', SPACE_ID, 'coordinationItems', 'coord-date'), { ...patch, authorUid: COTUTOR.uid }))
+  })
+
   test('un cotutor pot editar el text escrit per l altre sense alterar-ne l autoria', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
