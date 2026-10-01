@@ -1371,6 +1371,67 @@ test('la proposta intel·ligent reserva les últimes sessions i deixa visible el
   assert.deepEqual(result.unscheduled.map((item) => item.activityId), ['c'])
 })
 
+test('la proposta completa amplia tres sessions futures fins a tota la capacitat restant de la UT', () => {
+  const idFactory = sequenceIdFactory()
+  const application = createGroupApplication({
+    ownerUid: 'teacher-1', academicYearId: 'year-2026', planningUnitId: 'up-1', classId: 'class-1',
+  }, options(idFactory))
+  const makeBundle = (id, startsAt, activityId, status = 'planned') => {
+    const session = createCalendarSession({
+      id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+      startsAt, durationMinutes: 60, timetableSlotId: `slot-${id}`, status,
+    }, options(idFactory))
+    return {
+      items: [createSessionItem({
+        ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+        type: 'activity', title: activityId, order: 0, plannedMinutes: 55,
+        sourceActivityId: activityId,
+      }, options(idFactory))],
+      results: [],
+      session,
+    }
+  }
+  const locked = [
+    makeBundle('past-1', '2026-09-22T09:30:00', 'activity-1', 'held'),
+    makeBundle('past-2', '2026-09-29T09:30:00', 'activity-2', 'held'),
+  ]
+  const existingFuture = [
+    makeBundle('future-1', '2026-10-06T09:30:00', 'activity-3'),
+    makeBundle('future-2', '2026-10-08T09:30:00', 'activity-4'),
+    makeBundle('future-3', '2026-10-08T11:00:00', 'activity-5'),
+  ]
+  const candidates = Array.from({ length: 12 }, (_, index) => {
+    const day = 13 + index
+    const date = `2026-10-${String(day).padStart(2, '0')}`
+    return {
+      date,
+      durationMinutes: 60,
+      startsAt: `${date}T09:30:00`,
+      timetableSlotId: `new-slot-${index + 1}`,
+    }
+  })
+  const activities = Array.from({ length: 17 }, (_, index) => ({
+    id: `activity-${index + 1}`,
+    plannedMinutes: 55,
+    title: `Activitat ${index + 1}`,
+    type: 'activity',
+  }))
+
+  const result = buildActivitySessionReflow({
+    activities,
+    application,
+    candidates,
+    existingSessionBundles: [...locked, ...existingFuture],
+    fromDate: '2026-10-01',
+    options: options(idFactory),
+  })
+
+  assert.equal(result.lockedSessionCount, 2)
+  assert.equal(result.logicalSessionCount, 15)
+  assert.equal(result.sessions.length, 15)
+  assert.equal(result.unscheduled.length, 0)
+})
+
 test('recuperar una activitat anterior desplaça l’agenda futura sense tocar la UP', () => {
   const idFactory = sequenceIdFactory()
   const application = createGroupApplication({
