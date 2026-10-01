@@ -604,6 +604,23 @@ describe('Planificació compartida', () => {
     assert.equal((await getDoc(sessionRef(db, localSession.id))).data().ownerUid, OWNER.uid)
   })
 
+  test('un reintent antic també repara el propietari abans de tornar-lo a enviar', async () => {
+    const db = authDb(AGENDA_EDITOR)
+    const staleSession = sessionData({
+      id: 'plan-session-stale-retry',
+      ownerUid: AGENDA_EDITOR.uid,
+      startsAt: '2026-10-27T09:30:00+01:00',
+    })
+
+    const result = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(staleSession, { planningUnitId: UP_ID }, '', AGENDA_EDITOR.uid),
+    )
+
+    assert.equal(result.applied, true)
+    assert.equal((await getDoc(sessionRef(db, staleSession.id))).data().ownerUid, OWNER.uid)
+  })
+
   test('la calendarització no es dona per acabada mentre Firebase manté canvis pendents', () => {
     assert.doesNotThrow(() => requireConfirmedSchedulingSync({ state: 'saved' }))
     assert.throws(

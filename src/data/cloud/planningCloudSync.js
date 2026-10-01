@@ -35,6 +35,16 @@ const IMMUTABLE_ENTITY_FIELDS = Object.freeze([
   'schemaVersion',
 ])
 
+const PLANNING_UNIT_OWNED_CHILDREN = new Set([
+  PLANNING_ENTITY_TYPES.PLANNING_PHASE,
+  PLANNING_ENTITY_TYPES.PLANNING_ACTIVITY,
+  PLANNING_ENTITY_TYPES.GROUP_APPLICATION,
+  PLANNING_ENTITY_TYPES.ACTIVITY_OVERRIDE,
+  PLANNING_ENTITY_TYPES.CALENDAR_SESSION,
+  PLANNING_ENTITY_TYPES.SESSION_ITEM,
+  PLANNING_ENTITY_TYPES.ACTIVITY_RESULT,
+])
+
 /**
  * Una reconstrucció local pot tornar a crear un document tècnic amb el mateix
  * identificador estable sense haver carregat encara la seva còpia remota. Si
@@ -127,9 +137,16 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
   return runTransaction(database, async (transaction) => {
     const snapshot = await transaction.get(reference)
     const remoteValue = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
+    let operationValue = operation.value
+    if (operation.operation === 'upsert' && PLANNING_UNIT_OWNED_CHILDREN.has(operation.entityType)) {
+      const unitSnapshot = await transaction.get(doc(database, 'planningUnits', pathParts[1]))
+      if (unitSnapshot.exists()) {
+        operationValue = { ...operation.value, ownerUid: unitSnapshot.data().ownerUid }
+      }
+    }
     const remoteUpdatedAt = remoteValue?.updatedAt || ''
     const operationAlreadyApplied = operation.operation === 'upsert' &&
-      remoteValue && areCloudDocumentsEqual(operation.value, remoteValue)
+      remoteValue && areCloudDocumentsEqual(operationValue, remoteValue)
     const remoteAlreadyDeleted = operation.operation === 'delete' && !remoteValue
 
     if (operationAlreadyApplied || remoteAlreadyDeleted) return { applied: true, remoteUpdatedAt }
@@ -154,7 +171,7 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
           new Date().toISOString(),
         )
       } else {
-        const value = cleanValue(operation.value)
+      const value = cleanValue(operationValue)
         transaction.set(reference, value)
         transaction.update(
           unitReference,
@@ -170,9 +187,9 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
     }
 
     if (operation.operation === 'delete') transaction.delete(reference)
-    else transaction.set(reference, cleanValue(withRemoteEntityIdentity(operation.value, remoteValue)), {
+    else transaction.set(reference, cleanValue(withRemoteEntityIdentity(operationValue, remoteValue)), {
       merge: pathParts.length === 2 && pathParts[0] === 'planningUnits',
     })
-    return { applied: true, remoteUpdatedAt: operation.value?.updatedAt || '' }
+    return { applied: true, remoteUpdatedAt: operationValue?.updatedAt || '' }
   }, { maxAttempts: 2 })
 }
