@@ -1239,19 +1239,21 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   const loadCompletedActivityIds = useCallback(async () => {
     if (!repository || !activePlanningUnit || !activeApplication) return []
     const temporalUnit = temporalUnits.find((item) => item.id === activePlanningUnit.temporalUnitId)
+    const from = temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00'
+    const to = temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59'
     const sessionResult = await repository.loadScope(
       `application:${activeApplication.id}:sessions`,
       async () => withPlanningRemoteContext(
         await loadPlanningSessions({
           applicationId: activeApplication.id,
-          from: temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00',
+          from,
           maxItems: 500,
           planningUnitId: activePlanningUnit.id,
-          to: temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59',
+          to,
         }),
         { applicationId: activeApplication.id, planningUnitId: activePlanningUnit.id },
       ),
-      { completeSnapshot: true },
+      { completeSnapshot: true, snapshotRange: { field: 'startsAt', from, to } },
     )
     const sessions = [...sessionResult.entities]
     const detailResults = await Promise.all(sessions.map((session) => repository.loadScope(

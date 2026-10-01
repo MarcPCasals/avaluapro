@@ -336,6 +336,8 @@ export async function mergePlanningRemoteScope(uid, scopeKey, descriptors = [], 
     if (options.completeSnapshot === true) {
       localByKey.forEach((localRow, cacheKey) => {
         if (remoteByKey.has(cacheKey)) return
+        const range = options.snapshotRange
+        if (range && !(localRow.value?.[range.field] >= range.from && localRow.value?.[range.field] <= range.to)) return
         const pending = pendingByKey.get(cacheKey)
         if (!pending) {
           entityStore.delete(cacheKey)

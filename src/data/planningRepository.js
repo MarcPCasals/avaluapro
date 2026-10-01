@@ -45,11 +45,19 @@ export function createPlanningRepository({
 
   return {
     async loadScope(scopeKey, loadRemote, options = {}) {
-      const cached = await loadPlanningScope(uid, scopeKey)
+      const selectSnapshotEntities = (entities) => options.snapshotRange
+        ? entities.filter((entity) => {
+            const { field, from, to } = options.snapshotRange
+            return entity[field] >= from && entity[field] <= to
+          })
+        : entities
+      const cached = selectSnapshotEntities(await loadPlanningScope(uid, scopeKey))
       if (!isOnline() || typeof loadRemote !== 'function') {
         return { entities: cached, source: 'local' }
       }
-      const requestKey = `${scopeKey}:${options.completeSnapshot === true ? 'complete' : 'partial'}`
+      // La setmana, la cronologia i el curs s'emmagatzemen al mateix abast,
+      // però no són la mateixa consulta ni comparteixen la mateixa frescor.
+      const requestKey = `${scopeKey}:${options.completeSnapshot === true ? 'complete' : 'partial'}:${JSON.stringify(options.snapshotRange || null)}`
       const refreshTokenPending = options.refreshToken !== undefined
         && appliedRefreshTokens.get(requestKey) !== options.refreshToken
       if (options.forceRemote !== true && !refreshTokenPending && Number(freshScopes.get(requestKey)) > Date.now()) {
@@ -58,7 +66,7 @@ export function createPlanningRepository({
       if (pendingScopeLoads.has(requestKey)) {
         try {
           await pendingScopeLoads.get(requestKey)
-          return { entities: await loadPlanningScope(uid, scopeKey), source: 'shared' }
+          return { entities: selectSnapshotEntities(await loadPlanningScope(uid, scopeKey)), source: 'shared' }
         } catch (error) {
           return { entities: cached, error, source: 'local' }
         }
@@ -73,7 +81,7 @@ export function createPlanningRepository({
       pendingScopeLoads.set(requestKey, remoteLoad)
       try {
         const entities = await remoteLoad
-        return { entities, source: 'remote' }
+        return { entities: selectSnapshotEntities(entities), source: 'remote' }
       } catch (error) {
         return { entities: cached, error, source: 'local' }
       } finally {

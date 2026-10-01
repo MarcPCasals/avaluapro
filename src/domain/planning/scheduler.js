@@ -5,6 +5,7 @@ import {
 } from './model.js'
 import { getProgrammableMinutes, selectEffectiveTimetable } from './rules.js'
 import { BABELIUM_MINUTES, createBabeliumItem, isBabeliumItem } from './babelium.js'
+import { getSessionOccurrenceKey, reconcileSessionOccurrences } from './sessionOccurrences.js'
 
 const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
@@ -53,7 +54,7 @@ function eventBlocksTimetableSlot(event, slot) {
 }
 
 function candidateKey(candidate) {
-  return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${candidate.startsAt}`
+  return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${String(candidate.startsAt).slice(0, 19)}`
 }
 
 function existingItemsSignature(items = []) {
@@ -461,8 +462,16 @@ export function buildActivitySessionDistribution({
     else pendingActivities.push(activity)
   }
 
+  const uniqueExistingBundles = reconcileSessionOccurrences(existingSessionBundles, options.now).bundles
+  const occupiedOccurrences = new Set(uniqueExistingBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const key = getSessionOccurrenceKey({ ...candidate, applicationId: application.id, classId: application.classId })
+    if (occupiedOccurrences.has(key)) return false
+    occupiedOccurrences.add(key)
+    return true
+  })
   const drafts = [
-    ...existingSessionBundles
+    ...uniqueExistingBundles
       .filter((bundle) => bundle?.session?.status === 'planned')
       .map((bundle) => ({
         candidate: {
@@ -483,7 +492,7 @@ export function buildActivitySessionDistribution({
           (bundle.items || []).reduce((total, item) => total + (Number(item.plannedMinutes) || 0), 0)),
         session: bundle.session,
       })),
-    ...candidates.map((candidate) => ({
+    ...uniqueCandidates.map((candidate) => ({
       candidate,
       existingItems: [],
       isExisting: false,
@@ -662,10 +671,18 @@ export function buildActivitySessionReflow({
   reservedSessionCount = 0,
 }) {
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
-  const reflowableBundles = existingSessionBundles
+  const allReflowableBundles = existingSessionBundles
     .filter((bundle) => canReflowSession(bundle, fromDate, options.now))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-  const lockedBundles = existingSessionBundles.filter((bundle) => !reflowableBundles.includes(bundle))
+  const reflowableBundles = reconcileSessionOccurrences(allReflowableBundles, options.now).bundles
+  const lockedBundles = existingSessionBundles.filter((bundle) => !allReflowableBundles.includes(bundle))
+  const occupiedOccurrences = new Set(reflowableBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const key = getSessionOccurrenceKey({ ...candidate, applicationId: application.id, classId: application.classId })
+    if (occupiedOccurrences.has(key)) return false
+    occupiedOccurrences.add(key)
+    return true
+  })
   const capacityCandidates = [
     ...reflowableBundles.map((bundle) => ({
       date: String(bundle.session.startsAt).slice(0, 10),
@@ -673,7 +690,7 @@ export function buildActivitySessionReflow({
       parallelProgrammingKey: bundle.session.parallelProgrammingKey,
       startsAt: bundle.session.startsAt,
     })),
-    ...candidates,
+    ...uniqueCandidates,
   ]
   const availability = reserveLastLogicalSessionCandidates(capacityCandidates, reservedSessionCount)
   const availableCandidateSet = new Set(availability.availableCandidates)
@@ -725,7 +742,7 @@ export function buildActivitySessionReflow({
     }),
   }))
   const usedSessionIds = new Set(sessions.map((bundle) => bundle.session.id))
-  const removedSessions = reflowableBundles
+  const removedSessions = allReflowableBundles
     .map((bundle) => bundle.session)
     .filter((session) => !usedSessionIds.has(session.id))
 
@@ -734,8 +751,8 @@ export function buildActivitySessionReflow({
     availability,
     kind: 'reflow',
     lockedSessionCount: lockedBundles.length,
-    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
-    removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
+    removedItems: allReflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
+    removedResults: allReflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions,
     replacedItemCount: reflowableBundles.reduce((total, bundle) => total + (bundle.items || []).length, 0),
     reflowableSessionCount: reflowableBundles.length,

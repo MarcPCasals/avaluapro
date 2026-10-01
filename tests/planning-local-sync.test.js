@@ -41,6 +41,7 @@ import {
   createTimetableVersion,
 } from '../src/domain/planning/model.js'
 import { PLANNING_ENTITY_TYPES } from '../src/domain/planning/constants.js'
+import { buildActivitySessionReflow } from '../src/domain/planning/scheduler.js'
 
 function deleteTestDatabase() {
   return new Promise((resolve, reject) => {
@@ -624,6 +625,179 @@ test('una validació recent s’aprofita fins que hi ha una edició local', asyn
 
   assert.equal(recent.source, 'memory')
   assert.equal(remoteLoads, 2)
+})
+
+test('carregar una setmana no elimina les sessions de novembre de la còpia local', async () => {
+  const uid = 'teacher-1'
+  const scope = 'application:application-1:sessions'
+  const session = (id, startsAt) => createCalendarSession({
+    id, startsAt, ownerUid: uid, applicationId: 'application-1', classId: 'class-1', durationMinutes: 60,
+  }, { now: '2026-10-01T10:00:00.000Z' })
+  const october = session('october', '2026-10-02T08:30:00')
+  const november = session('november', '2026-11-06T08:30:00')
+  const descriptors = (sessions) => withPlanningRemoteContext(sessions, {
+    applicationId: 'application-1', planningUnitId: 'up-1',
+  })
+  await mergePlanningRemoteScope(uid, scope, descriptors([october, november]))
+  await mergePlanningRemoteScope(uid, scope, descriptors([october]), {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-10-01T00:00:00', to: '2026-10-08T23:59:59' },
+  })
+
+  assert.deepEqual((await loadPlanningScope(uid, scope)).map((entry) => entry.id).sort(), ['november', 'october'])
+  assert.equal((await loadPlanningOutbox(uid)).length, 0)
+})
+
+test('la consulta de tota la UT no reutilitza la resposta fresca de només una setmana', async () => {
+  const uid = 'teacher-1'
+  const scope = 'application:application-1:sessions'
+  const repository = createPlanningRepository({ uid, freshForMs: 30_000 })
+  const session = (id, startsAt) => createCalendarSession({
+    id, startsAt, ownerUid: uid, applicationId: 'application-1', classId: 'class-1', durationMinutes: 60,
+  }, { now: '2026-10-01T10:00:00.000Z' })
+  const october = session('october', '2026-10-02T08:30:00')
+  const november = session('november', '2026-11-06T08:30:00')
+  const descriptors = (sessions) => withPlanningRemoteContext(sessions, {
+    applicationId: 'application-1', planningUnitId: 'up-1',
+  })
+  let fullLoads = 0
+  await repository.loadScope(scope, async () => descriptors([october]), {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-10-01T00:00:00', to: '2026-10-08T23:59:59' },
+  })
+  const result = await repository.loadScope(scope, async () => {
+    fullLoads += 1
+    return descriptors([october, november])
+  }, {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-09-01T00:00:00', to: '2026-11-30T23:59:59' },
+  })
+
+  assert.equal(fullLoads, 1)
+  assert.equal(result.entities.length, 2)
+})
+
+test('un rang complet reconcilia baixes només dins del rang i la lectura offline no inclou altres setmanes', async () => {
+  const uid = 'teacher-1'
+  const scope = 'application:application-1:sessions'
+  const context = { applicationId: 'application-1', planningUnitId: 'up-1' }
+  const makeSession = (id, startsAt) => createCalendarSession({
+    id, startsAt, ownerUid: uid, applicationId: context.applicationId, classId: 'class-1', durationMinutes: 60,
+  })
+  const october = makeSession('october', '2026-10-02T08:30:00')
+  const november = makeSession('november', '2026-11-06T08:30:00')
+  await mergePlanningRemoteScope(uid, scope, withPlanningRemoteContext([october, november], context))
+  await savePlanningEntityLocally(uid, { ...november, durationMinutes: 90 }, context)
+  const options = {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-10-01T00:00:00', to: '2026-10-08T23:59:59' },
+  }
+  await mergePlanningRemoteScope(uid, scope, [], options)
+  const rows = await loadPlanningScope(uid, scope)
+  assert.deepEqual(rows.map((session) => session.id), ['november'])
+  assert.equal(rows[0].durationMinutes, 90)
+  assert.equal((await loadPlanningOutbox(uid)).length, 1)
+  assert.equal((await loadPlanningConflicts(uid)).length, 0)
+  const repository = createPlanningRepository({ uid, isOnline: () => false })
+  assert.equal((await repository.loadScope(scope, null, options)).entities.length, 0)
+})
+
+test('dues consultes simultànies amb rangs diferents no comparteixen una resposta incompleta', async () => {
+  const uid = 'teacher-1'
+  const scope = 'application:application-1:sessions'
+  const repository = createPlanningRepository({ uid, freshForMs: 30_000 })
+  let unblockWeek
+  const waitingWeek = new Promise((resolve) => { unblockWeek = resolve })
+  let weekStarted
+  const started = new Promise((resolve) => { weekStarted = resolve })
+  const week = repository.loadScope(scope, async () => {
+    weekStarted()
+    await waitingWeek
+    return []
+  }, {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-10-01', to: '2026-10-08' },
+  })
+  await started
+  const november = createCalendarSession({
+    id: 'november', startsAt: '2026-11-06T08:30:00', ownerUid: uid,
+    applicationId: 'application-1', classId: 'class-1', durationMinutes: 60,
+  })
+  const full = await repository.loadScope(scope, async () => withPlanningRemoteContext([november], {
+    applicationId: 'application-1', planningUnitId: 'up-1',
+  }), {
+    completeSnapshot: true,
+    snapshotRange: { field: 'startsAt', from: '2026-09-01', to: '2026-11-30' },
+  })
+  unblockWeek()
+  await week
+
+  assert.equal(full.entities.length, 1)
+  assert.equal((await loadPlanningScope(uid, scope))[0].id, 'november')
+})
+
+test('tres reinicis amb una setmana de tres sessions conserven les quinze sessions i els seus ids al servidor', async () => {
+  const uid = 'teacher-1'
+  const now = '2026-10-01T10:00:00.000Z'
+  const application = createGroupApplication({
+    id: 'application-1', ownerUid: uid, classId: 'class-1', planningUnitId: 'up-1', academicYearId: 'year-1',
+  }, { now })
+  const context = { applicationId: application.id, planningUnitId: 'up-1' }
+  const scope = `application:${application.id}:sessions`
+  const remoteDocuments = new Map()
+  const makeRepository = () => createPlanningRepository({
+    uid, freshForMs: 30_000, isOnline: () => true,
+    applyRemoteOperation: async (operation) => {
+      if (operation.operation === 'delete') remoteDocuments.delete(operation.path)
+      else remoteDocuments.set(operation.path, operation.value)
+      return { applied: true }
+    },
+  })
+  const candidates = [
+    '2026-10-06T11:00:00', '2026-10-08T09:30:00', '2026-10-08T11:00:00',
+    '2026-10-13T11:00:00', '2026-10-15T09:30:00', '2026-10-15T11:00:00',
+    '2026-10-20T11:00:00', '2026-10-22T09:30:00', '2026-10-22T11:00:00',
+    '2026-10-27T11:00:00', '2026-10-29T09:30:00', '2026-10-29T11:00:00',
+    '2026-11-03T11:00:00', '2026-11-05T09:30:00', '2026-11-05T11:00:00',
+  ].map((startsAt) => ({ startsAt, date: startsAt.slice(0, 10), durationMinutes: 60 }))
+  const activities = candidates.map((_, index) => ({
+    id: `activity-${index}`, title: `Activitat ${index}`, plannedMinutes: 55, type: 'activity',
+  }))
+  const savePreview = async (repository, preview) => {
+    for (const item of preview.removedItems) await repository.remove(item, { ...context, sessionId: item.sessionId })
+    for (const session of preview.removedSessions) await repository.remove(session, context)
+    for (const bundle of preview.sessions) {
+      await repository.save(bundle.session, context)
+      for (const item of bundle.items) await repository.save(item, { ...context, sessionId: bundle.session.id })
+    }
+    assert.equal((await repository.synchronize()).state, PLANNING_SYNC_STATES.SAVED)
+  }
+  const input = { application, activities, candidates, fromDate: '2026-10-01', options: { now } }
+  const initial = buildActivitySessionReflow(input)
+  await savePreview(makeRepository(), initial)
+  const initialIds = initial.sessions.map((bundle) => bundle.session.id).sort()
+  for (let restart = 0; restart < 3; restart += 1) {
+    const repository = makeRepository()
+    const readRange = (from, to) => repository.loadScope(scope, async () => withPlanningRemoteContext(
+      [...remoteDocuments.values()].filter((entity) => entity.entityType === PLANNING_ENTITY_TYPES.CALENDAR_SESSION
+        && entity.startsAt >= from && entity.startsAt <= to), context,
+    ), { completeSnapshot: true, snapshotRange: { field: 'startsAt', from, to } })
+    assert.equal((await readRange('2026-10-01T00:00:00', '2026-10-08T23:59:59')).entities.length, 3)
+    const full = await readRange('2026-09-01T00:00:00', '2027-06-30T23:59:59')
+    assert.equal(full.entities.length, 15)
+    const bundles = await Promise.all(full.entities.map(async (session) => ({
+      session, results: [],
+      items: (await repository.loadScope(`session:${session.id}:detail`)).entities
+        .filter((entity) => entity.entityType === PLANNING_ENTITY_TYPES.SESSION_ITEM),
+    })))
+    const repeated = buildActivitySessionReflow({ ...input, existingSessionBundles: bundles })
+    assert.deepEqual(repeated.sessions.map((bundle) => bundle.session.id).sort(), initialIds)
+    assert.equal(repeated.sessions.flatMap((bundle) => bundle.items).reduce((sum, item) => sum + item.plannedMinutes, 0), 825)
+    await savePreview(repository, repeated)
+    assert.equal([...remoteDocuments.values()].filter((entity) => entity.entityType === PLANNING_ENTITY_TYPES.CALENDAR_SESSION).length, 15)
+    assert.equal((await loadPlanningOutbox(uid)).length, 0)
+    assert.equal((await loadPlanningConflicts(uid)).length, 0)
+  }
 })
 
 test('una actualització entre dispositius força Firebase encara que la còpia recent sigui vigent', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyPlanningCloudOperation,
   loadPlanningAcademicYears,
@@ -56,6 +56,7 @@ import {
   moveTimetableSlot,
   orderActivitiesForScheduling,
   reserveLastLogicalSessionCandidates,
+  reconcileSessionOccurrences,
   resolveSchedulingStartDate,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
@@ -102,8 +103,9 @@ function sortEvents(items) {
 }
 
 function mergeSessionBundles(current, incoming) {
-  return [...new Map([...current, ...incoming].map((bundle) => [bundle.session.id, bundle])).values()]
-    .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+  return reconcileSessionOccurrences(
+    [...new Map([...current, ...incoming].map((bundle) => [bundle.session.id, bundle])).values()],
+  ).bundles
 }
 
 function activityMinutesById(activities = []) {
@@ -140,6 +142,7 @@ export function useAgendaWorkspace(user, classes = []) {
   const [temporalUnits, setTemporalUnits] = useState([])
   const [sessionBundles, setSessionBundles] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  const sessionRangeRequest = useRef(0)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activeTimetableId, setActiveTimetableId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -613,6 +616,7 @@ export function useAgendaWorkspace(user, classes = []) {
     to,
   }) => {
     if (!repository || !from || !to) return []
+    const requestId = ++sessionRangeRequest.current
     setSessionsLoading(true)
     try {
       const applications = await loadAccessiblePlanningApplications({ classId })
@@ -629,7 +633,11 @@ export function useAgendaWorkspace(user, classes = []) {
             }),
             { applicationId: application.id, planningUnitId: planningUnit.id },
           ),
-          { completeSnapshot: true, refreshToken: refreshRevision },
+          {
+            completeSnapshot: true,
+            refreshToken: refreshRevision,
+            snapshotRange: { field: 'startsAt', from: `${from}T00:00:00`, to: `${to}T23:59:59` },
+          },
         )))
       const failedSessionLoad = sessionResults.find((result) => result.error)
       if (failedSessionLoad) throw failedSessionLoad.error
@@ -643,7 +651,7 @@ export function useAgendaWorkspace(user, classes = []) {
         // fem cap consulta remota d'elements, resultats, descripcions o materials.
         const cachedDetails = await Promise.all(sessionRecords.map(({ session }) =>
           repository.loadScope(`session:${session.id}:detail`)))
-        const bundles = sessionRecords.map((record, index) => ({
+        const rawBundles = sessionRecords.map((record, index) => ({
           ...record,
           detailsLoaded: false,
           items: cachedDetails[index].entities
@@ -653,7 +661,10 @@ export function useAgendaWorkspace(user, classes = []) {
           results: cachedDetails[index].entities
             .filter((entity) => entity.entityType === 'activityResult'),
         })).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-        setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
+        const bundles = reconcileSessionOccurrences(rawBundles).bundles
+        if (requestId === sessionRangeRequest.current) {
+          setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
+        }
         return bundles
       }
       const detailResults = await Promise.all(sessionRecords.map(({ application, planningUnit, session }) =>
@@ -728,7 +739,7 @@ export function useAgendaWorkspace(user, classes = []) {
           overrideResults[index].entities,
         ).map((activity) => [activity.id, activity])),
       ]))
-      const bundles = sessionRecords.map((record, index) => {
+      const rawBundles = sessionRecords.map((record, index) => {
         const entities = detailResults[index].entities
         const activityById = activitiesByApplicationKey.get(
           `${record.planningUnit.id}:${record.application.id}`,
@@ -748,10 +759,13 @@ export function useAgendaWorkspace(user, classes = []) {
           results: entities.filter((entity) => entity.entityType === 'activityResult'),
         }, Object.values(slotsByTimetableId).flat().find((slot) => slot.id === record.session.timetableSlotId))
       }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
-      setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
+      const bundles = reconcileSessionOccurrences(rawBundles).bundles
+      if (requestId === sessionRangeRequest.current) {
+        setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
+      }
       return bundles
     } finally {
-      setSessionsLoading(false)
+      if (requestId === sessionRangeRequest.current) setSessionsLoading(false)
     }
   }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, slotsByTimetableId, user?.uid])
 
@@ -1050,6 +1064,7 @@ export function useAgendaWorkspace(user, classes = []) {
         }),
         { applicationId: application.id, planningUnitId: planningUnit.id },
       ),
+      { snapshotRange: { field: 'startsAt', from: bundle.session.startsAt, to: '9999-12-31T23:59:59' } },
     )))
     return sessionResults.flatMap((result) => result.entities)
       .filter(isNextValidSession)
@@ -1212,7 +1227,14 @@ export function useAgendaWorkspace(user, classes = []) {
           }),
           { applicationId: application.id, planningUnitId },
         ),
-        { completeSnapshot: true },
+        {
+          completeSnapshot: true,
+          snapshotRange: {
+            field: 'startsAt',
+            from: `${activeAcademicYear.startsOn}T00:00:00`,
+            to: `${activeAcademicYear.endsOn}T23:59:59`,
+          },
+        },
       )
       existingSessions = sessionResult.entities
       const detailResults = await Promise.all(existingSessions.map((session) => repository.loadScope(
@@ -1239,8 +1261,9 @@ export function useAgendaWorkspace(user, classes = []) {
     const slotById = new Map(Object.values(slotsByTimetableId).flat().map((slot) => [slot.id, slot]))
     existingSessionBundles = existingSessionBundles.map((bundle) =>
       withBabelium(bundle, slotById.get(bundle.session.timetableSlotId)))
+    const currentSessionBundles = reconcileSessionOccurrences(existingSessionBundles).bundles
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
-      summarizeAssignedActivityProgress(existingSessionBundles)
+      summarizeAssignedActivityProgress(currentSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
       const plannedMinutes = Number(activity.plannedMinutes)
       if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
@@ -1358,7 +1381,7 @@ export function useAgendaWorkspace(user, classes = []) {
         plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
       }))
     if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
-    const futureExistingBundles = setup.existingSessionBundles.filter((bundle) => {
+    const futureExistingBundles = reconcileSessionOccurrences(setup.existingSessionBundles).bundles.filter((bundle) => {
       const date = String(bundle.session.startsAt).slice(0, 10)
       return bundle.session.status === 'planned' && date >= effectiveStartDate && date <= horizonEnd
     })
@@ -1538,6 +1561,11 @@ export function useAgendaWorkspace(user, classes = []) {
           }),
           { applicationId: application.id, planningUnitId: unit.id },
         ),
+        {
+          snapshotRange: {
+            field: 'startsAt', from: `${activeAcademicYear.startsOn}T00:00:00`, to: bundle.session.startsAt,
+          },
+        },
       )))
       const previousSessions = sessionResults.flatMap((result, index) => result.entities
         .filter((session) => session.startsAt < bundle.session.startsAt)
