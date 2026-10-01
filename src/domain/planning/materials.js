@@ -13,7 +13,7 @@ function materialLink(material, audience, url) {
  */
 export function getActivityMaterialLinks(activity = {}) {
   const links = [
-    ...(activity.studentMaterials || []).flatMap((material) => [
+    ...(activity?.studentMaterials || []).flatMap((material) => [
       material?.kind === 'link' && material.url
         ? materialLink(material, 'students', material.url)
         : null,
@@ -21,7 +21,7 @@ export function getActivityMaterialLinks(activity = {}) {
         ? materialLink(material, 'teacher', material.teacherUrl)
         : null,
     ]),
-    ...(activity.teacherMaterials || []).map((material) => (
+    ...(activity?.teacherMaterials || []).map((material) => (
       material?.kind === 'link' && material.url
         ? materialLink(material, 'teacher', material.url)
         : null
@@ -38,7 +38,7 @@ export function getActivityMaterialLinks(activity = {}) {
  */
 export function getEffectiveActivityMaterialLinks(activity = {}, planningUnit = {}) {
   const transversalActivity = {
-    studentMaterials: planningUnit.transversalMaterials || [],
+    studentMaterials: planningUnit?.transversalMaterials || [],
     teacherMaterials: [],
   }
   const links = [

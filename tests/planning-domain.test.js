@@ -172,6 +172,25 @@ test('un sol material pot obrir el recurs de l’alumnat i el recurs opcional de
   ])
 })
 
+test('l’Agenda pot calcular materials amb activitats o UP encara no disponibles', () => {
+  const material = { kind: 'link', label: 'Aula virtual', url: 'https://example.test/students' }
+  const unit = { transversalMaterials: [material] }
+
+  assert.deepEqual(getActivityMaterialLinks(null), [])
+  assert.deepEqual(getEffectiveActivityMaterialLinks(null, null), [])
+  assert.deepEqual(getEffectiveActivityMaterialLinks(null, unit), [
+    { ...material, audience: 'students', transversal: true },
+  ])
+  assert.deepEqual(getEffectiveActivityMaterialLinks({ studentMaterials: [material] }, null), [
+    { ...material, audience: 'students' },
+  ])
+
+  const items = [{ sourceActivity: null }, { sourceActivity: { studentMaterials: [material] } }]
+  const links = items.flatMap((item) => getEffectiveActivityMaterialLinks(item.sourceActivity, unit))
+  assert.equal(links.length, 2)
+  assert.ok(links.every((link) => link.url === material.url))
+})
+
 test('els materials antics del docent i de l’alumnat continuen obrint-se', () => {
   const links = getActivityMaterialLinks({
     studentMaterials: [{ kind: 'link', label: 'Fitxa', url: 'https://example.test/students' }],
