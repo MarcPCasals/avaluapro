@@ -41,6 +41,10 @@ import {
 } from '../src/domain/planning/index.js'
 import { applyPlanningCloudOperationToDatabase } from '../src/data/cloud/planningCloudSync.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
+import {
+  buildSchedulingPersistenceEntries,
+  requireConfirmedSchedulingSync,
+} from '../src/features/agenda/agendaSchedulingPersistence.js'
 
 const PROJECT_ID = 'avaluapro-planning-rules-test'
 const NOW = '2026-09-18T12:00:00.000Z'
@@ -530,6 +534,82 @@ describe('Planificació compartida', () => {
     )
     assert.equal(result.applied, true)
     assert.equal((await getDoc(sessionRef(db))).data().status, 'held')
+  })
+
+  test('la cua local-first permet crear una sessió futura nova i els seus elements', async () => {
+    const db = authDb(AGENDA_EDITOR)
+    const futureSession = sessionData({
+      id: 'plan-session-future-new',
+      startsAt: '2026-10-20T09:30:00+02:00',
+    })
+    const sessionResult = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(futureSession, { planningUnitId: UP_ID }, '', AGENDA_EDITOR.uid),
+    )
+    assert.equal(sessionResult.applied, true)
+
+    const futureItem = sessionItemData({
+      id: 'plan-item-future-new',
+      sessionId: futureSession.id,
+      sourceActivityId: 'plan-activity-one',
+      title: 'Activitat futura',
+    })
+    const itemResult = await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(
+        futureItem,
+        { applicationId: APP_ONE, planningUnitId: UP_ID, sessionId: futureSession.id },
+        '',
+        AGENDA_EDITOR.uid,
+      ),
+    )
+    assert.equal(itemResult.applied, true)
+    assert.equal((await getDoc(doc(sessionRef(db, futureSession.id), 'items', futureItem.id))).data().title, 'Activitat futura')
+  })
+
+  test('una proposta d’un col·laborador desa les sessions noves amb el propietari de la UP', async () => {
+    const db = authDb(AGENDA_EDITOR)
+    const localApplication = applicationData(APP_ONE, CLASS_ONE, { ownerUid: AGENDA_EDITOR.uid })
+    const localSession = sessionData({
+      id: 'plan-session-collaborator-new',
+      ownerUid: AGENDA_EDITOR.uid,
+      startsAt: '2026-10-22T11:00:00+02:00',
+    })
+    const localItem = sessionItemData({
+      id: 'plan-item-collaborator-new',
+      ownerUid: AGENDA_EDITOR.uid,
+      sessionId: localSession.id,
+      sourceActivityId: 'plan-activity-one',
+    })
+    const { entries } = buildSchedulingPersistenceEntries({
+      sessions: [{ items: [localItem], session: localSession }],
+      setup: {
+        application: localApplication,
+        planningUnit: planningUnitData(),
+      },
+    }, NOW)
+    const sessionEntry = entries.find((entry) => entry.entity.entityType === 'calendarSession')
+    const itemEntry = entries.find((entry) => entry.entity.entityType === 'sessionItem')
+
+    assert.equal(sessionEntry.entity.ownerUid, OWNER.uid)
+    assert.equal(itemEntry.entity.ownerUid, OWNER.uid)
+    await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(sessionEntry.entity, sessionEntry.context, '', AGENDA_EDITOR.uid),
+    )
+    await applyPlanningCloudOperationToDatabase(
+      db,
+      queuedOperation(itemEntry.entity, itemEntry.context, '', AGENDA_EDITOR.uid),
+    )
+    assert.equal((await getDoc(sessionRef(db, localSession.id))).data().ownerUid, OWNER.uid)
+  })
+
+  test('la calendarització no es dona per acabada mentre Firebase manté canvis pendents', () => {
+    assert.doesNotThrow(() => requireConfirmedSchedulingSync({ state: 'saved' }))
+    assert.throws(
+      () => requireConfirmedSchedulingSync({ state: 'error' }),
+      /Firebase encara no les ha confirmat totes/,
+    )
   })
 
   test('la cua conserva la identitat remota d’un element tècnic reconstruït localment', async () => {

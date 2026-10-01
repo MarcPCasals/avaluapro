@@ -24,6 +24,10 @@ import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/plan
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 import {
+  buildSchedulingPersistenceEntries,
+  requireConfirmedSchedulingSync,
+} from './agendaSchedulingPersistence'
+import {
   copyTimetableVersionStructure,
   buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
@@ -1418,21 +1422,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     const now = new Date().toISOString()
     const planningUnitId = preview.setup.planningUnit.id
-    const application = createGroupApplication({
-      ...preview.setup.application,
-      status: 'active',
-      updatedAt: now,
-    }, { now })
-    const entries = [{ entity: application }]
-    for (const bundle of preview.sessions) {
-      entries.push({ entity: bundle.session, context: { planningUnitId } })
-      for (const item of bundle.items) {
-        entries.push({
-          entity: item,
-          context: { applicationId: application.id, planningUnitId, sessionId: bundle.session.id },
-        })
-      }
-    }
+    const { application, entries } = buildSchedulingPersistenceEntries(preview, now)
     if (preview.kind === 'reflow') {
       if (!repository) throw new Error('Cal iniciar sessió abans de reorganitzar l’Agenda.')
       for (const result of preview.removedResults || []) {
@@ -1454,7 +1444,7 @@ export function useAgendaWorkspace(user, classes = []) {
       }
       for (const entry of entries) await repository.save(entry.entity || entry, entry.context || {})
       await refreshSync()
-      await synchronize()
+      requireConfirmedSchedulingSync(await synchronize())
       return {
         application,
         logicalSessionCount: preview.logicalSessionCount ?? preview.sessions.length,
@@ -1465,7 +1455,7 @@ export function useAgendaWorkspace(user, classes = []) {
         unscheduled: preview.unscheduled,
       }
     }
-    await persist(entries)
+    requireConfirmedSchedulingSync(await persist(entries))
     return {
       application,
       logicalSessionCount: preview.logicalSessionCount ?? preview.sessions.length,
