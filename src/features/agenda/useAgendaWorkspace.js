@@ -872,17 +872,8 @@ export function useAgendaWorkspace(user, classes = []) {
   useEffect(() => {
     if (allPlanningUnits.length === 0) {
       queueMicrotask(() => setSessionBundles([]))
-      return
     }
-    let cancelled = false
-    queueMicrotask(() => {
-      if (cancelled) return
-      loadTodaySessions().catch((loadError) => {
-        if (!cancelled) setError(loadError.message || 'No s’han pogut carregar les sessions de la setmana.')
-      })
-    })
-    return () => { cancelled = true }
-  }, [allPlanningUnits.length, loadTodaySessions, refreshRevision])
+  }, [allPlanningUnits.length])
 
   const persistSessionSnapshot = useCallback(async (bundle, session) => {
     if (!repository) throw new Error('Cal iniciar sessió abans de desar la sessió.')

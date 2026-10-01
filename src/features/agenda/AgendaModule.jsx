@@ -440,6 +440,7 @@ export default function AgendaModule() {
   )
   const setWorkspaceError = workspace.setError
   const loadSessionRange = workspace.loadSessionRange
+  const loadTodaySessions = workspace.loadTodaySessions
   const loadUnscheduledPlanningActivities = workspace.loadUnscheduledPlanningActivities
   const academicYearStartsOn = workspace.activeAcademicYear?.startsOn
   const academicYearEndsOn = workspace.activeAcademicYear?.endsOn
@@ -520,6 +521,18 @@ export default function AgendaModule() {
     hasApplications: false,
     loading: false,
   })
+
+  useEffect(() => {
+    if (view !== 'today' || !hasAgendaWorkspace) return undefined
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      loadTodaySessions().catch((error) => {
+        if (!cancelled) setWorkspaceError(error.message || 'No s’han pogut carregar les sessions de la setmana.')
+      })
+    })
+    return () => { cancelled = true }
+  }, [hasAgendaWorkspace, loadTodaySessions, setWorkspaceError, view])
 
   useEffect(() => {
     if (!materialReminderBundles.length) return

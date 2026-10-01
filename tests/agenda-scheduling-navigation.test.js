@@ -46,3 +46,11 @@ test('la Cronologia obre les activitats pendents en mode intel·ligent', () => {
   assert.match(source, /setSchedulingMode\('smart'\)/)
   assert.match(source, /onSchedule=\{hasOwnCalendar \? openTimelineScheduling : null\}/)
 })
+
+test('la càrrega curta d’Avui no pot substituir la Cronologia', () => {
+  const moduleSource = fs.readFileSync(new URL('../src/features/agenda/AgendaModule.jsx', import.meta.url), 'utf8')
+  const workspaceSource = fs.readFileSync(new URL('../src/features/agenda/useAgendaWorkspace.js', import.meta.url), 'utf8')
+
+  assert.match(moduleSource, /if \(view !== 'today' \|\| !hasAgendaWorkspace\) return undefined/)
+  assert.doesNotMatch(workspaceSource, /loadTodaySessions\(\)\.catch/)
+})
