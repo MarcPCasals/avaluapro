@@ -106,6 +106,7 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
   const firstClass = classes[0] || null
   const [values, setValues] = useState(() => ({
     classId: initialValue?.classId || firstClass?.id || '',
+    babeliumEnabled: Boolean(initialValue?.babeliumEnabled),
     durationMinutes: initialValue?.durationMinutes || 60,
     space: initialValue?.space || '',
     startsAt: initialValue?.startsAt || initialPosition?.startsAt || '08:00',
@@ -146,6 +147,8 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
         <label>Grup<select required value={values.classId} onChange={(event) => selectClass(event.target.value)}><option value="">Selecciona un grup</option>{classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}</select></label>
         <label>Durada<select value={values.durationMinutes} onChange={(event) => setValues({ ...values, durationMinutes: Number(event.target.value), sharedProgrammingSlotId: '' })}><option value="60">60 min · 55 programables</option><option value="90">90 min · 85 programables</option><option value="120">120 min · 115 programables</option></select></label>
       </div>
+      <label className="agenda-check"><input type="checkbox" checked={values.babeliumEnabled} onChange={(event) => setValues({ ...values, babeliumEnabled: event.target.checked })} /> Babèlium els primers 30 minuts</label>
+      {values.babeliumEnabled && <p className="agenda-dialog-help">Lectura autònoma des de les {values.startsAt}. Queden {Number(values.durationMinutes) - 35} minuts per a les activitats de SG o PI, amb el marge habitual de 5 minuts. Si ja tens activitats calendaritzades, reorganitza-les amb la calendarització intel·ligent.</p>}
       <label>Assignatura<input required value={values.subject} onChange={(event) => setValues({ ...values, subject: event.target.value })} /></label>
       <div className="agenda-form-row">
         <label>Mig grup<select value={values.subgroupId} onChange={(event) => setValues({ ...values, subgroupId: event.target.value })}><option value="">Grup sencer</option>{(selectedClass?.halfGroups || []).map((group) => <option key={group} value={group}>{group}</option>)}</select></label>

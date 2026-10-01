@@ -128,6 +128,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       </header>
       {blockingEvent && <div className="agenda-session-calendar-blocked"><Moon size={18} /><div><strong>{blockingEvent.title}</strong><span>{CALENDAR_EVENT_LABELS[blockingEvent.type] || 'Canvi de calendari'} · aquesta sessió no es fa.</span>{blockingEvent.reason && <p>{blockingEvent.reason}</p>}</div></div>}
       {!blockingEvent && bundle.session.status === 'planned' && freeMinutes > 0 && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{freeMinutes} min programables sense ocupar</strong><span>Pots avançar la propera activitat i, si cal, dividir-la per completar els {sessionLoad.programmableMinutes} minuts.</span></div>{onResolveGap && <button className="secondary-action compact" onClick={() => onResolveGap(bundle)} type="button"><ArrowLeft size={14} />Avançar la propera activitat</button>}</div>}
+      {!blockingEvent && bundle.session.status === 'planned' && bundle.session.babeliumEnabled && sessionLoad.plannedMinutes > sessionLoad.programmableMinutes && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{sessionLoad.plannedMinutes - sessionLoad.programmableMinutes} min per sobre del temps disponible</strong><span>Reorganitza les activitats amb la calendarització intel·ligent per respectar el bloc de Babèlium i el temps real de classe.</span></div></div>}
       <div className="agenda-session-activities">
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
         {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
@@ -338,6 +339,7 @@ export function AgendaWeekView({ activeTemporalUnit, bundles, calendarEvents, cl
               const slotDetails = [
                 slot.subject && slot.subject !== classItem?.name ? slot.subject : '',
                 `${slot.durationMinutes} min`,
+                slot.babeliumEnabled ? 'Babèlium · primers 30 min' : '',
                 slot.subgroupId,
                 slot.space,
               ].filter(Boolean).join(' · ')

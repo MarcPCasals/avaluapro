@@ -317,6 +317,7 @@ function TimetableGrid({ classes, onDelete, onEdit, onError, onMove, onQuickAdd,
           {late && <small>{WEEKDAYS.find(([weekday]) => weekday === Number(slot.weekday))?.[1]} · {slot.startsAt}</small>}
           <strong>{classItem?.name || 'Grup'}</strong>
           <span>{slot.subject}</span>
+          {slot.babeliumEnabled && <small>Babèlium · primers 30 min</small>}
           {!late && <small>{slot.startsAt}{slot.subgroupId ? ` · ${slot.subgroupId}` : ''}{slot.space ? ` · ${slot.space}` : ''}{sharedProgrammingSlot ? ` · ↔ ${sharedProgrammingSlot.startsAt}` : ''}</small>}
           {late && (slot.subgroupId || slot.space || sharedProgrammingSlot) && <small>{[slot.subgroupId, slot.space, sharedProgrammingSlot ? `↔ ${sharedProgrammingSlot.startsAt}` : ''].filter(Boolean).join(' · ')}</small>}
         </button>

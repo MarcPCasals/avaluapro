@@ -425,6 +425,8 @@ describe('Planificació compartida', () => {
       status: 'held',
       updatedAt: NOW,
     }))
+    await assertSucceeds(updateDoc(sessionRef(db), { babeliumEnabled: true, updatedAt: NOW }))
+    await assertFails(updateDoc(sessionRef(db), { babeliumEnabled: 'yes', updatedAt: NOW }))
     await assertFails(updateDoc(sessionRef(db), { timerStartedAt: NOW, updatedAt: NOW }))
     await assertSucceeds(setDoc(
       doc(sessionRef(db), 'items', 'plan-session-item-two'),

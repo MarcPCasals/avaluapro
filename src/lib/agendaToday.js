@@ -1,4 +1,5 @@
 import { createSessionItem } from '../domain/planning/model.js'
+import { createBabeliumItem, isBabeliumItem } from '../domain/planning/babelium.js'
 import { getNoClassCalendarEvent } from './agendaCalendar.js'
 
 function addDays(dateKey, amount) {
@@ -154,6 +155,7 @@ export function buildAgendaSessionItemUpdate(bundle, item, changes, options = {}
  * sessió feta, tancada o amb assistència confirmada continua protegida.
  */
 export function getAgendaSessionItemRemovalState(bundle, item, options = {}) {
+  if (isBabeliumItem(item)) return { canRemove: false, linkedResults: [], reason: 'Configura Babèlium des de l’horari.' }
   const now = new Date(options.now || new Date().toISOString()).getTime()
   const startsAt = new Date(bundle?.session?.startsAt || '').getTime()
   const isFutureSession = Number.isFinite(startsAt) && startsAt > now
@@ -217,7 +219,9 @@ export function buildTimetableClassroomBundle(occurrence, classItem = {}, ownerU
       classId: slot.classId,
       classLabel: classItem.name || slot.subject || 'Classe',
     },
-    items: [],
+    items: slot.babeliumEnabled ? [createBabeliumItem({
+      id: stableId, ownerUid, applicationId: `timetable_${slot.classId}`,
+    })] : [],
     planningUnit: {
       id: '',
       code: 'Horari',
@@ -231,6 +235,7 @@ export function buildTimetableClassroomBundle(occurrence, classItem = {}, ownerU
       classroomOpenedAt: new Date().toISOString(),
       classId: slot.classId,
       durationMinutes: Number(slot.durationMinutes || 60),
+      babeliumEnabled: Boolean(slot.babeliumEnabled),
       id: stableId,
       ownerUid,
       startsAt: occurrence.startsAt,

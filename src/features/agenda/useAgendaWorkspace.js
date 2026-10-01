@@ -42,6 +42,8 @@ import {
   createPlanningPrivateNote,
   createTemporalUnit,
   createTimetableSlot,
+  isBabeliumItem,
+  withBabelium,
   createTimetableVersion,
   findTimetableSlotConflicts,
   getManuallyCompletedActivityIds,
@@ -726,7 +728,7 @@ export function useAgendaWorkspace(user, classes = []) {
         const activityById = activitiesByApplicationKey.get(
           `${record.planningUnit.id}:${record.application.id}`,
         ) || new Map()
-        return {
+        return withBabelium({
           ...record,
           detailsLoaded: true,
           items: entities
@@ -739,14 +741,14 @@ export function useAgendaWorkspace(user, classes = []) {
                 || null,
             })),
           results: entities.filter((entity) => entity.entityType === 'activityResult'),
-        }
+        }, Object.values(slotsByTimetableId).flat().find((slot) => slot.id === record.session.timetableSlotId))
       }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
       setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
       return bundles
     } finally {
       setSessionsLoading(false)
     }
-  }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, user?.uid])
+  }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, slotsByTimetableId, user?.uid])
 
   /**
    * Completa una única sessió quan el docent l'obre des del calendari o la
@@ -825,7 +827,7 @@ export function useAgendaWorkspace(user, classes = []) {
         baseActivitiesByUnitId.get(bundle.planningUnit.id) || [],
         overrideResult.entities,
       ).map((activity) => [activity.id, activity]))
-      const detailedBundle = {
+      const detailedBundle = withBabelium({
         ...bundle,
         detailsLoaded: true,
         items: rawItems.map((item) => ({
@@ -835,14 +837,14 @@ export function useAgendaWorkspace(user, classes = []) {
             || null,
         })),
         results: detailResult.entities.filter((entity) => entity.entityType === 'activityResult'),
-      }
+      }, Object.values(slotsByTimetableId).flat().find((slot) => slot.id === bundle.session.timetableSlotId))
       setSessionBundles((bundles) => bundles.map((current) =>
         current.session.id === detailedBundle.session.id ? detailedBundle : current))
       return detailedBundle
     } finally {
       setSessionsLoading(false)
     }
-  }, [allPlanningUnits, refreshRevision, repository, user?.uid])
+  }, [allPlanningUnits, refreshRevision, repository, slotsByTimetableId, user?.uid])
 
   /**
    * La portada d'Agenda només obre el tram necessari per a avui i la setmana
@@ -878,21 +880,38 @@ export function useAgendaWorkspace(user, classes = []) {
     return () => { cancelled = true }
   }, [allPlanningUnits.length, loadTodaySessions, refreshRevision])
 
+  const persistSessionSnapshot = useCallback(async (bundle, session) => {
+    if (!repository) throw new Error('Cal iniciar sessió abans de desar la sessió.')
+    for (const item of bundle.removedBabeliumItems || []) {
+      await repository.remove(item, {
+        planningUnitId: bundle.planningUnit.id,
+        applicationId: bundle.application.id,
+        sessionId: session.id,
+      })
+    }
+    await persist([
+      { entity: session, context: { planningUnitId: bundle.planningUnit.id } },
+      ...bundle.items.filter(isBabeliumItem).map((item) => ({
+        entity: item,
+        context: { planningUnitId: bundle.planningUnit.id, applicationId: bundle.application.id, sessionId: session.id },
+      })),
+    ])
+    setSessionBundles((items) => items.map((item) => item.session.id === session.id
+      ? { ...item, items: bundle.items, session } : item))
+    return session
+  }, [persist, repository])
+
   const saveSessionStatus = useCallback(async (bundle, status) => {
     const now = new Date().toISOString()
     const session = createCalendarSession({ ...bundle.session, status, updatedAt: now }, { now })
-    await persist({ entity: session, context: { planningUnitId: bundle.planningUnit.id } })
-    setSessionBundles((items) => items.map((item) => item.session.id === session.id ? { ...item, session } : item))
-    return session
-  }, [persist])
+    return persistSessionSnapshot(bundle, session)
+  }, [persistSessionSnapshot])
 
   const saveSessionClassroomState = useCallback(async (bundle, changes) => {
     const now = new Date().toISOString()
     const session = createCalendarSession({ ...bundle.session, ...changes, updatedAt: now }, { now })
-    await persist({ entity: session, context: { planningUnitId: bundle.planningUnit.id } })
-    setSessionBundles((items) => items.map((item) => item.session.id === session.id ? { ...item, session } : item))
-    return session
-  }, [persist])
+    return persistSessionSnapshot(bundle, session)
+  }, [persistSessionSnapshot])
 
   /**
    * Un resultat és únic per element de sessió. Aturar o revisar el temporitzador
@@ -911,6 +930,7 @@ export function useAgendaWorkspace(user, classes = []) {
       sourceActivityId: item.sourceActivityId,
       updatedAt: now,
     }, { now })
+    if (bundle.standalone) return result
     const entries = [{
       entity: result,
       context: {
@@ -1220,6 +1240,9 @@ export function useAgendaWorkspace(user, classes = []) {
       timetable.id,
       sortSlots(slotResults[index]?.entities || []),
     ]))
+    const slotById = new Map(Object.values(slotsByTimetableId).flat().map((slot) => [slot.id, slot]))
+    existingSessionBundles = existingSessionBundles.map((bundle) =>
+      withBabelium(bundle, slotById.get(bundle.session.timetableSlotId)))
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
       summarizeAssignedActivityProgress(existingSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
@@ -1402,7 +1425,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }, { now })
     const entries = [{ entity: application }]
     for (const bundle of preview.sessions) {
-      if (!bundle.isExisting) entries.push({ entity: bundle.session, context: { planningUnitId } })
+      entries.push({ entity: bundle.session, context: { planningUnitId } })
       for (const item of bundle.items) {
         entries.push({
           entity: item,
@@ -1587,7 +1610,7 @@ export function useAgendaWorkspace(user, classes = []) {
           .filter(Boolean))
         const currentIndex = orderedActivities.findIndex((activity) =>
           currentActivityIds.has(activity.id))
-        const programmableMinutes = Math.max(1, Number(bundle.session.durationMinutes) - 5)
+        const programmableMinutes = Math.max(1, Number(bundle.session.durationMinutes) - 5 - (bundle.session.babeliumEnabled ? 30 : 0))
         const precedingActivities = currentIndex > 0
           ? orderedActivities.slice(0, currentIndex).reverse()
           : []
@@ -1714,9 +1737,7 @@ export function useAgendaWorkspace(user, classes = []) {
       })
     }
     for (const candidate of preview.sessions) {
-      if (!candidate.isExisting) {
-        entries.push({ entity: candidate.session, context: { planningUnitId } })
-      }
+      entries.push({ entity: candidate.session, context: { planningUnitId } })
       for (const item of candidate.items) {
         entries.push({
           entity: item,

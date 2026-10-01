@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import {
   CLASSROOM_BEHAVIOR_CATEGORIES,
+  isBabeliumItem,
   getClassroomEvidenceItems,
   getBackdatedTimerStart,
   getClassroomStudents,
@@ -75,12 +76,16 @@ function loadClassroomTimer(sessionId, itemId) {
 
 function saveClassroomTimer(sessionId, itemId, timer) {
   if (!sessionId || !itemId) return
-  globalThis.sessionStorage?.setItem(classroomTimerKey(sessionId, itemId), JSON.stringify(timer))
+  try {
+    globalThis.sessionStorage?.setItem(classroomTimerKey(sessionId, itemId), JSON.stringify(timer))
+  } catch { /* The in-memory timer remains usable when browser storage is unavailable. */ }
 }
 
 function clearClassroomTimer(sessionId, itemId) {
   if (!sessionId || !itemId) return
-  globalThis.sessionStorage?.removeItem(classroomTimerKey(sessionId, itemId))
+  try {
+    globalThis.sessionStorage?.removeItem(classroomTimerKey(sessionId, itemId))
+  } catch { /* Clearing the in-memory timer does not depend on browser storage. */ }
 }
 
 const TASK_STATUSES = [
@@ -769,7 +774,7 @@ export function ClassroomMode({
 
             <div className="classroom-activity-actions">
               {currentResult && <button className="secondary-action" disabled={Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => setReviewItem(currentItem)} type="button"><PencilLine size={16} />Revisar</button>}
-              <button className="secondary-action" disabled={busy === 'result' || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => onContinue(currentBundle, currentItem)} type="button"><ArrowRight size={16} />Continuarà</button>
+              <button className="secondary-action" disabled={isBabeliumItem(currentItem) || busy === 'result' || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => onContinue(currentBundle, currentItem)} type="button"><ArrowRight size={16} />Continuarà</button>
               <button className="primary-action" disabled={busy === 'result' || Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => saveResult({ actualMinutes: currentResult?.actualMinutes || null, status: 'completed' })} type="button">{busy === 'result' ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}{currentResult ? 'Següent' : 'Fet i següent'}</button>
             </div>
           </article> : <div className="classroom-no-activity"><CheckCircle2 size={36} /><strong>{currentBundle.standalone ? 'Classe sense activitats programades' : 'Seqüència completada'}</strong><p>{currentBundle.standalone ? 'Pots passar llista i revisar les tasques amb data d’entrega d’avui.' : 'Pots revisar qualsevol element o tancar la classe.'}</p></div>}

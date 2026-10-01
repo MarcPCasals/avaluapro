@@ -1,3 +1,4 @@
+export * from './babelium.js'
 export * from './constants.js'
 export * from './classroom.js'
 export * from './classPlanning.js'

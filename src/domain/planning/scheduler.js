@@ -4,6 +4,7 @@ import {
   createSessionItem,
 } from './model.js'
 import { getProgrammableMinutes, selectEffectiveTimetable } from './rules.js'
+import { BABELIUM_MINUTES, createBabeliumItem, isBabeliumItem } from './babelium.js'
 
 const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
@@ -56,7 +57,7 @@ function candidateKey(candidate) {
 }
 
 function existingItemsSignature(items = []) {
-  return items.map((item) => [
+  return items.filter((item) => !isBabeliumItem(item)).map((item) => [
     item.sourceActivityId || '',
     Number(item.segmentIndex) || 0,
     item.plannedMinutes == null ? '' : Number(item.plannedMinutes),
@@ -353,6 +354,7 @@ export function buildTimetableSessionCandidates({
         const candidate = {
           date: dateKey,
           durationMinutes: Number(slot.durationMinutes),
+          babeliumEnabled: Boolean(slot.babeliumEnabled),
           space: slot.space || '',
           startsAt: `${dateKey}T${slot.startsAt}:00`,
           subgroupId: slot.subgroupId || null,
@@ -467,6 +469,7 @@ export function buildActivitySessionDistribution({
           date: String(bundle.session.startsAt).slice(0, 10),
           calendarEventId: bundle.session.calendarEventId,
           durationMinutes: bundle.session.durationMinutes,
+          babeliumEnabled: Boolean(bundle.session.babeliumEnabled),
           startsAt: bundle.session.startsAt,
           subgroupId: bundle.session.subgroupId,
           parallelProgrammingKey: bundle.session.parallelProgrammingKey,
@@ -476,6 +479,7 @@ export function buildActivitySessionDistribution({
         isExisting: true,
         items: [],
         remainingMinutes: Math.max(0, getProgrammableMinutes(bundle.session.durationMinutes, marginMinutes) -
+          (bundle.session.babeliumEnabled && !(bundle.items || []).some(isBabeliumItem) ? BABELIUM_MINUTES : 0) -
           (bundle.items || []).reduce((total, item) => total + (Number(item.plannedMinutes) || 0), 0)),
         session: bundle.session,
       })),
@@ -484,7 +488,8 @@ export function buildActivitySessionDistribution({
       existingItems: [],
       isExisting: false,
       items: [],
-      remainingMinutes: getProgrammableMinutes(candidate.durationMinutes, marginMinutes),
+      remainingMinutes: Math.max(0, getProgrammableMinutes(candidate.durationMinutes, marginMinutes) -
+        (candidate.babeliumEnabled ? BABELIUM_MINUTES : 0)),
       session: null,
     })),
   ].sort((left, right) => left.candidate.startsAt.localeCompare(right.candidate.startsAt))
@@ -571,6 +576,7 @@ export function buildActivitySessionDistribution({
         calendarEventId: draft.candidate.calendarEventId,
         classId: application.classId,
         durationMinutes: draft.candidate.durationMinutes,
+        babeliumEnabled: Boolean(draft.candidate.babeliumEnabled),
         ownerUid: application.ownerUid,
         startsAt: draft.candidate.startsAt,
         subgroupId: draft.candidate.subgroupId,
@@ -579,10 +585,12 @@ export function buildActivitySessionDistribution({
       },
       options,
     )
+    const fixedItems = session.babeliumEnabled && !draft.existingItems.some(isBabeliumItem)
+      ? [createBabeliumItem(session, options)] : []
     const items = logicalItems.map(({ activity, plannedMinutes, segmentCount, segmentIndex }, order) => (
       createSessionItem({
         applicationId: application.id,
-        order: draft.existingItems.length + order,
+        order: draft.existingItems.length + fixedItems.length + order,
         ownerUid: application.ownerUid,
         plannedMinutes,
         segmentCount,
@@ -598,7 +606,7 @@ export function buildActivitySessionDistribution({
       candidate: draft.candidate,
       existingItems: draft.existingItems,
       isExisting: draft.isExisting,
-      items,
+      items: [...fixedItems, ...items],
       logicalSessionIndex: logicalSessionIndex.get(logical),
       parallelSubgroupCount: logical?.drafts.filter((item) => item.candidate.subgroupId).length || 0,
       programmableMinutes: getProgrammableMinutes(session.durationMinutes, marginMinutes),
@@ -610,7 +618,7 @@ export function buildActivitySessionDistribution({
     logicalSessionCount: scheduledLogicalDrafts.length,
     physicalSessionCount: sessions.length,
     scheduledActivityIds: [...new Set(sessions.flatMap((bundle) =>
-      bundle.items.map((item) => item.sourceActivityId)))],
+      bundle.items.map((item) => item.sourceActivityId).filter(Boolean)))],
     sessions,
     scheduledMinutes: logicalDrafts.reduce((total, draft) => total + draft.items.reduce(
       (sum, item) => sum + (Number(item.plannedMinutes) || 0), 0), 0),
@@ -726,7 +734,7 @@ export function buildActivitySessionReflow({
     availability,
     kind: 'reflow',
     lockedSessionCount: lockedBundles.length,
-    removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
     removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions,
     replacedItemCount: reflowableBundles.reduce((total, bundle) => total + (bundle.items || []).length, 0),
@@ -805,6 +813,7 @@ export function buildAgendaRecoveryReflow({
     type: recoveryItem.type || 'activity',
   }]
   displacedItems.forEach((item, index) => {
+    if (isBabeliumItem(item)) return
     const key = `agenda-displaced:${item.id || index}`
     activityMeta.set(key, {
       sourceActivityId: item.sourceActivityId || null,
@@ -830,6 +839,7 @@ export function buildAgendaRecoveryReflow({
   let provisionalSessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
+      if (isBabeliumItem(item)) return item
       const meta = activityMeta.get(item.sourceActivityId)
       return createSessionItem({
         ...item,
@@ -907,6 +917,7 @@ export function buildAgendaRecoveryReflow({
   for (const group of groupParallelSessionBundles(provisionalSessions)) {
     const representativeItems = group.bundles[0]?.items || []
     representativeItems.forEach((item, itemIndex) => {
+      if (isBabeliumItem(item)) return
       if (!item.sourceActivityId) return
       const segmentIndex = (nextIndexByActivityId[item.sourceActivityId] || 0) + 1
       nextIndexByActivityId[item.sourceActivityId] = segmentIndex
@@ -941,7 +952,7 @@ export function buildAgendaRecoveryReflow({
     kind: 'agenda-recovery',
     recoveryItem,
     recoveryMinutes: minutes,
-    removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
     removedSessions: reflowableBundles
       .map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
@@ -1023,6 +1034,7 @@ function buildAgendaItemsReflow({
   logicalGroups.forEach((group, groupIndex) => {
     const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
     representativeItems.forEach((item, itemIndex) => {
+      if (isBabeliumItem(item)) return
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
       const title = isTarget ? String(changes.title || item.title).trim() || item.title : item.title
       const activity = includeActivity({
@@ -1074,6 +1086,7 @@ function buildAgendaItemsReflow({
   const provisionalSessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
+      if (isBabeliumItem(item)) return item
       const meta = activityMeta.get(item.sourceActivityId)
       return createSessionItem({
         ...item,
@@ -1143,7 +1156,7 @@ function buildAgendaItemsReflow({
     changedLockedItems,
     changedTargetResults: [],
     editedItem: targetItem,
-    removedItems: reflowableBundles.flatMap((bundle) => bundle.items || []),
+    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
     removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions: reflowableBundles.map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
