@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowRight, CalendarX2, CheckCircle2, Clock3, Edit3, Loader2,
-  History, RotateCcw, Trash2, X,
+  History, RotateCcw,
 } from 'lucide-react'
 import { FormattedText } from '../../components/FormattedText'
 import { BABELIUM_MINUTES } from '../../domain/planning/babelium'
 import { Modal } from '../../components/Modal'
 import { ContextualTab } from '../../components/ContextualHelp'
-import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { AgendaSessionDetail } from './AgendaSessionViews'
 
@@ -16,10 +15,10 @@ function dateLabel(startsAt) {
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
 }
 
-export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onRemoveItem, onResolveGap }) {
+export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap }) {
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-session-dialog" size="lg" title="Detall de la sessió">
-      <AgendaSessionDetail onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
+      <AgendaSessionDetail onSaveItem={onSaveItem} onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
     </Modal>
   )
 }
@@ -37,8 +36,6 @@ export function AgendaSessionAdjustDialog({
   onConfirmReplacement,
   onConfirmContinuation,
   onLoadRecoveryOptions,
-  onRemoveItem,
-  onSaveItem,
   onSaved,
   onStatus,
 }) {
@@ -62,8 +59,6 @@ export function AgendaSessionAdjustDialog({
 
   const [itemId, setItemId] = useState(initialItemId || editableItems[0]?.id || '')
   const item = editableItems.find((candidate) => candidate.id === itemId) || editableItems[0] || null
-  const [title, setTitle] = useState(item?.title || '')
-  const [plannedMinutes, setPlannedMinutes] = useState(item?.plannedMinutes || '')
   const [continuationMinutes, setContinuationMinutes] = useState(item?.plannedMinutes || 15)
   const [continuationPreview, setContinuationPreview] = useState(null)
   const [recoveryOptions, setRecoveryOptions] = useState([])
@@ -71,7 +66,6 @@ export function AgendaSessionAdjustDialog({
   const [recoveryMinutes, setRecoveryMinutes] = useState(15)
   const [recoveryPreview, setRecoveryPreview] = useState(null)
   const [recoveryLoading, setRecoveryLoading] = useState(false)
-  const [confirmRemoval, setConfirmRemoval] = useState(false)
   const [dialogOpenedAt] = useState(() => Date.now())
   const canReplace = bundle.session.status === 'planned'
     && new Date(bundle.session.startsAt).getTime() > dialogOpenedAt
@@ -79,8 +73,6 @@ export function AgendaSessionAdjustDialog({
     && !bundle.session.classroomClosedAt && !(bundle.results || []).length
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const removalState = getAgendaSessionItemRemovalState(bundle, item)
-  const canRemoveItem = removalState.canRemove
   const movesFromFutureSession = bundle.session.status === 'planned'
     && new Date(bundle.session.startsAt).getTime() > dialogOpenedAt
   const recoveryItem = recoveryOptions.find((candidate) => candidate.id === recoveryItemId)
@@ -90,11 +82,8 @@ export function AgendaSessionAdjustDialog({
   const selectItem = (nextId) => {
     const nextItem = editableItems.find((candidate) => candidate.id === nextId)
     setItemId(nextId)
-    setTitle(nextItem?.title || '')
-    setPlannedMinutes(nextItem?.plannedMinutes || '')
     setContinuationMinutes(nextItem?.plannedMinutes || 15)
     setContinuationPreview(null)
-    setConfirmRemoval(false)
   }
 
   const execute = async (operation, successMessage) => {
@@ -202,7 +191,6 @@ export function AgendaSessionAdjustDialog({
       <nav aria-label="Tipus de reajustament" className="agenda-adjust-tabs" role="tablist">
         <ContextualTab aria-selected={action === 'session'} className={action === 'session' ? 'active' : ''} help="Anul·la o restaura tota la sessió. La cronologia es conserva i les activitats no fetes poden tornar a quedar pendents." helpTitle="Reajustar la sessió" onClick={() => setAction('session')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'session' ? 0 : -1} type="button"><CalendarX2 size={15} />Sessió</ContextualTab>
         <ContextualTab aria-selected={action === 'replacement'} className={action === 'replacement' ? 'active' : ''} disabled={!canReplace || busy} help="Substitueix una sessió futura per una proposta nova i decideix si ajornes o retires les activitats previstes." helpTitle="Substituir sessió" onClick={() => setAction('replacement')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'replacement' ? 0 : -1} type="button"><Edit3 size={15} />Substituir sessió</ContextualTab>
-        <ContextualTab aria-selected={action === 'activity'} className={action === 'activity' ? 'active' : ''} disabled={editableItems.length === 0} help="Canvia el títol o els minuts d’un fragment només en aquesta sessió, o retira un fragment futur sense modificar l’activitat original de la UP." helpTitle="Reajustar una activitat" onClick={() => setAction('activity')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'activity' ? 0 : -1} type="button"><Edit3 size={15} />Activitat</ContextualTab>
         <ContextualTab aria-selected={action === 'continuation'} className={action === 'continuation' ? 'active' : ''} disabled={editableItems.length === 0} help={movesFromFutureSession ? 'Trasllada minuts d’aquesta sessió futura a les següents i previsualitza tot l’efecte dominó abans de confirmar-lo.' : 'Afegeix el temps que no has pogut completar a les sessions següents i previsualitza l’efecte dominó.'} helpTitle="Continuar una activitat" onClick={() => setAction('continuation')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'continuation' ? 0 : -1} type="button"><ArrowRight size={15} />Continuació</ContextualTab>
         <ContextualTab aria-selected={action === 'recovery'} className={action === 'recovery' ? 'active' : ''} help="Recupera una activitat anterior del grup i reorganitza la part futura de l’Agenda sense canviar la programació base." helpTitle="Recuperar una activitat anterior" onClick={openRecovery} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'recovery' ? 0 : -1} type="button"><History size={15} />Recuperar anterior</ContextualTab>
       </nav>
@@ -229,27 +217,6 @@ export function AgendaSessionAdjustDialog({
         <div className="agenda-adjust-preview"><ArrowRight size={18} /><div><strong>{disposition === 'postpone' ? 'El contingut passarà a les classes següents' : 'Les sessions següents conservaran la seva distribució'}</strong><p>{disposition === 'postpone' ? 'Les activitats d’aquesta sessió es traslladaran a la següent classe disponible i la resta es reajustarà en cadena.' : 'Es retirarà només el contingut previst d’aquesta sessió.'} L’ajornament reajusta les sessions de la mateixa UP. La Programació original es conserva. Si hi ha Babelium, es manté a la sessió.</p></div></div>
         {replacementPreview && <div className="agenda-continuation-preview"><header><CheckCircle2 size={17} /><strong>{replacementPreview.sessions.length} {replacementPreview.sessions.length === 1 ? 'sessió afectada' : 'sessions afectades'}</strong></header>{replacementPreview.sessions.map((candidate) => <div key={candidate.session.id}><span>{dateLabel(candidate.session.startsAt)} · {String(candidate.session.startsAt).slice(11, 16)}</span><strong>{candidate.items.map((current) => `${current.title} · ${current.plannedMinutes || 0} min`).join(' · ') || 'Sessió sense activitats previstes'}</strong><small>{candidate.isExisting ? 'Sessió reajustada' : 'Nova sessió necessària'}</small></div>)}{replacementPreview.removedSessions.length > 0 && <p>{replacementPreview.removedSessions.length} sessions buides es retiraran de la cronologia.</p>}</div>}
         {replacementPreview ? <button className="primary-action" disabled={busy || !canReplace} onClick={() => execute(() => onConfirmReplacement(replacementPreview), 'Sessió substituïda i cronologia actualitzada.')} type="button">{busy && <Loader2 className="spin" size={16} />}Confirmar substitució</button> : <button className="secondary-action" disabled={busy || replacementActivitiesLoading || !canReplace || (replacementSource === 'planning' ? !selectedReplacementActivity || selectedReplacementActivity.availableMinutes <= 0 : !replacementTitle.trim()) || !Number.isFinite(Number(replacementMinutes)) || Number(replacementMinutes) <= 0} onClick={previewReplacement} type="button">{busy ? <Loader2 className="spin" size={16} /> : <ArrowRight size={16} />}Previsualitzar canvi</button>}
-      </section>}
-
-      {action === 'activity' && item && <section className="agenda-adjust-panel" role="tabpanel">
-        <label>Activitat<select value={item.id} onChange={(event) => selectItem(event.target.value)}>{editableItems.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}{candidate.plannedMinutes ? ` · ${candidate.plannedMinutes} min` : ''}{candidate.segmentCount > 1 ? ` · part ${candidate.segmentIndex}/${candidate.segmentCount}` : ''}</option>)}</select></label>
-        <label>Títol<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-        <label>Minuts previstos<input min="1" type="number" value={plannedMinutes} onChange={(event) => setPlannedMinutes(event.target.value)} /></label>
-        <div className="agenda-adjust-preview ready"><CheckCircle2 size={18} /><div><strong>Reajustament automàtic de l’Agenda</strong><p>«{item.title}» passarà a «{title}» amb {plannedMinutes || '—'} minuts. Les activitats futures es tornaran a encaixar per omplir els 55 minuts de cada sessió; la Programació original no es modificarà.</p></div></div>
-        <button className="primary-action" disabled={busy || !title.trim() || Number(plannedMinutes) <= 0} onClick={() => execute(() => onSaveItem(item, { plannedMinutes: Number(plannedMinutes), title: title.trim() }), 'Activitat i cronologia futura reajustades.')} type="button">{busy && <Loader2 className="spin" size={16} />}Desar i reajustar l’Agenda</button>
-        <div className="agenda-remove-session-item">
-          {!confirmRemoval ? <>
-            <div><strong>Treure aquest fragment de la sessió</strong><p>L’activitat original de la UP i les altres parts programades es conservaran.</p></div>
-            <button className="danger-action compact" disabled={busy || !canRemoveItem} onClick={() => setConfirmRemoval(true)} type="button"><Trash2 size={15} />Treure de la sessió</button>
-          </> : <>
-            <div><strong>Vols treure «{item.title}»?</strong><p>S’eliminaran només {item.plannedMinutes ? `aquests ${item.plannedMinutes} minuts` : 'aquest element'} de la sessió del {dateLabel(bundle.session.startsAt)}.</p></div>
-            <div className="agenda-remove-session-item-actions"><button className="secondary-action compact" disabled={busy} onClick={() => setConfirmRemoval(false)} type="button"><X size={14} />Cancel·lar</button><button className="danger-action compact" disabled={busy} onClick={() => execute(() => onRemoveItem(item), 'Fragment eliminat de la sessió.')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}Confirmar</button></div>
-          </>}
-          {canRemoveItem && removalState.linkedResults.length > 0 && (
-            <small>Aquest fragment futur arrossega un registre tècnic del reajustament. També es netejarà, però es conservaran l’activitat original i tot l’historial de les sessions ja fetes.</small>
-          )}
-          {!canRemoveItem && <small>Aquesta sessió ja té dades reals de classe i es conserva per no perdre l’historial.</small>}
-        </div>
       </section>}
 
       {action === 'continuation' && item && <section className="agenda-adjust-panel" role="tabpanel">

@@ -761,6 +761,22 @@ export default function AgendaModule() {
       results: (current.results || []).filter((result) => result.sessionItemId !== item.id),
     } : current)
   }
+  const saveDetailSessionItem = async (item, changes) => {
+    const sessionId = activeBundle.session.id
+    const result = await workspace.saveSessionItemChange(activeBundle, item, changes)
+    const updated = result.sessions.find((candidate) => candidate.session.id === sessionId)
+    const activityById = new Map(result.setup.activities.map((activity) => [activity.id, activity]))
+    setActiveBundle((current) => current?.session.id === sessionId && updated ? {
+      ...current,
+      session: updated.session,
+      items: updated.items.map((candidate) => ({
+        ...candidate,
+        sourceActivity: activityById.get(candidate.sourceActivityId) || null,
+      })),
+      results: result.changedTargetResults || [],
+    } : current)
+    setTimelinePlanningRevision((revision) => revision + 1)
+  }
   const resolveSessionGap = async (bundle) => {
     try {
       await workspace.compactAgendaSession(bundle)
@@ -952,7 +968,7 @@ export default function AgendaModule() {
         tasks={tasks}
         onUpdateTaskRecord={updateTaskRecord}
       />
-      {dialog === 'session-adjust' && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onBuildReplacement={workspace.buildSessionReplacementPreview} onLoadReplacementActivities={workspace.loadSessionReplacementActivities} onConfirmReplacement={workspace.confirmSessionReplacementPreview} onClose={() => setDialog(null)} onConfirmContinuation={confirmClassroomContinuation} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
+      {dialog === 'session-adjust' && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onBuildReplacement={workspace.buildSessionReplacementPreview} onLoadReplacementActivities={workspace.loadSessionReplacementActivities} onConfirmReplacement={workspace.confirmSessionReplacementPreview} onClose={() => setDialog(null)} onConfirmContinuation={confirmClassroomContinuation} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </>
   }
 
@@ -1021,8 +1037,8 @@ export default function AgendaModule() {
       {dialog === 'event' && <CalendarEventDialog academicYear={workspace.activeAcademicYear} classes={classes} initialValue={editingEvent || eventPreset} onClose={() => { setDialog(null); setEditingEvent(null); setEventPreset(null) }} onSave={workspace.saveCalendarEvent} today={workspace.today} />}
       {dialog === 'reminders' && <RemindersModal focusedReminderIds={focusedReminderIds} onClose={() => { setDialog(null); setFocusedReminderIds([]) }} sessionOptions={reminderSessionOptions} sessionOptionsLoading={workspace.sessionsLoading} />}
       {dialog === 'scheduling' && <AgendaSchedulingDialog academicYear={workspace.activeAcademicYear} classes={classes} initialClassId={activeClassId} initialMode={schedulingMode} initialPlanningUnitId={schedulingUnitId} onBuildPreview={workspace.buildSchedulingPreview} onClose={() => { setDialog(null); setSchedulingUnitId(''); setSchedulingMode('progressive') }} onConfirm={workspace.confirmSchedulingPreview} onLoadSetup={workspace.loadSchedulingSetup} onSaved={(result) => { setScheduleNotice(schedulingSavedNotice(result)); setTimelinePlanningRevision((revision) => revision + 1); reloadActiveView() }} planningUnits={workspace.schedulablePlanningUnits} today={workspace.today} />}
-      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog onRemoveItem={removeDetailSessionItem} bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} onResolveGap={resolveSessionGap} />}
-      {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onBuildReplacement={workspace.buildSessionReplacementPreview} onLoadReplacementActivities={workspace.loadSessionReplacementActivities} onConfirmReplacement={workspace.confirmSessionReplacementPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onRemoveItem={(item) => workspace.removeSessionItem(activeBundle, item)} onSaveItem={(item, changes) => workspace.saveSessionItemChange(activeBundle, item, changes)} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
+      {dialog === 'session-detail' && activeBundle && <AgendaSessionDetailDialog onSaveItem={saveDetailSessionItem} onRemoveItem={removeDetailSessionItem} bundle={activeBundle} calendarEvents={workspace.calendarEvents} classes={agendaClasses} onAdjust={adjustSession} onClose={() => setDialog(null)} onOpenClassroom={openClassroom} onResolveGap={resolveSessionGap} />}
+      {dialog === 'session-adjust' && activeBundle && <AgendaSessionAdjustDialog bundle={activeBundle} initialAction={adjustInitialAction} initialItemId={adjustItemId} onBuildContinuation={workspace.buildContinuationPreview} onBuildRecovery={workspace.buildAgendaRecoveryPreview} onBuildReplacement={workspace.buildSessionReplacementPreview} onLoadReplacementActivities={workspace.loadSessionReplacementActivities} onConfirmReplacement={workspace.confirmSessionReplacementPreview} onClose={() => setDialog(null)} onConfirmContinuation={workspace.confirmContinuationPreview} onConfirmRecovery={workspace.confirmAgendaRecoveryPreview} onLoadRecoveryOptions={workspace.loadAgendaRecoveryOptions} onSaved={setScheduleNotice} onStatus={(status) => workspace.saveSessionStatus(activeBundle, status)} />}
     </section>
   )
 }
