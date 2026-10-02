@@ -7,6 +7,7 @@ import {
   buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
   buildAgendaSessionCompaction,
+  combineAgendaSessionItems,
   getAgendaActivityMinutesById,
   applyPlanningActivityOverrides,
   applyImprovementProposals,
@@ -2062,4 +2063,51 @@ test('ampliar la segona part de 35 a 55 minuts desplaça la següent activitat i
   })
   assert.deepEqual(reduced.sessions[0].items.map(item => [item.sourceActivityId, item.plannedMinutes]), [['theory', 35], ['atoms', 20]])
   assert.deepEqual(reduced.activityMinutesChanges, { theory: 90 })
+})
+
+test('combina qualsevol nom repetit en una sessió i conserva les fonts sense barrejar UP ni Babèlium', () => {
+  const items = [
+    { id: 'a', title: 'Teoria', type: 'activity', plannedMinutes: 35, sourceActivityId: 'source-a', sourceActivity: { description: 'Primera descripció' }, segmentCount: 2, segmentIndex: 2 },
+    { id: 'b', title: ' teoria ', type: 'activity', plannedMinutes: 20, sourceActivityId: 'source-b', sourceActivity: { description: 'Segona descripció' }, segmentCount: 2, segmentIndex: 1 },
+    { id: 'c', title: 'Exercicis', type: 'activity', plannedMinutes: 10, sourceActivityId: 'source-c' },
+    { id: 'd', title: 'Exercicis', type: 'activity', plannedMinutes: 15, sourceActivityId: 'source-c' },
+    { id: 'other-up', title: 'Teoria', type: 'activity', plannedMinutes: 5, sourcePlanningUnitId: 'another-up' },
+    { id: 'untimed', title: 'Teoria', type: 'activity', plannedMinutes: null },
+  ]
+  const before = structuredClone(items)
+  const grouped = combineAgendaSessionItems(items)
+  assert.deepEqual(grouped.map(item => item.plannedMinutes), [55, 25, 5, null])
+  assert.deepEqual(grouped[0].combinedItems.map(item => item.sourceActivityId), ['source-a', 'source-b'])
+  assert.equal(grouped[0].segmentCount, null)
+  assert.equal(grouped[0].sourceActivity.description, 'Primera descripció\n\nSegona descripció')
+  assert.deepEqual(items, before)
+  assert.equal(combineAgendaSessionItems([{ id: 'one', title: 'Única', plannedMinutes: 10 }]).length, 1)
+  assert.equal(combineAgendaSessionItems([
+    { id: 'babelium_session', sessionId: 'session', title: 'Babèlium', type: 'activity', plannedMinutes: 30 },
+    { id: 'regular', title: 'Babèlium', type: 'activity', plannedMinutes: 10 },
+  ]).length, 2)
+  assert.equal(combineAgendaSessionItems([
+    { id: 'legacy', title: 'Teoria', type: 'activity', plannedMinutes: 10 },
+    { id: 'scoped', title: 'Teoria', type: 'activity', plannedMinutes: 15, sourcePlanningUnitId: 'up-1' },
+  ], 'up-1')[0].plannedMinutes, 25)
+})
+
+test('editar els minuts d’una entrada combinada usa el total i reajusta totes les fonts', () => {
+  const application = createGroupApplication({id:'app-combined',ownerUid:'teacher-1',academicYearId:'year-1',planningUnitId:'up-1',classId:'class-1'}, {now:NOW})
+  const sessions = ['2026-09-25T08:30:00','2026-09-28T08:30:00'].map((startsAt,index) => createCalendarSession({id:`combined-${index}`,ownerUid:'teacher-1',applicationId:application.id,classId:'class-1',startsAt,durationMinutes:60}, {now:NOW}))
+  const makeItem = (id, sourceActivityId, title, plannedMinutes, order) => createSessionItem({id,sourceActivityId,title,plannedMinutes,order,type:'activity',ownerUid:'teacher-1',applicationId:application.id,sessionId:sessions[0].id}, {now:NOW})
+  const items = [makeItem('a','source-a','Teoria',35,0),makeItem('b','source-b','Teoria',20,1)]
+  const input = {application,activityMinutesById:{'source-a':35,'source-b':20},existingSessionBundles:[{session:sessions[0],items,results:[]},{session:sessions[1],items:[],results:[]}],targetSessionId:sessions[0].id,targetItemId:'a',options:options(sequenceIdFactory())}
+  const unchanged = buildAgendaItemChangeReflow({...input,changes:{plannedMinutes:55,title:'Teoria'}})
+  assert.equal(unchanged.sessions[0].items.reduce((sum,item)=>sum+item.plannedMinutes,0),55)
+  assert.equal(combineAgendaSessionItems(unchanged.sessions[0].items).length,1)
+  assert.deepEqual(unchanged.activityMinutesChanges,{'source-a':35,'source-b':20})
+  const extended = buildAgendaItemChangeReflow({...input,changes:{plannedMinutes:70,title:'Teoria ampliada'}})
+  assert.deepEqual(extended.sessions.map(bundle=>combineAgendaSessionItems(bundle.items).map(item=>[item.title,item.plannedMinutes])),[[['Teoria ampliada',55]],[['Teoria ampliada',15]]])
+  assert.equal(extended.unscheduled.length,0)
+  const reduced = buildAgendaItemChangeReflow({...input,changes:{plannedMinutes:25,title:'Teoria'}})
+  assert.deepEqual(reduced.sessions[0].items.map(item=>[item.sourceActivityId,item.plannedMinutes]),[['source-a',25]])
+  assert.deepEqual(reduced.activityMinutesChanges,{'source-a':25,'source-b':0})
+  const overrides = Object.entries(reduced.activityMinutesChanges).map(([activityId,agendaPlannedMinutes])=>createGroupActivityOverride({activityId,changes:{agendaPlannedMinutes},ownerUid:'teacher-1',applicationId:application.id},{now:NOW}))
+  assert.equal(getAgendaActivityMinutesById([{id:'source-b',plannedMinutes:20}],overrides)['source-b'],0)
 })

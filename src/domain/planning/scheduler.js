@@ -1,3 +1,4 @@
+import { combineAgendaSessionItems } from './agendaItems.js'
 import {
   createActivityResult,
   createCalendarSession,
@@ -987,6 +988,7 @@ function buildAgendaItemsReflow({
   application,
   candidates = [],
   changes = {},
+  itemChanges = {},
   existingSessionBundles = [],
   options = {},
   startAfterTarget = false,
@@ -1012,9 +1014,9 @@ function buildAgendaItemsReflow({
     group.bundles.some((bundle) => bundle.session.id === targetSessionId))
   const physicalTarget = targetGroup?.bundles.find((bundle) => bundle.session.id === targetSessionId)
   const targetItemIndex = targetItemId
-    ? physicalTarget?.items.findIndex((item) => item.id === targetItemId) ?? -1
+    ? [...(physicalTarget?.items || [])].sort(compareOrder).findIndex((item) => item.id === targetItemId) ?? -1
     : -1
-  const targetItem = targetItemIndex >= 0 ? physicalTarget.items[targetItemIndex] : null
+  const targetItem = targetItemIndex >= 0 ? [...physicalTarget.items].sort(compareOrder)[targetItemIndex] : null
   if (targetItemId && !targetItem?.sourceActivityId) {
     throw new Error('No s’ha trobat el fragment que vols reajustar.')
   }
@@ -1048,20 +1050,31 @@ function buildAgendaItemsReflow({
   additionalActivities.forEach((activity, index) => {
     includeActivity(activity, `additional:${index}`)
   })
+  const editedMinutesBySourceId = new Map()
   logicalGroups.forEach((group, groupIndex) => {
     const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
     representativeItems.forEach((item, itemIndex) => {
       if (isBabeliumItem(item)) return
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
-      const title = isTarget ? String(changes.title || item.title).trim() || item.title : item.title
+      const physicalItem = group === targetGroup
+        ? [...physicalTarget.items].sort(compareOrder)[itemIndex] : null
+      const itemChange = itemChanges[physicalItem?.id] || (isTarget ? changes : null)
+      const title = itemChange ? String(itemChange.title || item.title).trim() || item.title : item.title
+      const newMinutes = itemChange ? Number(itemChange.plannedMinutes) : item.plannedMinutes
+      if (itemChange && item.sourceActivityId) {
+        const edited = editedMinutesBySourceId.get(item.sourceActivityId) || { delta: 0, minutes: 0 }
+        edited.delta += newMinutes - Number(item.plannedMinutes || 0)
+        edited.minutes += newMinutes
+        editedMinutesBySourceId.set(item.sourceActivityId, edited)
+      }
       const activity = includeActivity({
-        plannedMinutes: isTarget ? minutes : item.plannedMinutes,
+        plannedMinutes: newMinutes,
         sourceActivityId: item.sourceActivityId || null,
         sourcePlanningUnitId: item.sourcePlanningUnitId || null,
         title,
         type: item.type || 'activity',
       }, `unlinked:${groupIndex}:${itemIndex}:${item.id}`)
-      if (isTarget) {
+      if (itemChange) {
         activity.title = title
         activityMeta.set(activity.id, {
           ...activityMeta.get(activity.id),
@@ -1081,12 +1094,12 @@ function buildAgendaItemsReflow({
   // Una edició explícita amplia o redueix el pressupost de l’Agenda. El límit
   // de la Programació només serveix per reparar duplicats no editats.
   const activityMinutesChanges = {}
-  if (targetItem) {
-    const sourceMinutes = Number(activityMinutesById[targetItem.sourceActivityId])
-    if (Number.isFinite(sourceMinutes) && sourceMinutes > 0) {
-      activityMinutesChanges[targetItem.sourceActivityId] = Math.max(
-        sourceMinutes + minutes - Number(targetItem.plannedMinutes || 0),
-        (lockedMinutesByActivityId[targetItem.sourceActivityId] || 0) + minutes,
+  for (const [sourceActivityId, edited] of editedMinutesBySourceId) {
+    const sourceMinutes = Number(activityMinutesById[sourceActivityId])
+    if (Number.isFinite(sourceMinutes) && sourceMinutes >= 0) {
+      activityMinutesChanges[sourceActivityId] = Math.max(
+        sourceMinutes + edited.delta,
+        (lockedMinutesByActivityId[sourceActivityId] || 0) + edited.minutes,
       )
     }
   }
@@ -1094,7 +1107,8 @@ function buildAgendaItemsReflow({
     const meta = activityMeta.get(activity.id)
     const sourceActivityId = meta?.sourceActivityId
     const sourceMinutes = Number(activityMinutesChanges[sourceActivityId] ?? activityMinutesById[sourceActivityId])
-    const remainingSourceMinutes = Number.isFinite(sourceMinutes) && sourceMinutes > 0
+    const remainingSourceMinutes = Number.isFinite(sourceMinutes) && sourceMinutes >= 0
+      && (activityMinutesChanges[sourceActivityId] != null || activityMinutesById[sourceActivityId] != null)
       ? Math.max(0, sourceMinutes - (lockedMinutesByActivityId[sourceActivityId] || 0))
       : Number.POSITIVE_INFINITY
     const plannedMinutes = Math.min(activity.plannedMinutes, remainingSourceMinutes)
@@ -1396,7 +1410,25 @@ export function buildAgendaSessionReplacement({
 
 /** Substitueix un fragment futur i compacta tota la cronologia posterior. */
 export function buildAgendaItemChangeReflow(input) {
-  return { ...buildAgendaItemsReflow(input), kind: 'agenda-item-change' }
+  const bundle = input.existingSessionBundles.find((candidate) => candidate.session.id === input.targetSessionId)
+  const grouped = combineAgendaSessionItems([...(bundle?.items || [])].sort(compareOrder), input.application?.planningUnitId)
+    .find((item) => item.id === input.targetItemId || item.combinedItems?.some((part) => part.id === input.targetItemId))
+  if (!grouped?.combinedItems) return { ...buildAgendaItemsReflow(input), kind: 'agenda-item-change' }
+  const totalMinutes = Number(input.changes.plannedMinutes)
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) throw new Error('Cal indicar una durada superior a zero minuts.')
+  // Manté les fonts i distribueix la nova durada entre els fragments originals.
+  let remaining = totalMinutes
+  const itemChanges = Object.fromEntries(grouped.combinedItems.map((item, index, parts) => {
+    const plannedMinutes = index === parts.length - 1 ? remaining : Math.min(Number(item.plannedMinutes), remaining)
+    remaining -= plannedMinutes
+    return [item.id, { ...input.changes, plannedMinutes }]
+  }))
+  return {
+    ...buildAgendaItemsReflow({
+      ...input, targetItemId: grouped.id, changes: itemChanges[grouped.id], itemChanges,
+    }),
+    kind: 'agenda-item-change',
+  }
 }
 
 /** Omple els buits d'una sessió futura avançant el contingut posterior. */

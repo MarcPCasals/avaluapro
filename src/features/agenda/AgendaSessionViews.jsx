@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, groupParallelSessionBundles } from '../../domain/planning'
+import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, combineAgendaSessionItems, groupParallelSessionBundles } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -156,6 +156,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   }
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
+  const visibleItems = combineAgendaSessionItems(bundle.items, bundle.planningUnit.id)
   const sessionLoad = getSessionLoad(bundle.items, bundle.session.durationMinutes)
   const freeMinutes = Math.max(0, sessionLoad.programmableMinutes - sessionLoad.plannedMinutes)
   const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
@@ -171,8 +172,8 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       {!blockingEvent && bundle.session.status === 'planned' && bundle.session.babeliumEnabled && sessionLoad.plannedMinutes > sessionLoad.programmableMinutes && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{sessionLoad.plannedMinutes - sessionLoad.programmableMinutes} min per sobre del temps disponible</strong><span>Reorganitza les activitats amb la calendarització intel·ligent per respectar el bloc de Babèlium i el temps real de classe.</span></div></div>}
       {editNotice && <p className="agenda-session-edit-notice" role="status">{editNotice}</p>}
       <div className="agenda-session-activities">
-        <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
-        {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
+        <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{visibleItems.length}</span></div>
+        {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item) => {
           const description = item.sourceActivity?.description?.trim()
           const removalState = getAgendaSessionItemRemovalState(bundle, item)
           const confirmingRemoval = removalItemId === item.id
@@ -187,13 +188,13 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
                 {editError && <p role="alert">{editError}</p>}
               </form>}
               {confirmingRemoval && <div className="agenda-session-item-confirmation">
-                <p>Treure aquest fragment de la sessió? L’activitat de la programació i les altres parts es conservaran.</p>
+                <p>Treure aquesta activitat de la sessió? Es retiraran tots els fragments d’aquesta entrada. La programació i les altres sessions es conservaran.</p>
                 <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}Confirmar eliminació</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
                 {removalError && <p role="alert">{removalError}</p>}
               </div>}
             </div>
             {(onRemoveItem || onSaveItem) && <div className="agenda-session-item-tools">
-              {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || !item.sourceActivityId} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
+              {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || (item.combinedItems || [item]).some((part) => !part.sourceActivityId)} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
               {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? 'Treure de la sessió' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
             </div>}
           </li>
@@ -259,7 +260,7 @@ export function AgendaTodayView({
     <div className="agenda-today-layout agenda-today-live">
       <section className="agenda-today-main">
         <div className="agenda-section-heading"><span className="agenda-section-icon"><CalendarDays size={20} /></span><div><span>Avui</span><h2>{formatDate(today, { long: true, weekday: true })}</h2></div>{loading && <Loader2 className="spin agenda-heading-loader" size={17} />}</div>
-        {classroomPrompt && <div className={`agenda-classroom-prompt ${classroomPrompt.kind}`}><Clock3 size={20} /><div><strong>{classroomPrompt.kind === 'upcoming' ? `${classNameFor(classes, automaticBundle.session.classId)} comença d’aquí ${classroomPrompt.minutesUntil} min` : `${classNameFor(classes, automaticBundle.session.classId)} està en curs`}</strong><span>{automaticBundle.items.length} activitats · {sessionMaterials(automaticBundle).length} materials preparats</span></div><button className="primary-action compact" onClick={() => onOpenClassroom(automaticBundle)} type="button">Obrir Mode aula</button></div>}
+        {classroomPrompt && <div className={`agenda-classroom-prompt ${classroomPrompt.kind}`}><Clock3 size={20} /><div><strong>{classroomPrompt.kind === 'upcoming' ? `${classNameFor(classes, automaticBundle.session.classId)} comença d’aquí ${classroomPrompt.minutesUntil} min` : `${classNameFor(classes, automaticBundle.session.classId)} està en curs`}</strong><span>{combineAgendaSessionItems(automaticBundle.items, automaticBundle.planningUnit.id).length} activitats · {sessionMaterials(automaticBundle).length} materials preparats</span></div><button className="primary-action compact" onClick={() => onOpenClassroom(automaticBundle)} type="button">Obrir Mode aula</button></div>}
         {showTimetableFallback ? (
           <div className="agenda-next-timetable-slot">
             <header>
@@ -278,7 +279,7 @@ export function AgendaTodayView({
       <aside className="agenda-today-side">
         <section>
           <header><Clock3 size={18} /><div><strong>Sessions d’avui</strong><span>{todayBundles.length} programades</span></div></header>
-          {todayBundles.length === 0 ? <p>Cap classe planificada per avui.</p> : <div className="agenda-today-session-list">{todayBundles.map((bundle) => <button className={bundle.session.id === selectedBundle?.session.id ? 'active' : ''} key={bundle.session.id} onClick={() => setSelectedSessionId(bundle.session.id)} type="button"><span>{sessionTime(bundle)}</span><div><strong>{classNameFor(classes, bundle.session.classId)}</strong><small>{bundle.planningUnit.code} · {bundle.items.length} activitats</small></div></button>)}</div>}
+          {todayBundles.length === 0 ? <p>Cap classe planificada per avui.</p> : <div className="agenda-today-session-list">{todayBundles.map((bundle) => <button className={bundle.session.id === selectedBundle?.session.id ? 'active' : ''} key={bundle.session.id} onClick={() => setSelectedSessionId(bundle.session.id)} type="button"><span>{sessionTime(bundle)}</span><div><strong>{classNameFor(classes, bundle.session.classId)}</strong><small>{bundle.planningUnit.code} · {combineAgendaSessionItems(bundle.items, bundle.planningUnit.id).length} activitats</small></div></button>)}</div>}
           {timetable && <small className="agenda-applied-timetable">Horari aplicable: {timetable.label}</small>}
         </section>
         <section>
@@ -388,7 +389,7 @@ export function AgendaWeekView({ activeTemporalUnit, bundles, calendarEvents, cl
                 const timeState = temporalState[`session:${item.bundle.session.id}`] || {}
                 const activityLabel = item.bundle.detailsLoaded === false && item.bundle.items.length === 0
                   ? 'detall en obrir'
-                  : `${item.bundle.items.length} activitats`
+                  : `${combineAgendaSessionItems(item.bundle.items, item.bundle.planningUnit.id).length} activitats`
                 return <article className="agenda-week-session-shell" key={item.bundle.session.id}><button aria-current={timeState.isCurrent ? 'time' : undefined} className={`agenda-week-session ${classItem?.color || 'blue'} ${item.bundle.session.status} ${stopReason ? 'calendar-blocked' : ''} ${timeState.isPast ? 'is-past' : ''} ${timeState.isFocused ? 'is-focused' : ''}`} onClick={() => onOpenSession(item.bundle)} type="button"><span>{stopReason && <Moon size={12} />}{item.time}</span><strong>{classNameFor(classes, item.bundle.session.classId)}</strong><small>{stopReason ? `${stopReason} · la sessió no es fa` : `${item.bundle.planningUnit.code} · ${activityLabel}`}</small>{timeState.isFocused && <i className="agenda-week-focus-label">{timeState.isCurrent ? 'Ara' : 'Següent'}</i>}</button>{onAddEvent && <button aria-label={targetedEvent ? `Editar ${targetedEvent.title}` : `Inhabilitar la sessió de les ${item.time}`} className={`agenda-week-session-moon ${targetedEvent ? 'active' : ''}`} onClick={() => onAddEvent(targetedEvent || { classIds: [item.bundle.session.classId], endsOn: dateKey, scope: 'session', sessionId: item.bundle.session.id, startsOn: dateKey, title: 'Classe anul·lada', type: 'cancellation' })} title={targetedEvent?.title || 'Inhabilitar només aquesta sessió'} type="button"><Moon size={13} /></button>}</article>
               }
               if (item.kind === 'coordination-reminder') {
@@ -504,7 +505,7 @@ function TimelineRows({ calendarEvents, groups, onOpenSession }) {
     const activities = bundle.detailsLoaded === false
       ? [{ id: 'loading', title: 'Obre per veure les activitats', showTiming: false }]
       : bundle.items.length > 0
-        ? bundle.items
+        ? combineAgendaSessionItems(bundle.items, bundle.planningUnit.id)
         : [{ id: 'empty', title: 'Sessió sense activitats', showTiming: false }]
     return <button className={`${blockingEvent ? 'calendar-blocked' : ''} ${group.isParallel ? 'parallel-session' : ''} ${freeMinutes > 0 ? 'underfilled' : ''}`} key={bundle.session.id} onClick={() => onOpenSession(bundle)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot">{blockingEvent && <Moon size={9} />}</span><div className="agenda-timeline-date"><strong>{formatDate(sessionDate(bundle), { weekday: true })}</strong><small>{sessionTime(bundle)} · {bundle.session.durationMinutes} min{bundle.session.subgroupId ? ` · ${bundle.session.subgroupId}` : ''}</small></div><div className="agenda-timeline-content">{group.isParallel && <span>Mateixa sessió de mig grup</span>}{blockingEvent ? <div className="agenda-timeline-activity"><strong>{blockingEvent.title}</strong><small>Aquesta sessió no es fa</small></div> : activities.map((item) => <div className="agenda-timeline-activity" key={item.id}><strong>{item.title}</strong>{item.showTiming !== false && <small>{item.plannedMinutes ? `${item.plannedMinutes} min${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}` : 'Sense temps assignat'}</small>}</div>)}</div><span className={`agenda-session-status ${blockingEvent ? 'notHeld' : freeMinutes > 0 ? 'underfilled' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : freeMinutes > 0 ? `${freeMinutes} min lliures` : STATUS_LABELS[bundle.session.status]}</span><MapPin size={15} /></button>
   }))}</div>

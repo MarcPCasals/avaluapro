@@ -1491,31 +1491,29 @@ export function useAgendaWorkspace(user, classes = []) {
    * modifica i les sessions ja iniciades queden protegides com a historial.
    */
   const removeSessionItem = useCallback(async (bundle, item) => {
-    const removalState = getAgendaSessionItemRemovalState(bundle, item)
-    if (!removalState.canRemove) {
+    const parts = item.combinedItems || [item]
+    const removalStates = parts.map((part) => getAgendaSessionItemRemovalState(bundle, part))
+    if (removalStates.some((state) => !state.canRemove)) {
       throw new Error('Aquesta activitat ja té dades de classe i no es pot eliminar de l’historial.')
     }
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
-
-    for (const result of removalState.linkedResults) {
-      await repository.remove(result, {
-        applicationId: bundle.application.id,
-        planningUnitId: bundle.planningUnit.id,
-        sessionId: bundle.session.id,
-      })
-    }
-    await repository.remove(item, {
+    const removedIds = new Set(parts.map((part) => part.id))
+    const context = {
       applicationId: bundle.application.id,
       planningUnitId: bundle.planningUnit.id,
       sessionId: bundle.session.id,
-    })
+    }
+    for (const result of removalStates.flatMap((state) => state.linkedResults)) {
+      await repository.remove(result, context)
+    }
+    for (const part of parts) await repository.remove(part, context)
     await refreshSync()
     await synchronize()
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
       ? {
           ...current,
-          items: current.items.filter((currentItem) => currentItem.id !== item.id),
-          results: current.results.filter((result) => result.sessionItemId !== item.id),
+          items: current.items.filter((currentItem) => !removedIds.has(currentItem.id)),
+          results: current.results.filter((result) => !removedIds.has(result.sessionItemId)),
         }
       : current))
     return item

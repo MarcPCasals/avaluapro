@@ -131,7 +131,7 @@ export function getAgendaActivityMinutesById(activities = [], overrides = []) {
       .localeCompare(String(right.updatedAt || right.createdAt || '')))
     .forEach((override) => {
       const minutes = Number(override.changes?.agendaPlannedMinutes)
-      if (Number.isFinite(minutes) && minutes > 0) minutesById[override.activityId] = minutes
+      if (override.changes?.agendaPlannedMinutes != null && Number.isFinite(minutes) && minutes >= 0) minutesById[override.activityId] = minutes
     })
   return minutesById
 }
