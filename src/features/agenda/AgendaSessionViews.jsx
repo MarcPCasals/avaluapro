@@ -15,7 +15,7 @@ import {
   isNoClassCalendarEvent,
   startOfCalendarWeek,
 } from '../../lib/agendaCalendar'
-import { filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
+import { filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
@@ -116,7 +116,22 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onResolveGap }) {
+function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onRemoveItem, onResolveGap }) {
+  const [removalItemId, setRemovalItemId] = useState('')
+  const [removing, setRemoving] = useState(false)
+  const [removalError, setRemovalError] = useState('')
+  const removeItem = async (item) => {
+    setRemoving(true)
+    setRemovalError('')
+    try {
+      await onRemoveItem(item)
+      setRemovalItemId('')
+    } catch (error) {
+      setRemovalError(error.message || 'No s’ha pogut treure l’activitat de la sessió.')
+    } finally {
+      setRemoving(false)
+    }
+  }
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
   const sessionLoad = getSessionLoad(bundle.items, bundle.session.durationMinutes)
@@ -136,7 +151,19 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{bundle.items.length}</span></div>
         {bundle.items.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{bundle.items.map((item) => {
           const description = item.sourceActivity?.description?.trim()
-          return <li key={item.id}><span /><div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><FormattedText as="p" text={description} /></details>}</div></li>
+          const removalState = getAgendaSessionItemRemovalState(bundle, item)
+          const confirmingRemoval = removalItemId === item.id
+          return <li className={onRemoveItem ? 'agenda-session-item-removable' : undefined} key={item.id}>
+            <span />
+            <div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><FormattedText as="p" text={description} /></details>}
+              {confirmingRemoval && <div className="agenda-session-item-confirmation">
+                <p>Treure aquest fragment de la sessió? L’activitat de la programació i les altres parts es conservaran.</p>
+                <div><button className="secondary-action compact agenda-session-item-delete" disabled={removing} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}Confirmar eliminació</button><button className="secondary-action compact" disabled={removing} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
+                {removalError && <p role="alert">{removalError}</p>}
+              </div>}
+            </div>
+            {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={removing || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError('') }} title={removalState.canRemove ? 'Treure de la sessió' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
+          </li>
         })}</ol>}
       </div>
       <div className="agenda-session-materials">
@@ -541,6 +568,6 @@ export function AgendaTimelineView({
   )
 }
 
-export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onResolveGap }) {
-  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onResolveGap={onResolveGap} />
+export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onRemoveItem, onResolveGap }) {
+  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onRemoveItem={onRemoveItem} onResolveGap={onResolveGap} />
 }
