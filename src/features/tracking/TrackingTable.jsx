@@ -1,3 +1,4 @@
+import { formatTaskSession, getTaskSessionKey, selectTaskSession } from './taskSessionChoices.js'
 import { useState } from 'react'
 import {
   AlertTriangle,
@@ -30,17 +31,25 @@ function getStudentRowClass(student) {
   return dominantDiagnosis ? `student-diagnosis-${dominantDiagnosis.color}` : ''
 }
 
-function EditableTaskDate({ nextSession, task, onChangeDate }) {
+function EditableTaskDate({ nextSession, sessions, task, onChangeDate }) {
   const [isEditing, setIsEditing] = useState(false)
   const formattedDate = new Date(task.date).toLocaleDateString('ca-ES', { day: '2-digit', month: 'short' })
 
   if (isEditing) {
     return (
       <div className="task-date-editor">
+        {sessions.length > 0 && <select aria-label={`Sessió per a ${task.title}`} defaultValue="" onChange={async (event) => {
+          const session = selectTaskSession(sessions, event.target.value)
+          if (!session) return
+          await onChangeDate(task.id, session.date)
+          setIsEditing(false)
+        }}>
+          <option value="">Selecciona una sessió</option>
+          {sessions.map((session) => <option key={getTaskSessionKey(session)} value={getTaskSessionKey(session)}>{formatTaskSession(session)}</option>)}
+        </select>}
         <input
           autoFocus
           className="task-date-input"
-          onBlur={() => setIsEditing(false)}
           onChange={async (event) => {
             await onChangeDate(task.id, event.target.value)
             setIsEditing(false)
@@ -48,6 +57,7 @@ function EditableTaskDate({ nextSession, task, onChangeDate }) {
           type="date"
           value={task.date}
         />
+        <button onClick={() => setIsEditing(false)} type="button">Tancar</button>
         {nextSession && (
           <button
             aria-label="Posar la data de la propera sessió"
@@ -129,6 +139,7 @@ function TaskCompletionSummary({ rows, task, taskRecords }) {
 
 export function TrackingTable({
   nextClassSession = null,
+  classSessionChoices = [],
   onAddBehavior = () => {},
   onChangeTaskDate = () => {},
   onChangeTaskTitle = () => {},
@@ -165,7 +176,7 @@ export function TrackingTable({
               <th className="task-header" key={task.id}>
                 <EditableTaskTitle task={task} onChangeTitle={onChangeTaskTitle} />
                 <TaskCompletionSummary rows={rows} task={task} taskRecords={taskRecords} />
-                <EditableTaskDate nextSession={nextClassSession} task={task} onChangeDate={onChangeTaskDate} />
+                <EditableTaskDate sessions={classSessionChoices} nextSession={nextClassSession} task={task} onChangeDate={onChangeTaskDate} />
                 <button
                   className="task-header-action done-all"
                   data-tour={taskIndex === 0 ? 'task-done-all' : undefined}

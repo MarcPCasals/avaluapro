@@ -1,3 +1,5 @@
+import { TaskDateField } from '../../src/features/tracking/TaskDateField.jsx'
+import { getTaskSessionKey } from '../../src/features/tracking/taskSessionChoices.js'
 import { HalfGroupsPanel } from '../../src/features/tutoring/HalfGroupsPanel.jsx'
 import { useMemo, useState } from 'react'
 import { DatabaseZap, LockKeyhole, RotateCcw, Search, ShieldCheck, WifiOff } from 'lucide-react'
@@ -103,7 +105,15 @@ function SecurityBadge({ icon: Icon, children }) {
   )
 }
 
+const syntheticTaskSessions = [
+  { date: '2026-10-02', startsAt: '2026-10-02T09:30:00', subgroupId: 'Grup A', timetableSlotId: 'synthetic-a' },
+  { date: '2026-10-02', startsAt: '2026-10-02T10:30:00', subgroupId: 'Grup B', timetableSlotId: 'synthetic-b' },
+  { date: '2026-10-05', startsAt: '2026-10-05T09:30:00', subgroupId: null, timetableSlotId: 'synthetic-all' },
+]
+
 function AssistanceApp() {
+  const [taskDemoDate, setTaskDemoDate] = useState('2026-10-02')
+  const [taskDemoKey, setTaskDemoKey] = useState('')
   const dataset = useDataAdapter(assistanceAdapter)
   const [syntheticHalfGroups, setSyntheticHalfGroups] = useState({})
   const [activeClassId, setActiveClassId] = useState(dataset.classes[0].id)
@@ -647,7 +657,11 @@ function AssistanceApp() {
           }}
           renderAbsenceControl={renderSyntheticAbsenceControl}
           students={evaluationStudents}
-        /> : activeSurface === 'tracking' ? <TrackingTable
+        /> : activeSurface === 'tracking' ? <><details><summary>Data d’una tasca · sessions fictícies</summary>
+          <TaskDateField date={taskDemoDate} label="Demostració" sessionKey={taskDemoKey} sessions={syntheticTaskSessions}
+            onChangeDate={(value) => { setTaskDemoDate(value); setTaskDemoKey('') }}
+            onSelectSession={(session) => { setTaskDemoKey(session ? getTaskSessionKey(session) : ''); if (session) setTaskDemoDate(session.date) }} />
+        </details><TrackingTable classSessionChoices={syntheticTaskSessions}
           onAddBehavior={(student, type) => simulateAction(`S’afegiria ${type} fictici a ${student.id}.`)}
           onChangeTaskDate={(taskId) => simulateAction(`Es canviaria la data fictícia de ${taskId}.`)}
           onChangeTaskTitle={(taskId) => simulateAction(`Es canviaria el nom fictici de ${taskId}.`)}
@@ -673,7 +687,7 @@ function AssistanceApp() {
           rows={trackingRows}
           taskRecords={dataset.trackingRecords}
           tasks={trackingTasks}
-        /> : activeSurface === 'analytics' ? <CrossAnalysisTable
+        /></> : activeSurface === 'analytics' ? <CrossAnalysisTable
           onOpenAbsences={(row) => simulateAction(
             row.absenceRecords.length > 0
               ? `${row.student.name}: ${row.absenceRecords.map(formatAbsenceDateTime).join(' · ')}`

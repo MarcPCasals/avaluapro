@@ -20,7 +20,7 @@ import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { NewTaskModal } from './NewTaskModal'
 import { TrackingTable } from './TrackingTable'
-import { loadNextClassSessions } from './loadNextClassSessions'
+import { loadClassSessionChoices } from './loadNextClassSessions'
 
 const interventionFilters = [
   { id: 'all', label: 'Tots' },
@@ -628,15 +628,17 @@ export function TrackingView() {
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const [redDetailStudentId, setRedDetailStudentId] = useState(null)
   const [studentSearch, setStudentSearch] = useState('')
-  const [nextClassSession, setNextClassSession] = useState(null)
+  const [loadedClassSessions, setLoadedClassSessions] = useState({ classId: '', sessions: [] })
+  const classSessionChoices = loadedClassSessions.classId === activeClassId ? loadedClassSessions.sessions : []
+  const nextClassSession = classSessionChoices.find((session) => new Date(session.startsAt) > new Date()) || null
   const tableWrapRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
     if (!user?.uid || !activeClassId) return undefined
-    loadNextClassSessions(user, [activeClassId])
-      .then((result) => { if (!cancelled) setNextClassSession(result[activeClassId] || null) })
-      .catch(() => { if (!cancelled) setNextClassSession(null) })
+    loadClassSessionChoices(user, [activeClassId])
+      .then((result) => { if (!cancelled) setLoadedClassSessions({ classId: activeClassId, sessions: result[activeClassId] || [] }) })
+      .catch(() => { if (!cancelled) setLoadedClassSessions({ classId: activeClassId, sessions: [] }) })
     return () => { cancelled = true }
   }, [activeClassId, user])
   const interventionInsights = useMemo(
@@ -1244,6 +1246,7 @@ export function TrackingView() {
         </section>
       ) : (
       <TrackingTable
+        classSessionChoices={classSessionChoices}
         nextClassSession={nextClassSession}
         onAddBehavior={(student, type) => setBehaviorDraft({ student, type })}
         onChangeTaskDate={(taskId, date) => updateTask(taskId, { date })}

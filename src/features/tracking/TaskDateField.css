@@ -1,0 +1,7 @@
+.task-session-date-field { display: grid; gap: 8px; min-width: 0; }
+.task-session-date-field .field-label { display: grid; gap: 6px; font-weight: 700; }
+.task-session-date-field select, .task-session-date-field input { min-width: 0; width: 100%; min-height: 40px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; background: #fff; font: inherit; font-size: 14px; box-sizing: border-box; }
+.task-session-date-field small { color: #64748b; font-weight: 500; }
+.task-target-row .task-session-date-field { grid-column: 2 / -1; }
+.task-session-date-field select:disabled, .task-session-date-field input:disabled { opacity: .5; }
+.task-date-editor select { max-width: 230px; min-height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px; font-size: 12px; }

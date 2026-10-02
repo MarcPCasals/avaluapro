@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, ClipboardCheck, Loader2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { loadNextClassSessions } from './loadNextClassSessions'
+import { loadClassSessionChoices } from './loadNextClassSessions'
+import { TaskDateField } from './TaskDateField'
+import { getTaskSessionKey, formatTaskSession } from './taskSessionChoices'
 
 export function NewTaskModal({ onClose }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [extraClassDates, setExtraClassDates] = useState({})
-  const [nextSessions, setNextSessions] = useState({})
+  const [sessionChoices, setSessionChoices] = useState({})
+  const [sessionKey, setSessionKey] = useState('')
+  const [sessionLoadError, setSessionLoadError] = useState(false)
   const [loadingNextSessions, setLoadingNextSessions] = useState(false)
   const state = useAvaluaproStore()
   const addTasksToClasses = useAvaluaproStore((store) => store.addTasksToClasses)
@@ -37,17 +41,17 @@ export function NewTaskModal({ onClose }) {
     let cancelled = false
     if (!state.cloud.user?.uid) return undefined
     queueMicrotask(() => { if (!cancelled) setLoadingNextSessions(true) })
-    loadNextClassSessions(state.cloud.user, state.classes.map((item) => item.id))
-      .then((result) => { if (!cancelled) setNextSessions(result) })
-      .catch(() => { if (!cancelled) setNextSessions({}) })
+    loadClassSessionChoices(state.cloud.user, state.classes.map((item) => item.id))
+      .then((result) => { if (!cancelled) { setSessionChoices(result); setSessionLoadError(false) } })
+      .catch(() => { if (!cancelled) { setSessionChoices({}); setSessionLoadError(true) } })
       .finally(() => { if (!cancelled) setLoadingNextSessions(false) })
     return () => { cancelled = true }
   }, [state.cloud.user, state.classes])
 
-  const formatNextSession = (candidate) => candidate
-    ? new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'short', weekday: 'short' })
-        .format(new Date(`${candidate.date}T12:00:00`)) + ` · ${candidate.startsAt.slice(11, 16)}`
-    : ''
+  const nextSessions = Object.fromEntries(Object.entries(sessionChoices).map(([classId, choices]) => [classId,
+    choices.find((candidate) => new Date(candidate.startsAt) > new Date()) || null,
+  ]))
+  const formatNextSession = formatTaskSession
 
   const handleSave = async () => {
     const entries = [
@@ -95,15 +99,15 @@ export function NewTaskModal({ onClose }) {
             value={title}
           />
         </label>
-        <label className="field-label">
-          Data
-          <input onChange={(event) => setDate(event.target.value)} type="date" value={date} />
-        </label>
+        <TaskDateField date={date} label={currentClass?.name || 'Classe'} sessions={sessionChoices[state.ui.activeClassId] || []}
+          sessionKey={sessionKey} loading={loadingNextSessions} error={sessionLoadError}
+          onChangeDate={(value) => { setDate(value); setSessionKey('') }}
+          onSelectSession={(session) => { setSessionKey(session ? getTaskSessionKey(session) : ''); if (session) setDate(session.date) }} />
         <div className="task-next-session-choice">
           <button
             className="secondary-action compact"
             disabled={loadingNextSessions || !nextSessions[state.ui.activeClassId]}
-            onClick={() => setDate(nextSessions[state.ui.activeClassId].date)}
+            onClick={() => { const session = nextSessions[state.ui.activeClassId]; setDate(session.date); setSessionKey(getTaskSessionKey(session)) }}
             type="button"
           >
             {loadingNextSessions ? <Loader2 className="spin" size={15} /> : <CalendarClock size={15} />}
@@ -115,8 +119,9 @@ export function NewTaskModal({ onClose }) {
           <div className="task-target-list">
             <strong>Afegir també a altres classes</strong>
             {targetClassOptions.map(({ classItem, uts, defaultUt }) => (
-              <label className="task-target-row" key={classItem.id}>
+              <div className="task-target-row" key={classItem.id}>
                 <input
+                  aria-label={`Afegir també a ${classItem.name}`}
                   checked={Object.prototype.hasOwnProperty.call(extraClassDates, classItem.id)}
                   onChange={() => toggleExtraClass(classItem.id)}
                   type="checkbox"
@@ -138,17 +143,11 @@ export function NewTaskModal({ onClose }) {
                     </option>
                   ))}
                 </select>
-                <input
-                  disabled={!Object.prototype.hasOwnProperty.call(extraClassDates, classItem.id)}
-                  onChange={(event) =>
-                    setExtraClassDates((current) => ({
-                      ...current,
-                      [classItem.id]: { ...(current[classItem.id] || { utId: uts[0]?.id }), date: event.target.value },
-                    }))
-                  }
-                  type="date"
-                  value={extraClassDates[classItem.id]?.date || date}
-                />
+                <TaskDateField date={extraClassDates[classItem.id]?.date || date} label={classItem.name}
+                  sessions={sessionChoices[classItem.id] || []} sessionKey={extraClassDates[classItem.id]?.sessionKey || ''}
+                  disabled={!Object.prototype.hasOwnProperty.call(extraClassDates, classItem.id)} loading={loadingNextSessions} error={sessionLoadError}
+                  onChangeDate={(value) => setExtraClassDates((current) => ({ ...current, [classItem.id]: { ...current[classItem.id], date: value, sessionKey: '' } }))}
+                  onSelectSession={(session) => setExtraClassDates((current) => ({ ...current, [classItem.id]: { ...current[classItem.id], ...(session ? { date: session.date } : {}), sessionKey: session ? getTaskSessionKey(session) : '' } }))} />
                 {Object.prototype.hasOwnProperty.call(extraClassDates, classItem.id) && nextSessions[classItem.id] && (
                   <button
                     className="task-target-next-session"
@@ -156,14 +155,14 @@ export function NewTaskModal({ onClose }) {
                       event.preventDefault()
                       setExtraClassDates((current) => ({
                         ...current,
-                        [classItem.id]: { ...current[classItem.id], date: nextSessions[classItem.id].date },
+                        [classItem.id]: { ...current[classItem.id], date: nextSessions[classItem.id].date, sessionKey: getTaskSessionKey(nextSessions[classItem.id]) },
                       }))
                     }}
                     title={`Proper sessió: ${formatNextSession(nextSessions[classItem.id])}`}
                     type="button"
                   ><CalendarClock size={14} />Proper sessió</button>
                 )}
-              </label>
+              </div>
             ))}
           </div>
         )}

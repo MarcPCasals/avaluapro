@@ -19,11 +19,10 @@ function localTimeKey(date) {
 }
 
 /**
- * Carrega només les peces de l'Agenda necessàries per proposar la pròxima
- * classe. Reutilitza el repositori local-first perquè l'opció funcioni també
+ * Carrega les sessions de l’horari des d’avui fins al final del curs. Reutilitza el repositori local-first perquè l'opció funcioni també
  * amb la còpia local quan Firebase no respon.
  */
-export async function loadNextClassSessions(user, classIds, now = new Date()) {
+export async function loadClassSessionChoices(user, classIds, now = new Date()) {
   if (!user?.uid || classIds.length === 0) return {}
   const repository = getSharedPlanningRepository({
     applyRemoteOperation: applyPlanningCloudOperation,
@@ -62,7 +61,6 @@ export async function loadNextClassSessions(user, classIds, now = new Date()) {
     return [timetable.id, result.entities]
   }))
   const slotsByTimetableId = Object.fromEntries(slotEntries)
-  const after = `${today}T${localTimeKey(now)}`
 
   return Object.fromEntries(classIds.map((classId) => {
     const { candidates } = buildTimetableSessionCandidates({
@@ -73,6 +71,15 @@ export async function loadNextClassSessions(user, classIds, now = new Date()) {
       timetables,
       to: academicYear.endsOn,
     })
-    return [classId, candidates.find((candidate) => candidate.startsAt > after) || null]
+    return [classId, candidates]
   }))
+}
+
+/** Existing callers still receive only the next future session. */
+export async function loadNextClassSessions(user, classIds, now = new Date()) {
+  const choices = await loadClassSessionChoices(user, classIds, now)
+  const after = `${localDateKey(now)}T${localTimeKey(now)}`
+  return Object.fromEntries(classIds.map((classId) => [classId,
+    (choices[classId] || []).find((candidate) => candidate.startsAt > after) || null,
+  ]))
 }
