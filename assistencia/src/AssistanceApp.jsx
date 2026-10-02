@@ -1,3 +1,4 @@
+import { HalfGroupsPanel } from '../../src/features/tutoring/HalfGroupsPanel.jsx'
 import { useMemo, useState } from 'react'
 import { DatabaseZap, LockKeyhole, RotateCcw, Search, ShieldCheck, WifiOff } from 'lucide-react'
 import { createMemoryDataAdapter } from '../../src/data/adapters/createMemoryDataAdapter.js'
@@ -104,6 +105,7 @@ function SecurityBadge({ icon: Icon, children }) {
 
 function AssistanceApp() {
   const dataset = useDataAdapter(assistanceAdapter)
+  const [syntheticHalfGroups, setSyntheticHalfGroups] = useState({})
   const [activeClassId, setActiveClassId] = useState(dataset.classes[0].id)
   const [activeSurface, setActiveSurface] = useState('overview')
   const [analysisSortMode, setAnalysisSortMode] = useState('intervention')
@@ -119,8 +121,8 @@ function AssistanceApp() {
   const activeClass = dataset.classes.find((classItem) => classItem.id === activeClassId) || dataset.classes[0]
   const activeClassStudents = useMemo(() => dataset.students
     .filter((student) => student.classId === activeClassId)
-    .map((student) => ({ ...student, diagnoses: [], name: student.displayName })),
-  [activeClassId, dataset.students])
+    .map((student) => ({ ...student, halfGroup: syntheticHalfGroups[student.id] || student.halfGroup, diagnoses: [], name: student.displayName })),
+  [activeClassId, dataset.students, syntheticHalfGroups])
   const visibleStudents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ca')
     return dataset.students.filter((student) => (
@@ -685,6 +687,12 @@ function AssistanceApp() {
           sortMode={analysisSortMode}
         /> : activeSurface === 'groups' ? <div className="assistance-cooperative-layout">
           <section className="assistance-cooperative-main">
+            <details><summary>Mitjos grups A/B · prova amb alumnat fictici</summary>
+              <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
+                relations={dataset.sociometricRelations || []}
+                appliedMessage="Mitjos grups ficticis aplicats només en memòria."
+                onApply={async (assignments) => { setSyntheticHalfGroups((current) => ({ ...current, ...assignments })); simulateAction('Proposta A/B comprovada només en memòria amb alumnat fictici.') }} />
+            </details>
             <header className="assistance-cooperative-heading">
               <div>
                 <span>Agrupament completament fictici</span>

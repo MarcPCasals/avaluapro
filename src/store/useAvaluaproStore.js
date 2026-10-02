@@ -529,7 +529,7 @@ function setProfileWithPreferences(set, patch) {
   })
 }
 
-async function persistCollections(set, get, collections, { syncSharedTutoring = true } = {}) {
+async function persistCollections(set, get, collections, { syncSharedTutoring = true, throwOnError = false } = {}) {
   const state = get()
   const dataset = collections.reduce(
     (nextDataset, collection) => ({ ...nextDataset, [collection]: state[collection] }),
@@ -562,6 +562,7 @@ async function persistCollections(set, get, collections, { syncSharedTutoring = 
     } else {
       set({ error: error.message || 'No s’han pogut guardar les dades locals.' })
     }
+    if (throwOnError) throw error
   }
 }
 
@@ -5749,6 +5750,27 @@ export const useAvaluaproStore = create((set, get) => ({
       .map((name) => ({ name: formatStudentNameForDisplay(name), halfGroup: '' }))
 
     await get().addStudents(classId, studentsToAdd)
+  },
+
+  applyClassHalfGroups: async (classId, assignments, lockedIds = []) => {
+    const classStudents = get().students.filter((student) => student.classId === classId)
+    const names = ['Grup A', 'Grup B']
+    if (classStudents.length < 2 || Object.keys(assignments).length !== classStudents.length ||
+        classStudents.some((student) => !names.includes(assignments[student.id]))) {
+      throw new Error('Cal assignar tot el grup classe als mitjos grups A/B.')
+    }
+    const sizeA = classStudents.filter((student) => assignments[student.id] === names[0]).length
+    if (Math.abs(sizeA - (classStudents.length - sizeA)) > 1) {
+      throw new Error('Els mitjos grups han de quedar equilibrats.')
+    }
+    const updatedAt = new Date().toISOString()
+    set((state) => ({
+      classes: state.classes.map((item) => item.id === classId
+        ? { ...item, halfGroups: names, updatedAt } : item),
+      students: state.students.map((student) => student.classId === classId
+        ? { ...student, halfGroup: assignments[student.id], halfGroupLocked: lockedIds.includes(student.id), updatedAt } : student),
+    }))
+    await persistCollections(set, get, ['classes', 'students'], { throwOnError: true })
   },
 
   updateStudent: async (studentId, patch) => {

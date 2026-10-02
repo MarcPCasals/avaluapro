@@ -1,3 +1,4 @@
+import { HalfGroupsPanel } from './HalfGroupsPanel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -4524,6 +4525,7 @@ export function TutoringView() {
   const tutorialStudentRoles = useAvaluaproStore((state) => state.tutorialStudentRoles)
   const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
+  const applyClassHalfGroups = useAvaluaproStore((state) => state.applyClassHalfGroups)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
@@ -8200,9 +8202,9 @@ export function TutoringView() {
               <ClipboardList size={25} />
               <strong>Qüestionari sociomètric</strong>
             </ContextualTab>
-            <ContextualTab data-tour="tutoring-tool-groups" help="Genera propostes de grups tenint en compte rols, notes, relacions i restriccions que pots ajustar manualment." helpTitle="Grups cooperatius" onClick={() => setActiveRelationshipTool('groups')} type="button">
+            <ContextualTab data-tour="tutoring-tool-groups" help="Genera propostes de grups tenint en compte rols, notes, relacions i restriccions que pots ajustar manualment." helpTitle="Grups" onClick={() => setActiveRelationshipTool('groups')} type="button">
               <UsersRound size={25} />
-              <strong>Grups cooperatius</strong>
+              <strong>Grups</strong>
             </ContextualTab>
             <ContextualTab data-tour="tutoring-tool-seating" help="Organitza l’alumnat en una matriu flexible de taules i cadires, amb restriccions, historial i exportació." helpTitle="Disposició d’aula" onClick={handleOpenTutorialSeatingTool} type="button">
               <LayoutGrid size={25} />
@@ -9949,17 +9951,41 @@ export function TutoringView() {
             </footer>
           </section>
 
+          <section className={`sociometric-import-panel relationship-tool-panel ${['groups', 'half-groups'].includes(activeRelationshipTool) ? 'active' : ''}`}>
+            <header>
+              <div><h2>Grups</h2></div>
+              <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">Tornar a eines</button>
+            </header>
+            <div className="half-groups-actions">
+              <button className="secondary-action" onClick={() => setActiveRelationshipTool('cooperative')} type="button">Grups cooperatius</button>
+              <button className="secondary-action" aria-pressed={activeRelationshipTool === 'half-groups'} onClick={() => setActiveRelationshipTool('half-groups')} type="button">Mitjos grups</button>
+            </div>
+            {activeRelationshipTool === 'half-groups' && <HalfGroupsPanel
+              key={linkedClassId}
+              students={classStudents}
+              relations={effectiveTutorialRelations}
+              onApply={async (assignments, lockedIds) => {
+                await applyClassHalfGroups(linkedClassId, assignments, lockedIds)
+                setManualCooperativeGroups([])
+                setSelectedCooperativeGroupSetId('')
+                setSelectedCooperativeGroupId('')
+                setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
+                setCooperativeEditHistory({ past: [], future: [] })
+              }}
+            />}
+          </section>
+
           <section
             className={`cooperative-generator-panel cooperative-canvas relationship-tool-panel ${
-              activeRelationshipTool === 'groups' ? 'active' : ''
+              activeRelationshipTool === 'cooperative' ? 'active' : ''
             } ${selectedCooperativeGroup || cooperativeWorkspacePanel ? 'has-inspector' : ''}`}
           >
             <header className="cooperative-canvas-header">
               <div className="cooperative-canvas-title">
                 <button
-                  aria-label="Tornar a eines"
+                  aria-label="Tornar a grups"
                   className="tool-back-button icon-only"
-                  onClick={() => setActiveRelationshipTool('')}
+                  onClick={() => setActiveRelationshipTool('groups')}
                   type="button"
                 >
                   <ArrowLeft aria-hidden="true" size={20} />
