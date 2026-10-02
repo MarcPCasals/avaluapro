@@ -7,6 +7,8 @@ import {
   buildAgendaContinuationReflow,
   buildAgendaItemChangeReflow,
   buildAgendaSessionCompaction,
+  getAgendaActivityMinutesById,
+  applyPlanningActivityOverrides,
   applyImprovementProposals,
   buildAgendaRecoveryReflow,
   buildActivityImprovementProposals,
@@ -1996,4 +1998,68 @@ test('totes les entitats principals declaren tipus i versió d’esquema', () =>
   assert.equal(entities.at(-2).granteeEmail, 'direccio@example.test')
   assert.equal('privateNote' in entities.at(-3), false)
   assert.equal(entities.at(-1).entityType, 'planningPrivateNote')
+})
+
+test('ampliar la segona part de 35 a 55 minuts desplaça la següent activitat i conserva el nou temps', () => {
+  const application = createGroupApplication({
+    id: 'app-duration', ownerUid: 'teacher-1', academicYearId: 'year-1',
+    planningUnitId: 'up-1', classId: 'class-1',
+  }, { now: NOW })
+  const makeSession = (id, startsAt, status = 'planned') => createCalendarSession({
+    id, ownerUid: 'teacher-1', applicationId: application.id, classId: 'class-1',
+    startsAt, durationMinutes: 60, status,
+  }, { now: NOW })
+  const sessions = [
+    makeSession('past-theory', '2026-09-24T08:30:00', 'held'),
+    makeSession('edit-theory', '2026-09-25T08:30:00'),
+    makeSession('next-atoms', '2026-09-28T08:30:00'),
+  ]
+  const makeItem = (id, session, sourceActivityId, plannedMinutes, order, segmentIndex) => createSessionItem({
+    id, ownerUid: 'teacher-1', applicationId: application.id, sessionId: session.id,
+    sourceActivityId, title: sourceActivityId, type: 'activity', plannedMinutes, order,
+    segmentIndex, segmentCount: 2,
+  }, { now: NOW })
+  const target = makeItem('theory-part-2', sessions[1], 'theory', 35, 0, 2)
+  const bundles = [
+    { session: sessions[0], items: [makeItem('theory-part-1', sessions[0], 'theory', 55, 0, 1)], results: [] },
+    { session: sessions[1], items: [target, makeItem('atoms-part-1', sessions[1], 'atoms', 20, 1, 1)], results: [] },
+    { session: sessions[2], items: [makeItem('atoms-part-2', sessions[2], 'atoms', 35, 0, 2)], results: [] },
+  ]
+  const activities = [{ id: 'theory', plannedMinutes: 90 }, { id: 'atoms', plannedMinutes: 55 }]
+  const result = buildAgendaItemChangeReflow({
+    application, activityMinutesById: getAgendaActivityMinutesById(activities),
+    changes: { plannedMinutes: 55 }, existingSessionBundles: bundles,
+    options: options(sequenceIdFactory()), targetItemId: target.id, targetSessionId: sessions[1].id,
+  })
+  assert.deepEqual(result.sessions.map(bundle => bundle.items.map(item => [item.sourceActivityId, item.plannedMinutes])), [
+    [['theory', 55]], [['atoms', 55]],
+  ])
+  assert.deepEqual(result.activityMinutesChanges, { theory: 110 })
+  assert.equal(result.unscheduled.length, 0)
+  assert.equal(result.sessions[0].items[0].segmentIndex, 2)
+  assert.equal(bundles[0].items[0].plannedMinutes, 55)
+  assert.ok(!result.removedItems.some(item => item.sessionId === sessions[0].id))
+
+  // La mateixa excepció que es desa al grup sobreviu a recàrregues i compactacions.
+  const override = createGroupActivityOverride({
+    ownerUid: 'teacher-1', applicationId: application.id, activityId: 'theory',
+    changes: { agendaPlannedMinutes: result.activityMinutesChanges.theory },
+  }, { now: NOW })
+  assert.equal(applyPlanningActivityOverrides(activities, [override])[0].plannedMinutes, 90)
+  const next = buildAgendaSessionCompaction({
+    application, activityMinutesById: getAgendaActivityMinutesById(activities, [override]),
+    existingSessionBundles: [bundles[0], ...result.sessions],
+    options: options(sequenceIdFactory()), targetSessionId: sessions[1].id,
+  })
+  assert.deepEqual(next.sessions.map(bundle => bundle.items.map(item => [item.sourceActivityId, item.plannedMinutes])), [
+    [['theory', 55]], [['atoms', 55]],
+  ])
+  const reduced = buildAgendaItemChangeReflow({
+    application, activityMinutesById: getAgendaActivityMinutesById(activities, [override]),
+    existingSessionBundles: [bundles[0], ...result.sessions], changes: { plannedMinutes: 35 },
+    options: options(sequenceIdFactory()), targetSessionId: sessions[1].id,
+    targetItemId: result.sessions[0].items[0].id,
+  })
+  assert.deepEqual(reduced.sessions[0].items.map(item => [item.sourceActivityId, item.plannedMinutes]), [['theory', 35], ['atoms', 20]])
+  assert.deepEqual(reduced.activityMinutesChanges, { theory: 90 })
 })

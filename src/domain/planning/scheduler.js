@@ -1078,10 +1078,22 @@ function buildAgendaItemsReflow({
     .filter((bundle) => !['cancelled', 'notHeld'].includes(bundle.session.status))
   const lockedMinutesByActivityId = summarizeAssignedActivityProgress(lockedLogicalBundles)
     .assignedMinutesByActivityId
+  // Una edició explícita amplia o redueix el pressupost de l’Agenda. El límit
+  // de la Programació només serveix per reparar duplicats no editats.
+  const activityMinutesChanges = {}
+  if (targetItem) {
+    const sourceMinutes = Number(activityMinutesById[targetItem.sourceActivityId])
+    if (Number.isFinite(sourceMinutes) && sourceMinutes > 0) {
+      activityMinutesChanges[targetItem.sourceActivityId] = Math.max(
+        sourceMinutes + minutes - Number(targetItem.plannedMinutes || 0),
+        (lockedMinutesByActivityId[targetItem.sourceActivityId] || 0) + minutes,
+      )
+    }
+  }
   const activities = activitySequence.flatMap((activity) => {
     const meta = activityMeta.get(activity.id)
     const sourceActivityId = meta?.sourceActivityId
-    const sourceMinutes = Number(activityMinutesById[sourceActivityId])
+    const sourceMinutes = Number(activityMinutesChanges[sourceActivityId] ?? activityMinutesById[sourceActivityId])
     const remainingSourceMinutes = Number.isFinite(sourceMinutes) && sourceMinutes > 0
       ? Math.max(0, sourceMinutes - (lockedMinutesByActivityId[sourceActivityId] || 0))
       : Number.POSITIVE_INFINITY
@@ -1172,6 +1184,7 @@ function buildAgendaItemsReflow({
     ...distribution,
     changedLockedItems,
     changedTargetResults: [],
+    activityMinutesChanges,
     editedItem: targetItem,
     removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
     removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
@@ -1394,7 +1407,7 @@ export function buildAgendaSessionCompaction(input) {
 /**
  * Afegeix una continuació a partir de la sessió següent i refà tota la part
  * futura. Els fragments amb la mateixa activitat es fusionen i la suma mai no
- * supera els minuts definits a la Programació.
+ * supera els minuts definits per a l’Agenda del grup.
  */
 export function buildAgendaContinuationReflow(input) {
   if (input.moveFromTarget) {

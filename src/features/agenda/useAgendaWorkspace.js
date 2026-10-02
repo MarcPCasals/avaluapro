@@ -45,6 +45,8 @@ import {
   createCalendarEvent,
   createCalendarSession,
   createGroupApplication,
+  createGroupActivityOverride,
+  getAgendaActivityMinutesById,
   createPlanningActivity,
   createPlanningPrivateNote,
   createTemporalUnit,
@@ -108,10 +110,6 @@ function mergeSessionBundles(current, incoming) {
   return reconcileSessionOccurrences(
     [...new Map([...current, ...incoming].map((bundle) => [bundle.session.id, bundle])).values()],
   ).bundles
-}
-
-function activityMinutesById(activities = []) {
-  return Object.fromEntries(activities.map((activity) => [activity.id, activity.plannedMinutes]))
 }
 
 function confirmAvoidTinyAgendaFragments(preview) {
@@ -1210,10 +1208,15 @@ export function useAgendaWorkspace(user, classes = []) {
           { completeSnapshot: true },
         )
       : { entities: [] }
-    const activities = orderActivitiesForScheduling(
+    const planningActivities = orderActivitiesForScheduling(
       phases,
       applyPlanningActivityOverrides(baseActivities, overrideResult.entities),
     )
+    const agendaMinutesById = getAgendaActivityMinutesById(planningActivities, overrideResult.entities)
+    const activities = planningActivities.map((activity) => ({
+      ...activity,
+      plannedMinutes: agendaMinutesById[activity.id],
+    }))
     let existingSessions = []
     let existingSessionBundles = []
     if (savedApplication) {
@@ -1267,7 +1270,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
       summarizeAssignedActivityProgress(currentSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
-      const plannedMinutes = Number(activity.plannedMinutes)
+      const plannedMinutes = Number(agendaMinutesById[activity.id])
       if (!Number.isFinite(plannedMinutes) || plannedMinutes <= 0) {
         return [activity.id, assignedSourceActivityIds.has(activity.id) ? 0 : null]
       }
@@ -1293,6 +1296,7 @@ export function useAgendaWorkspace(user, classes = []) {
       existingSessions,
       existingSessionBundles,
       isNewApplication: !savedApplication,
+      activityOverrides: overrideResult.entities,
       planningUnit,
       remainingMinutesByActivityId,
       scheduledSourceActivityIds,
@@ -1823,6 +1827,17 @@ export function useAgendaWorkspace(user, classes = []) {
         })
       }
     }
+    for (const [activityId, agendaPlannedMinutes] of Object.entries(preview.activityMinutesChanges || {})) {
+      entries.push({
+        entity: createGroupActivityOverride({
+          activityId,
+          applicationId: preview.setup.application.id,
+          ownerUid: preview.setup.planningUnit.ownerUid,
+          changes: { agendaPlannedMinutes },
+        }),
+        context: { applicationId: preview.setup.application.id, planningUnitId },
+      })
+    }
     for (const entry of entries) await repository.save(entry.entity, entry.context)
     await refreshSync()
     await synchronize()
@@ -1942,7 +1957,7 @@ export function useAgendaWorkspace(user, classes = []) {
       to: activeAcademicYear.endsOn,
     })
     const reflowInput = {
-      activityMinutesById: activityMinutesById(setup.activities),
+      activityMinutesById: getAgendaActivityMinutesById(setup.activities, setup.activityOverrides),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
@@ -1992,7 +2007,7 @@ export function useAgendaWorkspace(user, classes = []) {
       to: activeAcademicYear.endsOn,
     })
     const reflowInput = {
-      activityMinutesById: activityMinutesById(setup.activities),
+      activityMinutesById: getAgendaActivityMinutesById(setup.activities, setup.activityOverrides),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
@@ -2059,7 +2074,7 @@ export function useAgendaWorkspace(user, classes = []) {
         title: item.title,
         type: item.type,
       }],
-      activityMinutesById: activityMinutesById(setup.activities),
+      activityMinutesById: getAgendaActivityMinutesById(setup.activities, setup.activityOverrides),
       application: setup.application,
       candidates: temporalProposal.candidates.filter((candidate) => candidate.startsAt > bundle.session.startsAt),
       continuationMinutes: Number(minutes),
