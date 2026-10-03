@@ -264,9 +264,9 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   if (emailPreview) {
     return (
       <Modal onClose={() => setEmailPreview(null)} size="lg" title="Previsualitzar el correu">
-        <div className="reminders-modal">
+        <div className="reminders-modal recovery-email-preview">
           <strong>{emailPreview.studentName}</strong>
-          <label className="classroom-recovery-email">
+          <label className="recovery-email-preview-field">
             <span>Text del correu de recuperació</span>
             <textarea readOnly rows={14} value={emailPreview.text} />
           </label>

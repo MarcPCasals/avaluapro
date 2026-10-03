@@ -31429,3 +31429,30 @@ button.profile-followup-card:focus-visible {
 @media (max-width: 720px) {
   .reminder-row > .reminder-row-actions { grid-column: 2 / -1; }
 }
+
+.recovery-email-preview {
+  color: #1f2937;
+}
+
+.recovery-email-preview-field {
+  display: grid;
+  gap: 8px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.recovery-email-preview-field textarea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+  color: #1f2937;
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
