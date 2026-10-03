@@ -7,6 +7,7 @@ import {
   clearRecoveryTaskLinks,
   completeRecoveryTaskRecords,
   getPreparationReminderDate,
+  getRecoveryEmailPreview,
   getStudentFirstName,
   linkRecoveryToTaskRecords,
   reconcileMaterialPreparationReminders,
@@ -171,4 +172,26 @@ test('un material eliminat cancel·la el recordatori i si torna no queda silenci
   const restored = reconcileMaterialPreparationReminders(removed.notes, [bundle], () => 'unused', '2026-09-19T10:00:00.000Z')
   assert.equal(restored.materialNotes[0].preparation.cancelledAt, undefined)
   assert.equal(restored.materialNotes[0].reminder.dismissedAt, '')
+})
+
+
+test('la previsualització preserva el correu desat i les edicions del docent', () => {
+  const emailText = 'Hola!\nActivitats i instruccions editades pel docent.\n'
+  assert.equal(getRecoveryEmailPreview({ recovery: { emailText } }, { name: 'Alumne fictici' }), emailText)
+})
+
+test('la previsualització sense correu desat recupera les activitats i les tasques de la nota', () => {
+  const text = getRecoveryEmailPreview({
+    sessionStartsAt: '2026-10-02T15:00:00',
+    recovery: {
+      kind: 'earlyDeparture',
+      activities: [{ title: 'Experiment fictici', evidenceMode: 'final' }],
+      nextSessionStartsAt: '2026-10-05T09:30:00',
+    },
+  }, { name: 'COGNOM, Laia' })
+  assert.match(text, /Hola, Laia/)
+  assert.match(text, /has marxat abans/)
+  assert.match(text, /Experiment fictici/)
+  assert.match(text, /Tasques que cal completar/)
+  assert.match(text, /5 d’octubre/)
 })

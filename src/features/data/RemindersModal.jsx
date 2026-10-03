@@ -1,5 +1,6 @@
-import { Bell, BellRing, CheckCircle2, Clock3, Plus, Skull } from 'lucide-react'
+import { Bell, BellRing, CheckCircle2, Clock3, Copy, Mail, Plus, Skull } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { getRecoveryEmailPreview } from '../../lib/classroomRecovery'
 import { Modal } from '../../components/Modal'
 import { getLocalToday, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -67,6 +68,8 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const [error, setError] = useState('')
   const [rescheduling, setRescheduling] = useState(null)
   const [savingDate, setSavingDate] = useState(false)
+  const [emailPreview, setEmailPreview] = useState(null)
+  const [emailCopied, setEmailCopied] = useState(false)
 
   const tutoringClasses = useMemo(
     () => classes.filter((classItem) => classItem.sharedTutoringSpaceId),
@@ -164,6 +167,26 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     }
   }
 
+  const previewRecoveryEmail = (item) => {
+    const student = students.find((candidate) => candidate.id === item.note.studentId)
+    setError('')
+    setEmailCopied(false)
+    setEmailPreview({
+      studentName: student?.name || 'Alumne',
+      text: getRecoveryEmailPreview(item.note, student),
+    })
+  }
+
+  const copyRecoveryEmail = async () => {
+    setError('')
+    try {
+      await navigator.clipboard.writeText(emailPreview.text)
+      setEmailCopied(true)
+    } catch {
+      setError('No s’ha pogut copiar automàticament. Selecciona el text i copia’l manualment.')
+    }
+  }
+
   const changeKind = (kind) => {
     const currentClassIsShared = tutoringClasses.some((classItem) => classItem.id === draft.classId)
     setError('')
@@ -236,6 +259,25 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     } finally {
       setCompletingId('')
     }
+  }
+
+  if (emailPreview) {
+    return (
+      <Modal onClose={() => setEmailPreview(null)} size="lg" title="Previsualitzar el correu">
+        <div className="reminders-modal">
+          <strong>{emailPreview.studentName}</strong>
+          <label className="classroom-recovery-email">
+            <span>Text del correu de recuperació</span>
+            <textarea readOnly rows={14} value={emailPreview.text} />
+          </label>
+          {error && <p className="reminder-form-error" role="alert">{error}</p>}
+          <div className="reminder-row-actions">
+            <button className="secondary-action compact" onClick={() => setEmailPreview(null)} type="button">Tornar als recordatoris</button>
+            <button className="primary-action compact" onClick={copyRecoveryEmail} type="button"><Copy size={15} />{emailCopied ? 'Copiat' : 'Copiar text'}</button>
+          </div>
+        </div>
+      </Modal>
+    )
   }
 
   return (
@@ -346,7 +388,9 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                     {item.classItem && <small>{item.classItem.name}</small>}
                   </div>
                   <div className="reminder-row-actions">
-                  <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>
+                  {item.kind === 'recovery'
+                    ? <button className="secondary-action compact" onClick={() => previewRecoveryEmail(item)} type="button"><Mail size={15} />Previsualitzar el correu</button>
+                    : <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>}
                   <button className="secondary-action compact" disabled={savingDate} onClick={() => markDone(item)} type="button">
                     <CheckCircle2 size={15} />
                     Fet

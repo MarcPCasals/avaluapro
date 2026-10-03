@@ -63,6 +63,21 @@ export function buildRecoveryEmail({
   return parts.join('\n')
 }
 
+export function getRecoveryEmailPreview(note = {}, student, subject = '') {
+  if (note.recovery?.emailText?.trim()) return note.recovery.emailText
+  return buildRecoveryEmail({
+    items: (note.recovery?.activities || []).map((activity) => ({
+      title: activity.title,
+      sourceActivity: { evidenceMode: activity.evidenceMode || 'none' },
+    })),
+    kind: note.recovery?.kind || 'absence',
+    nextSessionStartsAt: note.recovery?.nextSessionStartsAt || '',
+    sessionStartsAt: note.sessionStartsAt || '',
+    student,
+    subject,
+  })
+}
+
 export function getPreparationReminderDate(startsAt, daysBefore = 1) {
   const date = new Date(`${String(startsAt).slice(0, 10)}T12:00:00Z`)
   if (Number.isNaN(date.getTime())) return ''
