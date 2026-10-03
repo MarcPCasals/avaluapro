@@ -25,6 +25,7 @@ import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
   buildRecoveryEmail,
+  formatRecoveryEmailDates,
   getRecoverableClassroomItems,
 } from '../../lib/classroomRecovery'
 import './classroom.css'
@@ -169,7 +170,7 @@ function RecoveryDialog({ bundle, existing, kind, nextSession, onClose, onSave, 
     student,
     subject: bundle.planningUnit.title,
   })
-  const [emailText, setEmailText] = useState(existing?.recovery?.emailText || generatedEmail)
+  const [emailText, setEmailText] = useState(formatRecoveryEmailDates(existing?.recovery?.emailText || generatedEmail))
   const [emailTouched, setEmailTouched] = useState(Boolean(existing?.recovery?.emailText))
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)

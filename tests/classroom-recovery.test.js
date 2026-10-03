@@ -195,3 +195,18 @@ test('la previsualització sense correu desat recupera les activitats i les tasq
   assert.match(text, /Tasques que cal completar/)
   assert.match(text, /5 d’octubre/)
 })
+
+
+test('els correus nous i desats mostren el dia i el mes sense any', () => {
+  const generated = getRecoveryEmailPreview({
+    sessionStartsAt: '2026-10-02T15:00:00',
+    recovery: { nextSessionStartsAt: '2026-10-05T09:30:00' },
+  }, { name: 'Laia' })
+  assert.match(generated, /Avui, 2 d’octubre,/)
+  assert.match(generated, /el 5 d’octubre\./)
+  assert.doesNotMatch(generated, /2026/)
+  const saved = getRecoveryEmailPreview({ recovery: {
+    emailText: 'Avui, 2 d’octubre del 2026, no has pogut assistir.\nHo revisarem el 5 d’octubre del 2026.\nMaterial: informe del 2026.',
+  } })
+  assert.equal(saved, 'Avui, 2 d’octubre, no has pogut assistir.\nHo revisarem el 5 d’octubre.\nMaterial: informe del 2026.')
+})

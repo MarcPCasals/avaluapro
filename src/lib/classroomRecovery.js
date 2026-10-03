@@ -23,7 +23,7 @@ function externalMaterials(items = []) {
 
 function formatDate(value) {
   if (!value) return ''
-  return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Intl.DateTimeFormat('ca-AD', { day: 'numeric', month: 'long' })
     .format(new Date(`${String(value).slice(0, 10)}T12:00:00`))
 }
 
@@ -63,8 +63,15 @@ export function buildRecoveryEmail({
   return parts.join('\n')
 }
 
+export function formatRecoveryEmailDates(text = '') {
+  return text.replace(
+    /(\b\d{1,2} (?:de |d[’'])(?:gener|febrer|març|abril|maig|juny|juliol|agost|setembre|octubre|novembre|desembre)) del? \d{4}\b/gu,
+    '$1',
+  )
+}
+
 export function getRecoveryEmailPreview(note = {}, student, subject = '') {
-  if (note.recovery?.emailText?.trim()) return note.recovery.emailText
+  if (note.recovery?.emailText?.trim()) return formatRecoveryEmailDates(note.recovery.emailText)
   return buildRecoveryEmail({
     items: (note.recovery?.activities || []).map((activity) => ({
       title: activity.title,
