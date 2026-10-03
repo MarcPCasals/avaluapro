@@ -16,6 +16,7 @@ import {
   getEffectiveActivityMaterialLinks,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { SessionNotesNotice } from './SessionNotesNotice'
 import { FormattedText } from '../../components/FormattedText'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
 import { getSessionPersonalReminders } from '../../lib/reminders'
@@ -234,6 +235,7 @@ function ClassroomCloseReviewDialog({
   setSummaryPrivateNote,
   setSummaryReflection,
   summaryPrivateNote,
+  summaryNoteRegistered = false,
   summaryReflection,
   showNotes = true,
 }) {
@@ -246,7 +248,7 @@ function ClassroomCloseReviewDialog({
       <article><strong>{pendingTaskCount}</strong><span>tasques pendents</span><small>{pendingTaskCount ? 'Inclou les recuperacions justificades de la sessió.' : 'Cap tasca pendent registrada.'}</small></article>
       <article><strong>{reminderCount}</strong><span>recordatoris creats</span><small>{reminderCount ? 'Es conservaran a la capa global de recordatoris.' : 'Cap recordatori nou.'}</small></article>
     </div>
-    {showNotes && <div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota privada <span>només per a tu</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>}
+    {showNotes && <div className="classroom-summary-notes"><label>Reflexió pedagògica <span>visible per direcció</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryReflection} onChange={(event) => setSummaryReflection(event.target.value)} /></label><label>Nota de sessió <span>{summaryNoteRegistered ? 'també registrada a la Programació' : 'només per a tu'}</span><textarea maxLength="4000" placeholder="Opcional" rows="2" value={summaryPrivateNote} onChange={(event) => setSummaryPrivateNote(event.target.value)} /></label></div>}
     {!attendanceConfirmed && <p className="classroom-close-warning">Encara no has confirmat la llista d’assistència.</p>}
     <div className="classroom-close-actions"><button className="secondary-action" disabled={busy} onClick={onClose} type="button">Continuar la classe</button><button className="primary-action" disabled={busy} onClick={onConfirm} type="button">{busy ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}Confirmar i tancar</button></div>
   </section></div>
@@ -680,8 +682,8 @@ export function ClassroomMode({
         nextBundle = { ...nextBundle, results: replaceResult(nextBundle.results, result) }
       }
       if (summaryPrivateNote.trim() || nextBundle.privateNotes?.length) {
-        const privateNote = await onSavePrivateNote(nextBundle, summaryPrivateNote)
-        nextBundle = { ...nextBundle, privateNotes: privateNote ? [privateNote] : [] }
+        const savedNote = await onSavePrivateNote(nextBundle, summaryPrivateNote)
+        nextBundle = { ...nextBundle, session: savedNote.session, privateNotes: savedNote.note ? [savedNote.note] : [] }
       }
       const closed = await onCloseSession(nextBundle)
       nextBundle = { ...nextBundle, ...closed }
@@ -731,6 +733,7 @@ export function ClassroomMode({
 
       <main className={`classroom-workspace ${sidePanel ? 'attendance-visible' : ''}`}>
         <section className="classroom-chronology" aria-label="Cronologia de la classe">
+          <SessionNotesNotice privateNotes={currentBundle.privateNotes} applicationNotes={currentBundle.session.applicationNotes} />
           {sessionPersonalReminders.length > 0 && <section className="classroom-session-reminders" aria-label="Recordatoris d’aquesta sessió">
             <Bell size={19} />
             <div>
@@ -832,7 +835,7 @@ export function ClassroomMode({
         <button className="classroom-close-button" disabled={Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => setCloseReview(true)} type="button"><CheckCircle2 size={17} />Tancar la classe</button>
       </footer>
 
-      {closeReview && <ClassroomCloseReviewDialog attendanceConfirmed={Boolean(currentBundle.session.attendanceConfirmedAt)} attendanceIssueCount={attendanceIssueIds.size} attendanceIssueDetail={attendanceIssueDetail} busy={busy === 'close'} className={classItem?.name} onClose={() => setCloseReview(false)} onConfirm={closeSession} pendingTaskCount={pendingTaskRecords.length} reminderCount={reminderCount} sessionTime={String(currentBundle.session.startsAt).slice(11, 16)} setSummaryPrivateNote={setSummaryPrivateNote} setSummaryReflection={setSummaryReflection} showNotes={!currentBundle.standalone} summaryPrivateNote={summaryPrivateNote} summaryReflection={summaryReflection} />}
+      {closeReview && <ClassroomCloseReviewDialog attendanceConfirmed={Boolean(currentBundle.session.attendanceConfirmedAt)} attendanceIssueCount={attendanceIssueIds.size} attendanceIssueDetail={attendanceIssueDetail} busy={busy === 'close'} className={classItem?.name} onClose={() => setCloseReview(false)} onConfirm={closeSession} pendingTaskCount={pendingTaskRecords.length} reminderCount={reminderCount} sessionTime={String(currentBundle.session.startsAt).slice(11, 16)} setSummaryPrivateNote={setSummaryPrivateNote} setSummaryReflection={setSummaryReflection} showNotes={!currentBundle.standalone} summaryPrivateNote={summaryPrivateNote} summaryNoteRegistered={Boolean(currentBundle.privateNotes?.[0]?.recordInPlanning)} summaryReflection={summaryReflection} />}
       {reviewItem && <ActivityReviewDialog item={reviewItem} onClose={() => setReviewItem(null)} onSave={(changes) => saveReview(reviewItem, changes)} result={currentBundle.results.find((result) => result.sessionItemId === reviewItem.id)} />}
       {timingProposal && <ClassroomTimingProposalDialog actualMinutes={timingProposal.actualMinutes} activity={timingProposal.item.sourceActivity} onApply={applyRealTimingToPlanning} onKeep={keepProgrammedTiming} />}
       {recoveryDraft && <RecoveryDialog bundle={currentBundle} existing={recoveryDraft.existing} kind={recoveryDraft.kind} nextSession={recoveryDraft.nextSession} onClose={() => setRecoveryDraft(null)} onSave={saveRecovery} student={recoveryDraft.student} />}

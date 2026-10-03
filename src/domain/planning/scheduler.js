@@ -647,7 +647,7 @@ export function buildActivitySessionDistribution({
 function canReflowSession(bundle, fromDate, now = new Date().toISOString()) {
   const session = bundle?.session
   if (!session || String(session.startsAt).slice(0, 10) < fromDate) return false
-  if (session.status !== 'planned') return false
+  if (session.status !== 'planned' || session.applicationNotes?.length) return false
   const startsAt = new Date(session.startsAt).getTime()
   const nowTime = new Date(now).getTime()
   const isFutureSession = Number.isFinite(startsAt) && Number.isFinite(nowTime) && startsAt > nowTime

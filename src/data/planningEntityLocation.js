@@ -55,6 +55,18 @@ export function getPlanningEntityLocation(entity, context = {}) {
     }
   }
 
+  if (entityType === PLANNING_ENTITY_TYPES.PRIVATE_NOTE) {
+    return {
+      documentId: entityId,
+      path: `planningPrivateNotes/${entityId}`,
+      scopeKeys: unique([
+        entity.planningUnitId ? `planningUnit:${entity.planningUnitId}:privateNotes` : '',
+        entity.sessionId ? `session:${entity.sessionId}:privateNotes` : '',
+        ...extraScopeKeys,
+      ]),
+    }
+  }
+
   const planningUnitId = requiredId(
     context.planningUnitId || entity.planningUnitId,
     'la UP de l’entitat',
@@ -93,18 +105,6 @@ export function getPlanningEntityLocation(entity, context = {}) {
       scopeKeys: unique([
         `planningUnit:${planningUnitId}:applications`,
         `class:${entity.classId}:applications`,
-        ...extraScopeKeys,
-      ]),
-    }
-  }
-
-  if (entityType === PLANNING_ENTITY_TYPES.PRIVATE_NOTE) {
-    return {
-      documentId: entityId,
-      path: `planningPrivateNotes/${entityId}`,
-      scopeKeys: unique([
-        `planningUnit:${planningUnitId}:privateNotes`,
-        entity.sessionId ? `session:${entity.sessionId}:privateNotes` : '',
         ...extraScopeKeys,
       ]),
     }

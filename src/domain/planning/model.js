@@ -605,6 +605,11 @@ export function createCalendarSession(input, options = {}) {
     ownerUid: requiredText(input.ownerUid, 'propietari'),
     applicationId: requiredText(input.applicationId, 'aplicació de grup'),
     classId: requiredText(input.classId, 'grup'),
+    applicationNotes: (Array.isArray(input.applicationNotes) ? input.applicationNotes : []).map((note) => ({
+      id: requiredText(note.id, 'identificador de la nota'),
+      text: requiredText(note.text, 'nota d’aplicació a l’aula'),
+      authorUid: requiredText(note.authorUid, 'autor de la nota'),
+    })),
     calendarEventId: optionalText(input.calendarEventId),
     timetableSlotId: optionalText(input.timetableSlotId),
     startsAt: isoDateTime(input.startsAt, "data i hora d'inici"),
@@ -678,9 +683,10 @@ export function createPlanningPrivateNote(input, options = {}) {
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.PRIVATE_NOTE, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
-    planningUnitId: requiredText(input.planningUnitId, 'UP'),
+    planningUnitId: optionalText(input.planningUnitId),
     applicationId: optionalText(input.applicationId),
     sessionId: optionalText(input.sessionId),
     text: requiredText(input.text, 'nota privada'),
+    recordInPlanning: Boolean(input.recordInPlanning),
   }
 }

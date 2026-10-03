@@ -794,6 +794,28 @@ describe('Planificació compartida', () => {
 })
 
 describe('Notes privades de planificació', () => {
+  test('la nota de recordatori continua privada i el registre de sessió és visible a l’aplicació autoritzada', async () => {
+    const db = authDb(OWNER)
+    const privateNote = privateNoteData({ id: 'plan-timeline-note', recordInPlanning: true })
+    await assertSucceeds(setDoc(doc(db, 'planningPrivateNotes', privateNote.id), privateNote))
+    await assertSucceeds(updateDoc(sessionRef(db), { applicationNotes: [{ id: privateNote.id, text: 'Recordar les mostres', authorUid: OWNER.uid }] }))
+    const registered = await assertSucceeds(getDoc(sessionRef(authDb(DIRECTION))))
+    assert.equal(registered.data().applicationNotes[0].text, 'Recordar les mostres')
+    await assertFails(getDoc(doc(authDb(DIRECTION), 'planningPrivateNotes', privateNote.id)))
+    await assertFails(updateDoc(sessionRef(authDb(DIRECTION)), { applicationNotes: [] }))
+    await assertFails(updateDoc(sessionRef(db), { applicationNotes: 'incorrecte' }))
+    await assertFails(updateDoc(doc(db, 'planningPrivateNotes', privateNote.id), { recordInPlanning: 'incorrecte' }))
+    await assertSucceeds(updateDoc(sessionRef(db), { applicationNotes: [] }))
+    await assertSucceeds(getDoc(doc(db, 'planningPrivateNotes', privateNote.id)))
+  })
+
+  test('una nota de franja sense UP manté la protecció del compte propietari', async () => {
+    const db = authDb(OWNER)
+    const value = privateNoteData({ id: 'plan-timetable-note', planningUnitId: null, applicationId: null, sessionId: 'timetable_2026-10-07_slot', recordInPlanning: false })
+    await assertSucceeds(setDoc(doc(db, 'planningPrivateNotes', value.id), value))
+    await assertFails(getDoc(doc(authDb(AGENDA_EDITOR), 'planningPrivateNotes', value.id)))
+  })
+
   test('només el propietari pot crear, consultar, llistar i eliminar una nota privada', async () => {
     const ownerDb = authDb(OWNER)
     const noteRef = doc(ownerDb, 'planningPrivateNotes', 'plan-private-note-two')

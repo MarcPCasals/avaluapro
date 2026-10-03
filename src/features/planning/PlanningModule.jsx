@@ -35,13 +35,13 @@ function SyncBadge({ isOnline, sync }) {
   )
 }
 
-function PlanningPreviewDialog({ activities, classes, loadApplications, onClose, phases, unit }) {
+function PlanningPreviewDialog({ activities, classes, loadApplications, onClose, phases, unit, initialTab = 'program' }) {
   const dialogRef = useDialogAccessibility(onClose)
   return (
     <div className="planning-dialog-backdrop">
       <section aria-label="Vista de direcció" aria-modal="true" className="planning-preview-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
         <button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={onClose} type="button"><X size={18} /></button>
-        <PlanningSharedView activities={activities} classes={classes} loadApplications={loadApplications} phases={phases} role="owner" unit={unit} />
+        <PlanningSharedView initialTab={initialTab} activities={activities} classes={classes} loadApplications={loadApplications} phases={phases} role="owner" unit={unit} />
       </section>
     </div>
   )
@@ -288,7 +288,7 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
@@ -366,6 +366,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         </div>
         <div className="planning-editor-actions">
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenDocuments} type="button"><FileText size={16} />Document i imports</button>}
+          {onOpenApplication && <button className="secondary-action compact" onClick={onOpenApplication} type="button"><Eye size={16} />Aplicació a l’aula</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenPreview} type="button"><Eye size={16} />Vista direcció</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenSharing} type="button"><Share2 size={16} />Compartir</button>}
           {canManageUnit && <button className="secondary-action compact" onClick={onOpenHistory} type="button"><History size={16} />Recuperar activitat</button>}
@@ -804,6 +805,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   ))}
                   onOpenDocuments={() => setDialog('documents')}
                   onOpenHistory={() => setDialog('history')}
+                  onOpenApplication={workspace.canReadActiveApplications ? () => setDialog('application-preview') : null}
                   onOpenPreview={() => setDialog('preview')}
                   onOpenSharing={() => setDialog('sharing')}
                   onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
@@ -851,7 +853,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
-      {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
+      {['preview', 'application-preview'].includes(dialog) && workspace.activePlanningUnit && <PlanningPreviewDialog initialTab={dialog === 'application-preview' ? 'applications' : 'program'} activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
       {connectedDecision && <ConnectedChangeDialog activeClassName={activeClass?.name || 'aquesta classe'} onChoose={resolveConnectedDecision} otherClassNames={otherConnectedClassLabels} supportsCurrentClass={connectedDecision.supportsCurrentClass} />}
     </section>

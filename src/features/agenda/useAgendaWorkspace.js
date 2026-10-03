@@ -52,7 +52,8 @@ import {
   createGroupActivityOverride,
   getAgendaActivityMinutesById,
   createPlanningActivity,
-  createPlanningPrivateNote,
+  buildSessionNoteChange,
+  getTimetableSessionNoteId,
   createTemporalUnit,
   createTimetableSlot,
   isBabeliumItem,
@@ -1005,15 +1006,17 @@ export function useAgendaWorkspace(user, classes = []) {
 
   const loadClassroomPrivateNotes = useCallback(async (bundle) => {
     if (!repository || !user?.uid) return { ...bundle, privateNotes: [] }
-    const result = await repository.loadScope(
-      `session:${bundle.session.id}:privateNotes`,
-      () => loadPlanningPrivateNotes(user.uid, {
-        planningUnitId: bundle.planningUnit.id,
-        sessionId: bundle.session.id,
-      }),
+    const sessionIds = [...new Set([bundle.session.id, getTimetableSessionNoteId(bundle.session)].filter(Boolean))]
+    const results = await Promise.all(sessionIds.map((sessionId) => repository.loadScope(
+      `session:${sessionId}:privateNotes`,
+      () => loadPlanningPrivateNotes(user.uid, { sessionId }),
       { completeSnapshot: true },
-    )
-    const nextBundle = { ...bundle, privateNotes: result.entities }
+    )))
+    const failed = results.find((result) => result.error)
+    if (failed) throw failed.error
+    const notes = [...new Map(results.flatMap((result) => result.entities).map((note) => [note.id, note])).values()]
+      .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
+    const nextBundle = { ...bundle, privateNotes: notes }
     setSessionBundles((bundles) => bundles.map((current) =>
       current.session.id === bundle.session.id ? nextBundle : current))
     return nextBundle
@@ -1075,32 +1078,19 @@ export function useAgendaWorkspace(user, classes = []) {
       .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0] || null
   }, [allPlanningUnits, repository, sessionBundles, user, userEmail])
 
-  const saveClassroomPrivateNote = useCallback(async (bundle, text) => {
-    const cleanText = String(text || '').trim()
-    const existing = (bundle.privateNotes || [])[0]
-    if (!cleanText) {
-      if (existing) await remove(existing)
-      setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
-        ? { ...current, privateNotes: [] }
-        : current))
-      return null
-    }
-    const now = new Date().toISOString()
-    const note = createPlanningPrivateNote({
-      ...(existing || {}),
-      // Les notes personals pertanyen sempre al compte que les escriu. Així
-      // un col·laborador d'Agenda no pot veure les del propietari ni a l'inrevés.
-      ownerUid: user.uid,
-      planningUnitId: bundle.planningUnit.id,
-      sessionId: bundle.session.id,
-      text: cleanText,
-      updatedAt: now,
-    }, { now })
-    await persist(note)
+  const saveClassroomPrivateNote = useCallback(async (bundle, text, options = {}) => {
+    const { note, existing, session, applicationNotesChanged } = buildSessionNoteChange({
+      bundle, ownerUid: user.uid, text, recordInPlanning: options.recordInPlanning,
+    })
+    const entries = []
+    if (note) entries.push({ entity: note })
+    if (!bundle.standalone && applicationNotesChanged) entries.push({ entity: session, context: { planningUnitId: bundle.planningUnit.id } })
+    if (entries.length) await persist(entries)
+    if (!note && existing) await remove(existing)
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
-      ? { ...current, privateNotes: [note] }
+      ? { ...current, session, privateNotes: note ? [note] : [] }
       : current))
-    return note
+    return { note, session }
   }, [persist, remove, user])
 
   /**

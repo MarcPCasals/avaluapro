@@ -1579,7 +1579,7 @@ service cloud.firestore {
 
     function validPlanningSession(upId, applicationId, sessionId) {
       return request.resource.data.keys().hasOnly([
-          'applicationId', 'attendanceConfirmedAt', 'babeliumEnabled', 'calendarEventId', 'classId',
+          'applicationId', 'applicationNotes', 'attendanceConfirmedAt', 'babeliumEnabled', 'calendarEventId', 'classId',
           'classroomClosedAt', 'classroomOpenedAt', 'createdAt', 'durationMinutes',
           'entityType', 'id', 'ownerUid', 'parallelProgrammingKey', 'schemaVersion', 'startsAt', 'status',
           'subgroupId', 'timetableSlotId', 'updatedAt'
@@ -1591,6 +1591,7 @@ service cloud.firestore {
         && request.resource.data.applicationId == applicationId
         && request.resource.data.classId == planningApplicationClassId(upId, applicationId)
         && request.resource.data.durationMinutes is number
+        && (!('applicationNotes' in request.resource.data) || request.resource.data.applicationNotes is list)
         && (!('babeliumEnabled' in request.resource.data) || request.resource.data.babeliumEnabled is bool)
         && request.resource.data.status in ['planned', 'held', 'cancelled', 'notHeld']
         && request.resource.data.startsAt is string
@@ -1649,9 +1650,10 @@ service cloud.firestore {
     function validPlanningPrivateNote(noteId) {
       return request.resource.data.keys().hasOnly([
           'applicationId', 'createdAt', 'entityType', 'id', 'ownerUid',
-          'planningUnitId', 'schemaVersion', 'sessionId', 'text', 'updatedAt'
+          'planningUnitId', 'recordInPlanning', 'schemaVersion', 'sessionId', 'text', 'updatedAt'
         ])
         && request.resource.data.id == noteId
+        && (!('recordInPlanning' in request.resource.data) || request.resource.data.recordInPlanning is bool)
         && request.resource.data.entityType == 'planningPrivateNote'
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == request.auth.uid

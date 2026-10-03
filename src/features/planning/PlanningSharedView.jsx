@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
@@ -147,7 +147,7 @@ function BaseProgramView({ activities, phases, unit }) {
   )
 }
 
-function SharedSession({ items, results, session }) {
+export function SharedSession({ items, results, session }) {
   return (
     <article>
       <header>
@@ -162,6 +162,7 @@ function SharedSession({ items, results, session }) {
         <span className={`status ${session.status}`}>{STATUS_LABELS[session.status] || session.status}</span>
       </header>
       <div>
+        {(session.applicationNotes || []).length > 0 && <section className="planning-session-application-notes"><strong>Notes d’aplicació a l’aula</strong>{session.applicationNotes.map((note) => <p key={note.id}>{note.text}</p>)}</section>}
         {items.map((item) => {
           const result = results.find((candidate) => candidate.sessionItemId === item.id)
           return (
@@ -231,11 +232,21 @@ function ApplicationView({ applications, classes }) {
  * i reflexions pedagògiques; les notes privades i les incidències individuals
  * no formen part de les propietats d'aquest component.
  */
-export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit }) {
-  const [tab, setTab] = useState('program')
+export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program' }) {
+  const [tab, setTab] = useState(initialTab)
   const [applications, setApplications] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(initialTab === 'applications')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (initialTab !== 'applications' || !loadApplications) return
+    let active = true
+    loadApplications()
+      .then((data) => { if (active) setApplications(data) })
+      .catch((loadError) => { if (active) setError(loadError.message || 'No s’ha pogut carregar l’aplicació real.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [initialTab, loadApplications])
 
   const openApplications = async () => {
     setTab('applications')
