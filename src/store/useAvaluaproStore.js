@@ -5608,6 +5608,8 @@ export const useAvaluaproStore = create((set, get) => ({
           itemId: activity.itemId,
           sourceActivityId: activity.sourceActivityId,
           title: activity.title,
+          teacherMaterials: activity.teacherMaterials || [],
+          studentMaterials: activity.studentMaterials || [],
         })),
         emailText: String(emailText || ''),
         kind,

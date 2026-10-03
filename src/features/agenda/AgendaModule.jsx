@@ -867,14 +867,10 @@ export default function AgendaModule() {
   const findNextClassroomSession = async (bundle) => {
     if (!bundle.standalone) return workspace.findNextClassroomSession(bundle)
     const sessionDate = String(bundle.session.startsAt).slice(0, 10)
-    const startMinutes = Number(String(bundle.session.startsAt).slice(11, 13)) * 60
-      + Number(String(bundle.session.startsAt).slice(14, 16))
-      + Number(bundle.session.durationMinutes || 0)
-    const afterTime = `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
     const occurrence = findNextTimetableOccurrence(
       workspace.slots.filter((slot) => slot.classId === bundle.session.classId),
       sessionDate,
-      afterTime,
+      '23:59',
       workspace.calendarEvents,
     )
     return occurrence ? buildTimetableClassroomBundle(occurrence, classes.find((item) => item.id === bundle.session.classId), user.uid).session : null
@@ -931,6 +927,8 @@ export default function AgendaModule() {
       itemId: item.id,
       sourceActivityId: item.sourceActivityId,
       title: item.title,
+      teacherMaterials: item.sourceActivity?.teacherMaterials || [],
+      studentMaterials: item.sourceActivity?.studentMaterials || [],
     })),
     applicationId: bundle.application.id,
     classId: bundle.session.classId,

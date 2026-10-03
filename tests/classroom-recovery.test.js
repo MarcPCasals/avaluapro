@@ -8,6 +8,7 @@ import {
   completeRecoveryTaskRecords,
   getPreparationReminderDate,
   getRecoveryEmailPreview,
+  groupDailyRecoveryReminders,
   getStudentFirstName,
   linkRecoveryToTaskRecords,
   reconcileMaterialPreparationReminders,
@@ -209,4 +210,33 @@ test('els correus nous i desats mostren el dia i el mes sense any', () => {
     emailText: 'Avui, 2 d’octubre del 2026, no has pogut assistir.\nHo revisarem el 5 d’octubre del 2026.\nMaterial: informe del 2026.',
   } })
   assert.equal(saved, 'Avui, 2 d’octubre, no has pogut assistir.\nHo revisarem el 5 d’octubre.\nMaterial: informe del 2026.')
+})
+
+
+test('agrupa les recuperacions del mateix dia amb activitats, tasques i materials i revisió un altre dia', () => {
+  const make = (id, time, title, material) => ({
+    id: `agenda_${id}`, kind: 'recovery',
+    note: {
+      id, classId: 'class-1', studentId: 'student-1', sessionStartsAt: `2026-10-02T${time}`,
+      recovery: { nextSessionStartsAt: '2026-10-02T15:00:00', emailText: buildRecoveryEmail({
+        student: { name: 'Laia' }, sessionStartsAt: '2026-10-02T09:00:00', nextSessionStartsAt: '2026-10-02T15:00:00',
+        items: [{ title, sourceActivity: { evidenceMode: 'final', studentMaterials: [{ label: material, url: `https://example.test/${id}` }] } }],
+      }) },
+    },
+  })
+  const items = [make('one', '09:00:00', 'Activitat A', 'Fitxa A'), make('two', '15:00:00', 'Activitat B', 'Fitxa B')]
+  const grouped = groupDailyRecoveryReminders(items, [
+    { classId: 'class-1', startsAt: '2026-10-02T15:00:00' },
+    { classId: 'class-1', startsAt: '2026-10-05T09:30:00' },
+  ])
+  assert.equal(grouped.length, 1)
+  assert.equal(grouped[0].recoveryNotes.length, 2)
+  const email = grouped[0].note.recovery.emailText
+  for (const title of ['Activitat A', 'Activitat B', 'Fitxa A', 'Fitxa B']) assert.ok(email.includes(title))
+  assert.match(email, /el 5 d’octubre/)
+  assert.doesNotMatch(email, /pròxima sessió, el 2 d’octubre/)
+  assert.equal(items[0].note.recovery.nextSessionStartsAt, '2026-10-02T15:00:00')
+  const otherStudent = { ...items[1], note: { ...items[1].note, studentId: 'student-2' } }
+  assert.equal(groupDailyRecoveryReminders([items[0], otherStudent]).length, 2)
+  assert.doesNotMatch(groupDailyRecoveryReminders(items)[0].note.recovery.emailText, /Ho revisarem/)
 })

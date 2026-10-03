@@ -1032,7 +1032,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const isNextValidSession = (session) => session.entityType === 'calendarSession'
       && session.id !== bundle.session.id
       && session.classId === bundle.session.classId
-      && session.startsAt > bundle.session.startsAt
+      && String(session.startsAt).slice(0, 10) > String(bundle.session.startsAt).slice(0, 10)
       && !['cancelled', 'notHeld'].includes(session.status)
     const alreadyLoaded = sessionBundles
       .map((candidate) => candidate.session)

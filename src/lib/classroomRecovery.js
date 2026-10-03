@@ -75,13 +75,69 @@ export function getRecoveryEmailPreview(note = {}, student, subject = '') {
   return buildRecoveryEmail({
     items: (note.recovery?.activities || []).map((activity) => ({
       title: activity.title,
-      sourceActivity: { evidenceMode: activity.evidenceMode || 'none' },
+      sourceActivity: {
+        evidenceMode: activity.evidenceMode || 'none',
+        teacherMaterials: activity.teacherMaterials || [],
+        studentMaterials: activity.studentMaterials || [],
+      },
     })),
     kind: note.recovery?.kind || 'absence',
     nextSessionStartsAt: note.recovery?.nextSessionStartsAt || '',
     sessionStartsAt: note.sessionStartsAt || '',
     student,
     subject,
+  })
+}
+
+/** Group the pending sessions for one student and class on one school day.
+ * Keep the original notes intact so each absence and task retains its session.
+ */
+export function groupDailyRecoveryReminders(items = [], sessionOptions = [], students = []) {
+  const groups = new Map()
+  for (const item of items) {
+    if (item.kind !== 'recovery') { groups.set(item.id, item); continue }
+    const day = String(item.note.sessionStartsAt || '').slice(0, 10)
+    const key = day ? `${item.note.classId}:${item.note.studentId}:${day}` : item.id
+    const existing = groups.get(key)
+    if (existing) existing.recoveryNotes.push(item.note)
+    else groups.set(key, { ...item, recoveryNotes: [item.note] })
+  }
+  return [...groups.values()].map((item) => {
+    if (!item.recoveryNotes) return item
+    const notes = [...item.recoveryNotes].sort((a, b) => String(a.sessionStartsAt).localeCompare(String(b.sessionStartsAt)))
+    const day = String(notes[0].sessionStartsAt || '').slice(0, 10)
+    const candidates = [
+      ...notes.map((note) => note.recovery?.nextSessionStartsAt || ''),
+      ...sessionOptions.filter((option) => option.classId === item.note.classId).map((option) => option.startsAt || `${option.date}T${option.time || '00:00'}`),
+    ].filter((value) => value && String(value).slice(0, 10) > day).sort()
+    const next = candidates[0] || ''
+    const emails = notes.map((note) => getRecoveryEmailPreview(note, students.find((student) => student.id === note.studentId)))
+    let text = emails[0]
+    for (const heading of ['Les activitats que t’has perdut són:', 'Tasques que cal completar o entregar:', 'Materials vinculats:']) {
+      const blocks = emails.map((email) => {
+        const start = email.indexOf(heading)
+        return start < 0 ? '' : email.slice(start + heading.length).split('\n\n')[0].trim()
+      })
+      const lines = [...new Set(blocks.flatMap((block) => block.split('\n')).filter((line) => line.startsWith('- ')))]
+      if (!lines.length) continue
+      const start = text.indexOf(heading)
+      const block = `${heading}\n${lines.join('\n')}`
+      if (start >= 0) {
+        const end = text.indexOf('\n\n', start)
+        text = text.slice(0, start) + block + (end < 0 ? '' : text.slice(end))
+      } else {
+        const end = text.indexOf('Si tens algun dubte')
+        text = text.slice(0, end) + block + '\n\n' + text.slice(end)
+      }
+    }
+    const review = next ? `Ho revisarem a la pròxima sessió, el ${formatDate(next)}.` : ''
+    if (/Ho revisarem a la pròxima sessió,[^\n]*/u.test(text)) {
+      text = text.replace(/Ho revisarem a la pròxima sessió,[^\n]*/u, review)
+    } else if (review) text = text.replace('Si tens algun dubte', `${review}\n\nSi tens algun dubte`)
+    if (notes.length > 1) text = text.replace('a la sessió de ', 'a les sessions de ')
+    return { ...item, recoveryNotes: notes, note: {
+      ...notes[0], recovery: { ...notes[0].recovery, nextSessionStartsAt: next, emailText: text },
+    } }
   })
 }
 

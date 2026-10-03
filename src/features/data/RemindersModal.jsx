@@ -1,6 +1,6 @@
 import { Bell, BellRing, CheckCircle2, Clock3, Copy, Mail, Plus, Skull } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { getRecoveryEmailPreview } from '../../lib/classroomRecovery'
+import { getRecoveryEmailPreview, groupDailyRecoveryReminders } from '../../lib/classroomRecovery'
 import { Modal } from '../../components/Modal'
 import { getLocalToday, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -92,7 +92,10 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     [agendaNotes, classes, students, taskRecords, tasks],
   )
   const hasFocusedReminders = focusedReminderIds.length > 0
-  const visibleSummaryItems = summary.items.filter((item) => reminderMatchesFocus(item.id, focusedReminderIds))
+  const dailySummaryItems = groupDailyRecoveryReminders(summary.items, sessionOptions, students)
+  const visibleSummaryItems = dailySummaryItems.filter((item) =>
+    reminderMatchesFocus(item.id, focusedReminderIds)
+    || item.recoveryNotes?.some((note) => focusedReminderIds.includes(`agenda_${note.id}`)))
   const visibleCoordinationReminders = openCoordinationReminders.filter((item) =>
     reminderMatchesFocus(`coordination_${item.id}`, focusedReminderIds))
   const visibleReminderCount = visibleSummaryItems.length + visibleCoordinationReminders.length
@@ -106,7 +109,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     const dismissedAt = new Date().toISOString()
     const reminder = { ...item.reminder, dismissedAt }
     if (item.kind === 'recovery') {
-      await completeClassroomRecovery(item.note.id)
+      for (const note of item.recoveryNotes || [item.note]) await completeClassroomRecovery(note.id)
       return
     }
     if (item.kind === 'material') {
@@ -372,7 +375,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
         <section className={`reminder-list ${hasFocusedReminders ? 'focused' : ''}`}>
           <header>
             <strong>{hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
-            <span>{hasFocusedReminders ? visibleReminderCount : summary.count + openCoordinationReminders.length}</span>
+            <span>{hasFocusedReminders ? visibleReminderCount : dailySummaryItems.length + openCoordinationReminders.length}</span>
           </header>
           {visibleReminderCount === 0 ? (
             <p className="empty-list">{hasFocusedReminders ? 'Aquest recordatori ja no està pendent.' : 'No hi ha cap recordatori pendent.'}</p>
