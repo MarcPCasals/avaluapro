@@ -41,6 +41,7 @@ function getAvailableStartDates(setup, academicYear) {
   const proposal = buildTimetableSessionCandidates({
     calendarEvents: setup.calendarEvents,
     classId: setup.application.classId,
+    subject: setup.application.subject,
     from: academicYear.startsOn,
     slotsByTimetableId: setup.slotsByTimetableId,
     timetables: setup.timetables,
@@ -60,6 +61,7 @@ export function AgendaSchedulingDialog({
   initialClassId = '',
   initialMode = 'progressive',
   initialPlanningUnitId = '',
+  initialSubject = '',
   onBuildPreview,
   onClose,
   onConfirm,
@@ -71,6 +73,7 @@ export function AgendaSchedulingDialog({
   const availableUnits = useMemo(() => planningUnits.filter((item) => item.status !== 'archived'), [planningUnits])
   const [values, setValues] = useState(() => ({
     classId: initialClassId || classes[0]?.id || '',
+    subject: initialSubject,
     mode: initialMode === 'smart' ? 'smart' : 'progressive',
     planningUnitId: initialPlanningUnitId || availableUnits[0]?.id || '',
     startDate: initialStartDate(academicYear, today),
@@ -143,6 +146,17 @@ export function AgendaSchedulingDialog({
     } finally {
       setBusy(false)
     }
+  }
+
+  const changeSubject = (subject) => {
+    const nextSetup = { ...setup, application: { ...setup.application, subject } }
+    const dates = getAvailableStartDates(nextSetup, academicYear)
+    setSetup(nextSetup)
+    setPreview(null)
+    setError('')
+    setValues((current) => ({ ...current, subject,
+      startDate: dates.find((item) => item.date >= current.startDate)?.date || dates[0]?.date || current.startDate,
+    }))
   }
 
   const changeMode = (mode) => {
@@ -225,7 +239,8 @@ export function AgendaSchedulingDialog({
           ) : (
             <div className="agenda-schedule-context"><div><span>UP</span><strong>{selectedUnit?.code} · {selectedUnit?.title}</strong></div><div><span>Grup</span><strong>{selectedClass?.name}</strong></div><button onClick={() => resetProposal({})} type="button"><ArrowLeft size={14} />Canviar</button></div>
           )}
-          {setup && <label>Primera classe de la programació<select value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }}>{availableStartDates.map((item) => <option key={item.date} value={item.date}>{formatDate(item.date)} · {item.times.join(' i ')}</option>)}</select><small>Només es mostren dies en què aquest grup té classe; els festius i les anul·lacions queden exclosos.</small></label>}
+          {setup && <label>Matèria de la calendarització<select required value={setup.application.subject || ''} onChange={(event) => changeSubject(event.target.value)}><option value="">Selecciona una matèria</option>{[...new Set([...setup.subjects, setup.application.subject].filter(Boolean))].map((subject) => <option key={subject} value={subject}>{subject}</option>)}</select><small>Les activitats només s’assignen a les franges d’aquesta matèria.</small></label>}
+          {setup && <label>Primera classe de la programació<select value={values.startDate} onChange={(event) => { setValues({ ...values, startDate: event.target.value }); setPreview(null) }}>{availableStartDates.map((item) => <option key={item.date} value={item.date}>{formatDate(item.date)} · {item.times.join(' i ')}</option>)}</select><small>Només es mostren dies en què aquest grup té aquesta matèria; els festius i les anul·lacions queden exclosos.</small></label>}
           {setup && (
             <div className="agenda-activity-picker">
               <header><div><strong>{values.mode === 'smart' ? 'Seqüència futura que es crearà o actualitzarà' : 'Activitats pendents'}</strong><span>{values.mode === 'smart' ? `${smartActivities.length} pendents · ${completedActivityIds.length} fetes queden intactes` : `${remainingActivities.length} per calendaritzar · ${unavailableActivityIds.length} ja programades o fetes`}</span></div>{values.mode === 'progressive' && <small>Marca les que vols afegir ara</small>}</header>

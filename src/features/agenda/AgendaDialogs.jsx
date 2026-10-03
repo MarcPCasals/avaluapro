@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CalendarPlus, Copy, Loader2, Moon } from 'lucide-react'
 import { Modal } from '../../components/Modal'
-import { findTimetableSlotConflicts } from '../../domain/planning'
+import { findTimetableSlotConflicts, planningSubjectsMatch } from '../../domain/planning'
 
 const EVENT_OPTIONS = [
   ['holiday', 'Festiu'],
@@ -119,6 +119,7 @@ export function TimetableSlotDialog({ classes, initialPosition, initialValue, on
   const shareableSlots = slots.filter((slot) =>
     slot.id !== initialValue?.id
       && slot.classId === values.classId
+      && planningSubjectsMatch(slot.subject, values.subject)
       && Number(slot.weekday) === Number(values.weekday)
       && Number(slot.durationMinutes) === Number(values.durationMinutes))
   const save = () => {
@@ -163,6 +164,7 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
   const currentEvent = initialValue?.isPreset ? null : initialValue
   const [values, setValues] = useState(() => ({
     classIds: initialValue?.classIds || [],
+    subject: initialValue?.subject || '',
     consumesPlannedSession: initialValue?.consumesPlannedSession || false,
     durationMinutes: initialValue?.durationMinutes || 60,
     endsOn: initialValue?.endsOn || initialValue?.startsOn || today,
@@ -210,6 +212,7 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
         <div>{classes.map((classItem) => <label key={classItem.id}><input checked={values.classIds.includes(classItem.id)} onChange={(event) => toggleClass(classItem.id, event.target.checked)} type="checkbox" />{classItem.name}</label>)}</div>
       </fieldset>}
       {values.type === 'extraordinarySession' && <>
+        <label>Matèria<input required placeholder={selectedClass?.subject || 'Tutoria, ciències…'} value={values.subject} onChange={(event) => setValues({ ...values, subject: event.target.value })} /><small>La classe extra només avançarà la calendarització d’aquesta matèria.</small></label>
         <div className="agenda-form-row">
           <label>Hora d’inici<input required step="900" type="time" value={values.startsAt} onChange={(event) => setValues({ ...values, startsAt: event.target.value })} /></label>
           <label>Durada<select value={values.durationMinutes} onChange={(event) => setValues({ ...values, durationMinutes: Number(event.target.value) })}><option value="60">60 min · 55 programables</option><option value="90">90 min · 85 programables</option><option value="120">120 min · 115 programables</option></select></label>

@@ -479,6 +479,7 @@ export function createGroupApplication(input, options = {}) {
     planningUnitVersion: Math.max(1, Number(input.planningUnitVersion) || 1),
     classId: requiredText(input.classId, 'grup'),
     classLabel: optionalText(input.classLabel),
+    subject: optionalText(input.subject),
     status: enumValue(input.status || 'draft', APPLICATION_STATUSES, "estat de l'aplicació"),
   }
 }
@@ -587,6 +588,7 @@ export function createCalendarEvent(input, options = {}) {
     endsOn,
     classIds: textList(input.classIds),
     reason: optionalText(input.reason),
+    subject: optionalText(input.subject),
     consumesPlannedSession: Boolean(input.consumesPlannedSession),
     startsAt,
     durationMinutes: optionalMinutes(input.durationMinutes, 'durada de la classe extraordinària'),

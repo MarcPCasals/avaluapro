@@ -1,3 +1,4 @@
+import { getClassPlanningSubjects, planningSubjectsMatch, sessionMatchesPlanningSubject } from './subjects.js'
 import { combineAgendaSessionItems } from './agendaItems.js'
 import {
   createActivityResult,
@@ -296,6 +297,7 @@ export function buildTimetableSessionCandidates({
   classId,
   from,
   occupiedCandidateKeys = [],
+  subject = '',
   slotsByTimetableId = {},
   timetables = [],
   to,
@@ -306,13 +308,14 @@ export function buildTimetableSessionCandidates({
   const occupied = new Set(occupiedCandidateKeys)
   const candidates = []
   const skippedDates = []
+  const classSubjects = getClassPlanningSubjects(Object.values(slotsByTimetableId).flat(), classId)
   const programmingLinksByTimetableId = new Map()
   for (const [timetableId, timetableSlots] of Object.entries(slotsByTimetableId)) {
     const links = new Map()
     for (const slot of timetableSlots) {
       if (!slot.sharedProgrammingSlotId) continue
       const source = timetableSlots.find((item) => item.id === slot.sharedProgrammingSlotId)
-      if (!source) continue
+      if (!source || source.classId !== slot.classId || !planningSubjectsMatch(source.subject, slot.subject)) continue
       const key = [slot.id, source.id].sort().join(':')
       links.set(slot.id, key)
       links.set(source.id, key)
@@ -328,7 +331,8 @@ export function buildTimetableSessionCandidates({
     const weekday = weekdayFromDate(dateKey)
     const matchingSlots = timetable
       ? (slotsByTimetableId[timetable.id] || [])
-          .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday)
+          .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday
+            && (!subject || planningSubjectsMatch(slot.subject, subject)))
           .sort((left, right) => String(left.startsAt).localeCompare(String(right.startsAt)))
       : []
     const blockingEvents = calendarEvents.filter((event) =>
@@ -370,6 +374,8 @@ export function buildTimetableSessionCandidates({
     }
     const extraordinaryEvents = calendarEvents.filter((event) =>
       event.type === 'extraordinarySession' &&
+      (!subject || (event.subject ? planningSubjectsMatch(event.subject, subject)
+        : classSubjects.length <= 1)) &&
       event.consumesPlannedSession &&
       event.startsAt &&
       Number(event.durationMinutes) > 0 &&
@@ -383,7 +389,7 @@ export function buildTimetableSessionCandidates({
         space: '',
         startsAt: `${dateKey}T${event.startsAt}:00`,
         subgroupId: event.subgroupId || null,
-        subject: '',
+        subject: event.subject || subject,
         timetableSlotId: null,
         timetableVersionId: timetable?.id || null,
       }
@@ -464,6 +470,7 @@ export function buildActivitySessionDistribution({
   }
 
   const uniqueExistingBundles = reconcileSessionOccurrences(existingSessionBundles, options.now).bundles
+    .filter((bundle) => sessionMatchesPlanningSubject(bundle, application.subject))
   const occupiedOccurrences = new Set(uniqueExistingBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
   const uniqueCandidates = candidates.filter((candidate) => {
     const key = getSessionOccurrenceKey({ ...candidate, applicationId: application.id, classId: application.classId })
@@ -673,9 +680,13 @@ export function buildActivitySessionReflow({
 }) {
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const allReflowableBundles = existingSessionBundles
-    .filter((bundle) => canReflowSession(bundle, fromDate, options.now))
+    .filter((bundle) => canReflowSession(bundle, fromDate, options.now)
+      && (sessionMatchesPlanningSubject(bundle, application.subject)
+        || !(bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
+          || bundle.session.classroomClosedAt || (bundle.results || []).length)))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const reflowableBundles = reconcileSessionOccurrences(allReflowableBundles, options.now).bundles
+    .filter((bundle) => sessionMatchesPlanningSubject(bundle, application.subject))
   const lockedBundles = existingSessionBundles.filter((bundle) => !allReflowableBundles.includes(bundle))
   const occupiedOccurrences = new Set(reflowableBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
   const uniqueCandidates = candidates.filter((candidate) => {

@@ -404,6 +404,9 @@
 .agenda-reminder-list strong { overflow: hidden; color: #475569; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-reminder-list small { color: #94a3b8; font-size: 8px; font-weight: 750; }
 
+.agenda-timeline-subject { display: flex; align-items: center; gap: 12px; padding: 16px 24px; font-weight: 600; }
+.agenda-timeline-subject select { max-width: 100%; padding: 8px 12px; border: 1px solid #dbe2ed; border-radius: 10px; background: white; color: #334155; }
+
 .agenda-week-view, .agenda-month-view, .agenda-timeline-view { min-height: 510px; border: 1px solid #e2e8f0; border-radius: 14px; overflow-x: auto; background: white; box-shadow: 0 10px 28px rgb(15 23 42 / 5%); }
 .agenda-calendar-toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .agenda-ut-countdown { display: inline-grid; grid-template-columns: 16px auto; gap: 0 5px; align-items: center; border: 1px solid #fed7aa; border-radius: 9px; padding: 6px 9px; color: #c2410c; background: #fff7ed; }

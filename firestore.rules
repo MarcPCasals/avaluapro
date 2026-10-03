@@ -1539,7 +1539,7 @@ service cloud.firestore {
     function validPlanningApplication(upId, applicationId) {
       return request.resource.data.keys().hasOnly([
           'academicYearId', 'classId', 'classLabel', 'createdAt', 'entityType', 'id', 'managerUid', 'ownerUid',
-          'planningUnitId', 'planningUnitVersion', 'schemaVersion', 'status', 'updatedAt'
+          'planningUnitId', 'planningUnitVersion', 'schemaVersion', 'status', 'subject', 'updatedAt'
         ])
         && request.resource.data.id == applicationId
         && request.resource.data.entityType == 'groupApplication'
@@ -1550,6 +1550,7 @@ service cloud.firestore {
           !('managerUid' in request.resource.data)
           || request.resource.data.managerUid is string
         )
+        && (!('subject' in request.resource.data) || request.resource.data.subject == null || request.resource.data.subject is string)
         && request.resource.data.classId is string
         && (
           request.resource.data.classLabel == null

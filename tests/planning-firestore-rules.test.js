@@ -649,6 +649,16 @@ describe('Planificació compartida', () => {
     assert.equal(saved.title, 'Babèlium · Lectura autònoma')
   })
 
+  test('la matèria de la calendarització es desa sense ampliar els permisos', async () => {
+    const ownerDb = authDb(OWNER)
+    await assertSucceeds(updateDoc(appRef(ownerDb, APP_ONE), { subject: 'Ciències' }))
+    const saved = await assertSucceeds(getDoc(appRef(ownerDb, APP_ONE)))
+    assert.equal(saved.data().subject, 'Ciències')
+    await assertFails(updateDoc(appRef(ownerDb, APP_ONE), { subject: 42 }))
+    await assertFails(updateDoc(appRef(authDb(DIRECTION), APP_ONE), { subject: 'Tutoria' }))
+    await assertFails(updateDoc(appRef(authDb(AGENDA_EDITOR), APP_TWO), { subject: 'Tutoria' }))
+  })
+
   test('l’aplicació de grup conserva un nom llegible sense ampliar els permisos', async () => {
     const ownerDb = authDb(OWNER)
     await assertSucceeds(setDoc(

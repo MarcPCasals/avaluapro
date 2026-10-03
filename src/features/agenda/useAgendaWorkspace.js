@@ -39,6 +39,10 @@ import {
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
+  getClassPlanningSubjects,
+  getSchedulingSubject,
+  resolvePlanningSubject,
+  sessionMatchesPlanningSubject,
   applyPlanningActivityOverrides,
   createAcademicYear,
   createActivityResult,
@@ -1147,7 +1151,7 @@ export function useAgendaWorkspace(user, classes = []) {
    * les sessions ja creades. La finestra de proposta pot així detectar què ja
    * està assignat sense mantenir obertes totes aquestes dades a l'Agenda.
    */
-  const loadSchedulingSetup = useCallback(async ({ applicationId = '', classId, planningUnitId }) => {
+  const loadSchedulingSetup = useCallback(async ({ applicationId = '', classId, planningUnitId, subject = '' }) => {
     if (!repository || !activeAcademicYear || !planningUnitId || !classId) {
       throw new Error('Cal seleccionar una UP i un grup.')
     }
@@ -1188,7 +1192,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const savedApplication = applicationId
       ? applications.find((item) => item.id === applicationId)
       : applications[0]
-    const application = savedApplication || createGroupApplication({
+    let application = savedApplication || createGroupApplication({
       academicYearId: activeAcademicYear.id,
       classId,
       classLabel: classes.find((item) => item.id === classId)?.name || '',
@@ -1264,8 +1268,14 @@ export function useAgendaWorkspace(user, classes = []) {
       sortSlots(slotResults[index]?.entities || []),
     ]))
     const slotById = new Map(Object.values(slotsByTimetableId).flat().map((slot) => [slot.id, slot]))
-    existingSessionBundles = existingSessionBundles.map((bundle) =>
-      withBabelium(bundle, slotById.get(bundle.session.timetableSlotId)))
+    const subjects = getClassPlanningSubjects([...slotById.values()], classId)
+    application = { ...application, subject: subject || resolvePlanningSubject({
+      application, planningUnit, classItem: classes.find((item) => item.id === classId), subjects,
+    }) }
+    existingSessionBundles = existingSessionBundles.map((bundle) => ({
+      ...withBabelium(bundle, slotById.get(bundle.session.timetableSlotId)),
+      timetableSubject: slotById.get(bundle.session.timetableSlotId)?.subject || '',
+    }))
     const currentSessionBundles = reconcileSessionOccurrences(existingSessionBundles).bundles
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
       summarizeAssignedActivityProgress(currentSessionBundles)
@@ -1300,6 +1310,7 @@ export function useAgendaWorkspace(user, classes = []) {
       planningUnit,
       remainingMinutesByActivityId,
       scheduledSourceActivityIds,
+      subjects,
       slotsByTimetableId,
       temporalUnit,
       timetables,
@@ -1325,6 +1336,7 @@ export function useAgendaWorkspace(user, classes = []) {
       planningUnitCode: setup.planningUnit.code,
       planningUnitId: setup.planningUnit.id,
       planningUnitTitle: setup.planningUnit.title,
+      subject: setup.application.subject,
     })))
     return {
       activities,
@@ -1334,6 +1346,7 @@ export function useAgendaWorkspace(user, classes = []) {
 
   const buildSchedulingPreview = useCallback((setup, { mode = 'progressive', selectedActivityIds, startDate }) => {
     if (!setup || !activeAcademicYear) throw new Error('Cal carregar primer la seqüència de la UP.')
+    if (!setup.application.subject && setup.subjects.length > 1) throw new Error('Selecciona la matèria de la calendarització.')
     const effectiveStartDate = resolveSchedulingStartDate({
       academicYear: activeAcademicYear,
       startDate,
@@ -1348,6 +1361,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
+      subject: getSchedulingSubject(setup),
       from: effectiveStartDate,
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
@@ -1390,6 +1404,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const futureExistingBundles = reconcileSessionOccurrences(setup.existingSessionBundles).bundles.filter((bundle) => {
       const date = String(bundle.session.startsAt).slice(0, 10)
       return bundle.session.status === 'planned' && date >= effectiveStartDate && date <= horizonEnd
+        && sessionMatchesPlanningSubject(bundle, setup.application.subject)
     })
     const capacityCandidates = [
       ...futureExistingBundles.map((bundle) => ({
@@ -1690,6 +1705,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
+      subject: getSchedulingSubject(setup),
       from: String(targetBundle.session.startsAt).slice(0, 10),
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
@@ -1741,6 +1757,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }))
     const proposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents, classId: setup.application.classId,
+      subject: getSchedulingSubject(setup),
       from: String(bundle.session.startsAt).slice(0, 10), occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId, timetables: setup.timetables,
       to: activeAcademicYear.endsOn,
@@ -1948,6 +1965,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
+      subject: getSchedulingSubject(setup),
       from: String(targetBundle.session.startsAt).slice(0, 10),
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
@@ -1998,6 +2016,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: setup.application.classId,
+      subject: getSchedulingSubject(setup),
       from: String(targetBundle.session.startsAt).slice(0, 10),
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
@@ -2058,6 +2077,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const temporalProposal = buildTimetableSessionCandidates({
       calendarEvents: setup.calendarEvents,
       classId: bundle.session.classId,
+      subject: getSchedulingSubject(setup),
       from: String(bundle.session.startsAt).slice(0, 10),
       occupiedCandidateKeys,
       slotsByTimetableId: setup.slotsByTimetableId,
