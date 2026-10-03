@@ -55,6 +55,14 @@ function eventBlocksTimetableSlot(event, slot) {
   return !event.timetableSlotId || event.timetableSlotId === slot.id
 }
 
+function getSessionBlockingEvent(calendarEvents, session) {
+  const date = String(session.startsAt).slice(0, 10)
+  return calendarEvents.find(event => BLOCKING_EVENT_TYPES.has(event.type)
+    && eventCoversDate(event, date) && eventAppliesToClass(event, session.classId)
+    && (!event.sessionId || event.sessionId === session.id)
+    && (!event.timetableSlotId || event.timetableSlotId === session.timetableSlotId))
+}
+
 function candidateKey(candidate) {
   return `${candidate.date}__${candidate.timetableSlotId || candidate.calendarEventId || ''}__${String(candidate.startsAt).slice(0, 19)}`
 }
@@ -455,13 +463,13 @@ export function buildActivitySessionDistribution({
   marginMinutes = 5,
   options = {},
   scheduledSourceActivityIds = [],
+  calendarEvents = options.calendarEvents || [],
 }) {
   if (!application?.id || !application?.ownerUid || !application?.classId) {
     throw new Error("Cal una aplicació de grup per preparar les sessions")
   }
   const scheduled = new Set(scheduledSourceActivityIds)
-  const avoidSmallFragments = Boolean(options.avoidSmallFragments)
-  const minimumFragmentMinutes = Math.max(0, Number(options.minimumFragmentMinutes) || 5)
+  const minimumFragmentMinutes = 10
   const skippedAlreadyScheduled = []
   const pendingActivities = []
   for (const activity of activities) {
@@ -469,12 +477,17 @@ export function buildActivitySessionDistribution({
     else pendingActivities.push(activity)
   }
 
+  const blockedOccurrences = new Set(existingSessionBundles
+    .filter(bundle => getSessionBlockingEvent(calendarEvents, bundle.session))
+    .map(bundle => getSessionOccurrenceKey(bundle.session)))
   const uniqueExistingBundles = reconcileSessionOccurrences(existingSessionBundles, options.now).bundles
+    .filter(bundle => !getSessionBlockingEvent(calendarEvents, bundle.session))
     .filter((bundle) => sessionMatchesPlanningSubject(bundle, application.subject))
   const occupiedOccurrences = new Set(uniqueExistingBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
   const uniqueCandidates = candidates.filter((candidate) => {
     const key = getSessionOccurrenceKey({ ...candidate, applicationId: application.id, classId: application.classId })
-    if (occupiedOccurrences.has(key)) return false
+    if (occupiedOccurrences.has(key) || blockedOccurrences.has(key)
+      || getSessionBlockingEvent(calendarEvents, { ...candidate, classId: application.classId })) return false
     occupiedOccurrences.add(key)
     return true
   })
@@ -541,6 +554,11 @@ export function buildActivitySessionDistribution({
       continue
     }
 
+    const originalMinutes = Number(activity.sourcePlannedMinutes) || plannedMinutes
+    if (originalMinutes > minimumFragmentMinutes && plannedMinutes < minimumFragmentMinutes) {
+      unscheduled.push({ activityId: activity.id, remainingMinutes: plannedMinutes, title: activity.title })
+      continue
+    }
     let remainingMinutes = plannedMinutes
     while (remainingMinutes > 0) {
       const draft = takeDraft()
@@ -548,18 +566,25 @@ export function buildActivitySessionDistribution({
         unscheduled.push({ activityId: activity.id, remainingMinutes, title: activity.title })
         break
       }
-      const segmentMinutes = Math.min(remainingMinutes, draft.remainingMinutes)
-      const assignedMinutes = plannedMinutes - remainingMinutes
-      if (avoidSmallFragments && plannedMinutes > minimumFragmentMinutes
-        && segmentMinutes <= minimumFragmentMinutes) {
-        if (assignedMinutes > 0 && remainingMinutes <= minimumFragmentMinutes) {
-          break
-        }
-        if (assignedMinutes === 0 && segmentMinutes < remainingMinutes) {
+      let segmentMinutes = Math.min(remainingMinutes, draft.remainingMinutes)
+      // Les activitats breus es mantenen senceres. Les llargues només es
+      // divideixen si totes dues parts tenen almenys deu minuts.
+      if (segmentMinutes < remainingMinutes) {
+        if (plannedMinutes <= minimumFragmentMinutes) {
           draft.remainingMinutes = 0
           currentDraft = null
           continue
         }
+        const tailMinutes = remainingMinutes - segmentMinutes
+        if (tailMinutes < minimumFragmentMinutes) {
+          segmentMinutes -= minimumFragmentMinutes - tailMinutes
+        }
+      }
+      if (plannedMinutes > minimumFragmentMinutes && segmentMinutes < minimumFragmentMinutes
+        && remainingMinutes >= minimumFragmentMinutes) {
+        draft.remainingMinutes = 0
+        currentDraft = null
+        continue
       }
       draft.items.push({ activity, plannedMinutes: segmentMinutes })
       draft.remainingMinutes -= segmentMinutes
@@ -677,6 +702,7 @@ export function buildActivitySessionReflow({
   marginMinutes = 5,
   options = {},
   reservedSessionCount = 0,
+  calendarEvents = options.calendarEvents || [],
 }) {
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const allReflowableBundles = existingSessionBundles
@@ -685,13 +711,17 @@ export function buildActivitySessionReflow({
         || !(bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
           || bundle.session.classroomClosedAt || (bundle.results || []).length)))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+  const blockedBundles = existingSessionBundles.filter(bundle => getSessionBlockingEvent(calendarEvents, bundle.session))
+  const blockedOccurrences = new Set(blockedBundles.map(bundle => getSessionOccurrenceKey(bundle.session)))
   const reflowableBundles = reconcileSessionOccurrences(allReflowableBundles, options.now).bundles
-    .filter((bundle) => sessionMatchesPlanningSubject(bundle, application.subject))
+    .filter((bundle) => sessionMatchesPlanningSubject(bundle, application.subject)
+      && !getSessionBlockingEvent(calendarEvents, bundle.session))
   const lockedBundles = existingSessionBundles.filter((bundle) => !allReflowableBundles.includes(bundle))
   const occupiedOccurrences = new Set(reflowableBundles.map((bundle) => getSessionOccurrenceKey(bundle.session)))
   const uniqueCandidates = candidates.filter((candidate) => {
     const key = getSessionOccurrenceKey({ ...candidate, applicationId: application.id, classId: application.classId })
-    if (occupiedOccurrences.has(key)) return false
+    if (occupiedOccurrences.has(key) || blockedOccurrences.has(key)
+      || getSessionBlockingEvent(calendarEvents, { ...candidate, classId: application.classId })) return false
     occupiedOccurrences.add(key)
     return true
   })
@@ -712,7 +742,8 @@ export function buildActivitySessionReflow({
   const availableReflowableBundles = reflowableBundles.filter((bundle) =>
     availableExistingSessionIds.has(bundle.session.id))
   const { assignedMinutesByActivityId, assignedSourceActivityIds } =
-    summarizeAssignedActivityProgress(lockedBundles)
+    summarizeAssignedActivityProgress(lockedBundles.filter(bundle => bundle.session.status === 'held'
+      || !getSessionBlockingEvent(calendarEvents, bundle.session)))
   const completedActivityIds = new Set(completedSourceActivityIds)
   const remainingActivities = activities.flatMap((activity) => {
     if (completedActivityIds.has(activity.id)) return []
@@ -721,7 +752,7 @@ export function buildActivitySessionReflow({
       return assignedSourceActivityIds.has(activity.id) ? [] : [activity]
     }
     const remainingMinutes = Math.max(0, plannedMinutes - (assignedMinutesByActivityId[activity.id] || 0))
-    return remainingMinutes > 0 ? [{ ...activity, plannedMinutes: remainingMinutes }] : []
+    return remainingMinutes > 0 ? [{ ...activity, plannedMinutes: remainingMinutes, sourcePlannedMinutes: plannedMinutes }] : []
   })
   const segmentOffsetByActivityId = {}
   for (const bundle of lockedBundles) {
@@ -736,6 +767,7 @@ export function buildActivitySessionReflow({
   const distribution = buildActivitySessionDistribution({
     activities: remainingActivities,
     application,
+    calendarEvents,
     candidates: candidates.filter((candidate) => availableCandidateSet.has(candidate)),
     existingSessionBundles: availableReflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
     marginMinutes,
@@ -762,6 +794,10 @@ export function buildActivitySessionReflow({
     ...distribution,
     availability,
     kind: 'reflow',
+    skippedCalendarDates: blockedBundles.map(bundle => {
+      const event = getSessionBlockingEvent(calendarEvents, bundle.session)
+      return { date: String(bundle.session.startsAt).slice(0, 10), eventIds: [event.id], titles: [event.title] }
+    }),
     lockedSessionCount: lockedBundles.length,
     removedItems: allReflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
     removedResults: allReflowableBundles.flatMap((bundle) => bundle.results || []),

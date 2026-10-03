@@ -1802,7 +1802,7 @@ test('traslladar minuts d’una sessió futura provoca l’efecte dominó sense 
     .reduce((total, item) => total + item.plannedMinutes, 0), 85)
 })
 
-test('si el docent ho confirma la compactació evita avançar un fragment de només cinc minuts', () => {
+test('la compactació evita sempre avançar un fragment de només cinc minuts', () => {
   const application = createGroupApplication({
     id: 'application-small-fragment', ownerUid: 'teacher-1', academicYearId: 'year-1',
     planningUnitId: 'up-1', classId: 'class-1',
@@ -1833,7 +1833,7 @@ test('si el docent ho confirma la compactació evita avançar un fragment de nom
       { session: firstSession, items: [firstItem], results: [] },
       { session: secondSession, items: [nextItem], results: [] },
     ],
-    options: { ...options(sequenceIdFactory()), avoidSmallFragments: true, minimumFragmentMinutes: 5 },
+    options: options(sequenceIdFactory()),
     targetSessionId: firstSession.id,
   })
 
@@ -2110,4 +2110,148 @@ test('editar els minuts d’una entrada combinada usa el total i reajusta totes 
   assert.deepEqual(reduced.activityMinutesChanges,{'source-a':25,'source-b':0})
   const overrides = Object.entries(reduced.activityMinutesChanges).map(([activityId,agendaPlannedMinutes])=>createGroupActivityOverride({activityId,changes:{agendaPlannedMinutes},ownerUid:'teacher-1',applicationId:application.id},{now:NOW}))
   assert.equal(getAgendaActivityMinutesById([{id:'source-b',plannedMinutes:20}],overrides)['source-b'],0)
+})
+
+
+function distributeFragmentExample(minutes, capacities, initialMinutes = 0) {
+  const application = { id: 'fragment-app', ownerUid: 'teacher', classId: 'class' }
+  return buildActivitySessionDistribution({
+    application,
+    activities: [
+      ...(initialMinutes ? [{ id: 'initial', title: 'Inicial', plannedMinutes: initialMinutes }] : []),
+      { id: 'long', title: 'Activitat', plannedMinutes: minutes },
+    ],
+    candidates: capacities.map((capacity, index) => ({
+      startsAt: `2026-10-${String(index + 5).padStart(2, '0')}T09:30:00`, durationMinutes: capacity + 5,
+    })),
+    options: options(sequenceIdFactory()),
+  })
+}
+
+test('una activitat de mitja hora no comença en els cinc minuts lliures després de 50 minuts', () => {
+  const result = distributeFragmentExample(30, [55, 55], 50)
+  assert.deepEqual(result.sessions.map(bundle => bundle.items.map(item => item.plannedMinutes)), [[50], [30]])
+  assert.deepEqual(result.unscheduled, [])
+  assert.equal(result.scheduledMinutes, 80)
+})
+
+test('el repartiment reserva deu minuts per al final sense perdre els últims cinc minuts', () => {
+  const result = distributeFragmentExample(60, [55, 55])
+  assert.deepEqual(result.sessions.map(bundle => bundle.items.map(item => item.plannedMinutes)), [[50], [10]])
+  assert.equal(result.scheduledMinutes, 60)
+  assert.deepEqual(result.unscheduled, [])
+})
+
+test('les activitats de cinc o deu minuts es mantenen senceres', () => {
+  assert.deepEqual(distributeFragmentExample(5, [55], 50).sessions[0].items.map(item => item.plannedMinutes), [50, 5])
+  assert.deepEqual(distributeFragmentExample(10, [55, 55], 50).sessions.map(bundle => bundle.items.map(item => item.plannedMinutes)), [[50], [10]])
+})
+
+test('la falta de capacitat conserva tots els minuts pendents i no crea un final de cinc minuts', () => {
+  const result = distributeFragmentExample(60, [55])
+  assert.equal(result.scheduledMinutes, 50)
+  assert.equal(result.unscheduled[0].remainingMinutes, 10)
+})
+
+test('totes les durades conserven els minuts i respecten el mínim de fragment en franges desiguals', () => {
+  for (let minutes = 1; minutes <= 150; minutes += 1) {
+    for (const capacities of [[5, 55, 55], [15, 25, 55], [55, 55, 55], [10, 10, 10]]) {
+      const result = distributeFragmentExample(minutes, capacities)
+      const items = result.sessions.flatMap(bundle => bundle.items)
+      assert.equal(result.scheduledMinutes + result.unscheduled.reduce((total, item) => total + item.remainingMinutes, 0), minutes)
+      if (minutes > 10) assert.ok(items.every(item => item.plannedMinutes >= 10), `Durada ${minutes}, capacitats ${capacities}`)
+      else assert.ok(items.length <= 1)
+      assert.ok(result.sessions.every(bundle => bundle.items.reduce((total, item) => total + item.plannedMinutes, 0) <= bundle.programmableMinutes))
+    }
+  }
+})
+
+
+function calendarReflowExample(calendarEvents, status = 'planned') {
+  const application = { id: 'calendar-app', ownerUid: 'teacher', classId: 'class' }
+  const session = createCalendarSession({ id: 'blocked-session', ownerUid: 'teacher', applicationId: application.id,
+    classId: 'class', startsAt: '2026-10-07T11:00:00', durationMinutes: 60, timetableSlotId: 'wednesday-slot', status }, { now: NOW })
+  const item = createSessionItem({ id: 'blocked-item', ownerUid: 'teacher', applicationId: application.id,
+    sessionId: session.id, sourceActivityId: 'activity', title: 'Activitat', type: 'activity', order: 0, plannedMinutes: 30 }, { now: NOW })
+  return { application, activities: [{ id: 'activity', title: 'Activitat', plannedMinutes: 30 }],
+    existingSessionBundles: [{ session, items: [item], results: [] }],
+    candidates: [
+      { startsAt: session.startsAt, timetableSlotId: session.timetableSlotId, durationMinutes: 60 },
+      { startsAt: '2026-10-09T11:00:00', timetableSlotId: 'friday-slot', durationMinutes: 60 },
+    ], calendarEvents, fromDate: '2026-10-05', options: options(sequenceIdFactory()) }
+}
+
+for (const scope of ['day', 'slot', 'session']) {
+  test(`la proposta intel·ligent exclou una sessió existent anul·lada per ${scope}`, () => {
+    const event = { id: 'cancellation', title: 'No hi ha classe', type: 'cancellation', startsOn: '2026-10-07', classIds: ['class'],
+      ...(scope === 'slot' ? { timetableSlotId: 'wednesday-slot' } : {}),
+      ...(scope === 'session' ? { sessionId: 'blocked-session' } : {}) }
+    const result = buildActivitySessionReflow(calendarReflowExample([event]))
+    assert.deepEqual(result.sessions.map(bundle => bundle.session.startsAt), ['2026-10-09T11:00:00'])
+    assert.deepEqual(result.removedSessions.map(session => session.id), ['blocked-session'])
+    assert.equal(result.availability.availableLogicalSessionCount, 1)
+    assert.equal(result.scheduledMinutes, 30)
+    assert.deepEqual(result.unscheduled, [])
+    assert.equal(result.skippedCalendarDates[0].date, '2026-10-07')
+  })
+}
+
+test('el repartiment progressiu també rebutja una franja anul·lada encara que ja existeixi', () => {
+  const input = calendarReflowExample([{ id: 'holiday', title: 'Festa', type: 'holiday', startsOn: '2026-10-07', classIds: [] }])
+  const result = buildActivitySessionDistribution(input)
+  assert.deepEqual(result.sessions.map(bundle => bundle.session.startsAt), ['2026-10-09T11:00:00'])
+})
+
+test('una anul·lació d’un altre grup o una altra franja no elimina la sessió correcta', () => {
+  for (const event of [
+    { classIds: ['other'] }, { classIds: ['class'], timetableSlotId: 'other-slot' },
+    { classIds: ['class'], sessionId: 'other-session' },
+  ]) {
+    const result = buildActivitySessionReflow(calendarReflowExample([{ id: 'event', title: 'Canvi', type: 'cancellation', startsOn: '2026-10-07', ...event }]))
+    assert.equal(result.sessions[0].session.startsAt, '2026-10-07T11:00:00')
+    assert.equal(result.removedSessions.length, 0)
+  }
+})
+
+test('les sessions impartides es conserven encara que després s’anul·li aquell dia', () => {
+  const result = buildActivitySessionReflow(calendarReflowExample([{ id: 'holiday', title: 'Festa', type: 'holiday', startsOn: '2026-10-07', classIds: [] }], 'held'))
+  assert.equal(result.lockedSessionCount, 1)
+  assert.deepEqual(result.removedSessions, [])
+  assert.deepEqual(result.sessions, [])
+})
+
+
+test('un romanent antic de cinc minuts no es perd ni es presenta com una activitat breu nova', () => {
+  const input = calendarReflowExample([], 'held')
+  input.activities[0].plannedMinutes = 35
+  const result = buildActivitySessionReflow(input)
+  assert.deepEqual(result.sessions, [])
+  assert.equal(result.unscheduled[0].remainingMinutes, 5)
+  assert.deepEqual(result.removedSessions, [])
+})
+
+
+test('els 50 minuts d’Àtoms anul·lats es recuperen amb els cinc restants per als dos mitjos grups', () => {
+  const input = calendarReflowExample([{ id: 'dream', title: 'DreamBig', type: 'specialDay', startsOn: '2026-10-07', classIds: ['class'] }])
+  input.activities = [{ id: 'atoms', title: 'Àtoms', plannedMinutes: 55 }, { id: 'exam', title: 'Prova', plannedMinutes: 30 }]
+  input.existingSessionBundles[0].items[0] = { ...input.existingSessionBundles[0].items[0], sourceActivityId: 'atoms', title: 'Àtoms', plannedMinutes: 50, segmentIndex: 1, segmentCount: 2 }
+  const halves = ['A', 'B'].map((half, index) => {
+    const session = createCalendarSession({ id: `half-${half}`, ownerUid: 'teacher', applicationId: input.application.id,
+      classId: 'class', startsAt: `2026-10-09T${index ? '12' : '08'}:30:00`, durationMinutes: 60,
+      subgroupId: half, timetableSlotId: `slot-${half}`, parallelProgrammingKey: 'parallel' }, { now: NOW })
+    const item = createSessionItem({ id: `tail-${half}`, ownerUid: 'teacher', applicationId: input.application.id,
+      sessionId: session.id, sourceActivityId: 'atoms', title: 'Àtoms', type: 'activity', order: 0,
+      plannedMinutes: 5, segmentIndex: 2, segmentCount: 2 }, { now: NOW })
+    return { session, items: [item], results: [] }
+  })
+  input.existingSessionBundles.push(...halves)
+  input.candidates = [{ startsAt: '2026-10-12T08:30:00', durationMinutes: 60, timetableSlotId: 'monday' }]
+  const result = buildActivitySessionReflow(input)
+  assert.equal(result.sessions.filter(bundle => bundle.session.startsAt.startsWith('2026-10-07')).length, 0)
+  for (const half of halves) {
+    const bundle = result.sessions.find(bundle => bundle.session.id === half.session.id)
+    assert.equal(bundle.items.filter(item => item.sourceActivityId === 'atoms').reduce((total, item) => total + item.plannedMinutes, 0), 55)
+  }
+  assert.equal(result.scheduledMinutes, 85)
+  assert.deepEqual(result.unscheduled, [])
 })

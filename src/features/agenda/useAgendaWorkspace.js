@@ -1,3 +1,4 @@
+import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyPlanningCloudOperation,
@@ -117,18 +118,6 @@ function mergeSessionBundles(current, incoming) {
   ).bundles
 }
 
-function confirmAvoidTinyAgendaFragments(preview) {
-  const tinyFragments = preview.sessions
-    .flatMap((candidate) => candidate.items || [])
-    .filter((item) => Number(item.segmentCount) > 1 && Number(item.plannedMinutes) <= 5)
-  if (tinyFragments.length === 0) return false
-  const titles = [...new Set(tinyFragments.map((item) => `«${item.title}»`))].join(', ')
-  return globalThis.confirm?.(
-    `La proposta crea un fragment de només 5 minuts de ${titles}. `
-    + 'Vols evitar-lo? Si és l’inici, l’activitat quedarà per a la sessió següent; '
-    + 'si és l’últim fragment, aquests 5 minuts s’eliminaran de l’Agenda.',
-  ) === true
-}
 
 /**
  * Aïlla les dades privades d'Agenda de la pantalla. Horaris, franges i
@@ -1267,6 +1256,9 @@ export function useAgendaWorkspace(user, classes = []) {
       timetableSubject: slotById.get(bundle.session.timetableSlotId)?.subject || '',
     }))
     const currentSessionBundles = reconcileSessionOccurrences(existingSessionBundles).bundles
+      .filter(bundle => bundle.session.status === 'held' || !getNoClassCalendarEvent(calendarEvents,
+        String(bundle.session.startsAt).slice(0, 10), bundle.session.classId,
+        { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId }))
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
       summarizeAssignedActivityProgress(currentSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
@@ -1281,7 +1273,7 @@ export function useAgendaWorkspace(user, classes = []) {
       .map((activity) => activity.id)
     const manuallyCompletedSourceActivityIds = getManuallyCompletedActivityIds(overrideResult.entities)
     const completedSourceActivityIds = [...new Set([
-      ...summarizeCompletedActivityIds(existingSessionBundles),
+      ...summarizeCompletedActivityIds(currentSessionBundles),
       ...manuallyCompletedSourceActivityIds,
     ])]
     const unavailableSourceActivityIds = [...new Set([
@@ -1362,6 +1354,7 @@ export function useAgendaWorkspace(user, classes = []) {
       const distribution = buildActivitySessionReflow({
         activities: setup.activities,
         application: setup.application,
+        calendarEvents: setup.calendarEvents,
         candidates: temporalProposal.candidates,
         completedSourceActivityIds: setup.completedSourceActivityIds,
         existingSessionBundles: setup.existingSessionBundles,
@@ -1379,7 +1372,9 @@ export function useAgendaWorkspace(user, classes = []) {
           horizonEnd,
         },
         schedulingMode: mode,
-        skippedDates: temporalProposal.skippedDates.filter((item) => item.date <= lastAffectedDate),
+        skippedDates: [...temporalProposal.skippedDates, ...distribution.skippedCalendarDates]
+          .filter((item, index, items) => item.date <= lastAffectedDate
+            && items.findIndex(candidate => candidate.date === item.date) === index),
         setup,
       }
     }
@@ -1389,12 +1384,15 @@ export function useAgendaWorkspace(user, classes = []) {
       .map((activity) => ({
         ...activity,
         plannedMinutes: setup.remainingMinutesByActivityId[activity.id] ?? activity.plannedMinutes,
+        sourcePlannedMinutes: activity.plannedMinutes,
       }))
     if (activities.length === 0) throw new Error('Selecciona almenys una activitat per calendaritzar.')
     const futureExistingBundles = reconcileSessionOccurrences(setup.existingSessionBundles).bundles.filter((bundle) => {
       const date = String(bundle.session.startsAt).slice(0, 10)
       return bundle.session.status === 'planned' && date >= effectiveStartDate && date <= horizonEnd
         && sessionMatchesPlanningSubject(bundle, setup.application.subject)
+        && !getNoClassCalendarEvent(setup.calendarEvents, date, bundle.session.classId,
+          { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId })
     })
     const capacityCandidates = [
       ...futureExistingBundles.map((bundle) => ({
@@ -1419,7 +1417,7 @@ export function useAgendaWorkspace(user, classes = []) {
       candidates: temporalProposal.candidates.filter((candidate) => availableCandidateSet.has(candidate)),
       existingSessionBundles: futureExistingBundles.filter((bundle) =>
         availableExistingSessionIds.has(bundle.session.id)),
-      options: { now: new Date().toISOString() },
+      options: { now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       scheduledSourceActivityIds: setup.unavailableSourceActivityIds,
     })
     const lastAffectedDate = distribution.sessions.at(-1)?.candidate.date || effectiveStartDate
@@ -1707,7 +1705,7 @@ export function useAgendaWorkspace(user, classes = []) {
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
       existingSessionBundles: setup.existingSessionBundles,
-      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       recoveryItem,
       recoveryMinutes: Number(minutes),
       targetSessionId: targetBundle.session.id,
@@ -1969,17 +1967,11 @@ export function useAgendaWorkspace(user, classes = []) {
         candidate.startsAt > targetBundle.session.startsAt),
       changes,
       existingSessionBundles: setup.existingSessionBundles,
-      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetItemId: item.id,
       targetSessionId: targetBundle.session.id,
     }
-    let preview = buildAgendaItemChangeReflow(reflowInput)
-    if (confirmAvoidTinyAgendaFragments(preview)) {
-      preview = buildAgendaItemChangeReflow({
-        ...reflowInput,
-        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
-      })
-    }
+    const preview = buildAgendaItemChangeReflow(reflowInput)
     if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou sessions disponibles per reajustar totes les activitats posteriors.')
     }
@@ -2019,16 +2011,10 @@ export function useAgendaWorkspace(user, classes = []) {
       candidates: temporalProposal.candidates.filter((candidate) =>
         candidate.startsAt > targetBundle.session.startsAt),
       existingSessionBundles: setup.existingSessionBundles,
-      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetSessionId: targetBundle.session.id,
     }
-    let preview = buildAgendaSessionCompaction(reflowInput)
-    if (confirmAvoidTinyAgendaFragments(preview)) {
-      preview = buildAgendaSessionCompaction({
-        ...reflowInput,
-        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
-      })
-    }
+    const preview = buildAgendaSessionCompaction(reflowInput)
     const previousMinutes = targetBundle.items.reduce((total, item) =>
       total + (Number(item.plannedMinutes) || 0), 0)
     const compactedTarget = preview.sessions.find((candidate) =>
@@ -2089,17 +2075,11 @@ export function useAgendaWorkspace(user, classes = []) {
       existingSessionBundles: setup.existingSessionBundles,
       moveFromTarget: bundle.session.status === 'planned'
         && new Date(bundle.session.startsAt).getTime() > Date.now(),
-      options: { currentDateKey: localDateKey(), now: new Date().toISOString() },
+      options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetItemId: item.id,
       targetSessionId: bundle.session.id,
     }
-    let preview = buildAgendaContinuationReflow(reflowInput)
-    if (confirmAvoidTinyAgendaFragments(preview)) {
-      preview = buildAgendaContinuationReflow({
-        ...reflowInput,
-        options: { ...reflowInput.options, avoidSmallFragments: true, minimumFragmentMinutes: 5 },
-      })
-    }
+    const preview = buildAgendaContinuationReflow(reflowInput)
     if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou temps disponible per afegir aquesta continuació.')
     }

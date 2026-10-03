@@ -66,8 +66,8 @@ test('afegir activitats a una sessió existent descompta la lectura només una v
   const original = distribute([{ ...activity, plannedMinutes: 20 }]).sessions[0]
   const result = buildActivitySessionDistribution({ application, activities: [{ ...activity, id: 'next', plannedMinutes: 40 }], existingSessionBundles: [original], options })
   assert.equal(result.sessions[0].items.length, 1)
-  assert.equal(result.sessions[0].items[0].plannedMinutes, 35)
-  assert.equal(result.unscheduled[0].remainingMinutes, 5)
+  assert.equal(result.sessions[0].items[0].plannedMinutes, 30)
+  assert.equal(result.unscheduled[0].remainingMinutes, 10)
 })
 
 test('l’horari propaga i copia la configuració de Babèlium', () => {
