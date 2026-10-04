@@ -853,6 +853,57 @@ describe('Planificació compartida', () => {
 })
 
 describe('Notes privades de planificació', () => {
+  test('el primer desament local-first crea la nota i el reintent i una recàrrega la recuperen', async () => {
+    const db = authDb(OWNER)
+    const note = privateNoteData({ id: `session_note_${OWNER.uid}_${SESSION_ONE}` })
+    const reference = doc(db, 'planningPrivateNotes', note.id)
+    assert.equal((await assertSucceeds(getDoc(reference))).exists(), false)
+    const operation = queuedOperation(note)
+    assert.equal((await assertSucceeds(applyPlanningCloudOperationToDatabase(db, operation))).applied, true)
+    assert.equal((await assertSucceeds(applyPlanningCloudOperationToDatabase(db, operation))).applied, true)
+    assert.deepEqual((await getDoc(doc(authDb(OWNER), 'planningPrivateNotes', note.id))).data(), note)
+    for (const user of [DIRECTION, EDITOR, AGENDA_EDITOR, THIRD]) {
+      await assertFails(getDoc(doc(authDb(user), 'planningPrivateNotes', note.id)))
+    }
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'planningPrivateNotes', note.id)))
+  })
+
+  test('la nota local-first sense UP també es crea i una baixa no enviada s’acusa sense error', async () => {
+    const db = authDb(OWNER)
+    const note = privateNoteData({
+      id: `session_note_${OWNER.uid}_timetable-fictional`, planningUnitId: null,
+      applicationId: null, sessionId: 'timetable-fictional', recordInPlanning: false,
+    })
+    assert.equal((await assertSucceeds(applyPlanningCloudOperationToDatabase(db, queuedOperation(note)))).applied, true)
+    assert.deepEqual((await getDoc(doc(db, 'planningPrivateNotes', note.id))).data(), note)
+    const neverSent = privateNoteData({ id: 'fictional-never-sent' })
+    assert.equal((await assertSucceeds(applyPlanningCloudOperationToDatabase(db, queuedDelete(neverSent)))).applied, true)
+    assert.equal((await getDoc(doc(db, 'planningPrivateNotes', neverSent.id))).exists(), false)
+  })
+
+  test('les edicions simultànies de la primera nota creen un conflicte en lloc de sobreescriure-la', async () => {
+    const db = authDb(OWNER)
+    const note = privateNoteData({ id: `session_note_${OWNER.uid}_${SESSION_ONE}` })
+    await assertSucceeds(applyPlanningCloudOperationToDatabase(db, queuedOperation(note)))
+    const otherDevice = { ...note, text: 'Una altra versió fictícia.', updatedAt: '2026-10-04T18:00:00.000Z' }
+    const conflict = await applyPlanningCloudOperationToDatabase(authDb(OWNER), queuedOperation(otherDevice))
+    assert.equal(conflict.conflict, true)
+    assert.deepEqual(conflict.remoteValue, note)
+    assert.deepEqual((await getDoc(doc(db, 'planningPrivateNotes', note.id))).data(), note)
+  })
+
+  test('comprovar una nota absent no autoritza consultar llistes ni llegir o modificar notes d’altres', async () => {
+    const thirdDb = authDb(THIRD)
+    assert.equal((await assertSucceeds(getDoc(doc(thirdDb, 'planningPrivateNotes', 'fictional-absent')))).exists(), false)
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'planningPrivateNotes', 'fictional-absent')))
+    await assertFails(getDocs(collection(thirdDb, 'planningPrivateNotes')))
+    const reference = doc(thirdDb, 'planningPrivateNotes', 'plan-private-note-one')
+    await assertFails(getDoc(reference))
+    await assertFails(setDoc(reference, privateNoteData({ ownerUid: THIRD.uid })))
+    await assertFails(updateDoc(reference, { text: 'No autoritzat.' }))
+    await assertFails(deleteDoc(reference))
+  })
+
   test('la nota de recordatori continua privada i el registre de sessió és visible a l’aplicació autoritzada', async () => {
     const db = authDb(OWNER)
     const privateNote = privateNoteData({ id: 'plan-timeline-note', recordInPlanning: true })

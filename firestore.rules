@@ -1788,7 +1788,13 @@ service cloud.firestore {
 
     match /planningPrivateNotes/{noteId} {
       allow create: if signedIn() && validPlanningPrivateNote(noteId);
-      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      // La transacció de primer desament ha de poder confirmar que no existeix.
+      // Si existeix, el contingut continua sent llegible només pel propietari.
+      allow get: if signedIn() && (
+        !exists(/databases/$(database)/documents/planningPrivateNotes/$(noteId))
+        || resource.data.ownerUid == request.auth.uid
+      );
+      allow list, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
       allow update: if signedIn()
         && resource.data.ownerUid == request.auth.uid
         && validPlanningPrivateNote(noteId)
