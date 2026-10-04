@@ -1,0 +1,3 @@
+.student-group-gender-controls { display:flex; align-items:center; gap:6px; min-width:0; }
+.student-group-gender-controls select.student-compact-group { width:60px; min-width:60px; height:42px; padding:8px 5px; border:1px solid #d1d5db; border-radius:8px; color:#1f2937; background:#fff; font:inherit; }
+.student-group-gender-controls .student-gender-compact { flex:none; }

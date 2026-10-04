@@ -1,3 +1,4 @@
+import { StudentGroupGenderControls } from './StudentGroupGenderControls.jsx'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Camera, CheckCircle2, Download, Plus, Trash2, UserRoundPlus, Users, X } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -394,18 +395,7 @@ export function ManageStudentsModal({ classId, onClose }) {
                     <span className="student-ee-badge" title="Esquí Estudi">EE</span>
                   )}
                 </div>
-                <select
-                  aria-label={`Mig grup de ${student.name}`}
-                  onChange={(event) => updateStudent(student.id, { halfGroup: event.target.value })}
-                  value={student.halfGroup || ''}
-                >
-                  <option value="">Sense grup</option>
-                  {halfGroups.map((group) => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
-                  ))}
-                </select>
+                <StudentGroupGenderControls student={student} halfGroups={halfGroups} onChange={(patch) => updateStudent(student.id, patch)} />
                 <button
                   className="danger-soft"
                   onClick={() => deleteStudent(student.id)}

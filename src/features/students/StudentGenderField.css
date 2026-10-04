@@ -1,3 +1,8 @@
 .student-gender-field { display:flex; flex-direction:column; gap:4px; }
 .student-gender-field select { padding:8px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; background:#fff; color:#0f172a; }
 .student-gender-field small { max-width:300px; color:#475569; font-size:12px; }
+
+.student-gender-compact { position:relative; display:inline-flex; align-items:center; justify-content:center; width:44px; height:42px; box-sizing:border-box; border:1px solid #d1d5db; border-radius:8px; background:#fff; color:#1f2937; font-size:25px; line-height:1; }
+.student-gender-compact select { position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; font-size:16px; }
+.student-gender-compact:hover { background:#eff6ff; border-color:#93c5fd; }
+.student-gender-compact:focus-within { outline:3px solid #ffedd5; border-color:#f97316; }

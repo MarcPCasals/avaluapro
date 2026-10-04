@@ -19301,7 +19301,7 @@ button.profile-followup-card:focus-visible {
 
 .student-editor-row {
   display: grid;
-  grid-template-columns: 28px minmax(96px, 0.28fr) minmax(230px, 1fr) minmax(132px, 0.34fr) 38px;
+  grid-template-columns: 28px minmax(96px, 0.28fr) minmax(0, 1fr) 112px 38px;
   gap: 8px;
   align-items: center;
   border: 1px solid #eef2f7;
@@ -22700,7 +22700,8 @@ button.profile-followup-card:focus-visible {
   .student-photo-editor,
   .student-editor-name-field,
   .student-editor-row input:not(:first-of-type),
-  .student-editor-row select {
+  .student-editor-row > select,
+  .student-editor-row > .student-group-gender-controls {
     grid-column: 1 / -1;
   }
 

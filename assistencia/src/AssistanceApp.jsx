@@ -1,5 +1,6 @@
-import { StudentGenderField } from '../../src/features/students/StudentGenderField.jsx'
-import { SociometricGenderPanel } from '../../src/features/tutoring/SociometricGenderPanel.jsx'
+import { StudentGroupGenderControls } from '../../src/features/students/StudentGroupGenderControls.jsx'
+import { SociogramInsights } from '../../src/features/tutoring/SociogramInsights.jsx'
+import { buildSocialSubgroups } from '../../src/features/tutoring/sociometricSubgroupUtils.js'
 import { GroupToolsMenu } from '../../src/features/tutoring/GroupToolsMenu.jsx'
 import { TaskDateField } from '../../src/features/tracking/TaskDateField.jsx'
 import { getTaskSessionKey } from '../../src/features/tracking/taskSessionChoices.js'
@@ -136,7 +137,7 @@ function AssistanceApp() {
   const activeClass = dataset.classes.find((classItem) => classItem.id === activeClassId) || dataset.classes[0]
   const activeClassStudents = useMemo(() => dataset.students
     .filter((student) => student.classId === activeClassId)
-    .map((student, index) => ({ ...student, gender: Object.hasOwn(syntheticGenders, student.id) ? syntheticGenders[student.id] : index % 2 ? 'girl' : 'boy', halfGroup: syntheticHalfGroups[student.id] || student.halfGroup, diagnoses: [], name: student.displayName })),
+    .map((student, index) => ({ ...student, gender: Object.hasOwn(syntheticGenders, student.id) ? syntheticGenders[student.id] : index % 2 ? 'girl' : 'boy', halfGroup: Object.hasOwn(syntheticHalfGroups, student.id) ? syntheticHalfGroups[student.id] : student.halfGroup, diagnoses: [], name: student.displayName })),
   [activeClassId, dataset.students, syntheticHalfGroups, syntheticGenders])
   const visibleStudents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ca')
@@ -707,7 +708,10 @@ function AssistanceApp() {
           sortMode={analysisSortMode}
         /> : activeSurface === 'groups' && !groupTool ? <GroupToolsMenu onOpenCooperative={() => setGroupTool('cooperative')} onOpenHalfGroups={() => setGroupTool('half-groups')} />
         : activeSurface === 'groups' && groupTool === 'half-groups' ? <><button onClick={() => setGroupTool('')} type="button">Tornar a grups</button>
-              <details><summary>Dades de l’alumnat fictici</summary>{activeClassStudents.map((student) => <div key={student.id}><strong>{student.name}</strong><StudentGenderField student={student} onChange={(gender) => setSyntheticGenders((current) => ({ ...current, [student.id]: gender }))} /></div>)}</details>
+              <details><summary>Dades de l’alumnat fictici</summary>{activeClassStudents.map((student) => <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #e2e8f0', gap: '12px' }}><strong>{student.name}</strong><StudentGroupGenderControls student={student} halfGroups={['Grup A', 'Grup B']} onChange={(patch) => {
+                if (Object.hasOwn(patch, 'gender')) setSyntheticGenders((current) => ({ ...current, [student.id]: patch.gender }))
+                if (Object.hasOwn(patch, 'halfGroup')) setSyntheticHalfGroups((current) => ({ ...current, [student.id]: patch.halfGroup }))
+              }} /></div>)}</details>
               <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
                 relations={dataset.sociometricRelations || []}
                 appliedMessage="Mitjos grups ficticis aplicats només en memòria."
@@ -803,7 +807,10 @@ function AssistanceApp() {
           </aside>
         </div> : activeSurface === 'sociometry' ? <div className="assistance-sociometry-layout">
           <section className="assistance-sociometry-main">
-            <SociometricGenderPanel students={activeClassStudents} rows={sociometricSummary.studentRows} hasRelations={sociometricSummary.relationCount > 0} />
+            <SociogramInsights key={activeClassId} students={activeClassStudents} rows={sociometricSummary.studentRows}
+              metrics={{ ...sociometricSummary.metrics, rejectionDensity: Math.round(sociometricSummary.studentRows.reduce((total, row) => total + row.avoidReceived, 0) / Math.max(1, activeClassStudents.length * (activeClassStudents.length - 1)) * 100) }}
+              subgroups={buildSocialSubgroups(activeClassStudents, (dataset.sociometricRelations || []).map((relation) => ({ ...relation, type: relation.type === 'positive' ? 'friendship' : relation.type })))}
+              hasRelations={sociometricSummary.relationCount > 0} onSelectStudent={setSelectedSociometricStudentId} />
             <SociometricSummaryPanel
               categoryRows={sociometricSummary.categoryRows}
               eyebrow="Lectura sintètica"

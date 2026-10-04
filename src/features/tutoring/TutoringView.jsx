@@ -1,4 +1,5 @@
-import { SociometricGenderPanel } from './SociometricGenderPanel'
+import { SociogramInsights } from './SociogramInsights'
+import { buildSocialSubgroups, getPositiveComponentMap } from './sociometricSubgroupUtils.js'
 import { GroupToolsMenu } from './GroupToolsMenu'
 import { HalfGroupsPanel } from './HalfGroupsPanel'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -1616,12 +1617,8 @@ function summarizeSociometricMetrics({ relations, students }) {
   }))
   const socialComponentMap = getPositiveComponentMap(students, positiveRelations)
   const subgroupCount = new Set(socialComponentMap.values()).size
-  const meaningfulSubgroupCount = Math.max(
-    0,
-    [...new Set(socialComponentMap.values())].filter(
-      (componentKey) => componentKey.split('__').filter(Boolean).length >= 2,
-    ).length,
-  )
+  const subgroups = buildSocialSubgroups(students, positiveRelations)
+  const meaningfulSubgroupCount = subgroups.length
 
   return {
     categoryCounts,
@@ -1639,6 +1636,7 @@ function summarizeSociometricMetrics({ relations, students }) {
     socialRelationCount: positiveRelations.length,
     subgroupCount,
     meaningfulSubgroupCount,
+    subgroups,
     workRelationCount: workRelations.length,
     positivity:
       positiveRelations.length + avoidRelations.length > 0
@@ -2034,37 +2032,6 @@ function getSociogramLinkEndpoint(source, target) {
     x: target.x - (deltaX / distance) * offset,
     y: target.y - (deltaY / distance) * offset,
   }
-}
-
-function getPositiveComponentMap(students, relations) {
-  const adjacency = new Map(students.map((student) => [student.id, new Set()]))
-  relations
-    .filter((relation) => relation.type === 'friendship' || relation.type === 'positive')
-    .forEach((relation) => {
-      adjacency.get(relation.sourceStudentId)?.add(relation.targetStudentId)
-      adjacency.get(relation.targetStudentId)?.add(relation.sourceStudentId)
-    })
-
-  const componentByStudentId = new Map()
-  const visited = new Set()
-  students.forEach((student) => {
-    if (visited.has(student.id)) return
-    const stack = [student.id]
-    const members = []
-    visited.add(student.id)
-    while (stack.length > 0) {
-      const currentId = stack.pop()
-      members.push(currentId)
-      adjacency.get(currentId)?.forEach((nextId) => {
-        if (visited.has(nextId)) return
-        visited.add(nextId)
-        stack.push(nextId)
-      })
-    }
-    const componentKey = members.sort().join('__') || student.id
-    members.forEach((memberId) => componentByStudentId.set(memberId, componentKey))
-  })
-  return componentByStudentId
 }
 
 function buildRadialSociogramNodes({ positionsByStudentId, relations, roleRowsByStudent, sociometricRows, studentRows, students }) {
@@ -9594,40 +9561,10 @@ export function TutoringView() {
               </div>
             </header>
 
-            <div className="tutorial-sociogram-insight-grid">
-              <article>
-                <span>Cohesió</span>
-                <strong>{sociometricMetrics.density}%</strong>
-                <small>Densitat social registrada.</small>
-              </article>
-              <article>
-                <span>Inclusió</span>
-                <strong>{sociometricMetrics.inclusion}%</strong>
-                <small>Amb almenys una afinitat.</small>
-              </article>
-              <article>
-                <span>Recíproques</span>
-                <strong>{sociometricMetrics.reciprocalPairCount}</strong>
-                <small>Parelles socials mútues.</small>
-              </article>
-              <article>
-                <span>Rebuig</span>
-                <strong>{sociometricMetrics.rejectionDensity}%</strong>
-                <small>Densitat de rebuig social.</small>
-              </article>
-              <article>
-                <span>Subgrups</span>
-                <strong>{sociometricMetrics.meaningfulSubgroupCount}</strong>
-                <small>Components amb 2+ alumnes.</small>
-              </article>
-              <article>
-                <span>Treball</span>
-                <strong>{sociometricMetrics.workRelationCount}</strong>
-                <small>Relacions docents d’aula.</small>
-              </article>
-            </div>
-
-            <SociometricGenderPanel students={classStudents} rows={sociometricMetrics.rows} hasRelations={sociometricMetrics.socialRelationCount > 0 || sociometricMetrics.rows.some((row) => row.avoidReceived > 0)} />
+            <SociogramInsights key={linkedClassId} students={classStudents} rows={sociometricMetrics.rows}
+              metrics={sociometricMetrics} subgroups={sociometricMetrics.subgroups}
+              hasRelations={sociometricMetrics.socialRelationCount > 0 || sociometricMetrics.rows.some((row) => row.avoidReceived > 0)}
+              onSelectStudent={setSelectedRelationStudentId} />
 
             {hasManualSociogramLayout && (
               <div className="tutorial-sociogram-warning">
