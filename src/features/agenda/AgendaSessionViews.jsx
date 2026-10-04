@@ -16,6 +16,7 @@ import {
   startOfCalendarWeek,
 } from '../../lib/agendaCalendar'
 import { filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
+import { AgendaSessionActivityPicker } from './AgendaSessionActivityPicker'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
 const STATUS_LABELS = {
@@ -116,7 +117,7 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap }) {
+function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap, onLoadActivities, onAddActivity }) {
   const [removalItemId, setRemovalItemId] = useState('')
   const [removing, setRemoving] = useState(false)
   const [removalError, setRemovalError] = useState('')
@@ -126,7 +127,28 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
   const [editNotice, setEditNotice] = useState('')
-  const busy = removing || saving
+  const [activityChoices, setActivityChoices] = useState(null)
+  const [loadingActivities, setLoadingActivities] = useState(false)
+  const [activityError, setActivityError] = useState('')
+  const busy = removing || saving || loadingActivities
+  const openActivityPicker = async () => {
+    setLoadingActivities(true)
+    setActivityError('')
+    setRemovalItemId('')
+    setEditItemId('')
+    try { setActivityChoices(await onLoadActivities()) }
+    catch (error) { setActivityError(error.message || 'No s’han pogut carregar les activitats.') }
+    finally { setLoadingActivities(false) }
+  }
+  const addActivity = async (activityId, minutes) => {
+    setSaving(true)
+    setEditNotice('')
+    try {
+      await onAddActivity(activityId, minutes)
+      setActivityChoices(null)
+      setEditNotice('Activitat afegida a aquesta sessió. La programació original es conserva.')
+    } finally { setSaving(false) }
+  }
   const saveItem = async (event, item) => {
     event.preventDefault()
     setSaving(true)
@@ -148,6 +170,8 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
     try {
       await onRemoveItem(item)
       setRemovalItemId('')
+      setActivityChoices(null)
+      setEditNotice('Activitat retirada de la sessió i conservada fora del calendari. La pots recuperar amb «Afegir activitat».')
     } catch (error) {
       setRemovalError(error.message || 'No s’ha pogut treure l’activitat de la sessió.')
     } finally {
@@ -172,7 +196,9 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       {!blockingEvent && bundle.session.status === 'planned' && bundle.session.babeliumEnabled && sessionLoad.plannedMinutes > sessionLoad.programmableMinutes && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{sessionLoad.plannedMinutes - sessionLoad.programmableMinutes} min per sobre del temps disponible</strong><span>Reorganitza les activitats amb la calendarització intel·ligent per respectar el bloc de Babèlium i el temps real de classe.</span></div></div>}
       {editNotice && <p className="agenda-session-edit-notice" role="status">{editNotice}</p>}
       <div className="agenda-session-activities">
-        <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{visibleItems.length}</span></div>
+        <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{visibleItems.length}</span>{onAddActivity && onLoadActivities && !blockingEvent && getAgendaSessionItemRemovalState(bundle, { id: 'new-activity' }).canRemove && <button className="secondary-action compact" disabled={busy} onClick={openActivityPicker} type="button">{loadingActivities ? <Loader2 className="spin" size={14} /> : <Plus size={14} />}Afegir activitat</button>}</div>
+        {activityError && <p role="alert">{activityError}</p>}
+        {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
         {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item) => {
           const description = item.sourceActivity?.description?.trim()
           const removalState = getAgendaSessionItemRemovalState(bundle, item)
@@ -188,14 +214,14 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
                 {editError && <p role="alert">{editError}</p>}
               </form>}
               {confirmingRemoval && <div className="agenda-session-item-confirmation">
-                <p>Treure aquesta activitat de la sessió? Es retiraran tots els fragments d’aquesta entrada. La programació i les altres sessions es conservaran.</p>
-                <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}Confirmar eliminació</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
+                <p>Treure aquesta activitat de la calendarització d’aquesta sessió? Es conservarà a la programació i els minuts retirats quedaran disponibles a «Afegir activitat». Les altres sessions es conservaran.</p>
+                <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}Treure i conservar</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
                 {removalError && <p role="alert">{removalError}</p>}
               </div>}
             </div>
             {(onRemoveItem || onSaveItem) && <div className="agenda-session-item-tools">
               {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || (item.combinedItems || [item]).some((part) => !part.sourceActivityId)} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
-              {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? 'Treure de la sessió' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
+              {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? 'Treure de la calendarització i conservar' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
             </div>}
           </li>
         })}</ol>}
@@ -643,6 +669,6 @@ export function AgendaTimelineView({
   )
 }
 
-export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap }) {
-  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onRemoveItem={onRemoveItem} onSaveItem={onSaveItem} onResolveGap={onResolveGap} />
+export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap, onLoadActivities, onAddActivity }) {
+  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onRemoveItem={onRemoveItem} onSaveItem={onSaveItem} onResolveGap={onResolveGap} onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} />
 }

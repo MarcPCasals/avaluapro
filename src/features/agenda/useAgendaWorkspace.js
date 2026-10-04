@@ -32,6 +32,8 @@ import {
 import {
   copyTimetableVersionStructure,
   buildAgendaContinuationReflow,
+  getSessionActivityChoices,
+  buildSessionActivityAddition,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
   buildAgendaSessionReplacement,
@@ -1716,6 +1718,35 @@ export function useAgendaWorkspace(user, classes = []) {
     return { ...preview, setup }
   }, [activeAcademicYear, loadSchedulingSetup])
 
+  const loadSessionActivityChoices = useCallback(async (bundle) => {
+    const setup = await loadSchedulingSetup({ applicationId: bundle.application.id,
+      classId: bundle.session.classId, planningUnitId: bundle.planningUnit.id })
+    return getSessionActivityChoices({ ...setup, targetSessionId: bundle.session.id,
+      manuallyCompletedSourceActivityIds: getManuallyCompletedActivityIds(setup.activityOverrides) })
+  }, [loadSchedulingSetup])
+
+  const addSessionActivity = useCallback(async (bundle, activityId, minutes) => {
+    const setup = await loadSchedulingSetup({ applicationId: bundle.application.id,
+      classId: bundle.session.classId, planningUnitId: bundle.planningUnit.id })
+    const target = setup.existingSessionBundles.find(({ session }) => session.id === bundle.session.id)
+    if (!target || getNoClassCalendarEvent(setup.calendarEvents, String(target.session.startsAt).slice(0, 10),
+      target.session.classId, { sessionId: target.session.id, timetableSlotId: target.session.timetableSlotId })) {
+      throw new Error('Aquesta sessió no es fa. Tria una altra sessió.')
+    }
+    const addition = buildSessionActivityAddition({ ...setup, targetSessionId: bundle.session.id,
+      manuallyCompletedSourceActivityIds: getManuallyCompletedActivityIds(setup.activityOverrides) }, activityId, minutes)
+    await persist([addition.item, ...addition.changedItems].map((entity) => ({ entity,
+      context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: entity.sessionId } })))
+    const changes = new Map(addition.changedItems.map((item) => [item.id, item]))
+    const updateBundle = (current) => ({ ...current, items: [
+      ...current.items.map((item) => changes.has(item.id) ? { ...item, ...changes.get(item.id) } : item),
+      ...(current.session.id === bundle.session.id ? [{ ...addition.item, sourceActivity: addition.activity }] : []),
+    ] })
+    setSessionBundles((current) => current.map(updateBundle))
+    return updateBundle({ ...bundle, session: target.session, items: target.items.map((item) => ({ ...item,
+      sourceActivity: setup.activities.find((activity) => activity.id === item.sourceActivityId) || null })), results: target.results })
+  }, [loadSchedulingSetup, persist])
+
   const loadSessionReplacementActivities = useCallback(async (bundle) => {
     const setup = await loadSchedulingSetup({
       applicationId: bundle.application.id, classId: bundle.session.classId,
@@ -2123,6 +2154,8 @@ export function useAgendaWorkspace(user, classes = []) {
     buildAgendaRecoveryPreview,
     buildSessionReplacementPreview,
     loadSessionReplacementActivities,
+    loadSessionActivityChoices,
+    addSessionActivity,
     buildContinuationPreview,
     compactAgendaSession,
     confirmAgendaRecoveryPreview,

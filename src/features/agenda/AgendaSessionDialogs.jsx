@@ -15,10 +15,10 @@ function dateLabel(startsAt) {
     .format(new Date(`${String(startsAt).slice(0, 10)}T12:00:00`))
 }
 
-export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap }) {
+export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap, onLoadActivities, onAddActivity }) {
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-session-dialog" size="lg" title="Detall de la sessió">
-      <AgendaSessionDetail onSaveItem={onSaveItem} onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
+      <AgendaSessionDetail onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} onSaveItem={onSaveItem} onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
     </Modal>
   )
 }
