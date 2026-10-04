@@ -1,0 +1,7 @@
+.sociometric-gender-panel { background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:12px; padding:18px; margin:18px 0; }
+.sociometric-gender-panel h3 { margin-top:0; }
+.sociometric-gender-panel p { font-size:14px; line-height:1.5; }
+.sociometric-gender-table { overflow-x:auto; }
+.sociometric-gender-panel table { width:100%; border-collapse:collapse; }
+.sociometric-gender-panel th,.sociometric-gender-panel td { padding:10px; text-align:left; border-bottom:1px solid #cbd5e1; }
+.sociometric-gender-panel summary { cursor:pointer; font-weight:650; }

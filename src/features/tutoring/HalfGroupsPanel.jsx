@@ -1,3 +1,4 @@
+import { countStudentGenders, studentRelationWarning } from './genderBalanceUtils.js'
 import './HalfGroupsPanel.css'
 import { useState } from 'react'
 import { analyzeHalfGroups, HALF_GROUP_NAMES, proposeHalfGroups } from './halfGroupUtils.js'
@@ -7,6 +8,9 @@ export function HalfGroupsPanel({ students, relations, onApply, appliedMessage =
   const [draft, setDraft] = useState(null)
   const [status, setStatus] = useState({ busy: false, message: '' })
   const assignments = draft || Object.fromEntries(students.map((student) => [student.id, student.halfGroup]))
+  const classGenders = countStudentGenders(students)
+  const gendersByGroup = HALF_GROUP_NAMES.map((name) => countStudentGenders(students.filter((student) => assignments[student.id] === name)))
+  const genderImbalance = ['boy', 'girl'].some((gender) => Math.abs(gendersByGroup[0][gender] - gendersByGroup[1][gender]) > 1)
   const analysis = analyzeHalfGroups(students, relations, assignments)
   const sizes = HALF_GROUP_NAMES.map((name) => students.filter((student) => assignments[student.id] === name).length)
   const complete = sizes[0] + sizes[1] === students.length
@@ -23,29 +27,40 @@ export function HalfGroupsPanel({ students, relations, onApply, appliedMessage =
   }
   return <div className="half-groups-workspace">
     <h3>Mitjos grups A/B</h3>
-    <p>Prioritat: relacions de treball → evitar relacions negatives → relacions positives d’afinitat. Dos mitjos grups amb una diferència màxima d’un alumne.</p>
+    <p>Equilibrem el nombre d’alumnes i el repartiment de nois i noies, respectant els bloquejos. Després, prioritat: relacions de treball → evitar relacions negatives → relacions positives d’afinitat. Dos mitjos grups amb una diferència màxima d’un alumne.</p>
     <p>En aplicar-los, s’actualitza el mig grup de cada alumne per passar llista, la disposició d’aula i les propostes cooperatives.</p>
     <p>Bloqueja un alumne a A o B per mantenir-lo en les noves propostes. Els bloquejos es desen en aplicar els mitjos grups.</p>
+    <p className="half-group-legend"><span className="relation-warning">Groc: vincles negatius amb l’altre mig grup.</span> <span className="relation-danger">Vermell: vincles negatius dins del mig grup.</span> Són avisos sobre les relacions registrades, no etiquetes personals.</p>
+    {classGenders.unknown > 0 && <p>{classGenders.unknown} alumne{classGenders.unknown === 1 ? '' : 's'} sense dada de noi/noia. Completa-la al perfil de l’alumne per millorar l’equilibri.</p>}
     <div className="half-groups-actions">
       <button className="primary-action" disabled={students.length < 2 || status.busy} onClick={() => { try { setDraft(proposeHalfGroups(students, relations, Object.fromEntries(lockedIds.map((id) => [id, assignments[id]])))); setStatus({ busy: false, message: '' }) } catch (error) { setStatus({ busy: false, message: error.message }) } }} type="button">Generar proposta A/B</button>
       <button className="secondary-action" disabled={!draft || !complete || !balanced || status.busy} onClick={apply} type="button">{status.busy ? 'Aplicant…' : 'Aplicar mitjos grups'}</button>
       {draft && <button className="secondary-action" disabled={status.busy} onClick={() => { setDraft(null); setLockedIds(students.filter((student) => student.halfGroupLocked).map((student) => student.id)) }} type="button">Descartar proposta</button>}
     </div>
-    {!relations.length && <p>No hi ha relacions registrades: la proposta només equilibra el nombre d’alumnes.</p>}
+    {!relations.length && <p>No hi ha relacions registrades: la proposta equilibra el nombre d’alumnes i les dades de noi/noia disponibles.</p>}
     {analysis.conflicts.length > 0 && <div role="alert"><strong>Hi ha {analysis.conflicts.length} relacions negatives dins dels mitjos grups.</strong><p>Revisa la proposta abans d’aplicar-la. Les prioritats i l’equilibri poden entrar en conflicte.</p><ul>{analysis.conflicts.map((relation, index) => <li key={index}>{students.find((student) => student.id === relation.sourceStudentId)?.name} → {students.find((student) => student.id === relation.targetStudentId)?.name}</li>)}</ul></div>}
+    {genderImbalance && <p role="alert">El repartiment de nois i noies encara és desigual. Genera una proposta o revisa els bloquejos i els canvis manuals.</p>}
     {draft && !balanced && <p role="alert">Equilibra els dos mitjos grups abans d’aplicar-los.</p>}
     <div className="half-groups-columns">{HALF_GROUP_NAMES.map((name, index) => {
+      const members = students.filter((student) => assignments[student.id] === name)
+      const genders = gendersByGroup[index]
       const groupRelations = analysis.internalRelations.filter((relation) => assignments[relation.sourceStudentId] === name)
       return <section key={name}><h3>{name} · {sizes[index]} alumnes</h3>
-        <ul>{students.filter((student) => assignments[student.id] === name).map((student) => <li key={student.id}>
-          <span>{student.name}</span><div className="half-group-member-actions">
+        <p className="half-group-gender-counts">{genders.boy} nois · {genders.girl} noies{genders.other > 0 && ` · ${genders.other} altra identitat`}{genders.unknown > 0 && ` · ${genders.unknown} sense informar`}</p>
+        <ul>{members.map((student) => {
+          const warning = studentRelationWarning(student.id, students, relations, assignments)
+          const partners = [...new Set((warning.internal.length ? warning.internal : warning.negative).map((relation) => relation.sourceStudentId === student.id ? relation.targetStudentId : relation.sourceStudentId))]
+          return <li key={student.id} className={warning.tone ? `half-group-member relation-${warning.tone}` : 'half-group-member'}>
+          <span className="half-group-member-info"><strong>{student.name}</strong><small>{student.gender === 'boy' ? 'Noi' : student.gender === 'girl' ? 'Noia' : student.gender === 'other' ? 'Altra identitat' : 'Sense informar'}</small>
+          {warning.tone && <small>{warning.internal.length ? 'Vincle negatiu dins del mig grup' : 'Vincle negatiu amb l’altre mig grup'}: {partners.map((id) => students.find((member) => member.id === id)?.name).join(', ')}.</small>}</span><div className="half-group-member-actions">
             <button disabled={status.busy} aria-pressed={lockedIds.includes(student.id)} onClick={() => {
               setDraft({ ...assignments })
               setLockedIds((current) => current.includes(student.id) ? current.filter((id) => id !== student.id) : [...current, student.id])
             }} type="button" aria-label={`${lockedIds.includes(student.id) ? 'Desbloquejar' : 'Bloquejar'} ${student.name} al ${name}`}>{lockedIds.includes(student.id) ? '🔒 Fixat' : 'Bloquejar'}</button>
             <button disabled={status.busy || lockedIds.includes(student.id)} onClick={() => setDraft({ ...assignments, [student.id]: HALF_GROUP_NAMES[index === 0 ? 1 : 0] })} type="button" aria-label={`Moure ${student.name} al ${HALF_GROUP_NAMES[index === 0 ? 1 : 0]}`}>→ {index === 0 ? 'B' : 'A'}</button>
           </div>
-        </li>)}</ul>
+        </li>
+        })}</ul>
         <details className="half-group-relations"><summary>Relacions internes · {groupRelations.length}</summary>
           <p>Cada fletxa indica el sentit de la relació registrada.</p>
           {[[ 'positive', 'Relacions de treball' ], [ 'avoid', 'Relacions negatives' ], [ 'friendship', 'Afinitats positives' ]].map(([type, label]) => {

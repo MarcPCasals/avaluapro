@@ -1,3 +1,5 @@
+import { StudentGenderField } from '../../src/features/students/StudentGenderField.jsx'
+import { SociometricGenderPanel } from '../../src/features/tutoring/SociometricGenderPanel.jsx'
 import { GroupToolsMenu } from '../../src/features/tutoring/GroupToolsMenu.jsx'
 import { TaskDateField } from '../../src/features/tracking/TaskDateField.jsx'
 import { getTaskSessionKey } from '../../src/features/tracking/taskSessionChoices.js'
@@ -117,6 +119,7 @@ function AssistanceApp() {
   const [taskDemoKey, setTaskDemoKey] = useState('')
   const dataset = useDataAdapter(assistanceAdapter)
   const [syntheticHalfGroups, setSyntheticHalfGroups] = useState({})
+  const [syntheticGenders, setSyntheticGenders] = useState({})
   const [activeClassId, setActiveClassId] = useState(dataset.classes[0].id)
   const [activeSurface, setActiveSurface] = useState('overview')
   const [groupTool, setGroupTool] = useState('')
@@ -133,8 +136,8 @@ function AssistanceApp() {
   const activeClass = dataset.classes.find((classItem) => classItem.id === activeClassId) || dataset.classes[0]
   const activeClassStudents = useMemo(() => dataset.students
     .filter((student) => student.classId === activeClassId)
-    .map((student) => ({ ...student, halfGroup: syntheticHalfGroups[student.id] || student.halfGroup, diagnoses: [], name: student.displayName })),
-  [activeClassId, dataset.students, syntheticHalfGroups])
+    .map((student, index) => ({ ...student, gender: Object.hasOwn(syntheticGenders, student.id) ? syntheticGenders[student.id] : index % 2 ? 'girl' : 'boy', halfGroup: syntheticHalfGroups[student.id] || student.halfGroup, diagnoses: [], name: student.displayName })),
+  [activeClassId, dataset.students, syntheticHalfGroups, syntheticGenders])
   const visibleStudents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ca')
     return dataset.students.filter((student) => (
@@ -704,6 +707,7 @@ function AssistanceApp() {
           sortMode={analysisSortMode}
         /> : activeSurface === 'groups' && !groupTool ? <GroupToolsMenu onOpenCooperative={() => setGroupTool('cooperative')} onOpenHalfGroups={() => setGroupTool('half-groups')} />
         : activeSurface === 'groups' && groupTool === 'half-groups' ? <><button onClick={() => setGroupTool('')} type="button">Tornar a grups</button>
+              <details><summary>Dades de l’alumnat fictici</summary>{activeClassStudents.map((student) => <div key={student.id}><strong>{student.name}</strong><StudentGenderField student={student} onChange={(gender) => setSyntheticGenders((current) => ({ ...current, [student.id]: gender }))} /></div>)}</details>
               <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
                 relations={dataset.sociometricRelations || []}
                 appliedMessage="Mitjos grups ficticis aplicats només en memòria."
@@ -799,6 +803,7 @@ function AssistanceApp() {
           </aside>
         </div> : activeSurface === 'sociometry' ? <div className="assistance-sociometry-layout">
           <section className="assistance-sociometry-main">
+            <SociometricGenderPanel students={activeClassStudents} rows={sociometricSummary.studentRows} hasRelations={sociometricSummary.relationCount > 0} />
             <SociometricSummaryPanel
               categoryRows={sociometricSummary.categoryRows}
               eyebrow="Lectura sintètica"

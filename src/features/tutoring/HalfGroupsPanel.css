@@ -22,3 +22,11 @@
 .half-group-relations summary { cursor: pointer; font-weight: 650; }
 .half-group-relations li { display: block; }
 .half-group-relations small { display: block; color: #64748b; }
+
+.half-group-member-info { min-width:0; overflow-wrap:anywhere; display:flex; flex-direction:column; gap:4px; }
+.half-groups-columns li.half-group-member { padding:10px; margin:6px 0; border-radius:8px; }
+.half-group-member-info small { font-size:12px; }
+.relation-warning { background:#fef3c7; color:#78350f; }
+.relation-danger { background:#fee2e2; color:#991b1b; }
+.half-group-legend span { display:inline-block; padding:5px 8px; margin:4px 0; border-radius:5px; }
+.half-group-gender-counts { color:#475569; font-size:14px; }

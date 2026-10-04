@@ -1,3 +1,4 @@
+import { halfGroupGenderGap } from './genderBalanceUtils.js'
 export const HALF_GROUP_NAMES = ['Grup A', 'Grup B']
 
 export function analyzeHalfGroups(students, relations, assignments) {
@@ -23,9 +24,9 @@ export function analyzeHalfGroups(students, relations, assignments) {
 // Lexicographic comparison: social affinity never compensates for lost work
 // relationships or additional negative relationships.
 function isBetter(a, b) {
-  return !b || a.work > b.work ||
+  return !b || a.genderGap < b.genderGap || (a.genderGap === b.genderGap && (a.work > b.work ||
     (a.work === b.work && (a.negative < b.negative ||
-      (a.negative === b.negative && a.positive > b.positive)))
+      (a.negative === b.negative && a.positive > b.positive)))))
 }
 
 export function proposeHalfGroups(students, relations, locks = {}) {
@@ -39,7 +40,7 @@ export function proposeHalfGroups(students, relations, locks = {}) {
   let best = null
   let bestScore = null
   const evaluate = (assignments) => {
-    const score = analyzeHalfGroups(ordered, relations, assignments)
+    const score = { ...analyzeHalfGroups(ordered, relations, assignments), genderGap: halfGroupGenderGap(ordered, assignments) }
     if (isBetter(score, bestScore)) {
       best = { ...assignments }
       bestScore = score
@@ -83,7 +84,7 @@ export function proposeHalfGroups(students, relations, locks = {}) {
           if (assignments[a.id] !== HALF_GROUP_NAMES[0] || assignments[b.id] !== HALF_GROUP_NAMES[1]) continue
           assignments[a.id] = HALF_GROUP_NAMES[1]
           assignments[b.id] = HALF_GROUP_NAMES[0]
-          const candidate = analyzeHalfGroups(ordered, relations, assignments)
+          const candidate = { ...analyzeHalfGroups(ordered, relations, assignments), genderGap: halfGroupGenderGap(ordered, assignments) }
           if (isBetter(candidate, nextScore)) { swap = [a.id, b.id]; nextScore = candidate }
           assignments[a.id] = HALF_GROUP_NAMES[0]
           assignments[b.id] = HALF_GROUP_NAMES[1]

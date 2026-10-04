@@ -1,3 +1,4 @@
+import { countStudentGenders } from './genderBalanceUtils.js'
 import { getSociometricRuntimeMeta } from './sociometricStudentProfileUtils.js'
 
 function average(values) {
@@ -205,6 +206,10 @@ export function createCooperativeSociometricHelpers({
     }
 
     let score = group.members.length * 8
+    // Spread manually recorded genders without inferring missing values.
+    if (['boy', 'girl'].includes(candidate.student.gender)) {
+      score += group.members.filter((member) => member.student.gender === candidate.student.gender).length * 60
+    }
     const nextMembers = [...group.members, candidate]
     const averagePerformance =
       nextMembers.reduce((total, member) => total + (member.tutorialProfile.averageScore || 2.5), 0) / nextMembers.length
@@ -381,7 +386,10 @@ export function createCooperativeSociometricHelpers({
       }
       if (sizeDifference <= 1) strengths.push('La mida és coherent amb l’objectiu seleccionat.')
 
+      const genderCounts = countStudentGenders(group.members.map((member) => member.student))
       const compositionParts = []
+      if (genderCounts.boy || genderCounts.girl) compositionParts.push(`${genderCounts.boy} nois i ${genderCounts.girl} noies`)
+      if (genderCounts.unknown) compositionParts.push(`${genderCounts.unknown} sense dada de noi/noia`)
       if (highPerformanceCount > 0) compositionParts.push(`${highPerformanceCount} de rendiment alt`)
       if (mediumPerformanceCount > 0) compositionParts.push(`${mediumPerformanceCount} de rendiment mitjà`)
       if (lowPerformanceCount > 0) compositionParts.push(`${lowPerformanceCount} que necessita reforç`)
@@ -607,6 +615,40 @@ export function createCooperativeSociometricHelpers({
     }
   }
 
+  function balanceCooperativeGenders(groups, relations) {
+    const counts = (group) => countStudentGenders(group.members.map((member) => member.student))
+    const cost = (group) => {
+      const genders = counts(group)
+      return genders.boy ** 2 + genders.girl ** 2
+    }
+    const conflicts = (group) => group.members.reduce((total, member, index) => total + group.members.slice(index + 1)
+      .filter((other) => summarizeCooperativePair(relations, member.student.id, other.student.id).hasAvoid).length, 0)
+    const allowed = (group) => group.members.filter((member) => member.isConflict).length <= 1
+    for (let pass = 0; pass < groups.reduce((total, group) => total + group.members.length, 0); pass += 1) {
+      let best = null
+      let improvement = 0
+      groups.forEach((a, ai) => groups.slice(ai + 1).forEach((b) => {
+        if (a.halfGroupName !== b.halfGroupName) return
+        const beforeCost = cost(a) + cost(b)
+        const beforeConflicts = conflicts(a) + conflicts(b)
+        a.members.forEach((left, li) => b.members.forEach((right, ri) => {
+          if (left.student.gender === right.student.gender) return
+          const nextA = { ...a, members: a.members.map((member, i) => i === li ? right : member) }
+          const nextB = { ...b, members: b.members.map((member, i) => i === ri ? left : member) }
+          const gain = beforeCost - cost(nextA) - cost(nextB)
+          if (gain > improvement && allowed(nextA) && allowed(nextB) && conflicts(nextA) + conflicts(nextB) <= beforeConflicts) {
+            best = { a, b, li, ri, left, right }
+            improvement = gain
+          }
+        }))
+      }))
+      if (!best) break
+      best.a.members[best.li] = best.right
+      best.b.members[best.ri] = best.left
+    }
+    return groups
+  }
+
   function buildCooperativeGroups({
     groupSize,
     prioritizeHalfGroups,
@@ -680,12 +722,12 @@ export function createCooperativeSociometricHelpers({
       })
 
       return enrichCooperativeGroups(
-        redistributeSingletonCooperativeGroups(
+        balanceCooperativeGenders(redistributeSingletonCooperativeGroups(
           halfGroupGroups,
           relations,
           strategy,
           cleanGroupSize,
-        ),
+        ), relations),
         relations,
       )
     }
@@ -717,7 +759,7 @@ export function createCooperativeSociometricHelpers({
     })
 
     return enrichCooperativeGroups(
-      redistributeSingletonCooperativeGroups(groups, relations, strategy, cleanGroupSize),
+      balanceCooperativeGenders(redistributeSingletonCooperativeGroups(groups, relations, strategy, cleanGroupSize), relations),
       relations,
     )
   }

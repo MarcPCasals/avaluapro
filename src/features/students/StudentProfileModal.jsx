@@ -1,3 +1,4 @@
+import { StudentGenderField } from './StudentGenderField'
 import { antecedentCompetencyKey, normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import {
   Camera,
@@ -550,6 +551,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
         </section>
 
         <section className="annotation-tools-row">
+          <StudentGenderField student={student} onChange={(gender) => updateStudent(studentId, { gender })} />
           <div>
             <span>{student.halfGroup || 'Sense mig grup assignat'}</span>
             <small>

@@ -1,3 +1,4 @@
+import { SociometricGenderPanel } from './SociometricGenderPanel'
 import { GroupToolsMenu } from './GroupToolsMenu'
 import { HalfGroupsPanel } from './HalfGroupsPanel'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -9625,6 +9626,8 @@ export function TutoringView() {
                 <small>Relacions docents d’aula.</small>
               </article>
             </div>
+
+            <SociometricGenderPanel students={classStudents} rows={sociometricMetrics.rows} hasRelations={sociometricMetrics.socialRelationCount > 0 || sociometricMetrics.rows.some((row) => row.avoidReceived > 0)} />
 
             {hasManualSociogramLayout && (
               <div className="tutorial-sociogram-warning">
