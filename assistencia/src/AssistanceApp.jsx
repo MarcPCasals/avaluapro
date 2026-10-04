@@ -1,3 +1,4 @@
+import { GroupToolsMenu } from '../../src/features/tutoring/GroupToolsMenu.jsx'
 import { TaskDateField } from '../../src/features/tracking/TaskDateField.jsx'
 import { getTaskSessionKey } from '../../src/features/tracking/taskSessionChoices.js'
 import { HalfGroupsPanel } from '../../src/features/tutoring/HalfGroupsPanel.jsx'
@@ -118,6 +119,7 @@ function AssistanceApp() {
   const [syntheticHalfGroups, setSyntheticHalfGroups] = useState({})
   const [activeClassId, setActiveClassId] = useState(dataset.classes[0].id)
   const [activeSurface, setActiveSurface] = useState('overview')
+  const [groupTool, setGroupTool] = useState('')
   const [analysisSortMode, setAnalysisSortMode] = useState('intervention')
   const [tutorialProfileFilter, setTutorialProfileFilter] = useState('priority')
   const [selectedTutorialStudentId, setSelectedTutorialStudentId] = useState('')
@@ -502,6 +504,7 @@ function AssistanceApp() {
                 const tutoringClass = dataset.classes.find((classItem) => classItem.isTutoringGroup)
                 if (tutoringClass) setActiveClassId(tutoringClass.id)
                 setActiveSurface('groups')
+                setGroupTool('')
                 setSelectedCooperativeGroupId('')
                 setSimulatedAction('')
               }}
@@ -699,14 +702,17 @@ function AssistanceApp() {
           onSortModeChange={setAnalysisSortMode}
           rows={crossAnalysisRows}
           sortMode={analysisSortMode}
-        /> : activeSurface === 'groups' ? <div className="assistance-cooperative-layout">
-          <section className="assistance-cooperative-main">
-            <details><summary>Mitjos grups A/B · prova amb alumnat fictici</summary>
+        /> : activeSurface === 'groups' && !groupTool ? <GroupToolsMenu onOpenCooperative={() => setGroupTool('cooperative')} onOpenHalfGroups={() => setGroupTool('half-groups')} />
+        : activeSurface === 'groups' && groupTool === 'half-groups' ? <><button onClick={() => setGroupTool('')} type="button">Tornar a grups</button>
               <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
                 relations={dataset.sociometricRelations || []}
                 appliedMessage="Mitjos grups ficticis aplicats només en memòria."
                 onApply={async (assignments) => { setSyntheticHalfGroups((current) => ({ ...current, ...assignments })); simulateAction('Proposta A/B comprovada només en memòria amb alumnat fictici.') }} />
-            </details>
+
+</>
+        : activeSurface === 'groups' ? <div className="assistance-cooperative-layout">
+          <button onClick={() => setGroupTool('')} type="button">Tornar a grups</button>
+          <section className="assistance-cooperative-main">
             <header className="assistance-cooperative-heading">
               <div>
                 <span>Agrupament completament fictici</span>

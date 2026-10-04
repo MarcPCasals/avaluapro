@@ -1,3 +1,4 @@
+import { GroupToolsMenu } from './GroupToolsMenu'
 import { HalfGroupsPanel } from './HalfGroupsPanel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -9953,13 +9954,13 @@ export function TutoringView() {
 
           <section className={`sociometric-import-panel relationship-tool-panel ${['groups', 'half-groups'].includes(activeRelationshipTool) ? 'active' : ''}`}>
             <header>
-              <div><h2>Grups</h2></div>
-              <button className="tool-back-button" onClick={() => setActiveRelationshipTool('')} type="button">Tornar a eines</button>
+              <div><h2>{activeRelationshipTool === 'half-groups' ? 'Mitjos grups' : 'Grups'}</h2></div>
+              <button className="tool-back-button" onClick={() => setActiveRelationshipTool(activeRelationshipTool === 'half-groups' ? 'groups' : '')} type="button">{activeRelationshipTool === 'half-groups' ? 'Tornar a grups' : 'Tornar a eines'}</button>
             </header>
-            <div className="half-groups-actions">
-              <button className="secondary-action" onClick={() => setActiveRelationshipTool('cooperative')} type="button">Grups cooperatius</button>
-              <button className="secondary-action" aria-pressed={activeRelationshipTool === 'half-groups'} onClick={() => setActiveRelationshipTool('half-groups')} type="button">Mitjos grups</button>
-            </div>
+            {activeRelationshipTool === 'groups' && <GroupToolsMenu
+              onOpenCooperative={() => setActiveRelationshipTool('cooperative')}
+              onOpenHalfGroups={() => setActiveRelationshipTool('half-groups')}
+            />}
             {activeRelationshipTool === 'half-groups' && <HalfGroupsPanel
               key={linkedClassId}
               students={classStudents}

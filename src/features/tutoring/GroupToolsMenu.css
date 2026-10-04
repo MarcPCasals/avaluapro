@@ -1,0 +1,25 @@
+.group-tools-menu { width: 100%; max-width: 1800px; margin: 0 auto; box-sizing: border-box; padding: clamp(20px, 4vw, 64px); min-height: calc(100dvh - 150px); display: flex; flex-direction: column; justify-content: center; gap: 30px; }
+.group-tools-intro h3 { margin: 0 0 10px; color: #0f172a; font-size: clamp(24px, 2.4vw, 36px); line-height: 1.2; font-weight: 800; }
+.group-tools-intro p { margin: 0; color: #64748b; font-size: 17px; line-height: 1.5; }
+.group-tools-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.group-tools-options .group-tool-card { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; min-width: 0; min-height: clamp(360px, 45vh, 540px); padding: clamp(24px, 3vw, 44px); border: 1px solid #fed7aa; border-radius: 24px; background: linear-gradient(145deg, #fffaf5, #fff); color: #0f172a; text-align: left; font: inherit; cursor: pointer; box-shadow: 0 8px 28px #0f172a08; transition: border-color .15s, box-shadow .15s; }
+.group-tools-options .group-tool-card.halves { background: linear-gradient(145deg, #faf8ff, #fff); border-color: #ddd6fe; }
+.group-tools-options .group-tool-card:hover { border-color: #f97316; box-shadow: 0 12px 32px #0f172a12; }
+.group-tools-options .group-tool-card.halves:hover { border-color: #8b5cf6; }
+.group-tools-options .group-tool-card:focus-visible { outline: 3px solid #4338ca; outline-offset: 5px; }
+.group-tool-icon { display: inline-flex; padding: 14px; border-radius: 16px; color: #c2410c; background: #ffedd5; }
+.halves .group-tool-icon { color: #6d28d9; background: #ede9fe; }
+.group-tool-title { font-size: clamp(25px, 2vw, 32px); font-weight: 800; line-height: 1.2; }
+.group-tool-description { max-width: 58ch; font-size: 17px; line-height: 1.65; color: #475569; font-weight: 450; }
+.group-tool-preview { display: flex; align-items: center; justify-content: center; width: 100%; gap: 16px; padding: 10px 0; flex: 1; min-height: 84px; }
+.cooperative-preview > span { display: grid; grid-template-columns: repeat(2, 14px); gap: 8px; padding: 14px; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 14px; }
+.cooperative-preview i { width: 14px; height: 14px; border-radius: 50%; background: #fb923c; }
+.halves-preview > span { display: grid; place-items: center; width: 40%; min-height: 76px; border-radius: 14px; background: #ede9fe; color: #6d28d9; font-size: 30px; font-weight: 800; }
+.halves-preview > span:last-child { background: #dcfce7; color: #15803d; }
+.group-tool-features { display: flex; flex-wrap: wrap; gap: 8px; }
+.group-tool-features > span { padding: 6px 10px; border: 1px solid #e2e8f0; background: #fff; border-radius: 20px; color: #475569; font-size: 12px; font-weight: 650; }
+.group-tool-open { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; margin-top: 6px; padding-top: 18px; border-top: 1px solid #e2e8f0; color: #c2410c; font-size: 15px; font-weight: 750; }
+.halves .group-tool-open { color: #6d28d9; }
+@media (max-width: 700px) { .group-tools-menu { min-height: auto; padding: 20px 8px; gap: 24px; } .group-tools-options { grid-template-columns: 1fr; gap: 18px; } .group-tools-options .group-tool-card { min-height: 320px; gap: 14px; padding: 24px; } }
+@media (prefers-reduced-motion: reduce) { .group-tools-options .group-tool-card { transition: none; } }
+@media (max-width: 700px) { .cooperative-preview { gap: 8px; } .cooperative-preview > span { padding: 10px; } }
