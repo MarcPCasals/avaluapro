@@ -35,6 +35,7 @@ import {
   createCalendarSession,
   createGroupApplication,
   createPlanningUnit,
+  createPlanningActivity,
   createPlanningPrivateNote,
   createSessionItem,
   createTimetableSlot,
@@ -42,6 +43,7 @@ import {
 } from '../src/domain/planning/model.js'
 import { PLANNING_ENTITY_TYPES } from '../src/domain/planning/constants.js'
 import { buildActivitySessionReflow } from '../src/domain/planning/scheduler.js'
+import { withPlanningCloudCompatibility } from '../src/data/cloud/planningCloudCompatibility.js'
 
 function deleteTestDatabase() {
   return new Promise((resolve, reject) => {
@@ -440,6 +442,37 @@ test('una sincronització correcta buida només la revisió que realment ha envi
   assert.equal(sent.length, 1)
   assert.equal(summary.state, PLANNING_SYNC_STATES.SAVED)
   assert.equal((await loadPlanningOutbox('teacher-1')).length, 0)
+})
+
+test('un canvi antic rebutjat es pot reintentar sense reeditar-lo i desapareix l’error de la cua', async () => {
+  const uid = 'teacher-1'
+  const original = createPlanningActivity({
+    id: 'fictional-activity', ownerUid: uid, planningUnitId: 'up-1', phaseId: 'phase-1',
+    title: 'Activitat fictícia', order: 0, plannedMinutes: 55,
+  }, { now: '2026-09-22T12:00:00.000Z' })
+  delete original.curriculumSelections
+  await mergePlanningRemoteScope(uid, 'planningUnit:up-1:structure', [original])
+  const edited = { ...original, description: 'Canvi pendent.', updatedAt: '2026-10-04T12:00:00.000Z' }
+  await savePlanningEntityLocally(uid, edited)
+  const failure = await flushPlanningOutbox(uid, async () => {
+    throw Object.assign(new Error('Rebuig simulat.'), { code: 'permission-denied' })
+  })
+  assert.equal(failure.state, PLANNING_SYNC_STATES.ERROR)
+  assert.equal((await loadPlanningOutbox(uid)).length, 1)
+  let remoteValue = original
+  const repository = createPlanningRepository({
+    uid, isOnline: () => true,
+    applyRemoteOperation: async (operation) => {
+      remoteValue = withPlanningCloudCompatibility(operation.value, remoteValue)
+      return { applied: true, remoteUpdatedAt: remoteValue.updatedAt }
+    },
+  })
+  assert.equal((await repository.synchronize()).state, PLANNING_SYNC_STATES.SAVED)
+  assert.equal((await loadPlanningOutbox(uid)).length, 0)
+  assert.equal((await loadPlanningConflicts(uid)).length, 0)
+  await repository.loadScope('planningUnit:up-1:structure', async () => [remoteValue])
+  const [saved] = (await repository.loadScope('planningUnit:up-1:structure')).entities
+  assert.deepEqual(saved, { ...edited, curriculumSelections: [] })
 })
 
 test('una edició remota posterior crea un conflicte i no substitueix la còpia local', async () => {

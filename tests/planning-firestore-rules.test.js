@@ -418,6 +418,65 @@ describe('Planificació compartida', () => {
     assert.equal(snapshot.data().description, 'Descripció revisada en coedició.')
   })
 
+  test('la cua adapta una activitat antiga rebutjada per les regles i pot reintentar-la sense duplicar-la', async () => {
+    const db = authDb(OWNER)
+    const legacy = activityData()
+    delete legacy.curriculumSelections
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(upRef(context.firestore()), 'activities', legacy.id), legacy)
+    })
+    const edited = { ...legacy, description: 'Canvi local pendent.', updatedAt: '2026-10-04T12:00:00.000Z' }
+    const reference = doc(upRef(db), 'activities', legacy.id)
+    await assertFails(setDoc(reference, edited))
+    const operation = queuedOperation(edited, {}, NOW)
+    const result = await assertSucceeds(applyPlanningCloudOperationToDatabase(db, operation))
+    assert.equal(result.applied, true)
+    assert.deepEqual((await getDoc(reference)).data(), { ...edited, curriculumSelections: [] })
+    const retry = await assertSucceeds(applyPlanningCloudOperationToDatabase(db, operation))
+    assert.equal(retry.applied, true)
+    assert.equal((await getDoc(reference)).data().createdAt, NOW)
+  })
+
+  test('una edició antiga compartida preserva les seleccions remotes i un buidatge explícit les pot retirar', async () => {
+    const db = authDb(EDITOR)
+    const selections = [{ temporalUnitId: 'fictional-ut', competencyId: 'fictional-competency' }]
+    const remote = activityData({ curriculumSelections: selections })
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(upRef(context.firestore()), 'activities', remote.id), remote)
+    })
+    const editedAt = '2026-10-04T12:00:00.000Z'
+    const edited = activityData({ description: 'Canvi del coeditor.', updatedAt: editedAt })
+    delete edited.curriculumSelections
+    const reference = doc(upRef(db), 'activities', edited.id)
+    await assertSucceeds(applyPlanningCloudOperationToDatabase(db, queuedOperation(edited, {}, NOW, EDITOR.uid)))
+    assert.deepEqual((await getDoc(reference)).data(), { ...edited, curriculumSelections: selections })
+    const cleared = { ...edited, curriculumSelections: [], updatedAt: '2026-10-04T12:01:00.000Z' }
+    await assertSucceeds(applyPlanningCloudOperationToDatabase(db, queuedOperation(cleared, {}, editedAt, EDITOR.uid)))
+    assert.deepEqual((await getDoc(reference)).data().curriculumSelections, [])
+  })
+
+  test('la compatibilitat antiga no dona permisos d’edició a un col·laborador només d’Agenda', async () => {
+    const edited = activityData({ description: 'Canvi no autoritzat.', updatedAt: '2026-10-04T12:00:00.000Z' })
+    delete edited.curriculumSelections
+    await assertFails(applyPlanningCloudOperationToDatabase(
+      authDb(AGENDA_EDITOR), queuedOperation(edited, {}, NOW, AGENDA_EDITOR.uid),
+    ))
+    assert.equal((await getDoc(doc(upRef(authDb(OWNER)), 'activities', edited.id))).data().updatedAt, NOW)
+  })
+
+  test('la compatibilitat antiga conserva els conflictes reals i no corregeix valors explícits invàlids', async () => {
+    const db = authDb(OWNER)
+    const edited = activityData({ description: 'Versió local.', updatedAt: '2026-10-04T12:00:00.000Z' })
+    delete edited.curriculumSelections
+    const result = await applyPlanningCloudOperationToDatabase(db, queuedOperation(edited, {}, '2026-09-01T12:00:00.000Z'))
+    assert.equal(result.conflict, true)
+    assert.equal(result.remoteUpdatedAt, NOW)
+    await assertFails(applyPlanningCloudOperationToDatabase(
+      db, queuedOperation({ ...edited, curriculumSelections: 'invalid' }, {}, NOW),
+    ))
+    assert.deepEqual((await getDoc(doc(upRef(db), 'activities', edited.id))).data(), activityData())
+  })
+
   test('el col·laborador d’Agenda només gestiona els grups concedits', async () => {
     const db = authDb(AGENDA_EDITOR)
     await assertSucceeds(getDoc(appRef(db, APP_ONE)))

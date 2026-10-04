@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore'
 import { PLANNING_ENTITY_TYPES } from '../../domain/planning/constants.js'
 import { areCloudDocumentsEqual } from '../../lib/cloudSyncDiff.js'
+import { withPlanningCloudCompatibility } from './planningCloudCompatibility.js'
 
 const OWNER_COLLECTIONS = Object.freeze({
   academicYear: 'planningAcademicYears',
@@ -137,11 +138,13 @@ export async function applyPlanningCloudOperationToDatabase(database, operation)
   return runTransaction(database, async (transaction) => {
     const snapshot = await transaction.get(reference)
     const remoteValue = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
-    let operationValue = operation.value
+    let operationValue = operation.operation === 'upsert'
+      ? withPlanningCloudCompatibility(operation.value, remoteValue)
+      : operation.value
     if (operation.operation === 'upsert' && PLANNING_UNIT_OWNED_CHILDREN.has(operation.entityType)) {
       const unitSnapshot = await transaction.get(doc(database, 'planningUnits', pathParts[1]))
       if (unitSnapshot.exists()) {
-        operationValue = { ...operation.value, ownerUid: unitSnapshot.data().ownerUid }
+        operationValue = { ...operationValue, ownerUid: unitSnapshot.data().ownerUid }
       }
     }
     const remoteUpdatedAt = remoteValue?.updatedAt || ''
