@@ -562,6 +562,10 @@ function TimelineRows({ calendarEvents, groups, onOpenSession, onOpenNotes, note
 
 function TimelineUnscheduledActivities({ activities = [], hasApplications = false, loading = false }) {
   if (!hasApplications && !loading) return null
+  const pendingMinutes = activities.reduce((total, activity) => {
+    const minutes = Number(activity.remainingMinutes)
+    return total + (Number.isFinite(minutes) && minutes > 0 ? minutes : 0)
+  }, 0)
   const groups = Array.from(activities.reduce((byUnit, activity) => {
     const key = activity.planningUnitId
     if (!byUnit.has(key)) byUnit.set(key, {
@@ -578,7 +582,7 @@ function TimelineUnscheduledActivities({ activities = [], hasApplications = fals
       <header>
         <span><AlertTriangle size={18} /></span>
         <div><strong>Activitats fora de la calendarització</strong><small>Continuen visibles a Programació, però no tenen cap data assignada.</small></div>
-        {!loading && <em>{activities.length}</em>}
+        {!loading && <em>{activities.length} {activities.length === 1 ? 'activitat' : 'activitats'} · {pendingMinutes} min pendents</em>}
       </header>
       {loading ? <div className="agenda-timeline-unscheduled-loading"><Loader2 className="spin" size={16} />Comprovant les activitats pendents…</div> : activities.length === 0 ? <p className="agenda-timeline-unscheduled-complete"><ListChecks size={16} />Totes les activitats pendents d’aquesta UT tenen data.</p> : <div className="agenda-timeline-unscheduled-groups">{groups.map((group) => (
         <article key={group.id}>
