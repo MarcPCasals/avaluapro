@@ -37,3 +37,16 @@ test('altres entitats i les baixes no es modifiquen', () => {
   assert.equal(withPlanningCloudCompatibility(session), session)
   assert.equal(withPlanningCloudCompatibility(undefined), undefined)
 })
+
+
+test('retira el context visual d’elements pendents, incloent Babèlium amb activitat nul·la', () => {
+  for (const sourceActivity of [null, { title: 'Context fictici', teacherMaterials: ['Privat fictici'] }]) {
+    const value = { id: 'babelium_fictional-session', entityType: 'sessionItem', sourceActivityId: null, sessionId: 'fictional-session', plannedMinutes: 30, sourceActivity }
+    const adapted = withPlanningCloudCompatibility(value)
+    assert.equal(Object.hasOwn(adapted, 'sourceActivity'), false)
+    assert.equal(adapted.sourceActivityId, null)
+    assert.equal(adapted.plannedMinutes, 30)
+    assert.equal(value.sourceActivity, sourceActivity)
+    assert.equal(withPlanningCloudCompatibility(adapted), adapted)
+  }
+})

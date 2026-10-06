@@ -418,6 +418,30 @@ describe('Planificació compartida', () => {
     assert.equal(snapshot.data().description, 'Descripció revisada en coedició.')
   })
 
+  test('la cua recupera elements amb context visual sense relaxar regles ni perdre conflictes', async () => {
+    const db = authDb(OWNER)
+    const editedAt = '2026-10-06T12:00:00.000Z'
+    for (const sourceActivity of [null, { title: 'Activitat fictícia hidratada' }]) {
+      const remote = sessionItemData()
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(sessionRef(context.firestore()), 'items', remote.id), remote)
+      })
+      const edited = { ...remote, title: 'Lectura fictícia revisada', updatedAt: editedAt, sourceActivity }
+      const reference = doc(sessionRef(db), 'items', remote.id)
+      await assertFails(setDoc(reference, edited))
+      const context = { planningUnitId: UP_ID }
+      const operation = queuedOperation(edited, context, NOW)
+      const result = await assertSucceeds(applyPlanningCloudOperationToDatabase(db, operation))
+      assert.equal(result.applied, true)
+      const expected = { ...remote, title: edited.title, updatedAt: editedAt }
+      assert.deepEqual((await getDoc(reference)).data(), expected)
+      assert.equal((await applyPlanningCloudOperationToDatabase(db, operation)).applied, true)
+      const conflict = await applyPlanningCloudOperationToDatabase(db, queuedOperation({ ...edited, title: 'Canvi local diferent' }, context, NOW))
+      assert.equal(conflict.conflict, true)
+      await assertFails(applyPlanningCloudOperationToDatabase(authDb(THIRD), queuedOperation(edited, context, NOW, THIRD.uid)))
+    }
+  })
+
   test('la cua adapta una activitat antiga rebutjada per les regles i pot reintentar-la sense duplicar-la', async () => {
     const db = authDb(OWNER)
     const legacy = activityData()

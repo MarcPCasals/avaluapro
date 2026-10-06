@@ -887,3 +887,18 @@ test('els sis estats públics de sincronització tenen una prioritat estable', (
   assert.equal(getPlanningSyncState({ isOnline: false }), PLANNING_SYNC_STATES.OFFLINE)
   assert.equal(getPlanningSyncState({ conflictCount: 1, isOnline: false }), PLANNING_SYNC_STATES.REVIEW)
 })
+
+
+test('l’element hidratat desa només dades de domini a la còpia local i la cua', async () => {
+  const uid = 'fictional-view-context-owner'
+  const item = createSessionItem({ id: 'babelium_fictional-session', ownerUid: uid, applicationId: 'fictional-app', sessionId: 'fictional-session', title: 'Lectura fictícia', type: 'activity', plannedMinutes: 30, order: 0 }, { now: '2026-10-06T12:00:00.000Z' })
+  const hydrated = { ...item, sourceActivity: { title: 'Context fictici' } }
+  await savePlanningEntityLocally(uid, hydrated, { planningUnitId: 'fictional-up' })
+  const pending = await loadPlanningOutbox(uid)
+  assert.deepEqual(pending[0].value, item)
+  const saved = await loadPlanningScope(uid, pending[0].scopeKeys[0])
+  assert.deepEqual(saved[0], item)
+  assert.ok(hydrated.sourceActivity)
+  await acknowledgePlanningOperation(pending[0], item.updatedAt)
+  await clearPlanningLocalData(uid)
+})

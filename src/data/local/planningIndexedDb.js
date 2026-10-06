@@ -1,3 +1,4 @@
+import { withoutPlanningViewContext } from '../cloud/planningCloudCompatibility.js'
 import { areCloudDocumentsEqual } from '../../lib/cloudSyncDiff.js'
 import { getSafeCloudSyncError } from '../../lib/cloudSyncQueue.js'
 import { getPlanningCacheKey, getPlanningEntityLocation } from '../planningEntityLocation.js'
@@ -74,6 +75,7 @@ async function rowsForUid(storeName, uid) {
 
 /** Desa l'entitat i la seva operació pendent dins la mateixa transacció. */
 export async function savePlanningEntityLocally(uid, entity, context = {}) {
+  entity = withoutPlanningViewContext(entity)
   const location = getPlanningEntityLocation(entity, { ...context, ownerUid: uid })
   const cacheKey = getPlanningCacheKey(uid, location.path)
   const queuedAt = context.now || new Date().toISOString()
