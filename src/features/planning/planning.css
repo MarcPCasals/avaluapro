@@ -874,3 +874,7 @@
 .planning-resource-options { display: grid; gap: 8px; padding-top: 12px; }
 
 .planning-unit-resources { grid-column: 1 / -1; }
+
+.planning-resource-option.already-assigned .planning-resource-option-text { color: #64748b; }
+.planning-resource-option.already-assigned { background: #f8fafc; border-radius: 6px; padding: 5px 7px; }
+.planning-resource-option.already-assigned input { opacity: 1; cursor: pointer; }

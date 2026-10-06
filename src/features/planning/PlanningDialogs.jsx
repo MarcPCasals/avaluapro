@@ -347,7 +347,7 @@ function ActivityCurriculumPicker({ competencies, onChange, selections }) {
   )
 }
 
-export function ActivityDialog({ availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, planningUnit, students = [] }) {
+export function ActivityDialog({ activities = [], availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, planningUnit, students = [] }) {
   const [values, setValues] = useState(() => ({
     description: initialValue?.description || '',
     evidenceMode: initialValue?.evidenceMode || 'none',
@@ -454,7 +454,7 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       {values.type === 'activity' && (
         <PlanningDiversityEditor classes={classes} measures={diversityMeasures} onChange={setDiversityMeasures} students={students} />
       )}
-      <PlanningResourcePicker unit={planningUnit} selections={resourceSelections} onChange={setResourceSelections} />
+      <PlanningResourcePicker activities={activities} activityId={initialValue?.id || ''} unit={planningUnit} selections={resourceSelections} onChange={setResourceSelections} />
       <section className="planning-material-editor">
         <div><div><strong>Materials</strong><span>Un mateix material pot tenir recurs d’alumnat i recurs opcional del docent.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
         {materials.map((material, index) => (
