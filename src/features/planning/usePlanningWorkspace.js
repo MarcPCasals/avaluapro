@@ -37,7 +37,7 @@ import {
   getPlanningActivityOverrideSnapshot,
   getPlanningUnitsForClass,
 } from '../../domain/planning/classPlanning'
-import { applyImprovementProposals, movePlanningActivityInSequence } from '../../domain/planning/rules'
+import { applyImprovementProposals, movePlanningActivityInSequence, movePlanningPhaseInSequence } from '../../domain/planning/rules'
 import { summarizeCompletedActivityIds } from '../../domain/planning/scheduler'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
@@ -816,6 +816,14 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return result
   }, [activities, persist])
 
+  const movePhase = useCallback(async (move) => {
+    const result = movePlanningPhaseInSequence(phases, move, { now: new Date().toISOString() })
+    if (result.changedPhases.length === 0) return result
+    await persist(result.changedPhases)
+    setPhases(sortByOrder(result.phases))
+    return result
+  }, [phases, persist])
+
   const saveGroupActivitySnapshots = useCallback(async (nextEffectiveActivities, activityIds, hiddenIds = []) => {
     if (!activeApplication || !activePlanningUnit) {
       throw new Error('No s’ha trobat la connexió d’aquesta classe amb la UP.')
@@ -1318,6 +1326,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     phases,
     ownedPlanningUnits: planningUnits,
     planningUnits: allPlanningUnits,
+    movePhase,
     moveActivity,
     moveActivityForActiveClass,
     removeActivity,

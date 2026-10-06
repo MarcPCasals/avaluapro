@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  AlertTriangle, ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
+  AlertTriangle, ArrowDown, ArrowUp, ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
   Plus, RotateCcw, Trash2, X,
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -52,6 +52,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
       data-phase-id={activity.phaseId}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
+        if (event.dataTransfer.getData('text/plain').startsWith('phase:')) return
         event.preventDefault()
         event.stopPropagation()
         onDrop(activity.phaseId, activity.id, event.dataTransfer.getData('text/plain'))
@@ -168,8 +169,11 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
   )
 }
 
-export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onSetManualCompletion, phases, planningUnit }) {
+export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onMovePhase, onSetManualCompletion, phases, planningUnit }) {
   const [dragId, setDragId] = useState('')
+  const [phaseDragId, setPhaseDragId] = useState('')
+  const [phaseDropId, setPhaseDropId] = useState('')
+  const [phaseMoveBusy, setPhaseMoveBusy] = useState(false)
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
   const flatPhases = useMemo(() => orderedPhases(phases), [phases])
@@ -189,6 +193,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
   const drop = async (targetPhaseId, targetActivityId = null, transferredActivityId = '') => {
+    if (phaseDragId || transferredActivityId.startsWith('phase:')) return
     const activityId = transferredActivityId || dragId
     if (!activityId) return
     setDragId('')
@@ -216,6 +221,47 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
       targetActivityId: following?.phaseId === neighbour.phaseId ? following.id : null,
       targetPhaseId: neighbour.phaseId,
     })
+  }
+  const phaseSiblings = (phase) => flatPhases.filter((item) =>
+    (item.parentPhaseId || null) === (phase.parentPhaseId || null))
+  const finishPhaseDrag = () => {
+    setPhaseDragId('')
+    setPhaseDropId('')
+  }
+  const movePhase = async (phaseId, targetPhaseId) => {
+    finishPhaseDrag()
+    if (phaseMoveBusy || phaseId === targetPhaseId) return
+    setPhaseMoveBusy(true)
+    try {
+      await onMovePhase({ phaseId, targetPhaseId })
+    } finally {
+      setPhaseMoveBusy(false)
+    }
+  }
+  const movePhaseByDirection = (phase, direction) => {
+    const siblings = phaseSiblings(phase)
+    const index = siblings.findIndex((item) => item.id === phase.id)
+    if (!siblings[index + direction]) return
+    return movePhase(phase.id, direction < 0 ? siblings[index - 1].id : siblings[index + 2]?.id || null)
+  }
+  const dropPhase = (phase, clientY, sourceId = phaseDragId) => {
+    const source = flatPhases.find((item) => item.id === sourceId)
+    if (!source || source.id === phase.id || !phaseSiblings(source).some((item) => item.id === phase.id)) {
+      finishPhaseDrag()
+      return
+    }
+    const header = globalThis.document?.querySelector(`[data-sequence-phase-id="${phase.id}"] > header`)
+    const rect = header?.getBoundingClientRect()
+    const after = rect && clientY > rect.top + rect.height / 2
+    const siblings = phaseSiblings(phase).filter((item) => item.id !== sourceId)
+    const index = siblings.findIndex((item) => item.id === phase.id)
+    return movePhase(sourceId, after ? siblings[index + 1]?.id || null : phase.id)
+  }
+  const touchPhaseDrop = (clientX, clientY) => {
+    const target = globalThis.document?.elementFromPoint(clientX, clientY)?.closest?.('[data-sequence-phase-id]')
+    const phase = flatPhases.find((item) => item.id === target?.dataset.sequencePhaseId)
+    if (phase) return dropPhase(phase, clientY)
+    finishPhaseDrag()
   }
   const remove = async (activity) => {
     if (!globalThis.confirm?.(`Vols eliminar «${activity.title}» de la seqüència?`)) return
@@ -251,7 +297,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
       <div className="planning-sequence-heading">
         <div className="planning-section-title">
           <span>03</span>
-          <div className="contextual-section-title"><h3>Seqüència d’activitats</h3><ContextualHelp title="Seqüència d’activitats">Ordena les activitats, indicacions i transicions tal com es treballaran. La temporització servirà després per distribuir-les a l’Agenda.</ContextualHelp></div>
+          <div className="contextual-section-title"><h3>Seqüència d’activitats</h3><ContextualHelp title="Seqüència d’activitats">Ordena les activitats, indicacions i transicions tal com es treballaran. La temporització servirà després per distribuir-les a l’Agenda. Mou una fase o subfase sencera amb la nansa del títol o les fletxes. Conserva totes les activitats i el seu nom; les subfases es reordenen dins de la mateixa fase mare.</ContextualHelp></div>
         </div>
         <div className="planning-sequence-tools">
           {completedActivitiesLoading && <span className="planning-completed-loading">Comprovant activitats fetes…</span>}
@@ -280,11 +326,61 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
             ? allPhaseActivities
             : allPhaseActivities.filter((activity) => !completedActivityIds.has(activity.id))
           if (!showCompleted && allPhaseActivities.length > 0 && phaseActivities.length === 0) return null
+          const siblings = phaseSiblings(phase)
+          const siblingIndex = siblings.findIndex((item) => item.id === phase.id)
           return (
-            <section className={`planning-sequence-phase ${phase.kind} ${phase.depth === 0 ? 'root-phase' : 'subphase'}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
+            <section
+              data-sequence-phase-id={phase.id}
+              onDragOver={(event) => {
+                if (!phaseDragId) return
+                event.preventDefault()
+                if (siblings.some((item) => item.id === phaseDragId) && phase.id !== phaseDragId) setPhaseDropId(phase.id)
+              }}
+              onDrop={(event) => {
+                const transferred = event.dataTransfer.getData('text/plain')
+                if (!phaseDragId && !transferred.startsWith('phase:')) return
+                event.preventDefault()
+                event.stopPropagation()
+                dropPhase(phase, event.clientY, phaseDragId || transferred.slice(6))
+              }}
+              className={`planning-sequence-phase ${phase.kind} ${phase.depth === 0 ? 'root-phase' : 'subphase'} ${phaseDragId === phase.id ? 'phase-dragging' : ''} ${phaseDropId === phase.id ? 'phase-drop-target' : ''}`} key={phase.id} style={{ '--phase-depth': phase.depth }}>
               <header>
-                <div><span /><div><strong>{phase.depth === 0 ? `FASE ${rootPhaseNumberById.get(phase.id)} — ${phase.title.toLocaleUpperCase('ca')}` : phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
+                <div>
+                  <button
+                    aria-label={`Reordenar ${phase.parentPhaseId ? 'subfase' : 'fase'} ${phase.title}. Arrossega o prem Alt i fletxa amunt o avall`}
+                    className="planning-drag-handle planning-phase-drag-handle"
+                    disabled={phaseMoveBusy || siblings.length < 2}
+                    onKeyDown={(event) => {
+                      if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return
+                      event.preventDefault()
+                      movePhaseByDirection(phase, event.key === 'ArrowUp' ? -1 : 1)
+                    }}
+                    onPointerCancel={finishPhaseDrag}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return
+                      event.preventDefault()
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      setDragId('')
+                      setPhaseDragId(phase.id)
+                    }}
+                    onPointerMove={(event) => {
+                      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+                      const target = globalThis.document?.elementFromPoint(event.clientX, event.clientY)?.closest?.('[data-sequence-phase-id]')
+                      const targetId = target?.dataset.sequencePhaseId
+                      setPhaseDropId(targetId !== phase.id && siblings.some((item) => item.id === targetId) ? targetId : '')
+                    }}
+                    onPointerUp={(event) => {
+                      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+                      event.currentTarget.releasePointerCapture(event.pointerId)
+                      touchPhaseDrop(event.clientX, event.clientY)
+                    }}
+                    title="Moure tot el bloc amb les seves activitats"
+                    type="button"
+                  ><Menu size={18} /></button>
+                  <span /><div><strong>{phase.depth === 0 ? `FASE ${rootPhaseNumberById.get(phase.id)} — ${phase.title.toLocaleUpperCase('ca')}` : phase.title}</strong><small>{totals.totalsByPhase[phase.id] || 0} min · {phaseActivities.length} elements</small></div></div>
                 <div className="planning-sequence-phase-actions">
+                  <button aria-label={`Pujar ${phase.title}`} className="icon-action planning-phase-move" disabled={phaseMoveBusy || siblingIndex === 0} onClick={() => movePhaseByDirection(phase, -1)} title="Pujar tot el bloc" type="button"><ArrowUp size={15} /></button>
+                  <button aria-label={`Baixar ${phase.title}`} className="icon-action planning-phase-move" disabled={phaseMoveBusy || siblingIndex === siblings.length - 1} onClick={() => movePhaseByDirection(phase, 1)} title="Baixar tot el bloc" type="button"><ArrowDown size={15} /></button>
                   <button aria-label={`Afegir subfase a ${phase.title}`} className="icon-action" onClick={() => onAddChildPhase(phase.id)} title="Afegir subfase" type="button"><Plus size={15} /></button>
                   <button aria-label={`Editar ${phase.title}`} className="icon-action" onClick={() => onEditPhase(phase)} title="Editar fase" type="button"><Pencil size={15} /></button>
                   <button
@@ -302,7 +398,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                 className={`planning-activity-dropzone ${phaseActivities.length === 0 ? 'empty' : ''}`}
                 data-phase-id={phase.id}
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => { event.preventDefault(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}
+                onDrop={(event) => { if (phaseDragId || event.dataTransfer.getData('text/plain').startsWith('phase:')) return; event.preventDefault(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}
               >
                 {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
                   <ActivityRow
@@ -326,7 +422,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                     sessionDuration={sessionDuration}
                   />
                 ))}
-                {phaseActivities.length > 0 && <div className="planning-drop-at-end" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}>Deixa anar aquí per posar-lo al final</div>}
+                {phaseActivities.length > 0 && <div className="planning-drop-at-end" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (phaseDragId || event.dataTransfer.getData('text/plain').startsWith('phase:')) return; event.preventDefault(); event.stopPropagation(); drop(phase.id, null, event.dataTransfer.getData('text/plain')) }}>Deixa anar aquí per posar-lo al final</div>}
               </div>
             </section>
           )

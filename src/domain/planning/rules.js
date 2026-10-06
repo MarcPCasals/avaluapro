@@ -230,6 +230,30 @@ export function movePlanningActivityInSequence(
   }
 }
 
+/** Reordena fases germanes conservant els vincles de tot el seu contingut. */
+export function movePlanningPhaseInSequence(phases, { phaseId, targetPhaseId = null }, options = {}) {
+  const source = phases.find((phase) => phase.id === phaseId)
+  if (!source) throw new Error('No s’ha trobat la fase que es vol moure')
+  if (phaseId === targetPhaseId) return { phases: [...phases], changedPhases: [] }
+  const parentId = source.parentPhaseId || null
+  const target = targetPhaseId ? phases.find((phase) => phase.id === targetPhaseId) : null
+  if (targetPhaseId && (!target || (target.parentPhaseId || null) !== parentId
+    || target.planningUnitId !== source.planningUnitId)) {
+    throw new Error('Només es poden reordenar fases dins de la mateixa fase mare')
+  }
+  const siblings = phases
+    .filter((phase) => phase.id !== phaseId && (phase.parentPhaseId || null) === parentId
+      && phase.planningUnitId === source.planningUnitId)
+    .sort((left, right) => Number(left.order) - Number(right.order))
+  const targetIndex = target ? siblings.findIndex((phase) => phase.id === target.id) : siblings.length
+  siblings.splice(targetIndex, 0, source)
+  const changedPhases = siblings.flatMap((phase, order) => Number(phase.order) === order ? [] : [{
+    ...phase, order, updatedAt: options.now || new Date().toISOString(),
+  }])
+  const changedById = new Map(changedPhases.map((phase) => [phase.id, phase]))
+  return { phases: phases.map((phase) => changedById.get(phase.id) || phase), changedPhases }
+}
+
 /**
  * Planifica un canvi d'activitat sense barrejar la UP ideal amb el que només
  * ha passat en un grup. L'únic abast que modifica la base és baseAndGroup.

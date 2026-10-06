@@ -288,7 +288,7 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
   const [values, setValues] = useState(unit)
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
@@ -429,6 +429,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         onEdit={onEditActivity}
         onEditPhase={onEditPhase}
         onMove={onMoveActivity}
+        onMovePhase={onMovePhase}
         onSetManualCompletion={setManualCompletion}
         phases={phases}
         planningUnit={values}
@@ -802,6 +803,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onMoveActivity={(move) => handleActivityAction(() => withConnectedConfirmation(
                     () => workspace.moveActivity(move),
                     () => workspace.moveActivityForActiveClass(move),
+                  ))}
+                  onMovePhase={(move) => handleActivityAction(() => withConnectedConfirmation(
+                    () => workspace.movePhase(move),
                   ))}
                   onOpenDocuments={() => setDialog('documents')}
                   onOpenHistory={() => setDialog('history')}
