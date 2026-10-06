@@ -1,3 +1,4 @@
+import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown,
@@ -14,7 +15,7 @@ import {
 } from './PlanningDialogs'
 import { PlanningActivitySequence } from './PlanningActivitySequence'
 import { PlanningDocumentDialog } from './PlanningDocumentDialog'
-import { PlanningPedagogicalContent } from './PlanningPedagogicalContent'
+import { PlanningPedagogicalContent, PlanningUnitResources } from './PlanningPedagogicalContent'
 import { PlanningRemindersDialog } from './PlanningRemindersDialog'
 import { PlanningSharingDialog } from './PlanningSharingDialog'
 import { PlanningSharedView } from './PlanningSharedView'
@@ -387,7 +388,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         <summary>
           <div className="planning-section-title">
             <span>01–02</span>
-            <div className="contextual-section-title"><h3>Informació inicial de la UP</h3><ContextualHelp title="Informació inicial de la UP">Reuneix la identificació de la unitat, el repte, el producte final i la llengua de vehiculació.</ContextualHelp></div>
+            <div className="contextual-section-title"><h3>Informació inicial de la UP</h3><ContextualHelp title="Informació inicial de la UP">Reuneix la identificació de la unitat, el repte, el producte final, la llengua de vehiculació i els recursos de tota la UP.</ContextualHelp></div>
           </div>
           <ChevronDown size={18} />
         </summary>
@@ -413,6 +414,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
             <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
           </section>
+          <PlanningUnitResources onChange={update} values={values} />
         </div>
       </details>
       <PlanningActivitySequence
@@ -434,7 +436,8 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         phases={phases}
         planningUnit={values}
       />
-      <PlanningPedagogicalContent activities={activities} completedActivityIds={allCompletedActivityIds} catalog={curriculumCatalog} onChange={update} values={values} />
+      <PlanningResourceCoverage unit={values} activities={activities} completedActivityIds={allCompletedActivityIds} />
+      <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
       <ImprovementPanel onAccept={acceptImprovements} onError={onError} proposals={values.improvementProposals} />
     </form>
   )

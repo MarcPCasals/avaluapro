@@ -867,3 +867,10 @@
 .planning-activity-resources { grid-column: 1 / -1; padding: 8px 12px; border-top: 1px solid #ede9fe; font-size: 12px; color: #475569; }
 .planning-activity-resources summary { cursor: pointer; color: #6d28d9; font-weight: 700; }
 .planning-activity-resources li { margin-top: 6px; }
+
+.planning-resource-group, .planning-resource-category { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+.planning-resource-group > summary, .planning-resource-category > summary, .planning-resource-coverage > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #334155; }
+.planning-resource-group > summary small, .planning-resource-category > summary small { display: inline; margin-left: 10px; font-size: 11px; font-weight: 500; color: #64748b; }
+.planning-resource-options { display: grid; gap: 8px; padding-top: 12px; }
+
+.planning-unit-resources { grid-column: 1 / -1; }

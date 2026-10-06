@@ -1,4 +1,3 @@
-import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useId, useMemo, useState } from 'react'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -103,30 +102,27 @@ function TextCollection({ items, label, onChange }) {
 
 function ResourceSection({ label, onChange, value }) {
   return (
-    <section className="planning-resource-section">
-      <header><strong>{label}</strong><span>Els tres apartats de la plantilla oficial</span></header>
+    <details className="planning-resource-section planning-resource-group">
+      <summary>{label}<small>{RESOURCE_FIELDS.reduce((total, field) => total + (value[field.key]?.length || 0), 0)} recursos</small></summary>
       {RESOURCE_FIELDS.map((field) => (
-        <TextCollection
-          items={value[field.key] || []}
-          key={field.key}
-          label={field.label}
-          onChange={(items) => onChange({ ...value, [field.key]: items })}
-        />
+        <details className="planning-resource-category" key={field.key}>
+          <summary>{field.label}<small>{value[field.key]?.length || 0} recursos</small></summary>
+          <TextCollection
+            items={value[field.key] || []}
+            label={field.label}
+            onChange={(items) => onChange({ ...value, [field.key]: items })}
+          />
+        </details>
       ))}
-    </section>
+    </details>
   )
 }
 
-export function PlanningPedagogicalContent({ activities = [], completedActivityIds = new Set(), catalog, onChange, values }) {
+export function PlanningPedagogicalContent({ catalog, onChange, values }) {
   const curriculum = values.curriculum || {
     competencies: [], expectedLearnings: [], assessmentCriteria: [], indicators: [],
   }
-  const resourceSections = normalizeResourceSections(values.resourceSections, values)
   const updateCurriculum = (key, items) => onChange('curriculum', { ...curriculum, [key]: items })
-  const updateResourceSection = (key, section) => onChange('resourceSections', {
-    ...resourceSections,
-    [key]: section,
-  })
   return (
     <section className="planning-editor-section planning-pedagogical-section">
       <div className="planning-section-title">
@@ -148,15 +144,20 @@ export function PlanningPedagogicalContent({ activities = [], completedActivityI
           ))}
         </div>
       </details>
-      <details>
-        <summary>Recursos de competències</summary>
-        <div className="planning-resource-grid">
-          <ResourceSection label="Competències específiques" onChange={(section) => updateResourceSection('specific', section)} value={resourceSections.specific} />
-          <ResourceSection label="Competències transversals" onChange={(section) => updateResourceSection('transversal', section)} value={resourceSections.transversal} />
-        </div>
-      </details>
-      <PlanningResourceCoverage unit={values} activities={activities} completedActivityIds={completedActivityIds} />
       <p className="planning-content-help">Les opcions d’AvaluaPro són suggeriments. En desar, la UP conserva el text visible perquè continuï sent llegible encara que el currículum d’avaluació canviï més endavant.</p>
     </section>
   )
+}
+
+export function PlanningUnitResources({ onChange, values }) {
+  const resourceSections = normalizeResourceSections(values.resourceSections, values)
+  const updateSection = (key, section) => onChange('resourceSections', { ...resourceSections, [key]: section })
+  return <section className="planning-editor-section planning-unit-resources">
+    <h3>Recursos de tota la UP</h3>
+    <p className="planning-content-help">Defineix aquí els recursos de la unitat, un per línia, i desa la UP. Després podràs seleccionar-los dins de cada activitat. Si la UP s’ha importat, revisa aquí la llista importada.</p>
+    <div className="planning-resource-grid">
+      <ResourceSection label="Competències específiques" onChange={section => updateSection('specific', section)} value={resourceSections.specific} />
+      <ResourceSection label="Competències transversals" onChange={section => updateSection('transversal', section)} value={resourceSections.transversal} />
+    </div>
+  </section>
 }
