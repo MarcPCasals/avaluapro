@@ -68,6 +68,7 @@ import {
   getManuallyCompletedActivityIds,
   getSessionCandidateKey,
   moveTimetableSlot,
+  moveAgendaSessionItem,
   orderActivitiesForScheduling,
   reserveLastLogicalSessionCandidates,
   reconcileSessionOccurrences,
@@ -1697,6 +1698,17 @@ export function useAgendaWorkspace(user, classes = []) {
     return { ...preview, setup }
   }, [activeAcademicYear, loadSchedulingSetup])
 
+  const reorderSessionItem = useCallback(async (bundle, item, direction) => {
+    const current = await loadSessionDetails(bundle)
+    const result = moveAgendaSessionItem(current, item.id, direction,
+      { now: new Date().toISOString(), calendarEvents })
+    if (result.changedItems.length) await persist(result.changedItems.map((entity) => ({ entity,
+      context: { planningUnitId: current.planningUnit.id, applicationId: current.application.id, sessionId: current.session.id } })))
+    const updated = { ...current, items: result.items }
+    setSessionBundles((bundles) => bundles.map((candidate) => candidate.session.id === updated.session.id ? updated : candidate))
+    return updated
+  }, [calendarEvents, loadSessionDetails, persist])
+
   const loadSessionActivityChoices = useCallback(async (bundle) => {
     const setup = await loadSchedulingSetup({ applicationId: bundle.application.id,
       classId: bundle.session.classId, planningUnitId: bundle.planningUnit.id })
@@ -2203,6 +2215,7 @@ export function useAgendaWorkspace(user, classes = []) {
     loadSessionReplacementActivities,
     loadSessionActivityChoices,
     addSessionActivity,
+    reorderSessionItem,
     buildContinuationPreview,
     compactAgendaSession,
     confirmAgendaRecoveryPreview,

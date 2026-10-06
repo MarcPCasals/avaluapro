@@ -1,11 +1,11 @@
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
+  AlertTriangle, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
   ExternalLink, Flag, History, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, StickyNote, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, combineAgendaSessionItems, groupParallelSessionBundles, getClassPlanningSubjects, resolvePlanningSubject, planningSubjectsMatch, sessionMatchesPlanningSubject, buildTimetableSessionCandidates } from '../../domain/planning'
+import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, canReorderAgendaSession, isBabeliumItem, combineAgendaSessionItems, groupParallelSessionBundles, getClassPlanningSubjects, resolvePlanningSubject, planningSubjectsMatch, sessionMatchesPlanningSubject, buildTimetableSessionCandidates } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -117,7 +117,7 @@ function sessionMaterials(bundle) {
   return [...new Map(materials.map((item) => [item.url, item])).values()]
 }
 
-function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap, onLoadActivities, onAddActivity }) {
+function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onMoveItem, onResolveGap, onLoadActivities, onAddActivity }) {
   const [removalItemId, setRemovalItemId] = useState('')
   const [removing, setRemoving] = useState(false)
   const [removalError, setRemovalError] = useState('')
@@ -132,7 +132,16 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   const [activityError, setActivityError] = useState('')
   const [resolvingGap, setResolvingGap] = useState(false)
   const [gapError, setGapError] = useState('')
-  const busy = removing || saving || loadingActivities || resolvingGap
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState('')
+  const moveItem = async (item, direction) => {
+    setMoving(true)
+    setMoveError('')
+    try { await onMoveItem(item, direction) }
+    catch (error) { setMoveError(error.message || 'No s’ha pogut canviar l’ordre.') }
+    finally { setMoving(false) }
+  }
+  const busy = removing || saving || loadingActivities || resolvingGap || moving
   const resolveGap = async () => {
     if (busy) return
     setResolvingGap(true)
@@ -190,7 +199,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   }
   if (!bundle) return null
   const materials = sessionMaterials(bundle)
-  const visibleItems = combineAgendaSessionItems(bundle.items, bundle.planningUnit.id)
+  const visibleItems = combineAgendaSessionItems([...bundle.items].sort((a, b) => Number(a.order) - Number(b.order)), bundle.planningUnit.id)
   const sessionLoad = getSessionLoad(bundle.items, bundle.session.durationMinutes)
   const freeMinutes = Math.max(0, sessionLoad.programmableMinutes - sessionLoad.plannedMinutes)
   const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
@@ -209,13 +218,15 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       {editNotice && <p className="agenda-session-edit-notice" role="status">{editNotice}</p>}
       <div className="agenda-session-activities">
         <div className="agenda-session-subheading"><ListChecks size={16} /><strong>Activitats</strong><span>{visibleItems.length}</span>{onAddActivity && onLoadActivities && !blockingEvent && getAgendaSessionItemRemovalState(bundle, { id: 'new-activity' }).canRemove && <button className="secondary-action compact" disabled={busy} onClick={openActivityPicker} type="button">{loadingActivities ? <Loader2 className="spin" size={14} /> : <Plus size={14} />}Afegir activitat</button>}</div>
+        {moveError && <p role="alert">{moveError}</p>}
+        {moving && <p role="status"><Loader2 className="spin" size={14} /> Desant l’ordre…</p>}
         {activityError && <p role="alert">{activityError}</p>}
         {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
-        {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item) => {
+        {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item, itemIndex) => {
           const description = item.sourceActivity?.description?.trim()
           const removalState = getAgendaSessionItemRemovalState(bundle, item)
           const confirmingRemoval = removalItemId === item.id
-          return <li className={onRemoveItem || onSaveItem ? 'agenda-session-item-removable' : undefined} key={item.id}>
+          return <li className={onRemoveItem || onSaveItem || onMoveItem ? 'agenda-session-item-removable' : undefined} key={item.id}>
             <span />
             <div><strong>{item.title}</strong><small>{item.plannedMinutes ? `${item.plannedMinutes} min` : 'Sense temps'}{item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}</small>{description && <details className="agenda-activity-description"><summary><ChevronDown size={13} />Descripció</summary><FormattedText as="p" text={description} /></details>}
               {editItemId === item.id && <form className="agenda-session-item-editor" onSubmit={(event) => saveItem(event, item)}>
@@ -231,7 +242,11 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
                 {removalError && <p role="alert">{removalError}</p>}
               </div>}
             </div>
-            {(onRemoveItem || onSaveItem) && <div className="agenda-session-item-tools">
+            {(onRemoveItem || onSaveItem || onMoveItem) && <div className="agenda-session-item-tools">
+              {onMoveItem && <>
+                <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || !removalState.canRemove || itemIndex === 0 || (visibleItems[itemIndex - 1] && isBabeliumItem(visibleItems[itemIndex - 1]))} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>
+                <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || !removalState.canRemove || itemIndex === visibleItems.length - 1} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>
+              </>}
               {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || (item.combinedItems || [item]).some((part) => !part.sourceActivityId)} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
               {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? 'Treure de la calendarització i conservar' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
             </div>}
@@ -685,6 +700,6 @@ export function AgendaTimelineView({
   )
 }
 
-export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onResolveGap, onLoadActivities, onAddActivity }) {
-  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onRemoveItem={onRemoveItem} onSaveItem={onSaveItem} onResolveGap={onResolveGap} onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} />
+export function AgendaSessionDetail({ bundle, calendarEvents, classes, onAdjust, onOpenClassroom, onRemoveItem, onSaveItem, onMoveItem, onResolveGap, onLoadActivities, onAddActivity }) {
+  return <SessionDetail bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={onAdjust} onOpenClassroom={onOpenClassroom} onRemoveItem={onRemoveItem} onSaveItem={onSaveItem} onMoveItem={onMoveItem} onResolveGap={onResolveGap} onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} />
 }

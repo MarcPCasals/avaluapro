@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, createCalendarSession, createSessionItem, createBabeliumItem } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, buildSessionActivityAddition, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -125,4 +125,45 @@ test('recuperar només A no retira contingut de B i no permet afegir a la sessi�
   const added = buildSessionActivityAddition(data, 'exam', 30, options)
   assert.deepEqual(added.removedItems.map((i) => i.id), ['blocked-A-exam'])
   assert.throws(() => buildSessionActivityAddition({ ...data, targetSessionId: 'blocked-A' }, 'exam', 30, options), /no es fa/)
+})
+
+test('moure una activitat amunt i avall desa l’ordre i conserva identitats, minuts i fragments', () => {
+  const data = bundle('target', '', [['atoms', 40], ['theory', 10]])
+  data.items[1].segmentIndex = 3
+  data.items[1].segmentCount = 3
+  const original = structuredClone(data)
+  const result = moveAgendaSessionItem(data, 'target-theory', 'up', options)
+  assert.deepEqual(result.items.map((i) => [i.id, i.order]), [['target-theory', 0], ['target-atoms', 1]])
+  assert.equal(result.items[0].segmentIndex, 3)
+  assert.equal(result.items[0].segmentCount, 3)
+  assert.equal(result.items.reduce((n, i) => n + i.plannedMinutes, 0), 50)
+  const savedById = new Map(result.changedItems.map((i) => [i.id, i]))
+  const reloaded = { ...data, items: data.items.map((i) => savedById.get(i.id) || i).sort((a, b) => a.order - b.order) }
+  assert.deepEqual(reloaded.items.map((i) => i.id), ['target-theory', 'target-atoms'])
+  assert.deepEqual(moveAgendaSessionItem(reloaded, 'target-theory', 'down', options).items.map((i) => i.id), original.items.map((i) => i.id))
+  assert.deepEqual(data, original)
+})
+
+test('els fragments combinats es mouen junts i Babèlium conserva el primer lloc', () => {
+  const data = bundle('target', '', [['atoms', 20], ['theory', 10]])
+  const tail = createSessionItem({ ...data.items[0], id: 'atoms-tail', plannedMinutes: 20, order: 2 }, options)
+  data.items.push(tail)
+  data.items.unshift(createBabeliumItem(data.session, options))
+  data.items.forEach((i, index) => { i.order = index })
+  const result = moveAgendaSessionItem(data, 'target-atoms', 'down', options)
+  assert.deepEqual(result.items.map((i) => i.id), ['babelium_target', 'target-theory', 'target-atoms', 'atoms-tail'])
+  assert.equal(combineAgendaSessionItems(result.items)[2].plannedMinutes, 40)
+  assert.deepEqual(moveAgendaSessionItem({ ...data, items: result.items }, 'target-theory', 'up', options).changedItems, [])
+  assert.throws(() => moveAgendaSessionItem(data, 'babelium_target', 'down', options), /trobat/)
+})
+
+test('no reordena sessions anul·lades ni amb dades de classe i no sobrepassa els extrems', () => {
+  const data = bundle('target', '', [['atoms', 40], ['theory', 10]])
+  for (const extras of [{ status: 'held' }, { classroomOpenedAt: options.now }, { attendanceConfirmedAt: options.now }]) {
+    assert.throws(() => moveAgendaSessionItem({ ...data, session: { ...data.session, ...extras } }, 'target-theory', 'up', options), /no es pot/)
+  }
+  assert.throws(() => moveAgendaSessionItem(data, 'target-theory', 'up', { ...options,
+    calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-09', classIds: ['fictional'] }] }), /no es pot/)
+  assert.deepEqual(moveAgendaSessionItem(data, 'target-atoms', 'up', options).changedItems, [])
+  assert.deepEqual(moveAgendaSessionItem(data, 'target-theory', 'down', options).changedItems, [])
 })
