@@ -4494,6 +4494,8 @@ export function TutoringView() {
   const tutorialStudentRoles = useAvaluaproStore((state) => state.tutorialStudentRoles)
   const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
   const updateTutorialMark = useAvaluaproStore((state) => state.updateTutorialMark)
+  const saveClassHalfGroupProposal = useAvaluaproStore((state) => state.saveClassHalfGroupProposal)
+  const deleteClassHalfGroupProposal = useAvaluaproStore((state) => state.deleteClassHalfGroupProposal)
   const applyClassHalfGroups = useAvaluaproStore((state) => state.applyClassHalfGroups)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
@@ -9905,6 +9907,9 @@ export function TutoringView() {
               key={linkedClassId}
               students={classStudents}
               relations={effectiveTutorialRelations}
+              savedProposals={linkedClass?.halfGroupProposals || []}
+              onSave={(proposal) => saveClassHalfGroupProposal(linkedClassId, proposal)}
+              onDelete={(proposalId) => deleteClassHalfGroupProposal(linkedClassId, proposalId)}
               onApply={async (assignments, lockedIds) => {
                 await applyClassHalfGroups(linkedClassId, assignments, lockedIds)
                 setManualCooperativeGroups([])

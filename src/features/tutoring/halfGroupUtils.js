@@ -29,7 +29,15 @@ function isBetter(a, b) {
       (a.negative === b.negative && a.positive > b.positive)))))
 }
 
-export function proposeHalfGroups(students, relations, locks = {}) {
+export function halfGroupPartitionKey(students, assignments) {
+  const ids = students.map((student) => student.id).sort()
+  if (Object.keys(assignments || {}).length !== ids.length || ids.some((id) => !HALF_GROUP_NAMES.includes(assignments?.[id]))) return ''
+  const key = ids.map((id) => assignments[id] === HALF_GROUP_NAMES[0] ? 'A' : 'B').join('')
+  const reverse = key.replace(/[AB]/g, (letter) => letter === 'A' ? 'B' : 'A')
+  return key < reverse ? key : reverse
+}
+
+export function proposeHalfGroups(students, relations, locks = {}, { excludedProposals = [], variant = 0 } = {}) {
   const ordered = [...students].sort((a, b) => a.id.localeCompare(b.id))
   const activeLocks = Object.fromEntries(ordered.filter((student) => HALF_GROUP_NAMES.includes(locks[student.id])).map((student) => [student.id, locks[student.id]]))
   const lockedA = Object.values(activeLocks).filter((name) => name === HALF_GROUP_NAMES[0]).length
@@ -37,11 +45,14 @@ export function proposeHalfGroups(students, relations, locks = {}) {
   const maxSize = Math.ceil(ordered.length / 2)
   if (lockedA > maxSize || lockedB > maxSize) throw new Error('Els bloquejos impedeixen equilibrar els mitjos grups. Desbloqueja algun alumne.')
   const sizeA = lockedB > Math.floor(ordered.length / 2) ? Math.floor(ordered.length / 2) : maxSize
+  const excluded = new Set(excludedProposals.map((assignments) => halfGroupPartitionKey(ordered, assignments)).filter(Boolean))
+  let minimumGenderGap = Infinity
   let best = null
   let bestScore = null
   const evaluate = (assignments) => {
     const score = { ...analyzeHalfGroups(ordered, relations, assignments), genderGap: halfGroupGenderGap(ordered, assignments) }
-    if (isBetter(score, bestScore)) {
+    minimumGenderGap = Math.min(minimumGenderGap, score.genderGap)
+    if (!excluded.has(halfGroupPartitionKey(ordered, assignments)) && isBetter(score, bestScore)) {
       best = { ...assignments }
       bestScore = score
     }
@@ -65,7 +76,7 @@ export function proposeHalfGroups(students, relations, locks = {}) {
     visit(0, sizeA, {})
   } else {
     // Deterministic multiple starts and improving swaps preserve equal sizes.
-    let seed = 719
+    let seed = (719 + variant * 101) >>> 0
     for (let start = 0; start < 40; start += 1) {
       const shuffled = ordered.filter((student) => !activeLocks[student.id])
       for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -96,6 +107,7 @@ export function proposeHalfGroups(students, relations, locks = {}) {
       }
     }
   }
+  if (!best || bestScore.genderGap > minimumGenderGap) throw new Error('No s’ha trobat cap altra proposta amb aquest equilibri i aquests bloquejos. Pots revisar els bloquejos o ajustar una proposta manualment.')
   // Keep A/B labels aligned with existing assignments where possible.
   const matches = ordered.filter((student) => student.halfGroup === best[student.id]).length
   const reverseMatches = ordered.filter((student) => student.halfGroup ===

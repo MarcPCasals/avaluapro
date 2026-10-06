@@ -1,3 +1,4 @@
+import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
 import { create } from 'zustand'
 import { createId } from '../lib/ids'
 import {
@@ -5752,6 +5753,22 @@ export const useAvaluaproStore = create((set, get) => ({
       .map((name) => ({ name: formatStudentNameForDisplay(name), halfGroup: '' }))
 
     await get().addStudents(classId, studentsToAdd)
+  },
+
+  saveClassHalfGroupProposal: async (classId, proposal) => {
+    if (!get().classes.some((item) => item.id === classId)) throw new Error('No s’ha trobat la classe.')
+    const createdAt = new Date().toISOString()
+    const saved = createHalfGroupProposal({ ...proposal, students: get().students.filter((student) => student.classId === classId), id: createId('half_group_proposal'), createdAt })
+    set((state) => ({ classes: state.classes.map((item) => item.id === classId
+      ? { ...item, halfGroupProposals: [...(item.halfGroupProposals || []), saved], updatedAt: createdAt } : item) }))
+    await persistCollections(set, get, ['classes'], { throwOnError: true })
+    return saved
+  },
+
+  deleteClassHalfGroupProposal: async (classId, proposalId) => {
+    set((state) => ({ classes: state.classes.map((item) => item.id === classId
+      ? { ...item, halfGroupProposals: (item.halfGroupProposals || []).filter((proposal) => proposal.id !== proposalId), updatedAt: new Date().toISOString() } : item) }))
+    await persistCollections(set, get, ['classes'], { throwOnError: true })
   },
 
   applyClassHalfGroups: async (classId, assignments, lockedIds = []) => {

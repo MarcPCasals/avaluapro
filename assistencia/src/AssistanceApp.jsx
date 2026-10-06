@@ -1,3 +1,4 @@
+import { createHalfGroupProposal } from '../../src/features/tutoring/halfGroupProposalUtils.js'
 import { StudentGroupGenderControls } from '../../src/features/students/StudentGroupGenderControls.jsx'
 import { SociogramInsights } from '../../src/features/tutoring/SociogramInsights.jsx'
 import { buildSocialSubgroups } from '../../src/features/tutoring/sociometricSubgroupUtils.js'
@@ -119,6 +120,7 @@ function AssistanceApp() {
   const [taskDemoDate, setTaskDemoDate] = useState('2026-10-02')
   const [taskDemoKey, setTaskDemoKey] = useState('')
   const dataset = useDataAdapter(assistanceAdapter)
+  const [syntheticHalfGroupProposals, setSyntheticHalfGroupProposals] = useState({})
   const [syntheticHalfGroups, setSyntheticHalfGroups] = useState({})
   const [syntheticGenders, setSyntheticGenders] = useState({})
   const [activeClassId, setActiveClassId] = useState(dataset.classes[0].id)
@@ -714,6 +716,13 @@ function AssistanceApp() {
               }} /></div>)}</details>
               <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
                 relations={dataset.sociometricRelations || []}
+                savedProposals={syntheticHalfGroupProposals[activeClassId] || []}
+                onSave={async (proposal) => {
+                  const saved = createHalfGroupProposal({ ...proposal, students: activeClassStudents, id: `synthetic-proposal-${Date.now()}`, createdAt: new Date().toISOString() })
+                  setSyntheticHalfGroupProposals((current) => ({ ...current, [activeClassId]: [...(current[activeClassId] || []), saved] }))
+                  return saved
+                }}
+                onDelete={async (id) => setSyntheticHalfGroupProposals((current) => ({ ...current, [activeClassId]: (current[activeClassId] || []).filter((proposal) => proposal.id !== id) }))}
                 appliedMessage="Mitjos grups ficticis aplicats només en memòria."
                 onApply={async (assignments) => { setSyntheticHalfGroups((current) => ({ ...current, ...assignments })); simulateAction('Proposta A/B comprovada només en memòria amb alumnat fictici.') }} />
 

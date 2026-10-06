@@ -30,3 +30,13 @@
 .relation-danger { background:#fee2e2; color:#991b1b; }
 .half-group-legend span { display:inline-block; padding:5px 8px; margin:4px 0; border-radius:5px; }
 .half-group-gender-counts { color:#475569; font-size:14px; }
+
+.half-group-save-row { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; margin:12px 0; }
+.half-group-save-row label { display:grid; gap:5px; font-weight:650; }
+.half-group-save-row input { max-width:100%; min-height:38px; border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font:inherit; }
+.half-group-save-row > span { flex-basis:100%; color:#475569; font-size:13px; }
+.half-group-saved-proposals { padding:12px; margin:12px 0; border:1px solid #cbd5e1; border-radius:10px; }
+.half-group-saved-proposals summary { cursor:pointer; font-weight:700; }
+.half-group-proposal-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; }
+.half-group-proposal-cards article { display:flex; flex-direction:column; align-items:flex-start; gap:7px; padding:12px; border:1px solid #dbeafe; border-radius:10px; background:#fff; }
+.half-group-proposal-cards small { color:#475569; }
