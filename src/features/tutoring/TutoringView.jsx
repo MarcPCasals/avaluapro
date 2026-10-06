@@ -1,3 +1,4 @@
+import { openGroupRosterExport } from './groupRosterExport.js'
 import { SociogramInsights } from './SociogramInsights'
 import { buildSocialSubgroups, getPositiveComponentMap } from './sociometricSubgroupUtils.js'
 import { GroupToolsMenu } from './GroupToolsMenu'
@@ -9905,6 +9906,7 @@ export function TutoringView() {
             />}
             {activeRelationshipTool === 'half-groups' && <HalfGroupsPanel
               key={linkedClassId}
+              className={linkedClass?.name || activeClass?.name}
               students={classStudents}
               relations={effectiveTutorialRelations}
               savedProposals={linkedClass?.halfGroupProposals || []}
@@ -10258,6 +10260,14 @@ export function TutoringView() {
                     <X aria-hidden="true" size={18} />
                   </button>
                 </header>
+                <button disabled={!visibleCooperativeGroups.length} onClick={() => {
+                  try {
+                    openGroupRosterExport(visibleCooperativeGroups.map((group) => ({ name: group.name, students: group.members.map((member) => member.student) })), { title: getCooperativeOutputTitle(), className: activeClass?.name })
+                  } catch (error) { setCooperativeCopyMessage(error.message) }
+                }} type="button">
+                  <FileDown aria-hidden="true" size={19} />
+                  <span><strong>Exportar llista amb fotos</strong><small>Imprimir o desar en PDF. Només grups, noms i fotos.</small></span>
+                </button>
                 <button onClick={() => handleCopyCooperativeGroups('teacher')} type="button">
                   <Clipboard aria-hidden="true" size={19} />
                   <span>

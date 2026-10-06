@@ -1,10 +1,11 @@
+import { halfGroupRoster, openGroupRosterExport } from './groupRosterExport.js'
 import { hasCurrentHalfGroupRoster } from './halfGroupProposalUtils.js'
 import { countStudentGenders, studentRelationWarning } from './genderBalanceUtils.js'
 import './HalfGroupsPanel.css'
 import { useState } from 'react'
 import { analyzeHalfGroups, HALF_GROUP_NAMES, proposeHalfGroups } from './halfGroupUtils.js'
 
-export function HalfGroupsPanel({ students, relations, onApply, savedProposals = [], onSave, onDelete, appliedMessage = 'Mitjos grups aplicats a tota l’aplicació.' }) {
+export function HalfGroupsPanel({ students, relations, onApply, savedProposals = [], onSave, onDelete, className = '', appliedMessage = 'Mitjos grups aplicats a tota l’aplicació.' }) {
   const [lockedIds, setLockedIds] = useState(() => students.filter((student) => student.halfGroupLocked).map((student) => student.id))
   const [draft, setDraft] = useState(null)
   const [proposalName, setProposalName] = useState('')
@@ -76,6 +77,11 @@ export function HalfGroupsPanel({ students, relations, onApply, savedProposals =
     <p className="half-group-legend"><span className="relation-warning">Groc: vincles negatius amb l’altre mig grup.</span> <span className="relation-danger">Vermell: vincles negatius dins del mig grup.</span> Són avisos sobre les relacions registrades, no etiquetes personals.</p>
     {classGenders.unknown > 0 && <p>{classGenders.unknown} alumne{classGenders.unknown === 1 ? '' : 's'} sense dada de noi/noia. Completa-la al perfil de l’alumne per millorar l’equilibri.</p>}
     <div className="half-groups-actions">
+      <button className="secondary-action" disabled={!students.length || !complete || !currentRoster || status.busy} onClick={() => {
+        try {
+          openGroupRosterExport(halfGroupRoster(students, assignments), { title: draft ? `Mitjos grups · ${proposalName.trim() || 'Proposta'}` : 'Mitjos grups', className })
+        } catch (error) { setStatus({ busy: false, message: error.message }) }
+      }} type="button">Exportar llista amb fotos</button>
       <button className="primary-action" disabled={students.length < 2 || status.busy} onClick={generate} type="button">{generated.length || draft ? 'Generar una altra proposta' : 'Generar proposta A/B'}</button>
       <button className="secondary-action" disabled={!draft || !complete || !balanced || !currentRoster || status.busy} onClick={apply} type="button">{status.busy ? 'Aplicant…' : 'Aplicar mitjos grups'}</button>
       {draft && <button className="secondary-action" disabled={status.busy} onClick={() => { setDraft(null); setSelectedProposalId(''); setProposalName(''); setLockedIds(students.filter((student) => student.halfGroupLocked).map((student) => student.id)) }} type="button">Descartar proposta</button>}

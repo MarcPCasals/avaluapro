@@ -714,7 +714,7 @@ function AssistanceApp() {
                 if (Object.hasOwn(patch, 'gender')) setSyntheticGenders((current) => ({ ...current, [student.id]: patch.gender }))
                 if (Object.hasOwn(patch, 'halfGroup')) setSyntheticHalfGroups((current) => ({ ...current, [student.id]: patch.halfGroup }))
               }} /></div>)}</details>
-              <HalfGroupsPanel key={activeClass?.id} students={activeClassStudents}
+              <HalfGroupsPanel key={activeClass?.id} className={activeClass?.name} students={activeClassStudents}
                 relations={dataset.sociometricRelations || []}
                 savedProposals={syntheticHalfGroupProposals[activeClassId] || []}
                 onSave={async (proposal) => {
