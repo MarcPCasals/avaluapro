@@ -1733,7 +1733,7 @@ export function useAgendaWorkspace(user, classes = []) {
       planningUnitId: bundle.planningUnit.id,
     })
     return getAgendaReplacementActivityOptions({ ...setup,
-      targetSessionId: bundle.session.id, options: { now: new Date().toISOString() } })
+      targetSessionId: bundle.session.id, options: { now: new Date().toISOString(), calendarEvents: setup.calendarEvents } })
   }, [loadSchedulingSetup])
 
   const buildSessionReplacementPreview = useCallback(async (bundle, changes) => {
@@ -1744,7 +1744,7 @@ export function useAgendaWorkspace(user, classes = []) {
     })
     const replacementActivity = changes.replacementActivityId
       ? getAgendaReplacementActivityOptions({ ...setup,
-          targetSessionId: bundle.session.id, options: { now: new Date().toISOString() } })
+          targetSessionId: bundle.session.id, options: { now: new Date().toISOString(), calendarEvents: setup.calendarEvents } })
           .find((activity) => activity.id === changes.replacementActivityId)
       : null
     if (changes.replacementActivityId && !replacementActivity) {
@@ -1786,7 +1786,7 @@ export function useAgendaWorkspace(user, classes = []) {
     }))
     const preview = buildAgendaSessionReplacement({
       application: setup.application, candidates: availableCandidates,
-      existingSessionBundles: setup.existingSessionBundles, options: { now: new Date().toISOString() },
+      existingSessionBundles: setup.existingSessionBundles, options: { now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetSessionId: bundle.session.id, ...changes, replacementActivity,
       title: replacementActivity?.title || changes.title,
     })

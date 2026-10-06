@@ -160,3 +160,51 @@ test('el trasllat de mitjos grups amb lectura només en una franja no deixa còp
   assert.equal(preview.removedItems.filter((i) => i.sourceActivityId === 'B').length, 2)
   assert.equal(preview.sessions[1].items[0].id, 'babelium_source-a')
 })
+
+for (const scope of ['day', 'slot', 'session']) {
+  test(`A12 i A13 d’una classe anul·lada per ${scope} continuen disponibles`, () => {
+    const blocked = bundle('blocked', '2026-09-29', 'A12')
+    blocked.items[0].plannedMinutes = 40
+    blocked.items.push(createSessionItem({ ownerUid: application.ownerUid, applicationId: application.id,
+      sessionId: blocked.session.id, sourceActivityId: 'A13', sourcePlanningUnitId: application.planningUnitId,
+      title: 'A13', type: 'activity', plannedMinutes: 15, order: 2 }, options))
+    const event = { id: 'cancel-fictional', type: 'cancellation', startsOn: '2026-09-29',
+      classIds: [application.classId], ...(scope === 'slot' ? { timetableSlotId: blocked.session.timetableSlotId } : {}),
+      ...(scope === 'session' ? { sessionId: blocked.session.id } : {}) }
+    const data = input({ options: { ...options, calendarEvents: [event] } })
+    data.existingSessionBundles.unshift(blocked)
+    const choices = getAgendaReplacementActivityOptions({ ...data, activities: [plannedActivity('A12', 40), plannedActivity('A13', 15)] })
+    assert.deepEqual(choices.map((a) => a.availableMinutes), [40, 15])
+    for (const disposition of ['postpone', 'remove']) {
+      const preview = buildAgendaSessionReplacement({ ...data, disposition, plannedMinutes: 40, replacementActivity: choices[0] })
+      const source = preview.sessions.find((b) => b.session.id === blocked.session.id)
+      assert.deepEqual(source.items.map((item) => item.sourceActivityId), ['A13'])
+      assert.equal(preview.sessions.find((b) => b.session.id === 'first').items[0].sourceActivityId, 'A12')
+      assert.ok(preview.removedItems.some((item) => item.id === blocked.items[0].id))
+      assert.equal(preview.sessions.flatMap((b) => b.items).filter((i) => i.sourceActivityId === 'A12').reduce((n, i) => n + i.plannedMinutes, 0), 40)
+      assert.equal(preview.unscheduled.length, 0)
+    }
+  })
+}
+
+test('les classes impartides o amb evidències continuen reservant minuts encara que hi hagi una anul·lació', () => {
+  for (const extra of [{ status: 'held' }, { classroomOpenedAt: options.now }, { attendanceConfirmedAt: options.now }]) {
+    const past = bundle('past', '2026-09-29', 'A12', extra)
+    const data = input({ options: { ...options, calendarEvents: [{ type: 'cancellation', startsOn: '2026-09-29', classIds: [application.classId] }] } })
+    data.existingSessionBundles.unshift(past)
+    const choice = getAgendaReplacementActivityOptions({ ...data, activities: [plannedActivity('A12')] })[0]
+    assert.equal(choice.availableMinutes, 0)
+  }
+})
+
+test('una còpia antiga anul·lada no deixa una segona còpia quan l’activitat també s’havia traslladat al futur', () => {
+  const old = bundle('old', '2026-09-29', 'B', { status: 'cancelled' })
+  const data = input()
+  data.existingSessionBundles.unshift(old)
+  const activity = getAgendaReplacementActivityOptions({ ...data, activities: [plannedActivity('B')] })[0]
+  assert.equal(activity.availableMinutes, 55)
+  const preview = buildAgendaSessionReplacement({ ...data, replacementActivity: activity })
+  assert.equal(preview.sessions.flatMap((b) => b.items).filter((i) => i.sourceActivityId === 'B').reduce((n, i) => n + i.plannedMinutes, 0), 55)
+  assert.ok(preview.removedItems.some((i) => i.id === 'item-old'))
+  assert.ok(preview.removedItems.some((i) => i.id === 'item-second'))
+})

@@ -1276,6 +1276,14 @@ function canMoveReplacementContent(bundle, fromDate, now) {
     && !bundle.session.classroomClosedAt && !(bundle.results || []).length
 }
 
+function isUnperformedNoClassBundle(bundle, calendarEvents = []) {
+  const session = bundle.session
+  if (session.status === 'held' || session.classroomOpenedAt || session.attendanceConfirmedAt
+    || session.classroomClosedAt || session.applicationNotes?.length || (bundle.results || []).length) return false
+  return ['cancelled', 'notHeld'].includes(session.status)
+    || Boolean(getSessionBlockingEvent(calendarEvents, session))
+}
+
 /** Els codis segueixen l'ordre complet de la Programació, també amb activitats fetes. */
 export function getAgendaReplacementActivityOptions({
   activities = [], application, existingSessionBundles = [], targetSessionId,
@@ -1287,14 +1295,15 @@ export function getAgendaReplacementActivityOptions({
   const now = options.now || new Date().toISOString()
   const completed = new Set(completedSourceActivityIds)
   const groups = groupParallelSessionBundles(existingSessionBundles
-    .filter((bundle) => bundle.session.applicationId === application.id)
+    .filter((bundle) => bundle.session.applicationId === application.id
+      && !isUnperformedNoClassBundle(bundle, options.calendarEvents))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt)))
   return activities.map((activity, index) => {
     const lockedMinutes = groups.reduce((sum, group) => {
       const locked = group.bundles.some((bundle) =>
         (!group.bundles.some((current) => current.session.id === targetSessionId)
           && bundle.session.startsAt < target.session.startsAt) || !canMoveReplacementContent(bundle, targetDate, now))
-      if (!locked || ['cancelled', 'notHeld'].includes(group.bundles[0].session.status)) return sum
+      if (!locked) return sum
       return sum + (group.bundles[0].items || []).filter((item) => item.sourceActivityId === activity.id)
         .reduce((total, item) => total + (Number(item.plannedMinutes) || 0), 0)
     }, 0)
@@ -1366,8 +1375,21 @@ export function buildAgendaSessionReplacement({
     // Traslladem els minuts ja previstos; la resta del temps de l'activitat es conserva.
     let remaining = minutes
     const updatedById = new Map()
+    // Una còpia tapada per una anul·lació no és progrés ni consumeix el trasllat.
+    // La traiem sencera perquè una restauració posterior no dupliqui l'activitat.
+    for (const bundle of existingSessionBundles) {
+      if (bundle.session.applicationId !== application.id
+        || !isUnperformedNoClassBundle(bundle, options.calendarEvents)) continue
+      const obsolete = (bundle.items || []).filter((item) => item.sourceActivityId === replacementActivity.id)
+      if (!obsolete.length) continue
+      transferredOriginalItems.push(...obsolete)
+      const updated = { ...bundle, items: bundle.items.filter((item) => !obsolete.includes(item)) }
+      updatedById.set(bundle.session.id, updated)
+      changedSourceSessions.push({ ...updated, isExisting: true })
+    }
     const sourceGroups = groupParallelSessionBundles(existingSessionBundles
-      .filter((bundle) => bundle.session.applicationId === application.id)
+      .filter((bundle) => bundle.session.applicationId === application.id
+        && !isUnperformedNoClassBundle(bundle, options.calendarEvents))
       .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt)))
     for (const group of sourceGroups) {
       if (group.bundles.some((bundle) => (!group.bundles.some((current) => targetIds.has(current.session.id))
@@ -1420,9 +1442,10 @@ export function buildAgendaSessionReplacement({
     }
   }
   if (replacementActivity) {
-    if (disposition === 'remove') {
-      reflow = { ...reflow, sessions: [...replacementSessions, ...changedSourceSessions] }
-    }
+    const rewrittenIds = new Set(reflow.sessions.map((bundle) => bundle.session.id))
+    const deletedIds = new Set(reflow.removedSessions.map((session) => session.id))
+    reflow.sessions.push(...changedSourceSessions.filter((bundle) =>
+      !rewrittenIds.has(bundle.session.id) && !deletedIds.has(bundle.session.id)))
     // L'element traslladat conserva el vincle a materials i al seguiment de la UP.
     const changedBySessionId = new Map(reflow.sessions.map((bundle) => [bundle.session.id, bundle]))
     const removedSessionIds = new Set(reflow.removedSessions.map((session) => session.id))
@@ -1432,7 +1455,7 @@ export function buildAgendaSessionReplacement({
       if (!combined.some((current) => current.session.id === bundle.session.id)) combined.push(bundle)
     }
     const activeGroups = groupParallelSessionBundles(combined
-      .filter((bundle) => !['cancelled', 'notHeld'].includes(bundle.session.status))
+      .filter((bundle) => !isUnperformedNoClassBundle(bundle, options.calendarEvents))
       .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt)))
     const count = activeGroups.reduce((total, group) => total + (group.bundles[0].items || [])
       .filter((item) => item.sourceActivityId === replacementActivity.id).length, 0)
