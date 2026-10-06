@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { CheckCircle2, Plus, X } from 'lucide-react'
+import { CheckCircle2, Plus, Trash2, X } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { createId } from '../../lib/ids'
 import { normalizeResourceSections } from '../../domain/planning/documents'
@@ -150,12 +150,35 @@ export function PlanningPedagogicalContent({ catalog, onChange, values }) {
 }
 
 export function PlanningUnitResources({ onChange, values }) {
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearVersion, setClearVersion] = useState(0)
   const resourceSections = normalizeResourceSections(values.resourceSections, values)
+  const resourceCount = Object.values(resourceSections).reduce((total, section) => (
+    total + RESOURCE_FIELDS.reduce((count, field) => count + section[field.key].length, 0)
+  ), 0)
   const updateSection = (key, section) => onChange('resourceSections', { ...resourceSections, [key]: section })
+  const clearResources = () => {
+    onChange('resourceSections', {
+      specific: { factsAndConcepts: [], procedures: [], attitudesAndValues: [] },
+      transversal: { factsAndConcepts: [], procedures: [], attitudesAndValues: [] },
+    })
+    setConfirmClear(false)
+    setClearVersion(version => version + 1)
+  }
   return <section className="planning-editor-section planning-unit-resources">
-    <h3>Recursos de tota la UP</h3>
+    <div className="planning-resource-heading">
+      <h3>Recursos de tota la UP</h3>
+      <button className="secondary-action compact planning-clear-resources" disabled={!resourceCount} onClick={() => setConfirmClear(true)} type="button"><Trash2 size={15} />Eliminar tots els recursos</button>
+    </div>
+    {confirmClear && <div className="planning-resource-clear-confirm" role="group" aria-label="Confirmar eliminació de recursos">
+      <p>Vols eliminar els {resourceCount} recursos de la llista de tota la UP? Els recursos ja vinculats a activitats es conservaran. Després hauràs de desar la UP per aplicar el canvi.</p>
+      <div className="planning-editor-actions">
+        <button className="secondary-action compact" onClick={() => setConfirmClear(false)} type="button">Cancel·lar</button>
+        <button className="secondary-action compact planning-clear-resources" onClick={clearResources} type="button">Sí, eliminar tots els recursos</button>
+      </div>
+    </div>}
     <p className="planning-content-help">Defineix aquí els recursos de la unitat, un per línia, i desa la UP. Després podràs seleccionar-los dins de cada activitat. Si la UP s’ha importat, revisa aquí la llista importada.</p>
-    <div className="planning-resource-grid">
+    <div className="planning-resource-grid" key={clearVersion}>
       <ResourceSection label="Competències específiques" onChange={section => updateSection('specific', section)} value={resourceSections.specific} />
       <ResourceSection label="Competències transversals" onChange={section => updateSection('transversal', section)} value={resourceSections.transversal} />
     </div>
