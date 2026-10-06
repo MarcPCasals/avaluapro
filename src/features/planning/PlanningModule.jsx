@@ -1,3 +1,4 @@
+import { acknowledgePlanningUnitDraft, getPlanningUnitDraftValues, updatePlanningUnitDraft } from '../../domain/planning/unitDraft'
 import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -289,8 +290,7 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit }) {
-  const [values, setValues] = useState(unit)
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange }) {
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
   const [completedActivitiesLoading, setCompletedActivitiesLoading] = useState(true)
@@ -323,15 +323,10 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       setCompletionBusyId('')
     }
   }
-  const update = (field, value) => setValues((current) => ({ ...current, [field]: value }))
+  const update = onChange
   const acceptImprovements = async (proposalIds) => {
     const result = await onAcceptImprovements(proposalIds)
     if (result === false) return false
-    setValues((current) => ({
-      ...current,
-      improvementProposals: result.planningUnit.improvementProposals,
-      updatedAt: result.planningUnit.updatedAt,
-    }))
     return result
   }
   const handleSave = async (event) => {
@@ -496,6 +491,24 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
     : storeActiveClassId
   const activeClassId = contextClassId
   const workspace = usePlanningWorkspace(user, contextClassId, { tutoringSpaceId: tutorialSpaceId })
+  const [unitDraft, setUnitDraft] = useState(null)
+  const unitDraftKey = `${workspace.activePlanningUnit?.id || ''}:${activeClassId}`
+  const unitValues = getPlanningUnitDraftValues(workspace.activePlanningUnit, unitDraft, unitDraftKey)
+  const updateUnitDraft = (field, value) => setUnitDraft(current => updatePlanningUnitDraft(current, unitDraftKey, field, value))
+  const acknowledgeUnitDraft = snapshot => setUnitDraft(current => acknowledgePlanningUnitDraft(current, unitDraftKey, snapshot))
+  const saveUnitDraft = async (unit, values) => {
+    const result = await withConnectedConfirmation(() => workspace.saveUnit(unit, values))
+    if (result !== false) acknowledgeUnitDraft(values)
+    return result
+  }
+  const saveActivityWithResources = async action => {
+    if (unitDraft?.key === unitDraftKey && Object.hasOwn(unitDraft.changes, 'resourceSections')) {
+      const snapshot = { resourceSections: unitValues.resourceSections }
+      await workspace.saveUnit(workspace.activePlanningUnit, snapshot)
+      acknowledgeUnitDraft(snapshot)
+    }
+    return action()
+  }
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -819,7 +832,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onOpenPreview={() => setDialog('preview')}
                   onOpenSharing={() => setDialog('sharing')}
                   onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
-                  onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))}
+                  values={unitValues}
+                  onChange={updateUnitDraft}
+                  onSave={saveUnitDraft}
                   onSetActivityManualCompletion={workspace.setActivityManualCompletion}
                   phases={workspace.phases}
                   sourceYearLabel={sourceYearLabel}
@@ -855,9 +870,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
       {dialog === 'transversalMaterials' && workspace.activePlanningUnit && <TransversalMaterialsDialog onClose={() => setDialog(null)} onError={(error) => workspace.setError(error.message || 'No s’han pogut desar els materials transversals.')} onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))} unit={workspace.activePlanningUnit} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog activities={workspace.activities} planningUnit={workspace.activePlanningUnit} availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
-        () => workspace.saveActivity(values, current),
-        () => workspace.saveActivityForActiveClass(values, current),
+      {dialog === 'activity' && <ActivityDialog activities={workspace.activities} planningUnit={unitValues} availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
+        () => saveActivityWithResources(() => workspace.saveActivity(values, current)),
+        () => saveActivityWithResources(() => workspace.saveActivityForActiveClass(values, current)),
       )} phases={workspace.phases} students={students} />}
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={(values) => workspace.duplicateUnitToAcademicYear(values, { classId: activeClassId, classLabel: activeClass?.name })} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
