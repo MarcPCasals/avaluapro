@@ -1,3 +1,5 @@
+import { PlanningResourcePicker } from './PlanningResourcePicker'
+import { normalizeActivityResourceSelections } from '../../domain/planning/resources'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Clock3, Copy, History, Italic, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
@@ -345,7 +347,7 @@ function ActivityCurriculumPicker({ competencies, onChange, selections }) {
   )
 }
 
-export function ActivityDialog({ availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, students = [] }) {
+export function ActivityDialog({ availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, planningUnit, students = [] }) {
   const [values, setValues] = useState(() => ({
     description: initialValue?.description || '',
     evidenceMode: initialValue?.evidenceMode || 'none',
@@ -359,6 +361,7 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
     type: initialValue?.type || 'activity',
   }))
   const [materials, setMaterials] = useState(() => materialDrafts(initialValue))
+  const [resourceSelections, setResourceSelections] = useState(() => normalizeActivityResourceSelections(initialValue?.resourceSelections))
   const [curriculumSelections, setCurriculumSelections] = useState(() => initialValue?.curriculumSelections || [])
   const [diversityMeasures, setDiversityMeasures] = useState(() => initialValue?.diversityMeasures || [])
   const updateMaterial = (index, field, value) => setMaterials((items) => items.map((item, itemIndex) => (
@@ -404,6 +407,7 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       evidenceMode: values.type === 'activity' ? values.evidenceMode : 'none',
       plannedMinutes: values.hasTiming ? Number(values.plannedMinutes) : null,
       curriculumSelections,
+      resourceSelections,
       indicatorIds: initialValue?.indicatorIds || [],
       diversityMeasureIds: diversityMeasures.map((measure) => measure.id),
       diversityMeasures,
@@ -450,6 +454,7 @@ export function ActivityDialog({ availableCompetencies = [], classes = [], initi
       {values.type === 'activity' && (
         <PlanningDiversityEditor classes={classes} measures={diversityMeasures} onChange={setDiversityMeasures} students={students} />
       )}
+      <PlanningResourcePicker unit={planningUnit} selections={resourceSelections} onChange={setResourceSelections} />
       <section className="planning-material-editor">
         <div><div><strong>Materials</strong><span>Un mateix material pot tenir recurs d’alumnat i recurs opcional del docent.</span></div><button className="secondary-action compact" onClick={addMaterial} type="button"><Plus size={15} />Afegir</button></div>
         {materials.map((material, index) => (

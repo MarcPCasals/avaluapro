@@ -1,3 +1,4 @@
+import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useId, useMemo, useState } from 'react'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -70,23 +71,23 @@ function CurriculumCollection({ items, label, onChange, placeholder, suggestions
 function TextCollection({ items, label, onChange }) {
   const [draft, setDraft] = useState('')
   const add = () => {
-    const value = normalizeLabel(draft)
-    if (!value || items.some((item) => item.toLocaleLowerCase('ca') === value.toLocaleLowerCase('ca'))) return
-    onChange([...items, value])
+    const next = [...items]
+    draft.split(/\r?\n/).map(normalizeLabel).filter(Boolean).forEach(value => {
+      if (!next.some(item => item.toLocaleLowerCase('ca') === value.toLocaleLowerCase('ca'))) next.push(value)
+    })
+    if (next.length === items.length) return
+    onChange(next)
     setDraft('')
   }
   return (
     <div className="planning-content-collection">
       <strong>{label}</strong>
       <div className="planning-content-add">
-        <input
+        <textarea
+          aria-label={`Recursos de ${label}`}
+          rows={3}
           onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return
-            event.preventDefault()
-            add()
-          }}
-          placeholder="Escriu i prem +"
+          placeholder="Escriu o enganxa recursos, un per línia, i prem +"
           value={draft}
         />
         <button aria-label={`Afegir a ${label}`} className="icon-action accent" onClick={add} type="button"><Plus size={16} /></button>
@@ -116,7 +117,7 @@ function ResourceSection({ label, onChange, value }) {
   )
 }
 
-export function PlanningPedagogicalContent({ catalog, onChange, values }) {
+export function PlanningPedagogicalContent({ activities = [], completedActivityIds = new Set(), catalog, onChange, values }) {
   const curriculum = values.curriculum || {
     competencies: [], expectedLearnings: [], assessmentCriteria: [], indicators: [],
   }
@@ -154,6 +155,7 @@ export function PlanningPedagogicalContent({ catalog, onChange, values }) {
           <ResourceSection label="Competències transversals" onChange={(section) => updateResourceSection('transversal', section)} value={resourceSections.transversal} />
         </div>
       </details>
+      <PlanningResourceCoverage unit={values} activities={activities} completedActivityIds={completedActivityIds} />
       <p className="planning-content-help">Les opcions d’AvaluaPro són suggeriments. En desar, la UP conserva el text visible perquè continuï sent llegible encara que el currículum d’avaluació canviï més endavant.</p>
     </section>
   )

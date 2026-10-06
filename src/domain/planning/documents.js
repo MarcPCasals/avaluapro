@@ -162,6 +162,7 @@ export function buildPlanningDocumentExport({ activities = [], phases = [], unit
     activities: activities.map((activity, index) => ({
       applicationComment: text(activity.applicationComment),
       curriculumSelections: clone(activity.curriculumSelections || []),
+      resourceSelections: clone(activity.resourceSelections || []),
       description: text(activity.description),
       diversityMeasures: clone(activity.diversityMeasures || []),
       evidenceMode: activity.evidenceMode || 'none',

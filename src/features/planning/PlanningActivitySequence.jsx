@@ -1,3 +1,4 @@
+import { normalizeActivityResourceSelections } from '../../domain/planning/resources'
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowDown, ArrowUp, ArrowRight, BookOpenText, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, ExternalLink, History, Layers3, Loader2, Menu, Pencil,
@@ -42,6 +43,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
   const materialCount = (activity.teacherMaterials?.length || 0)
     + (activity.studentMaterials?.length || 0)
     + (planningUnit?.transversalMaterials?.length || 0)
+  const resources = normalizeActivityResourceSelections(activity.resourceSelections)
   const competencyCount = activity.curriculumSelections?.length || 0
   const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)
   const load = activity.plannedMinutes ? getSessionLoad([activity], sessionDuration) : null
@@ -95,6 +97,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
         <small>
           {activity.grouping && <span>{activity.grouping}</span>}
           {activity.space && <span>{activity.space}</span>}
+          {resources.length > 0 && <span>{resources.length} {resources.length === 1 ? 'recurs de competències' : 'recursos de competències'}</span>}
           {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
           {competencyCount > 0 && <span>{competencyCount} {competencyCount === 1 ? 'competència' : 'competències'}</span>}
           {criterionCount > 0 && <span>{criterionCount} {criterionCount === 1 ? 'criteri' : 'criteris'}</span>}
@@ -150,6 +153,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
         <button aria-label={`Editar ${activity.title}`} className="icon-action" onClick={() => onEdit(activity)} type="button"><Pencil size={15} /></button>
         <button aria-label={`Eliminar ${activity.title}`} className="icon-action danger" onClick={() => onDelete(activity)} type="button"><Trash2 size={15} /></button>
       </div>
+      {resources.length > 0 && <details className="planning-activity-resources"><summary>Recursos vinculats ({resources.length})</summary><ul>{resources.map((resource, index) => <li key={index}>{resource.text}</li>)}</ul></details>}
       {descriptionExpanded && (
         <FormattedText
           as="div"

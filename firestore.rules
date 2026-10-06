@@ -1469,7 +1469,7 @@ service cloud.firestore {
           'applicationComment', 'copiedFrom', 'createdAt', 'curriculumSelections', 'description', 'diversityMeasureIds', 'diversityMeasures',
           'entityType', 'evidenceMode', 'grouping', 'id', 'indicatorIds', 'order', 'pedagogicalType',
           'ownerUid', 'phaseId', 'plannedMinutes', 'planningUnitId', 'schemaVersion',
-          'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
+          'resourceSelections', 'space', 'studentMaterials', 'teacherMaterials', 'title', 'type', 'updatedAt'
         ])
         && request.resource.data.id == activityId
         && request.resource.data.entityType == 'planningActivity'
@@ -1486,6 +1486,9 @@ service cloud.firestore {
         && request.resource.data.indicatorIds is list
         && request.resource.data.curriculumSelections is list
         && request.resource.data.curriculumSelections.size() <= 50
+        && (!('resourceSelections' in request.resource.data)
+          || (request.resource.data.resourceSelections is list
+            && request.resource.data.resourceSelections.size() <= 500))
         && request.resource.data.diversityMeasureIds is list
         && request.resource.data.diversityMeasures is list
         && request.resource.data.diversityMeasures.size() <= 100

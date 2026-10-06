@@ -434,7 +434,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         phases={phases}
         planningUnit={values}
       />
-      <PlanningPedagogicalContent catalog={curriculumCatalog} onChange={update} values={values} />
+      <PlanningPedagogicalContent activities={activities} completedActivityIds={allCompletedActivityIds} catalog={curriculumCatalog} onChange={update} values={values} />
       <ImprovementPanel onAccept={acceptImprovements} onError={onError} proposals={values.improvementProposals} />
     </form>
   )
@@ -849,7 +849,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'connect' && <PlanningConnectionDialog applications={workspace.applications} classes={classes} currentClass={activeClass} onClose={() => setDialog(null)} onSave={(unit) => workspace.connectUnitToClass(unit, { classId: activeClassId, classLabel: activeClass?.name })} units={connectableUnits} />}
       {dialog === 'transversalMaterials' && workspace.activePlanningUnit && <TransversalMaterialsDialog onClose={() => setDialog(null)} onError={(error) => workspace.setError(error.message || 'No s’han pogut desar els materials transversals.')} onSave={(unit, values) => withConnectedConfirmation(() => workspace.saveUnit(unit, values))} unit={workspace.activePlanningUnit} />}
       {dialog === 'phase' && <PhaseDialog initialValue={editingPhase} onClose={() => { setDialog(null); setEditingPhase(null); setPhaseParentId('') }} onSave={(values, current) => withConnectedConfirmation(() => workspace.savePhase(values, current))} parentPhaseId={phaseParentId} />}
-      {dialog === 'activity' && <ActivityDialog availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
+      {dialog === 'activity' && <ActivityDialog planningUnit={workspace.activePlanningUnit} availableCompetencies={activityCurriculumOptions} classes={classes} initialPhaseId={activityPhaseId} initialValue={editingActivity} onClose={() => { setDialog(null); setEditingActivity(null); setActivityPhaseId('') }} onSave={(values, current) => withConnectedConfirmation(
         () => workspace.saveActivity(values, current),
         () => workspace.saveActivityForActiveClass(values, current),
       )} phases={workspace.phases} students={students} />}

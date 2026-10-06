@@ -788,6 +788,21 @@ describe('Planificació compartida', () => {
     await assertFails(setDoc(doc(upRef(db), 'phases', 'forged'), phaseData({ id: 'forged' })))
   })
 
+  test('els recursos d’activitat es desen amb compatibilitat antiga i sense ampliar permisos', async () => {
+    const resourceSelections = [{ scope: 'specific', category: 'procedures', text: 'Recurs completament fictici' }]
+    const ownerDb = authDb(OWNER)
+    const reference = doc(upRef(ownerDb), 'activities', 'plan-activity-one')
+    await assertSucceeds(updateDoc(reference, { resourceSelections, updatedAt: NOW }))
+    assert.deepEqual((await getDoc(reference)).data().resourceSelections, resourceSelections)
+    const legacy = activityData()
+    delete legacy.resourceSelections
+    await assertSucceeds(setDoc(reference, legacy))
+    await assertFails(updateDoc(reference, { resourceSelections: 'text' }))
+    await assertFails(updateDoc(reference, { resourceSelections: Array.from({ length: 501 }, () => resourceSelections[0]) }))
+    await assertFails(updateDoc(doc(upRef(authDb(DIRECTION)), 'activities', 'plan-activity-one'), { resourceSelections }))
+    await assertSucceeds(updateDoc(doc(upRef(authDb(EDITOR)), 'activities', 'plan-activity-one'), { resourceSelections, updatedAt: NOW }))
+  })
+
   test('els camps inesperats i els canvis d’identitat es rebutgen', async () => {
     const ownerDb = authDb(OWNER)
     await assertFails(setDoc(

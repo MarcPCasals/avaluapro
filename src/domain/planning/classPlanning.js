@@ -39,6 +39,7 @@ const ACTIVITY_OVERRIDE_FIELDS = Object.freeze([
   'applicationComment',
   'description',
   'curriculumSelections',
+  'resourceSelections',
   'diversityMeasureIds',
   'diversityMeasures',
   'evidenceMode',

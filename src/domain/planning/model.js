@@ -1,3 +1,4 @@
+import { normalizeActivityResourceSelections } from './resources.js'
 import {
   ACCESS_ROLES,
   APPLICATION_STATUSES,
@@ -348,6 +349,7 @@ export function createPlanningActivity(input, options = {}) {
     grouping: optionalText(input.grouping),
     space: optionalText(input.space),
     curriculumSelections: normalizeActivityCurriculumSelections(input.curriculumSelections),
+    resourceSelections: normalizeActivityResourceSelections(input.resourceSelections),
     indicatorIds: textList(input.indicatorIds),
     diversityMeasureIds: Object.prototype.hasOwnProperty.call(input, 'diversityMeasures')
       ? diversityMeasures.map((measure) => measure.id)
