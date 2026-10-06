@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowRight, CalendarX2, CheckCircle2, Clock3, Edit3, Loader2,
   History, RotateCcw,
@@ -41,8 +41,6 @@ export function AgendaSessionAdjustDialog({
 }) {
   const editableItems = useMemo(() => bundle.items.filter((item) => item.sourceActivityId), [bundle.items])
   const [action, setAction] = useState(initialAction)
-  const [replacementTitle, setReplacementTitle] = useState('')
-  const [replacementSource, setReplacementSource] = useState('new')
   const [replacementActivities, setReplacementActivities] = useState([])
   const [replacementActivitiesLoaded, setReplacementActivitiesLoaded] = useState(false)
   const [replacementActivitiesLoading, setReplacementActivitiesLoading] = useState(false)
@@ -101,21 +99,26 @@ export function AgendaSessionAdjustDialog({
     }
   }
 
-  const selectReplacementSource = async (source) => {
-    setReplacementSource(source)
-    setReplacementPreview(null)
-    setError('')
-    if (source !== 'planning' || replacementActivitiesLoaded || replacementActivitiesLoading) return
-    setReplacementActivitiesLoading(true)
-    try {
-      setReplacementActivities(await onLoadReplacementActivities(bundle))
-      setReplacementActivitiesLoaded(true)
-    } catch (loadError) {
-      setError(loadError.message || 'No s’han pogut carregar les activitats de la Programació.')
-    } finally {
-      setReplacementActivitiesLoading(false)
-    }
-  }
+  useEffect(() => {
+    if (action !== 'replacement' || replacementActivitiesLoaded) return undefined
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setReplacementActivitiesLoading(true)
+      setError('')
+    })
+    Promise.resolve().then(() => onLoadReplacementActivities(bundle))
+      .then((activities) => {
+        if (cancelled) return
+        setReplacementActivities(activities)
+        setReplacementActivitiesLoaded(true)
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || 'No s’han pogut carregar les activitats de la Programació.')
+      })
+      .finally(() => { if (!cancelled) setReplacementActivitiesLoading(false) })
+    return () => { cancelled = true }
+  }, [action, bundle, onLoadReplacementActivities, replacementActivitiesLoaded])
   const selectReplacementActivity = (id) => {
     setReplacementActivityId(id)
     setReplacementPreview(null)
@@ -129,8 +132,7 @@ export function AgendaSessionAdjustDialog({
     setError('')
     try {
       setReplacementPreview(await onBuildReplacement(bundle, {
-        title: replacementTitle.trim(), plannedMinutes: Number(replacementMinutes), disposition,
-        replacementActivityId: replacementSource === 'planning' ? replacementActivityId : '',
+        plannedMinutes: Number(replacementMinutes), disposition, replacementActivityId,
       }))
     } catch (previewError) {
       setError(previewError.message || 'No s’ha pogut preparar la substitució.')
@@ -190,7 +192,7 @@ export function AgendaSessionAdjustDialog({
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-adjust-dialog" size="lg" title="Reajustar la sessió">
       <nav aria-label="Tipus de reajustament" className="agenda-adjust-tabs" role="tablist">
         <ContextualTab aria-selected={action === 'session'} className={action === 'session' ? 'active' : ''} help="Anul·la o restaura tota la sessió. Les activitats no fetes es traslladen automàticament a les sessions següents." helpTitle="Reajustar la sessió" onClick={() => setAction('session')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'session' ? 0 : -1} type="button"><CalendarX2 size={15} />Sessió</ContextualTab>
-        <ContextualTab aria-selected={action === 'replacement'} className={action === 'replacement' ? 'active' : ''} disabled={!canReplace || busy} help="Substitueix una sessió futura per una proposta nova i decideix si ajornes o retires les activitats previstes." helpTitle="Substituir sessió" onClick={() => setAction('replacement')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'replacement' ? 0 : -1} type="button"><Edit3 size={15} />Substituir sessió</ContextualTab>
+        <ContextualTab aria-selected={action === 'replacement'} className={action === 'replacement' ? 'active' : ''} disabled={!canReplace || busy} help="Tria una activitat de la Programació per a aquesta sessió i decideix si ajornes o retires les activitats previstes." helpTitle="Substituir sessió" onClick={() => setAction('replacement')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'replacement' ? 0 : -1} type="button"><Edit3 size={15} />Substituir sessió</ContextualTab>
         <ContextualTab aria-selected={action === 'continuation'} className={action === 'continuation' ? 'active' : ''} disabled={editableItems.length === 0} help={movesFromFutureSession ? 'Trasllada minuts d’aquesta sessió futura a les següents i previsualitza tot l’efecte dominó abans de confirmar-lo.' : 'Afegeix el temps que no has pogut completar a les sessions següents i previsualitza l’efecte dominó.'} helpTitle="Continuar una activitat" onClick={() => setAction('continuation')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'continuation' ? 0 : -1} type="button"><ArrowRight size={15} />Continuació</ContextualTab>
         <ContextualTab aria-selected={action === 'recovery'} className={action === 'recovery' ? 'active' : ''} help="Recupera una activitat anterior del grup i reorganitza la part futura de l’Agenda sense canviar la programació base." helpTitle="Recuperar una activitat anterior" onClick={openRecovery} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={action === 'recovery' ? 0 : -1} type="button"><History size={15} />Recuperar anterior</ContextualTab>
       </nav>
@@ -202,21 +204,19 @@ export function AgendaSessionAdjustDialog({
       </section>}
 
       {action === 'replacement' && <section className="agenda-adjust-panel" role="tabpanel">
-        <div className="agenda-adjust-heading"><Edit3 size={21} /><div><strong>Nova proposta per a aquesta sessió</strong><p>{dateLabel(bundle.session.startsAt)} · {String(bundle.session.startsAt).slice(11, 16)}</p></div></div>
-        <label>Substituir per<select disabled={busy || replacementActivitiesLoading} value={replacementSource} onChange={(event) => selectReplacementSource(event.target.value)}><option value="new">Una proposta nova</option><option value="planning">Una activitat de la Programació</option></select></label>
-        {replacementSource === 'new' ? <label>Títol de la nova proposta<input disabled={busy} placeholder="Pràctica de laboratori" value={replacementTitle} onChange={(event) => { setReplacementTitle(event.target.value); setReplacementPreview(null) }} /></label> : <>
-          {replacementActivitiesLoading ? <p role="status"><Loader2 className="spin" size={16} /> Carregant les activitats de la Programació…</p> : <>
-            <label>Cercar per codi o títol<input disabled={busy} placeholder="A13" value={replacementSearch} onChange={(event) => setReplacementSearch(event.target.value)} /></label>
-            <label>Activitat de la Programació<select disabled={busy} value={replacementActivityId} onChange={(event) => selectReplacementActivity(event.target.value)}><option value="">Tria una activitat</option>{[...new Map([...(selectedReplacementActivity ? [selectedReplacementActivity] : []), ...matchingReplacementActivities].map((activity) => [activity.id, activity])).values()].map((activity) => <option disabled={activity.availableMinutes <= 0} key={activity.id} value={activity.id}>{activity.code} · {activity.title} · {activity.availableMinutes > 0 ? `${activity.availableMinutes} min disponibles` : 'Sense minuts pendents'}</option>)}</select></label>
-            {matchingReplacementActivities.length === 0 && <p>No hi ha activitats que coincideixin amb aquesta cerca.</p>}
-            {selectedReplacementActivity && <div className="agenda-adjust-preview"><CheckCircle2 size={18} /><div><strong>{selectedReplacementActivity.code} · {selectedReplacementActivity.title}</strong>{selectedReplacementActivity.description && <FormattedText as="p" text={selectedReplacementActivity.description} />}<p>Conserva els materials i el vincle amb l’activitat original. Si ja estava prevista més endavant, se’n traslladaran els minuts triats per evitar duplicar-la.</p>{Number(replacementMinutes) < selectedReplacementActivity.availableMinutes && <p>Només en faràs {replacementMinutes || '—'} minuts en aquesta sessió. La resta manté la seva previsió o queda pendent de calendaritzar.</p>}</div></div>}
-          </>}
+        <div className="agenda-adjust-heading"><Edit3 size={21} /><div><strong>Triar una activitat per a aquesta sessió</strong><p>{dateLabel(bundle.session.startsAt)} · {String(bundle.session.startsAt).slice(11, 16)}</p></div></div>
+        <p>Prepara la proposta a Programació i escull aquí l’activitat que vols fer.</p>
+        {replacementActivitiesLoading ? <p role="status"><Loader2 className="spin" size={16} /> Carregant les activitats de la Programació…</p> : <>
+          <label>Cercar per codi o títol<input disabled={busy} placeholder="A13" value={replacementSearch} onChange={(event) => setReplacementSearch(event.target.value)} /></label>
+          <label>Activitat de la Programació<select disabled={busy} value={replacementActivityId} onChange={(event) => selectReplacementActivity(event.target.value)}><option value="">Tria una activitat</option>{[...new Map([...(selectedReplacementActivity ? [selectedReplacementActivity] : []), ...matchingReplacementActivities].map((activity) => [activity.id, activity])).values()].map((activity) => <option disabled={activity.availableMinutes <= 0} key={activity.id} value={activity.id}>{activity.code} · {activity.title} · {activity.availableMinutes > 0 ? `${activity.availableMinutes} min disponibles` : 'Sense minuts pendents'}</option>)}</select></label>
+          {matchingReplacementActivities.length === 0 && <p>No hi ha activitats que coincideixin amb aquesta cerca.</p>}
+          {selectedReplacementActivity && <div className="agenda-adjust-preview"><CheckCircle2 size={18} /><div><strong>{selectedReplacementActivity.code} · {selectedReplacementActivity.title}</strong>{selectedReplacementActivity.description && <FormattedText as="p" text={selectedReplacementActivity.description} />}<p>Conserva els materials i el vincle amb l’activitat original. Si ja estava prevista més endavant, se’n traslladaran els minuts triats per evitar duplicar-la.</p>{Number(replacementMinutes) < selectedReplacementActivity.availableMinutes && <p>Només en faràs {replacementMinutes || '—'} minuts en aquesta sessió. La resta manté la seva previsió o queda pendent de calendaritzar.</p>}</div></div>}
         </>}
-        <label>Minuts previstos<input disabled={busy} min="1" max={Math.min(bundle.session.durationMinutes - 5 - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0), replacementSource === 'planning' ? selectedReplacementActivity?.availableMinutes || 0 : Infinity)} type="number" value={replacementMinutes} onChange={(event) => { setReplacementMinutes(event.target.value); setReplacementPreview(null) }} /></label>
+        <label>Minuts previstos<input disabled={busy} min="1" max={Math.min(bundle.session.durationMinutes - 5 - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0), selectedReplacementActivity?.availableMinutes || 0)} type="number" value={replacementMinutes} onChange={(event) => { setReplacementMinutes(event.target.value); setReplacementPreview(null) }} /></label>
         <label>Què fem amb les activitats previstes?<select disabled={busy} value={disposition} onChange={(event) => { setDisposition(event.target.value); setReplacementPreview(null) }}><option value="postpone">Ajornar-les a les classes següents</option><option value="remove">Retirar-les de la cronologia</option></select></label>
         <div className="agenda-adjust-preview"><ArrowRight size={18} /><div><strong>{disposition === 'postpone' ? 'El contingut passarà a les classes següents' : 'Les sessions següents conservaran la seva distribució'}</strong><p>{disposition === 'postpone' ? 'Les activitats d’aquesta sessió es traslladaran a la següent classe disponible i la resta es reajustarà en cadena.' : 'Es retirarà només el contingut previst d’aquesta sessió.'} L’ajornament reajusta les sessions de la mateixa UP. La Programació original es conserva. Si hi ha Babelium, es manté a la sessió.</p></div></div>
         {replacementPreview && <div className="agenda-continuation-preview"><header><CheckCircle2 size={17} /><strong>{replacementPreview.sessions.length} {replacementPreview.sessions.length === 1 ? 'sessió afectada' : 'sessions afectades'}</strong></header>{replacementPreview.sessions.map((candidate) => <div key={candidate.session.id}><span>{dateLabel(candidate.session.startsAt)} · {String(candidate.session.startsAt).slice(11, 16)}</span><strong>{candidate.items.map((current) => `${current.title} · ${current.plannedMinutes || 0} min`).join(' · ') || 'Sessió sense activitats previstes'}</strong><small>{candidate.isExisting ? 'Sessió reajustada' : 'Nova sessió necessària'}</small></div>)}{replacementPreview.removedSessions.length > 0 && <p>{replacementPreview.removedSessions.length} sessions buides es retiraran de la cronologia.</p>}</div>}
-        {replacementPreview ? <button className="primary-action" disabled={busy || !canReplace} onClick={() => execute(() => onConfirmReplacement(replacementPreview), 'Sessió substituïda i cronologia actualitzada.')} type="button">{busy && <Loader2 className="spin" size={16} />}Confirmar substitució</button> : <button className="secondary-action" disabled={busy || replacementActivitiesLoading || !canReplace || (replacementSource === 'planning' ? !selectedReplacementActivity || selectedReplacementActivity.availableMinutes <= 0 : !replacementTitle.trim()) || !Number.isFinite(Number(replacementMinutes)) || Number(replacementMinutes) <= 0} onClick={previewReplacement} type="button">{busy ? <Loader2 className="spin" size={16} /> : <ArrowRight size={16} />}Previsualitzar canvi</button>}
+        {replacementPreview ? <button className="primary-action" disabled={busy || !canReplace} onClick={() => execute(() => onConfirmReplacement(replacementPreview), 'Sessió substituïda i cronologia actualitzada.')} type="button">{busy && <Loader2 className="spin" size={16} />}Confirmar substitució</button> : <button className="secondary-action" disabled={busy || replacementActivitiesLoading || !canReplace || (!selectedReplacementActivity || selectedReplacementActivity.availableMinutes <= 0) || !Number.isFinite(Number(replacementMinutes)) || Number(replacementMinutes) <= 0} onClick={previewReplacement} type="button">{busy ? <Loader2 className="spin" size={16} /> : <ArrowRight size={16} />}Previsualitzar canvi</button>}
       </section>}
 
       {action === 'continuation' && item && <section className="agenda-adjust-panel" role="tabpanel">
