@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { CheckCircle2, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle2, Loader2, Plus, Save, Trash2, X } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { createId } from '../../lib/ids'
 import { normalizeResourceSections } from '../../domain/planning/documents'
@@ -67,8 +67,7 @@ function CurriculumCollection({ items, label, onChange, placeholder, suggestions
   )
 }
 
-function TextCollection({ items, label, onChange }) {
-  const [draft, setDraft] = useState('')
+function TextCollection({ items, label, onChange, draft, setDraft, disabled }) {
   const add = () => {
     const next = [...items]
     draft.split(/\r?\n/).map(normalizeLabel).filter(Boolean).forEach(value => {
@@ -83,24 +82,25 @@ function TextCollection({ items, label, onChange }) {
       <strong>{label}</strong>
       <div className="planning-content-add">
         <textarea
+          disabled={disabled}
           aria-label={`Recursos de ${label}`}
           rows={3}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Escriu o enganxa recursos, un per línia, i prem +"
           value={draft}
         />
-        <button aria-label={`Afegir a ${label}`} className="icon-action accent" onClick={add} type="button"><Plus size={16} /></button>
+        <button aria-label={`Afegir a ${label}`} className="icon-action accent" disabled={disabled} onClick={add} type="button"><Plus size={16} /></button>
       </div>
       {items.length > 0 ? (
         <div className="planning-content-chips neutral">
-          {items.map((item) => <span key={item}>{item}<button aria-label={`Retirar ${item}`} onClick={() => onChange(items.filter((entry) => entry !== item))} type="button"><X size={12} /></button></span>)}
+          {items.map((item) => <span key={item}>{item}<button aria-label={`Retirar ${item}`} disabled={disabled} onClick={() => onChange(items.filter((entry) => entry !== item))} type="button"><X size={12} /></button></span>)}
         </div>
       ) : <small>Encara no n’hi ha cap.</small>}
     </div>
   )
 }
 
-function ResourceSection({ label, onChange, value }) {
+function ResourceSection({ label, onChange, value, drafts, onDraftChange, disabled }) {
   return (
     <details className="planning-resource-section planning-resource-group">
       <summary>{label}<small>{RESOURCE_FIELDS.reduce((total, field) => total + (value[field.key]?.length || 0), 0)} recursos</small></summary>
@@ -111,6 +111,9 @@ function ResourceSection({ label, onChange, value }) {
             items={value[field.key] || []}
             label={field.label}
             onChange={(items) => onChange({ ...value, [field.key]: items })}
+            draft={drafts[field.key] || ''}
+            setDraft={text => onDraftChange(field.key, text)}
+            disabled={disabled}
           />
         </details>
       ))}
@@ -149,15 +152,54 @@ export function PlanningPedagogicalContent({ catalog, onChange, values }) {
   )
 }
 
-export function PlanningUnitResources({ onChange, values }) {
+export function PlanningUnitResources({ onChange, onSave, hasChanges = false, values }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [clearVersion, setClearVersion] = useState(0)
+  const [drafts, setDrafts] = useState({ specific: {}, transversal: {} })
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const pending = hasChanges || Object.values(drafts).some(section => Object.values(section).some(text => text.trim()))
   const resourceSections = normalizeResourceSections(values.resourceSections, values)
   const resourceCount = Object.values(resourceSections).reduce((total, section) => (
     total + RESOURCE_FIELDS.reduce((count, field) => count + section[field.key].length, 0)
   ), 0)
-  const updateSection = (key, section) => onChange('resourceSections', { ...resourceSections, [key]: section })
+  const updateSection = (key, section) => {
+    setSaved(false)
+    onChange('resourceSections', { ...resourceSections, [key]: section })
+  }
+  const updateDraft = (scope, field, text) => {
+    setSaved(false)
+    setDrafts(current => ({ ...current, [scope]: { ...current[scope], [field]: text } }))
+  }
+  const save = async () => {
+    setBusy(true)
+    setSaveError('')
+    setSaved(false)
+    const next = normalizeResourceSections(resourceSections)
+    for (const scope of ['specific', 'transversal']) {
+      for (const { key } of RESOURCE_FIELDS) {
+        for (const text of (drafts[scope][key] || '').split(/\r?\n/).map(normalizeLabel).filter(Boolean)) {
+          if (!next[scope][key].some(item => item.toLocaleLowerCase('ca') === text.toLocaleLowerCase('ca'))) next[scope][key].push(text)
+        }
+      }
+    }
+    onChange('resourceSections', next)
+    try {
+      const result = await onSave(next)
+      if (result !== false) {
+        setDrafts({ specific: {}, transversal: {} })
+        setSaved(true)
+      }
+    } catch (error) {
+      setSaveError(error.message || 'No s’han pogut desar els recursos. Els canvis es conserven aquí; torna-ho a provar.')
+    } finally {
+      setBusy(false)
+    }
+  }
   const clearResources = () => {
+    setDrafts({ specific: {}, transversal: {} })
+    setSaved(false)
     onChange('resourceSections', {
       specific: { factsAndConcepts: [], procedures: [], attitudesAndValues: [] },
       transversal: { factsAndConcepts: [], procedures: [], attitudesAndValues: [] },
@@ -168,19 +210,27 @@ export function PlanningUnitResources({ onChange, values }) {
   return <section className="planning-editor-section planning-unit-resources">
     <div className="planning-resource-heading">
       <h3>Recursos de tota la UP</h3>
-      <button className="secondary-action compact planning-clear-resources" disabled={!resourceCount} onClick={() => setConfirmClear(true)} type="button"><Trash2 size={15} />Eliminar tots els recursos</button>
+      <div className="planning-editor-actions">
+        <button className="secondary-action compact planning-clear-resources" disabled={busy || !resourceCount} onClick={() => setConfirmClear(true)} type="button"><Trash2 size={15} />Eliminar tots els recursos</button>
+        <button className="primary-action compact" disabled={busy || !pending} onClick={save} type="button">{busy ? <Loader2 className="spin" size={15} /> : <Save size={15} />}Desar recursos</button>
+      </div>
     </div>
+    <p role="status">{busy ? 'Desant els recursos…' : pending ? 'Tens canvis de recursos pendents de desar.' : saved ? 'Recursos desats.' : 'Els recursos de la llista estan desats.'}</p>
+    {saveError && <p role="alert">{saveError}</p>}
     {confirmClear && <div className="planning-resource-clear-confirm" role="group" aria-label="Confirmar eliminació de recursos">
-      <p>Vols eliminar els {resourceCount} recursos de la llista de tota la UP? Els recursos ja vinculats a activitats es conservaran. Després hauràs de desar la UP per aplicar el canvi.</p>
+      <p>Vols eliminar els {resourceCount} recursos de la llista de tota la UP? Els recursos ja vinculats a activitats es conservaran. Després prem «Desar recursos» per aplicar el canvi.</p>
       <div className="planning-editor-actions">
         <button className="secondary-action compact" onClick={() => setConfirmClear(false)} type="button">Cancel·lar</button>
-        <button className="secondary-action compact planning-clear-resources" onClick={clearResources} type="button">Sí, eliminar tots els recursos</button>
+        <button className="secondary-action compact planning-clear-resources" disabled={busy} onClick={clearResources} type="button">Sí, eliminar tots els recursos</button>
       </div>
     </div>}
-    <p className="planning-content-help">Defineix aquí els recursos de la unitat, un per línia, i desa la UP. Després podràs seleccionar-los dins de cada activitat. Si la UP s’ha importat, revisa aquí la llista importada.</p>
+    <p className="planning-content-help">Enganxa els recursos al camp corresponent, un per línia, i prem «Desar recursos». Aquest botó també incorpora el text que encara no has afegit amb +. Si la UP s’ha importat, revisa aquí la llista importada.</p>
     <div className="planning-resource-grid" key={clearVersion}>
-      <ResourceSection label="Competències específiques" onChange={section => updateSection('specific', section)} value={resourceSections.specific} />
-      <ResourceSection label="Competències transversals" onChange={section => updateSection('transversal', section)} value={resourceSections.transversal} />
+      <ResourceSection label="Competències específiques" onChange={section => updateSection('specific', section)} value={resourceSections.specific} drafts={drafts.specific} onDraftChange={(field, text) => updateDraft('specific', field, text)} disabled={busy} />
+      <ResourceSection label="Competències transversals" onChange={section => updateSection('transversal', section)} value={resourceSections.transversal} drafts={drafts.transversal} onDraftChange={(field, text) => updateDraft('transversal', field, text)} disabled={busy} />
+    </div>
+    <div className="planning-editor-actions">
+      <button className="primary-action compact" disabled={busy || !pending} onClick={save} type="button">{busy ? <Loader2 className="spin" size={15} /> : <Save size={15} />}Desar recursos</button>
     </div>
   </section>
 }

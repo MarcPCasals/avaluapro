@@ -290,7 +290,7 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange }) {
+function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenApplication, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange, onSaveResources, resourcesPending }) {
   const [busy, setBusy] = useState(false)
   const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
   const [completedActivitiesLoading, setCompletedActivitiesLoading] = useState(true)
@@ -410,7 +410,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
             <label>Proposta de producció o producte<textarea rows="3" value={values.expectedProduct || ''} onChange={(event) => update('expectedProduct', event.target.value)} /></label>
             <label>Llengua de vehiculació<input value={values.vehicularLanguage || ''} onChange={(event) => update('vehicularLanguage', event.target.value)} /></label>
           </section>
-          <PlanningUnitResources onChange={update} values={values} />
+          <PlanningUnitResources onChange={update} onSave={onSaveResources} hasChanges={resourcesPending} values={values} />
         </div>
       </details>
       <PlanningActivitySequence
@@ -501,12 +501,15 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
     if (result !== false) acknowledgeUnitDraft(values)
     return result
   }
+  const resourcesPending = unitDraft?.key === unitDraftKey && Object.hasOwn(unitDraft.changes, 'resourceSections')
+  const saveUnitResources = async sections => {
+    const snapshot = { resourceSections: sections }
+    const result = await workspace.saveUnit(workspace.activePlanningUnit, snapshot)
+    acknowledgeUnitDraft(snapshot)
+    return result
+  }
   const saveActivityWithResources = async action => {
-    if (unitDraft?.key === unitDraftKey && Object.hasOwn(unitDraft.changes, 'resourceSections')) {
-      const snapshot = { resourceSections: unitValues.resourceSections }
-      await workspace.saveUnit(workspace.activePlanningUnit, snapshot)
-      acknowledgeUnitDraft(snapshot)
-    }
+    if (resourcesPending) await saveUnitResources(unitValues.resourceSections)
     return action()
   }
   const [dialog, setDialog] = useState(null)
@@ -834,6 +837,8 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
                   values={unitValues}
                   onChange={updateUnitDraft}
+                  onSaveResources={saveUnitResources}
+                  resourcesPending={resourcesPending}
                   onSave={saveUnitDraft}
                   onSetActivityManualCompletion={workspace.setActivityManualCompletion}
                   phases={workspace.phases}
