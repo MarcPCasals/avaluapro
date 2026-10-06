@@ -1039,6 +1039,7 @@ function buildAgendaItemsReflow({
   existingSessionBundles = [],
   options = {},
   startAfterTarget = false,
+  cancellation = false,
   targetItemId = '',
   targetSessionId,
 }) {
@@ -1048,14 +1049,17 @@ function buildAgendaItemsReflow({
   const targetBundle = applicationBundles.find((bundle) => bundle.session.id === targetSessionId)
   if (!targetBundle) throw new Error('No s’ha trobat la sessió que vols reajustar.')
   const targetDate = String(targetBundle.session.startsAt).slice(0, 10)
-  if (!startAfterTarget && !canReflowSession(targetBundle, targetDate)) {
+  if (!startAfterTarget && !canReflowSession(targetBundle, targetDate, options.now)) {
     throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
   }
   const reflowableBundles = applicationBundles.filter((bundle) =>
     (startAfterTarget
       ? bundle.session.startsAt > targetBundle.session.startsAt
       : bundle.session.startsAt >= targetBundle.session.startsAt)
-      && canReflowSession(bundle, targetDate))
+      && canReflowSession(bundle, targetDate, options.now)
+      && (!cancellation || !(bundle.session.classroomOpenedAt
+        || bundle.session.attendanceConfirmedAt || bundle.session.classroomClosedAt
+        || (bundle.results || []).length)))
   const logicalGroups = groupParallelSessionBundles(reflowableBundles)
   const targetGroup = logicalGroups.find((group) =>
     group.bundles.some((bundle) => bundle.session.id === targetSessionId))
@@ -1240,6 +1244,13 @@ function buildAgendaItemsReflow({
       ...item,
       segmentCount: totalCountByActivityId[item.sourceActivityId],
     }, options))
+  if (cancellation) {
+    for (const bundle of reflowableBundles) {
+      if (!getSessionBlockingEvent(options.calendarEvents || [], bundle.session)) continue
+      sessions.push({ isExisting: true, session: bundle.session, items: [] })
+    }
+    sessions.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
+  }
   const usedSessionIds = new Set(sessions.map((bundle) => bundle.session.id))
   return {
     ...distribution,
@@ -1554,4 +1565,9 @@ export function buildAgendaContinuationReflow(input) {
 
 export function getSessionCandidateKey(candidate) {
   return candidateKey(candidate)
+}
+
+/** Mou només el contingut ja programat, mantenint l'ordre real de l'Agenda. */
+export function buildAgendaCancellationReflow(input) {
+  return { ...buildAgendaItemsReflow({ ...input, cancellation: true }), kind: 'agenda-cancellation' }
 }

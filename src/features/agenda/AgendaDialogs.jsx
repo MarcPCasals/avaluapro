@@ -28,19 +28,19 @@ function suggestedVersionStart(academicYear, currentTimetable) {
     : currentTimetable.effectiveFrom
 }
 
-function DialogActions({ busy, onClose, submitLabel }) {
+function DialogActions({ busy, busyLabel = 'Desant…', onClose, submitLabel }) {
   return (
     <div className="modal-actions">
       <button className="secondary-action" disabled={busy} onClick={onClose} type="button">Cancel·lar</button>
       <button className="primary-action" disabled={busy} form="agenda-dialog-form" type="submit">
         {busy && <Loader2 className="spin" size={17} />}
-        {submitLabel}
+        {busy ? busyLabel : submitLabel}
       </button>
     </div>
   )
 }
 
-function AgendaDialog({ children, onClose, onSubmit, size = 'md', submitLabel, title }) {
+function AgendaDialog({ children, onClose, onSubmit, size = 'md', submitLabel, busyLabel, title }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const handleSubmit = async (event) => {
@@ -62,7 +62,7 @@ function AgendaDialog({ children, onClose, onSubmit, size = 'md', submitLabel, t
         {children}
         {error && <p className="agenda-inline-error" role="alert">{error}</p>}
       </form>
-      <DialogActions busy={busy} onClose={onClose} submitLabel={submitLabel} />
+      <DialogActions busy={busy} busyLabel={busyLabel} onClose={onClose} submitLabel={submitLabel} />
     </Modal>
   )
 }
@@ -198,7 +198,7 @@ export function CalendarEventDialog({ academicYear, classes, initialValue, onClo
     ? values
     : { ...values, durationMinutes: null, startsAt: null, subgroupId: null }, currentEvent)
   return (
-    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" submitLabel={currentEvent ? 'Desar canvi' : 'Inhabilitar'} title={currentEvent ? 'Editar la inhabilitació' : targetsOneSession ? 'Inhabilitar aquesta sessió' : targetsWholeDay ? 'Inhabilitar tot el dia' : 'Afegir un canvi al calendari'}>
+    <AgendaDialog onClose={onClose} onSubmit={save} size="lg" busyLabel="Recalculant la cronologia…" submitLabel={currentEvent ? 'Desar canvi' : 'Inhabilitar'} title={currentEvent ? 'Editar la inhabilitació' : targetsOneSession ? 'Inhabilitar aquesta sessió' : targetsWholeDay ? 'Inhabilitar tot el dia' : 'Afegir un canvi al calendari'}>
       <div className="agenda-event-intro">{targetsOneSession || targetsWholeDay ? <Moon size={19} /> : <CalendarPlus size={19} />}<p>{targetsOneSession ? 'Aquest canvi només afecta la sessió seleccionada. La resta de classes del dia continuaran actives.' : targetsWholeDay ? 'Aquest canvi afecta totes les sessions del dia. Pots indicar si és un festiu o un altre motiu.' : 'Els festius, les vacances i els canvis de jornada es mostraran al calendari i a les sessions afectades.'}</p></div>
       <label>Tipus<select value={values.type} onChange={(event) => setType(event.target.value)}>{eventOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Títol<input autoFocus placeholder={eventLabel} required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>

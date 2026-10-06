@@ -1,3 +1,4 @@
+import { saveCalendarEventWithAutomaticReflow } from './agendaCancellation.js'
 import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -526,21 +527,6 @@ export function useAgendaWorkspace(user, classes = []) {
     setSlots((items) => items.filter((item) => item.id !== slot.id))
   }, [remove])
 
-  const saveCalendarEvent = useCallback(async (values, current = null) => {
-    if (!activeAcademicYear) throw new Error('Cal seleccionar un curs acadèmic.')
-    const now = new Date().toISOString()
-    const next = createCalendarEvent({
-      ...(current || {}),
-      ...values,
-      academicYearId: activeAcademicYear.id,
-      ownerUid: user.uid,
-      updatedAt: now,
-    }, { now })
-    await persist(next)
-    setCalendarEvents((items) => sortEvents(replaceById(items, next)))
-    return next
-  }, [activeAcademicYear, persist, user])
-
   const removeCalendarEvent = useCallback(async (event) => {
     await remove(event)
     setCalendarEvents((items) => items.filter((item) => item.id !== event.id))
@@ -906,12 +892,6 @@ export function useAgendaWorkspace(user, classes = []) {
       ? { ...item, items: bundle.items, session } : item))
     return session
   }, [persist, repository])
-
-  const saveSessionStatus = useCallback(async (bundle, status) => {
-    const now = new Date().toISOString()
-    const session = createCalendarSession({ ...bundle.session, status, updatedAt: now }, { now })
-    return persistSessionSnapshot(bundle, session)
-  }, [persistSessionSnapshot])
 
   const saveSessionClassroomState = useCallback(async (bundle, changes) => {
     const now = new Date().toISOString()
@@ -1874,7 +1854,8 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     for (const entry of entries) await repository.save(entry.entity, entry.context)
     await refreshSync()
-    await synchronize()
+    const summary = await synchronize()
+    if (preview.kind === 'agenda-cancellation') requireConfirmedSchedulingSync(summary)
 
     const activityById = new Map(preview.setup.activities.map((activity) => [activity.id, activity]))
     const changedById = new Map(preview.changedLockedItems.map((item) => [item.id, item]))
@@ -1938,6 +1919,67 @@ export function useAgendaWorkspace(user, classes = []) {
       sessionCount: preview.sessions.length,
     }
   }, [refreshSync, repository, synchronize])
+
+  const saveCalendarEvent = useCallback(async (values, current = null) => {
+    if (!activeAcademicYear) throw new Error('Cal seleccionar un curs acadèmic.')
+    const now = new Date().toISOString()
+    const next = createCalendarEvent({ ...(current || {}), ...values,
+      academicYearId: activeAcademicYear.id, ownerUid: user.uid, updatedAt: now }, { now })
+    await saveCalendarEventWithAutomaticReflow({
+      event: next, calendarEvents, academicYear: activeAcademicYear, now,
+      loadApplications: loadAccessiblePlanningApplications,
+      loadSetup: loadSchedulingSetup,
+      saveEvent: persist,
+      saveReflow: persistAgendaReflowPreview,
+    })
+    setCalendarEvents((items) => sortEvents(replaceById(items, next)))
+    return next
+  }, [activeAcademicYear, calendarEvents, loadAccessiblePlanningApplications, loadSchedulingSetup,
+    persist, persistAgendaReflowPreview, user])
+
+  const saveSessionStatus = useCallback(async (bundle, status) => {
+    const now = new Date().toISOString()
+    if (status === 'cancelled') {
+      if (bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
+        || bundle.session.classroomClosedAt || bundle.session.applicationNotes?.length || bundle.results?.length
+        || bundle.session.status === 'held') {
+        throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
+      }
+      const event = { id: `cancel-session:${bundle.session.id}`, type: 'cancellation',
+        title: 'Classe anul·lada', startsOn: String(bundle.session.startsAt).slice(0, 10),
+        classIds: [bundle.session.classId], sessionId: bundle.session.id }
+      let cancelledSession = null
+      let currentBundle = bundle
+      await saveCalendarEventWithAutomaticReflow({
+        event, calendarEvents, academicYear: activeAcademicYear, now,
+        loadApplications: () => loadAccessiblePlanningApplications({ classId: bundle.session.classId }),
+        loadSetup: async (request) => {
+          const setup = await loadSchedulingSetup(request)
+          const current = setup.existingSessionBundles.find((candidate) => candidate.session.id === bundle.session.id)
+          if (current) currentBundle = { ...bundle, ...current }
+          return setup
+        },
+        saveEvent: async () => {},
+        saveReflow: async (preview) => {
+          preview.sessions = preview.sessions.map((candidate) => candidate.session.id === bundle.session.id
+            ? { ...candidate, session: createCalendarSession({ ...candidate.session, status, updatedAt: now }, { now }) }
+            : candidate)
+          await persistAgendaReflowPreview(preview)
+          cancelledSession = preview.sessions.find((candidate) => candidate.session.id === bundle.session.id)?.session
+        },
+      })
+      if (cancelledSession) return cancelledSession
+      if (currentBundle.session.status === 'held' || currentBundle.session.classroomOpenedAt
+        || currentBundle.session.attendanceConfirmedAt || currentBundle.session.classroomClosedAt
+        || currentBundle.session.applicationNotes?.length || currentBundle.results?.length) {
+        throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
+      }
+      return persistSessionSnapshot(currentBundle,
+        createCalendarSession({ ...currentBundle.session, status, updatedAt: now }, { now }))
+    }
+    const session = createCalendarSession({ ...bundle.session, status, updatedAt: now }, { now })
+    return persistSessionSnapshot(bundle, session)
+  }, [activeAcademicYear, calendarEvents, loadAccessiblePlanningApplications, loadSchedulingSetup, persistAgendaReflowPreview, persistSessionSnapshot])
 
   const confirmSessionReplacementPreview = useCallback(async (preview) => {
     const currentSetup = await loadSchedulingSetup({
