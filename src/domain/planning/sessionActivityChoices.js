@@ -1,6 +1,6 @@
 import { createSessionItem } from './model.js'
 import { getSessionLoad } from './rules.js'
-import { groupParallelSessionBundles, summarizeAssignedActivityProgress, summarizeCompletedActivityIds } from './scheduler.js'
+import { groupParallelSessionBundles, isUnperformedNoClassBundle, summarizeAssignedActivityProgress, summarizeCompletedActivityIds } from './scheduler.js'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday.js'
 
 function relevantBundles(application, target, bundles) {
@@ -9,10 +9,11 @@ function relevantBundles(application, target, bundles) {
 }
 
 /** Els minuts fora del calendari són propis del grup i, si cal, del mig grup. */
-export function getSessionActivityChoices({ activities, application, existingSessionBundles, targetSessionId, manuallyCompletedSourceActivityIds = [] }) {
+export function getSessionActivityChoices({ activities, application, existingSessionBundles, targetSessionId, manuallyCompletedSourceActivityIds = [], calendarEvents = [] }) {
   const target = existingSessionBundles.find(({ session }) => session.id === targetSessionId)
   if (!target) throw new Error('No s’ha trobat la sessió.')
   const bundles = relevantBundles(application, target, existingSessionBundles)
+    .filter((bundle) => !isUnperformedNoClassBundle(bundle, calendarEvents))
   const { assignedMinutesByActivityId, assignedSourceActivityIds } = summarizeAssignedActivityProgress(bundles)
   const completed = new Set([...manuallyCompletedSourceActivityIds, ...summarizeCompletedActivityIds(bundles)])
   return activities.map((activity, index) => {
@@ -32,6 +33,9 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
   if (!target || !getAgendaSessionItemRemovalState(target, { id: 'new-activity' }, options).canRemove) {
     throw new Error('Aquesta sessió ja té dades de classe i no es pot modificar.')
   }
+  if (isUnperformedNoClassBundle(target, input.calendarEvents)) {
+    throw new Error('Aquesta sessió no es fa. Tria una altra sessió.')
+  }
   const activity = getSessionActivityChoices(input).find((choice) => choice.id === activityId)
   if (!activity?.available) throw new Error('Aquesta activitat ja està feta o calendaritzada.')
   const minutes = Number(activity.plannedMinutes) > 0 ? Number(plannedMinutes) : null
@@ -45,7 +49,7 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
     title: activity.title, type: activity.type, plannedMinutes: minutes,
     order: Math.max(-1, ...target.items.map((current) => Number(current.order) || 0)) + 1 }, options)
   const bundles = relevantBundles(input.application, target, input.existingSessionBundles)
-    .filter(({ session }) => !['cancelled', 'notHeld'].includes(session.status))
+    .filter((bundle) => !isUnperformedNoClassBundle(bundle, input.calendarEvents))
     .map((bundle) => bundle.session.id === target.session.id ? { ...bundle, items: [...bundle.items, item] } : bundle)
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const groups = groupParallelSessionBundles(bundles).flatMap((group) => {
@@ -58,5 +62,8 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
     if (part.id === item.id) item = updated
     else if (part.segmentIndex !== updated.segmentIndex || part.segmentCount !== updated.segmentCount) changedItems.push(updated)
   }))
-  return { item, activity, changedItems }
+  const removedItems = relevantBundles(input.application, target, input.existingSessionBundles)
+    .filter((bundle) => isUnperformedNoClassBundle(bundle, input.calendarEvents))
+    .flatMap((bundle) => bundle.items.filter((part) => part.sourceActivityId === activity.id))
+  return { item, activity, changedItems, removedItems }
 }

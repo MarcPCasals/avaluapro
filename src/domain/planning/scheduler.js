@@ -1276,7 +1276,8 @@ function canMoveReplacementContent(bundle, fromDate, now) {
     && !bundle.session.classroomClosedAt && !(bundle.results || []).length
 }
 
-function isUnperformedNoClassBundle(bundle, calendarEvents = []) {
+/** Una anul·lació sense historial no consumeix minuts ni completa activitats. */
+export function isUnperformedNoClassBundle(bundle, calendarEvents = []) {
   const session = bundle.session
   if (session.status === 'held' || session.classroomOpenedAt || session.attendanceConfirmedAt
     || session.classroomClosedAt || session.applicationNotes?.length || (bundle.results || []).length) return false

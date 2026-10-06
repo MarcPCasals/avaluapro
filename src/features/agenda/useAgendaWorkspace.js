@@ -61,6 +61,7 @@ import {
   createTemporalUnit,
   createTimetableSlot,
   isBabeliumItem,
+  isUnperformedNoClassBundle,
   withBabelium,
   createTimetableVersion,
   findTimetableSlotConflicts,
@@ -1238,9 +1239,7 @@ export function useAgendaWorkspace(user, classes = []) {
       timetableSubject: slotById.get(bundle.session.timetableSlotId)?.subject || '',
     }))
     const currentSessionBundles = reconcileSessionOccurrences(existingSessionBundles).bundles
-      .filter(bundle => bundle.session.status === 'held' || !getNoClassCalendarEvent(calendarEvents,
-        String(bundle.session.startsAt).slice(0, 10), bundle.session.classId,
-        { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId }))
+      .filter(bundle => !isUnperformedNoClassBundle(bundle, calendarEvents))
     const { assignedMinutesByActivityId, assignedSourceActivityIds } =
       summarizeAssignedActivityProgress(currentSessionBundles)
     const remainingMinutesByActivityId = Object.fromEntries(activities.map((activity) => {
@@ -1715,17 +1714,23 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     const addition = buildSessionActivityAddition({ ...setup, targetSessionId: bundle.session.id,
       manuallyCompletedSourceActivityIds: getManuallyCompletedActivityIds(setup.activityOverrides) }, activityId, minutes)
+    for (const item of addition.removedItems) {
+      await repository.remove(item, { planningUnitId: setup.planningUnit.id,
+        applicationId: setup.application.id, sessionId: item.sessionId })
+    }
     await persist([addition.item, ...addition.changedItems].map((entity) => ({ entity,
       context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: entity.sessionId } })))
     const changes = new Map(addition.changedItems.map((item) => [item.id, item]))
+    const removedIds = new Set(addition.removedItems.map((item) => item.id))
     const updateBundle = (current) => ({ ...current, items: [
-      ...current.items.map((item) => changes.has(item.id) ? { ...item, ...changes.get(item.id) } : item),
+      ...current.items.filter((item) => !removedIds.has(item.id))
+        .map((item) => changes.has(item.id) ? { ...item, ...changes.get(item.id) } : item),
       ...(current.session.id === bundle.session.id ? [{ ...addition.item, sourceActivity: addition.activity }] : []),
     ] })
     setSessionBundles((current) => current.map(updateBundle))
     return updateBundle({ ...bundle, session: target.session, items: target.items.map((item) => ({ ...item,
       sourceActivity: setup.activities.find((activity) => activity.id === item.sourceActivityId) || null })), results: target.results })
-  }, [loadSchedulingSetup, persist])
+  }, [loadSchedulingSetup, persist, repository])
 
   const loadSessionReplacementActivities = useCallback(async (bundle) => {
     const setup = await loadSchedulingSetup({

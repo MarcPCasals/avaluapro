@@ -58,3 +58,71 @@ test('els elements sense temps es poden afegir a una sessió plena però no dupl
   data.existingSessionBundles[0].items.push(added.item)
   assert.equal(getSessionActivityChoices(data)[0].available, false)
 })
+
+for (const scope of ['day', 'slot', 'session']) {
+  test(`afegir recupera A12 i A13 d’una classe anul·lada per ${scope} i retira només la còpia seleccionada`, () => {
+    const target = bundle('target', '', [['lab', 40]])
+    const blocked = bundle('blocked', '', [['atoms', 40], ['notebook', 15]],
+      { startsAt: '2026-10-07T08:30:00', timetableSlotId: 'slot-blocked' })
+    const event = { id: 'cancel-fictional', type: 'cancellation', startsOn: '2026-10-07', classIds: ['fictional'],
+      ...(scope === 'slot' ? { timetableSlotId: 'slot-blocked' } : {}),
+      ...(scope === 'session' ? { sessionId: 'blocked' } : {}) }
+    const data = { ...input([target, blocked]), calendarEvents: [event], activities: [
+      { id: 'atoms', type: 'activity', title: 'Àtoms', plannedMinutes: 40 },
+      { id: 'notebook', type: 'activity', title: 'Presentació', plannedMinutes: 15 },
+    ] }
+    const original = structuredClone(data)
+    assert.deepEqual(getSessionActivityChoices(data).map((a) => [a.available, a.assignedMinutes, a.calendarLabel]),
+      [[true, 0, 'Fora del calendari'], [true, 0, 'Fora del calendari']])
+    const addition = buildSessionActivityAddition(data, 'notebook', 15, options)
+    assert.equal(addition.item.sourceActivityId, 'notebook')
+    assert.equal(addition.item.segmentCount, 1)
+    assert.deepEqual(addition.removedItems.map((i) => i.id), ['blocked-notebook'])
+    assert.deepEqual(addition.changedItems, [])
+    const persisted = { ...data, existingSessionBundles: [
+      { ...target, items: [...target.items, addition.item] },
+      { ...blocked, items: blocked.items.filter((i) => !addition.removedItems.some((removed) => removed.id === i.id)) },
+    ] }
+    assert.equal(getSessionActivityChoices(persisted)[1].available, false)
+    assert.equal(getSessionActivityChoices(persisted)[0].available, true)
+    assert.throws(() => buildSessionActivityAddition(persisted, 'notebook', 15, options), /calendaritzada/)
+    assert.deepEqual(data, original)
+  })
+}
+
+test('recuperar una part no compta el fragment anul·lat ni altera els fragments vàlids', () => {
+  const target = bundle('target')
+  const blocked = bundle('blocked', '', [['exam', 30]], { status: 'cancelled' })
+  const later = bundle('later', '', [['exam', 20]], { startsAt: '2026-10-12T08:30:00' })
+  const data = input([target, blocked, later])
+  assert.equal(getSessionActivityChoices(data)[0].remainingMinutes, 10)
+  const added = buildSessionActivityAddition(data, 'exam', 10, options)
+  assert.deepEqual(added.removedItems.map((i) => i.id), ['blocked-exam'])
+  assert.equal(added.item.segmentCount, 2)
+  assert.equal(added.changedItems[0].id, 'later-exam')
+  assert.equal(added.changedItems[0].segmentIndex, 2)
+})
+
+test('un altre grup o franja no allibera minuts, i les activitats realment fetes continuen protegides', () => {
+  for (const extra of [{ classIds: ['other'] }, { timetableSlotId: 'other-slot' }]) {
+    const data = { ...input([bundle('target'), bundle('planned', '', [['exam', 30]])]),
+      calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-09', ...extra }] }
+    assert.equal(getSessionActivityChoices(data)[0].available, false)
+  }
+  const held = bundle('held', '', [['exam', 30]], { status: 'held', startsAt: '2026-10-07T08:30:00' })
+  held.results.push({ sessionItemId: held.items[0].id, status: 'completed' })
+  const data = { ...input([bundle('target'), held]),
+    calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-07' }] }
+  assert.equal(getSessionActivityChoices(data)[0].calendarLabel, 'Ja feta')
+  assert.throws(() => buildSessionActivityAddition(data, 'exam', 30, options), /feta/)
+})
+
+test('recuperar només A no retira contingut de B i no permet afegir a la sessió anul·lada', () => {
+  const target = bundle('target-A', 'A')
+  const blockedA = bundle('blocked-A', 'A', [['exam', 30]], { startsAt: '2026-10-07T08:30:00' })
+  const blockedB = bundle('blocked-B', 'B', [['exam', 30]], { startsAt: '2026-10-07T11:30:00' })
+  const data = { ...input([target, blockedA, blockedB]), calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-07' }] }
+  const added = buildSessionActivityAddition(data, 'exam', 30, options)
+  assert.deepEqual(added.removedItems.map((i) => i.id), ['blocked-A-exam'])
+  assert.throws(() => buildSessionActivityAddition({ ...data, targetSessionId: 'blocked-A' }, 'exam', 30, options), /no es fa/)
+})
