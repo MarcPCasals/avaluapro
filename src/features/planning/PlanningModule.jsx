@@ -388,11 +388,12 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
         <summary>
           <div className="planning-section-title">
             <span>01–02</span>
-            <div className="contextual-section-title"><h3>Informació inicial de la UP</h3><ContextualHelp title="Informació inicial de la UP">Reuneix la identificació de la unitat, el repte, el producte final, la llengua de vehiculació i els recursos de tota la UP.</ContextualHelp></div>
+            <h3>Informació inicial de la UP</h3>
           </div>
           <ChevronDown size={18} />
         </summary>
         <div className="planning-basics-content">
+          <div className="contextual-section-title"><span>Informació inicial de la UP</span><ContextualHelp title="Informació inicial de la UP">Reuneix la identificació de la unitat, el repte, el producte final, la llengua de vehiculació i els recursos de tota la UP.</ContextualHelp></div>
           <section className="planning-editor-section">
             <div className="planning-section-title">
               <span>01</span>
@@ -738,7 +739,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
         </section>
       )}
 
-      {workspace.loading ? (
+      {/* Keep an open editor mounted during background refreshes: its draft
+          and the resource inputs must survive until the user saves them. */}
+      {workspace.loading && !workspace.activePlanningUnit ? (
         <div className="planning-loading"><Loader2 className="spin" size={26} />Carregant la programació…</div>
       ) : workspace.academicYears.length === 0 && workspace.planningUnits.length === 0 ? (
         <section className="planning-empty-state first-step">
