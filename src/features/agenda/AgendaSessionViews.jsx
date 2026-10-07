@@ -16,6 +16,7 @@ import {
   startOfCalendarWeek,
 } from '../../lib/agendaCalendar'
 import { filterAgendaItemsForClass, findNextTimetableOccurrence, getAgendaWeekTemporalState, getAgendaSessionItemRemovalState, getWeekTimetableOccurrences } from '../../lib/agendaToday'
+import { getTimetableSessionNoteId } from '../../domain/planning/sessionNotes'
 import { AgendaSessionActivityPicker } from './AgendaSessionActivityPicker'
 import { AgendaDoubleBell } from './AgendaDoubleBell'
 
@@ -550,7 +551,7 @@ export function AgendaMonthView({ academicYear, activeTemporalUnit, bundles, cal
 
 function TimelineRows({ calendarEvents, groups, onOpenSession, onOpenNotes, notesLoadingId, onOpenTimetableClassroom, slots = [], classes = [] }) {
   return <div className="agenda-timeline-list">{groups.flatMap((group) => group.bundles.map((bundle) => {
-    const notesButton = onOpenNotes && <button aria-label={`Notes de la sessió del ${formatDate(sessionDate(bundle))} a les ${sessionTime(bundle)}`} className={`agenda-timeline-notes ${bundle.privateNotes?.[0]?.text ? 'has-note' : ''}`} disabled={Boolean(notesLoadingId)} onClick={() => onOpenNotes(bundle)} title="Notes" type="button">{notesLoadingId === bundle.session.id ? <Loader2 className="spin" size={15} /> : <StickyNote size={15} />}</button>
+    const notesButton = onOpenNotes && <button aria-label={`Notes de la sessió del ${formatDate(sessionDate(bundle))} a les ${sessionTime(bundle)}`} className={`agenda-timeline-notes ${bundle.privateNotes?.some((note) => String(note.text || '').trim()) ? 'has-note' : ''}`} disabled={Boolean(notesLoadingId)} onClick={() => onOpenNotes(bundle)} title="Notes" type="button">{notesLoadingId === bundle.session.id ? <Loader2 className="spin" size={15} /> : <StickyNote size={15} />}</button>
     if (bundle.timetableOccurrence) {
       const occurrence = bundle.timetableOccurrence
       return <div className={`agenda-timeline-row ${group.isParallel ? 'parallel-session' : ''}`} key={bundle.session.id}><button className="agenda-timeline-session" onClick={() => onOpenTimetableClassroom?.(occurrence)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot" /><div className="agenda-timeline-date"><strong>{formatDate(occurrence.date, { weekday: true })}</strong><small>{occurrence.slot.startsAt} · {occurrence.slot.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{occurrence.slot.subject}</span><div className="agenda-timeline-activity"><strong>{occurrence.slot.subject}</strong><small>Sense activitats calendaritzades</small></div></div><CalendarRange size={15} /></button>{notesButton}</div>
@@ -630,6 +631,8 @@ export function AgendaTimelineView({
   onOpenSession,
   onOpenNotes,
   notesLoadingId,
+  onLoadNotes,
+  sessionPrivateNotes = {},
   onOpenTimetableClassroom,
   onSchedule,
   selectedClassId,
@@ -668,7 +671,16 @@ export function AgendaTimelineView({
     items: [], results: [],
     timetableOccurrence: { ...candidate, id: `timetable_${candidate.date}_${candidate.timetableSlotId}`, slot: slots.find((slot) => slot.id === candidate.timetableSlotId) },
   }))
-  const classBundles = [...groupBundles, ...timetableBundles].filter((bundle) => !activeSubject || planningSubjectsMatch(subjectForBundle(bundle), activeSubject))
+  const noteSessionIdsKey = [...new Set([...groupBundles, ...timetableBundles].flatMap((bundle) =>
+    [bundle.session.id, getTimetableSessionNoteId(bundle.session)].filter(Boolean)))].sort().join('|')
+  useEffect(() => {
+    if (noteSessionIdsKey && onLoadNotes) onLoadNotes(noteSessionIdsKey.split('|'))
+  }, [noteSessionIdsKey, onLoadNotes])
+  const classBundles = [...groupBundles, ...timetableBundles].map((bundle) => ({ ...bundle,
+    privateNotes: [bundle.session.id, getTimetableSessionNoteId(bundle.session)]
+      .flatMap((id) => sessionPrivateNotes[id] || [])
+      .concat(bundle.privateNotes || []),
+  })).filter((bundle) => !activeSubject || planningSubjectsMatch(subjectForBundle(bundle), activeSubject))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const visibleUnscheduledActivities = unscheduledActivities.filter((activity) => !activeSubject || planningSubjectsMatch(activity.subject, activeSubject))
   const logicalGroups = groupParallelSessionBundles(classBundles)

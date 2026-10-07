@@ -140,6 +140,7 @@ export function useAgendaWorkspace(user, classes = []) {
   const [sharedClasses, setSharedClasses] = useState([])
   const [temporalUnits, setTemporalUnits] = useState([])
   const [sessionBundles, setSessionBundles] = useState([])
+  const [sessionPrivateNotes, setSessionPrivateNotes] = useState({})
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const sessionRangeRequest = useRef(0)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
@@ -977,6 +978,20 @@ export function useAgendaWorkspace(user, classes = []) {
     return activity
   }, [persist])
 
+  const loadTimelinePrivateNotes = useCallback(async (sessionIds) => {
+    if (!repository || !user?.uid) return
+    const results = await Promise.all(sessionIds.map((sessionId) => repository.loadScope(
+      `session:${sessionId}:privateNotes`,
+      () => loadPlanningPrivateNotes(user.uid, { sessionId }),
+      { completeSnapshot: true, refreshToken: refreshRevision },
+    )))
+    const failed = results.find((result) => result.error)
+    if (failed) throw failed.error
+    setSessionPrivateNotes((current) => ({ ...current,
+      ...Object.fromEntries(sessionIds.map((id, index) => [id, results[index].entities])),
+    }))
+  }, [repository, user, refreshRevision])
+
   const loadClassroomPrivateNotes = useCallback(async (bundle) => {
     if (!repository || !user?.uid) return { ...bundle, privateNotes: [] }
     const sessionIds = [...new Set([bundle.session.id, getTimetableSessionNoteId(bundle.session)].filter(Boolean))]
@@ -1063,6 +1078,8 @@ export function useAgendaWorkspace(user, classes = []) {
     setSessionBundles((bundles) => bundles.map((current) => current.session.id === bundle.session.id
       ? { ...current, session, privateNotes: note ? [note] : [] }
       : current))
+    const noteSessionId = note?.sessionId || existing?.sessionId || getTimetableSessionNoteId(bundle.session) || bundle.session.id
+    setSessionPrivateNotes((current) => ({ ...current, [noteSessionId]: note ? [note] : [] }))
     return { note, session }
   }, [persist, remove, user])
 
@@ -2238,6 +2255,8 @@ export function useAgendaWorkspace(user, classes = []) {
     loadSchedulingSetup,
     loadAgendaRecoveryOptions,
     loadClassroomPrivateNotes,
+    loadTimelinePrivateNotes,
+    sessionPrivateNotes,
     loadSessionDetails,
     loadSessionRange,
     loadUnscheduledPlanningActivities,

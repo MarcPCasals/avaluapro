@@ -700,7 +700,7 @@
 .agenda-timeline-row { display: flex; align-items: center; gap: 10px; }
 .agenda-timeline-row > .agenda-timeline-session { flex: 1; min-width: 0; }
 .agenda-timeline-notes { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; color: #64748b; font-size: 10px; font-weight: 700; }
-.agenda-timeline-notes.has-note { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+.agenda-timeline-notes.has-note { border-color: #fdba74; background: #fff7ed; color: #f97316; }
 .agenda-session-notes-dialog p { margin: 0; color: #64748b; font-size: 12px; line-height: 1.5; }
 .agenda-session-notes-help { display: flex; align-items: flex-start; gap: 8px; }
 .agenda-session-notes-help > svg { flex-shrink: 0; margin-top: 2px; }
