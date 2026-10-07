@@ -4,7 +4,7 @@ import {
   buildActivitySessionDistribution, buildActivitySessionReflow,
   buildAgendaSessionCompaction, buildAgendaRecoveryReflow,
   buildTimetableSessionCandidates, copyTimetableVersionStructure,
-  createTimetableSlot, createTimetableVersion, isBabeliumItem,
+  createCalendarSession, createTimetableSlot, createTimetableVersion, isBabeliumItem,
   withBabelium, getSessionLoad, getClassroomTimerState,
 } from '../src/domain/planning/index.js'
 import { buildTimetableClassroomBundle, getAgendaSessionItemRemovalState } from '../src/lib/agendaToday.js'
@@ -114,4 +114,52 @@ test('desactivar Babèlium també retira el bloc antic de la proposta de reorgan
   const reflow = buildActivitySessionReflow({ application, activities: [{ ...activity, plannedMinutes: 55 }], existingSessionBundles: [disabled], fromDate: '2026-10-05', options })
   assert.equal(reflow.removedItems.filter(isBabeliumItem).length, 1)
   assert.equal(reflow.sessions.flatMap((bundle) => bundle.items).filter(isBabeliumItem).length, 0)
+})
+
+
+test('treure Babèlium d’una sessió persisteix l’excepció sense modificar l’horari ni les altres activitats', () => {
+  const original = { ...distribute().sessions[0], results: [] }
+  const slot = { babeliumEnabled: true }
+  const session = createCalendarSession({ ...original.session, babeliumEnabled: false, babeliumSuppressed: true }, options)
+  const removed = withBabelium({ ...original, session }, slot)
+  assert.equal(removed.session.babeliumEnabled, false)
+  assert.equal(removed.session.babeliumSuppressed, true)
+  assert.equal(removed.items.some(isBabeliumItem), false)
+  assert.deepEqual(removed.items, original.items.filter(item => !isBabeliumItem(item)))
+  assert.equal(removed.removedBabeliumItems.length, 1)
+  assert.equal(withBabelium(removed, slot).items.some(isBabeliumItem), false)
+  assert.equal(withBabelium(original, slot).items.some(isBabeliumItem), true)
+  assert.equal(slot.babeliumEnabled, true)
+  assert.equal(getSessionLoad(removed.items, session.durationMinutes).plannedMinutes,
+    getSessionLoad(original.items, original.session.durationMinutes).plannedMinutes - 30)
+})
+
+test('Babèlium impartit o amb assistència confirmada continua protegit com a historial', () => {
+  const original = { ...distribute().sessions[0], results: [] }
+  const babelium = original.items.find(isBabeliumItem)
+  for (const changes of [{ status: 'held' }, { attendanceConfirmedAt: options.now }, { classroomClosedAt: options.now }]) {
+    assert.equal(getAgendaSessionItemRemovalState({ ...original, session: { ...original.session, ...changes } }, babelium, options).canRemove, false)
+  }
+})
+
+
+test('un resultat real de Babèlium impedeix retirar-lo encara que la sessió sigui prevista', () => {
+  const original = { ...distribute().sessions[0], results: [] }
+  const item = original.items.find(isBabeliumItem)
+  original.results.push({ sessionItemId: item.id, status: 'completed' })
+  assert.equal(getAgendaSessionItemRemovalState(original, item, options).canRemove, false)
+})
+
+
+test('la proposta intel·ligent manté la retirada de Babèlium i aprofita els 30 minuts alliberats', () => {
+  const original = { ...distribute().sessions[0], results: [] }
+  const session = createCalendarSession({ ...original.session, babeliumEnabled: false, babeliumSuppressed: true }, options)
+  const removed = withBabelium({ ...original, session }, { babeliumEnabled: true })
+  const result = buildActivitySessionReflow({ application, activities: [activity], existingSessionBundles: [removed],
+    candidates: [candidate('2026-10-12')], fromDate: '2026-10-05', options })
+  const first = result.sessions.find(bundle => bundle.session.id === session.id)
+  assert.equal(first.session.babeliumSuppressed, true)
+  assert.equal(first.items.some(isBabeliumItem), false)
+  assert.equal(first.items.reduce((total, item) => total + item.plannedMinutes, 0), 85)
+  assert.equal(withBabelium({ ...first, results: [] }, { babeliumEnabled: true }).items.some(isBabeliumItem), false)
 })

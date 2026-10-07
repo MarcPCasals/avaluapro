@@ -1482,6 +1482,12 @@ export function useAgendaWorkspace(user, classes = []) {
       throw new Error('Aquesta activitat ja té dades de classe i no es pot eliminar de l’historial.')
     }
     if (!repository) throw new Error('Cal iniciar sessió abans de modificar l’Agenda.')
+    if (isBabeliumItem(item)) {
+      const now = new Date().toISOString()
+      const session = createCalendarSession({ ...bundle.session, babeliumEnabled: false, babeliumSuppressed: true, updatedAt: now }, { now })
+      await persistSessionSnapshot({ ...bundle, items: bundle.items.filter(part => !isBabeliumItem(part)), removedBabeliumItems: parts }, session)
+      return { ...item, updatedSession: session }
+    }
     const removedIds = new Set(parts.map((part) => part.id))
     const context = {
       applicationId: bundle.application.id,
@@ -1502,7 +1508,7 @@ export function useAgendaWorkspace(user, classes = []) {
         }
       : current))
     return item
-  }, [refreshSync, repository, synchronize])
+  }, [persistSessionSnapshot, refreshSync, repository, synchronize])
 
   /**
    * Ofereix les activitats ja treballades abans de la sessió actual. Es pren

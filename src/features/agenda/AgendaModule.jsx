@@ -773,10 +773,11 @@ export default function AgendaModule() {
   }
   const removeDetailSessionItem = async (item) => {
     const sessionId = activeBundle.session.id
-    await workspace.removeSessionItem(activeBundle, item)
+    const removed = await workspace.removeSessionItem(activeBundle, item)
     const removedIds = new Set((item.combinedItems || [item]).map((part) => part.id))
     setActiveBundle((current) => current?.session.id === sessionId ? {
       ...current,
+      session: removed.updatedSession || current.session,
       items: current.items.filter((candidate) => !removedIds.has(candidate.id)),
       results: (current.results || []).filter((result) => !removedIds.has(result.sessionItemId)),
     } : current)

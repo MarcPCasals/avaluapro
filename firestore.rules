@@ -1582,7 +1582,7 @@ service cloud.firestore {
 
     function validPlanningSession(upId, applicationId, sessionId) {
       return request.resource.data.keys().hasOnly([
-          'applicationId', 'applicationNotes', 'attendanceConfirmedAt', 'babeliumEnabled', 'calendarEventId', 'classId',
+          'applicationId', 'applicationNotes', 'attendanceConfirmedAt', 'babeliumEnabled', 'babeliumSuppressed', 'calendarEventId', 'classId',
           'classroomClosedAt', 'classroomOpenedAt', 'createdAt', 'durationMinutes',
           'entityType', 'id', 'ownerUid', 'parallelProgrammingKey', 'schemaVersion', 'startsAt', 'status',
           'subgroupId', 'timetableSlotId', 'updatedAt'
@@ -1596,6 +1596,7 @@ service cloud.firestore {
         && request.resource.data.durationMinutes is number
         && (!('applicationNotes' in request.resource.data) || request.resource.data.applicationNotes is list)
         && (!('babeliumEnabled' in request.resource.data) || request.resource.data.babeliumEnabled is bool)
+        && (!('babeliumSuppressed' in request.resource.data) || request.resource.data.babeliumSuppressed is bool)
         && request.resource.data.status in ['planned', 'held', 'cancelled', 'notHeld']
         && request.resource.data.startsAt is string
         && request.resource.data.createdAt is string

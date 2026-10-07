@@ -190,7 +190,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       await onRemoveItem(item)
       setRemovalItemId('')
       setActivityChoices(null)
-      setEditNotice('Activitat retirada de la sessió i conservada fora del calendari. La pots recuperar amb «Afegir activitat».')
+      setEditNotice(isBabeliumItem(item) ? 'Babèlium retirat només d’aquesta sessió. Les altres sessions de l’horari es conserven.' : 'Activitat retirada de la sessió i conservada fora del calendari. La pots recuperar amb «Afegir activitat».')
     } catch (error) {
       setRemovalError(error.message || 'No s’ha pogut treure l’activitat de la sessió.')
     } finally {
@@ -237,18 +237,18 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
                 {editError && <p role="alert">{editError}</p>}
               </form>}
               {confirmingRemoval && <div className="agenda-session-item-confirmation">
-                <p>Treure aquesta activitat de la calendarització d’aquesta sessió? Es conservarà a la programació i els minuts retirats quedaran disponibles a «Afegir activitat». Les altres sessions es conservaran.</p>
-                <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}Treure i conservar</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
+                <p>{isBabeliumItem(item) ? 'Treure Babèlium només d’aquesta sessió? S’alliberaran els 30 minuts. Les altres sessions de l’horari es conservaran.' : 'Treure aquesta activitat de la calendarització d’aquesta sessió? Es conservarà a la programació i els minuts retirats quedaran disponibles a «Afegir activitat». Les altres sessions es conservaran.'}</p>
+                <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}{isBabeliumItem(item) ? 'Treure Babèlium' : 'Treure i conservar'}</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
                 {removalError && <p role="alert">{removalError}</p>}
               </div>}
             </div>
             {(onRemoveItem || onSaveItem || onMoveItem) && <div className="agenda-session-item-tools">
               {onMoveItem && <>
-                <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || !removalState.canRemove || itemIndex === 0 || (visibleItems[itemIndex - 1] && isBabeliumItem(visibleItems[itemIndex - 1]))} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>
-                <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || !removalState.canRemove || itemIndex === visibleItems.length - 1} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>
+                <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || isBabeliumItem(item) || !removalState.canRemove || itemIndex === 0 || (visibleItems[itemIndex - 1] && isBabeliumItem(visibleItems[itemIndex - 1]))} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>
+                <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || isBabeliumItem(item) || !removalState.canRemove || itemIndex === visibleItems.length - 1} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>
               </>}
               {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || (item.combinedItems || [item]).some((part) => !part.sourceActivityId)} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
-              {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? 'Treure de la calendarització i conservar' : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
+              {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? (isBabeliumItem(item) ? 'Treure Babèlium només d’aquesta sessió' : 'Treure de la calendarització i conservar') : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
             </div>}
           </li>
         })}</ol>}

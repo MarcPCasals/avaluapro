@@ -28,7 +28,7 @@ export function withBabelium(bundle, slot, options = {}) {
     ...bundle, items: [...(bundle.items || [])].sort((left, right) =>
       Number(isBabeliumItem(right)) - Number(isBabeliumItem(left)) || Number(left.order) - Number(right.order)),
   }
-  const enabled = slot ? Boolean(slot.babeliumEnabled) : Boolean(session.babeliumEnabled)
+  const enabled = !session.babeliumSuppressed && (slot ? Boolean(slot.babeliumEnabled) : Boolean(session.babeliumEnabled))
   const nextSession = { ...session, babeliumEnabled: enabled }
   const regularItems = (bundle.items || []).filter((item) => !isBabeliumItem(item))
   const fixedItem = enabled

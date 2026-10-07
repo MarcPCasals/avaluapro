@@ -155,14 +155,14 @@ export function buildAgendaSessionItemUpdate(bundle, item, changes, options = {}
  * sessió feta, tancada o amb assistència confirmada continua protegida.
  */
 export function getAgendaSessionItemRemovalState(bundle, item, options = {}) {
-  if (isBabeliumItem(item)) return { canRemove: false, linkedResults: [], reason: 'Configura Babèlium des de l’horari.' }
   const now = new Date(options.now || new Date().toISOString()).getTime()
   const startsAt = new Date(bundle?.session?.startsAt || '').getTime()
   const isFutureSession = Number.isFinite(startsAt) && startsAt > now
   const linkedResults = item
     ? (bundle?.results || []).filter((result) => result.sessionItemId === item.id)
     : []
-  const hasProtectedClassroomData = bundle?.session?.status !== 'planned'
+  const hasProtectedClassroomData = (isBabeliumItem(item) && linkedResults.length > 0)
+    || bundle?.session?.status !== 'planned'
     || Boolean(bundle?.session?.attendanceConfirmedAt)
     || Boolean(bundle?.session?.classroomClosedAt)
     || (Boolean(bundle?.session?.classroomOpenedAt) && !isFutureSession)

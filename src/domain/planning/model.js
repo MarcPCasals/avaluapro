@@ -617,6 +617,7 @@ export function createCalendarSession(input, options = {}) {
     startsAt: isoDateTime(input.startsAt, "data i hora d'inici"),
     durationMinutes: positiveMinutes(input.durationMinutes, 'durada de la sessió'),
     ...(input.babeliumEnabled != null ? { babeliumEnabled: Boolean(input.babeliumEnabled) } : {}),
+    ...(input.babeliumSuppressed != null ? { babeliumSuppressed: Boolean(input.babeliumSuppressed) } : {}),
     subgroupId: optionalText(input.subgroupId),
     parallelProgrammingKey: optionalText(input.parallelProgrammingKey),
     status: enumValue(input.status || 'planned', SESSION_STATUSES, 'estat de la sessió'),
