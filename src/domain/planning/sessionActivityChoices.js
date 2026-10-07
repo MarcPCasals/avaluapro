@@ -50,6 +50,19 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
   if (isUnperformedNoClassBundle(target, input.calendarEvents)) {
     throw new Error('Aquesta sessió no es fa. Tria una altra sessió.')
   }
+  if (activityId && typeof activityId === 'object') {
+    const title = String(activityId.title || '').trim()
+    const minutes = Number(plannedMinutes)
+    const load = getSessionLoad(target.items, target.session.durationMinutes)
+    const freeMinutes = Math.max(0, load.programmableMinutes - load.plannedMinutes)
+    if (!title || !Number.isFinite(minutes) || minutes <= 0 || minutes > freeMinutes) {
+      throw new Error(`Escriu l’activitat i indica una durada entre 1 i ${freeMinutes} minuts.`)
+    }
+    const item = createSessionItem({ ownerUid: target.session.ownerUid, applicationId: input.application.id,
+      sessionId: target.session.id, title, type: 'activity', plannedMinutes: minutes,
+      order: Math.max(-1, ...target.items.map((current) => Number(current.order) || 0)) + 1 }, options)
+    return { item, activity: null, changedItems: [], removedItems: [] }
+  }
   const activity = getSessionActivityChoices({ ...input, options }).find((choice) => choice.id === activityId)
   if (!activity?.available) throw new Error('Aquesta activitat ja està feta o calendaritzada en aquesta sessió o en una sessió passada.')
   const minutes = Number(activity.plannedMinutes) > 0 ? Number(plannedMinutes) : null

@@ -708,6 +708,7 @@ export function buildActivitySessionReflow({
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const allReflowableBundles = existingSessionBundles
     .filter((bundle) => canReflowSession(bundle, fromDate, options.now)
+      && !(bundle.items || []).some((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item))
       && (sessionMatchesPlanningSubject(bundle, application.subject)
         || !(bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
           || bundle.session.classroomClosedAt || (bundle.results || []).length)))

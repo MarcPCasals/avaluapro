@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, buildSessionActivityAddition, buildActivitySessionReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -236,4 +236,46 @@ test('una activitat passada sencera queda marcada com acabada sense perdre els c
   assert.equal(choices[0].available, false)
   assert.equal(choices[1].code, 'A2')
   assert.deepEqual(choices.filter(choice => !choice.completed).map(choice => choice.id), ['lab'])
+})
+
+test('afegir una activitat pròpia només crea un element de sessió i conserva la Programació', () => {
+  const data = input([bundle('target', '', [['exam', 30]]), bundle('later')])
+  const original = structuredClone(data)
+  const addition = buildSessionActivityAddition(data, { title: '  Debat sobre una notícia  ' }, 25, options)
+  assert.equal(addition.item.title, 'Debat sobre una notícia')
+  assert.equal(addition.item.plannedMinutes, 25)
+  assert.equal(addition.item.sourceActivityId, null)
+  assert.equal(addition.item.sourcePlanningUnitId, null)
+  assert.equal(addition.item.sessionId, 'target')
+  assert.equal(addition.item.order, 1)
+  assert.equal(addition.activity, null)
+  assert.deepEqual(addition.changedItems, [])
+  assert.deepEqual(addition.removedItems, [])
+  assert.deepEqual(data, original)
+  assert.throws(() => buildSessionActivityAddition(data, { title: 'Debat' }, 26, options), /25 minuts/)
+  assert.throws(() => buildSessionActivityAddition(data, { title: '  ' }, 10, options), /Escriu/)
+  assert.throws(() => buildSessionActivityAddition(data, { title: 'Debat' }, 0, options), /durada/)
+})
+
+test('les activitats pròpies respecten Babèlium, les anul·lacions i les sessions amb historial', () => {
+  const target = bundle('target')
+  target.items.push(createBabeliumItem(target.session, options))
+  assert.throws(() => buildSessionActivityAddition(input([target]), { title: 'Debat' }, 30, options), /25 minuts/)
+  assert.throws(() => buildSessionActivityAddition(input([{ ...target, session: { ...target.session, status: 'held' } }]), { title: 'Debat' }, 10, options), /dades de classe/)
+  const data = { ...input([target]), calendarEvents: [{ id: 'cancel', type: 'cancellation', startsOn: '2026-10-09', classIds: ['fictional'] }] }
+  assert.throws(() => buildSessionActivityAddition(data, { title: 'Debat' }, 10, options), /no es fa/)
+})
+
+
+test('recalcular la Programació conserva una sessió amb una activitat pròpia', () => {
+  const target = bundle('target', '', [['exam', 30]])
+  const addition = buildSessionActivityAddition(input([target]), { title: 'Debat' }, 25, options)
+  const customBundle = { ...target, items: [...target.items, addition.item] }
+  const original = structuredClone(customBundle)
+  const result = buildActivitySessionReflow({ application, activities, existingSessionBundles: [customBundle],
+    fromDate: '2026-10-04', options, candidates: [{ date: '2026-10-12', startsAt: '2026-10-12T08:30:00', durationMinutes: 60 }] })
+  assert.equal(result.lockedSessionCount, 1)
+  assert(!result.removedSessions.some(session => session.id === target.session.id))
+  assert(!result.removedItems.some(item => item.id === addition.item.id))
+  assert.deepEqual(customBundle, original)
 })
