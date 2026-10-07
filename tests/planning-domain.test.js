@@ -980,6 +980,8 @@ test('inhabilitar una franja concreta conserva les altres classes del mateix dia
 
   assert.deepEqual(result.candidates.map((candidate) => candidate.timetableSlotId), ['slot-early'])
   assert.deepEqual(result.skippedDates[0].eventIds, ['cancelled-slot'])
+  assert.deepEqual(result.blockedCandidates.map((candidate) => [candidate.timetableSlotId, candidate.startsAt, candidate.blockingEvent.title]),
+    [['slot-late', '2026-09-21T11:00:00', 'Reunió de centre']])
 })
 
 test('una proposta divide una activitat llarga, manté indicacions i no duplica les ja assignades', () => {

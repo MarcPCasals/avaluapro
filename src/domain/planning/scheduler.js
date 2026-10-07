@@ -311,11 +311,12 @@ export function buildTimetableSessionCandidates({
   to,
 }) {
   if (!classId || !from || !to || from > to) {
-    return { candidates: [], skippedDates: [] }
+    return { candidates: [], skippedDates: [], blockedCandidates: [] }
   }
   const occupied = new Set(occupiedCandidateKeys)
   const candidates = []
   const skippedDates = []
+  const blockedCandidates = []
   const classSubjects = getClassPlanningSubjects(Object.values(slotsByTimetableId).flat(), classId)
   const programmingLinksByTimetableId = new Map()
   for (const [timetableId, timetableSlots] of Object.entries(slotsByTimetableId)) {
@@ -364,21 +365,20 @@ export function buildTimetableSessionCandidates({
       })
     }
     for (const { events, slot } of blockedSlots) {
-      if (events.length === 0) {
-        const candidate = {
-          date: dateKey,
-          durationMinutes: Number(slot.durationMinutes),
-          babeliumEnabled: Boolean(slot.babeliumEnabled),
-          space: slot.space || '',
-          startsAt: `${dateKey}T${slot.startsAt}:00`,
-          subgroupId: slot.subgroupId || null,
-          parallelProgrammingKey: programmingLinksByTimetableId.get(timetable.id)?.get(slot.id) || null,
-          subject: slot.subject || '',
-          timetableSlotId: slot.id,
-          timetableVersionId: timetable.id,
-        }
-        if (!occupied.has(candidateKey(candidate))) candidates.push(candidate)
+      const candidate = {
+        date: dateKey,
+        durationMinutes: Number(slot.durationMinutes),
+        babeliumEnabled: Boolean(slot.babeliumEnabled),
+        space: slot.space || '',
+        startsAt: `${dateKey}T${slot.startsAt}:00`,
+        subgroupId: slot.subgroupId || null,
+        parallelProgrammingKey: programmingLinksByTimetableId.get(timetable.id)?.get(slot.id) || null,
+        subject: slot.subject || '',
+        timetableSlotId: slot.id,
+        timetableVersionId: timetable.id,
       }
+      if (events.length > 0) blockedCandidates.push({ ...candidate, blockingEvent: events[0] })
+      else if (!occupied.has(candidateKey(candidate))) candidates.push(candidate)
     }
     const extraordinaryEvents = calendarEvents.filter((event) =>
       event.type === 'extraordinarySession' &&
@@ -407,6 +407,7 @@ export function buildTimetableSessionCandidates({
   }
 
   return {
+    blockedCandidates: blockedCandidates.sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
     candidates: candidates.sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
     skippedDates,
   }

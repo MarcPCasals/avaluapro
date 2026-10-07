@@ -203,7 +203,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   const visibleItems = combineAgendaSessionItems([...bundle.items].sort((a, b) => Number(a.order) - Number(b.order)), bundle.planningUnit.id)
   const sessionLoad = getSessionLoad(bundle.items, bundle.session.durationMinutes)
   const freeMinutes = Math.max(0, sessionLoad.programmableMinutes - sessionLoad.plannedMinutes)
-  const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
+  const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId })
   return (
     <div className="agenda-session-detail">
       <header>
@@ -376,7 +376,7 @@ export function AgendaWeekView({ activeTemporalUnit, bundles, calendarEvents, cl
     ...bundles
       .filter((bundle) => days.includes(sessionDate(bundle)))
       .filter((bundle) => !['cancelled', 'notHeld'].includes(bundle.session.status))
-      .filter((bundle) => !getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id }))
+      .filter((bundle) => !getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId }))
       .map((bundle) => ({
         durationMinutes: bundle.session.durationMinutes,
         id: `session:${bundle.session.id}`,
@@ -554,9 +554,11 @@ function TimelineRows({ calendarEvents, groups, onOpenSession, onOpenNotes, note
     const notesButton = onOpenNotes && <button aria-label={`Notes de la sessió del ${formatDate(sessionDate(bundle))} a les ${sessionTime(bundle)}`} className={`agenda-timeline-notes ${bundle.privateNotes?.some((note) => String(note.text || '').trim()) ? 'has-note' : ''}`} disabled={Boolean(notesLoadingId)} onClick={() => onOpenNotes(bundle)} title="Notes" type="button">{notesLoadingId === bundle.session.id ? <Loader2 className="spin" size={15} /> : <StickyNote size={15} />}</button>
     if (bundle.timetableOccurrence) {
       const occurrence = bundle.timetableOccurrence
+      const blockingEvent = bundle.session.blockingEvent
+      if (blockingEvent) return <div className="agenda-timeline-row" key={bundle.session.id}><div className="agenda-timeline-session calendar-blocked"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot"><Moon size={9} /></span><div className="agenda-timeline-date"><strong>{formatDate(occurrence.date, { weekday: true })}</strong><small>{occurrence.slot.startsAt} · {occurrence.slot.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{occurrence.slot.subject}</span><div className="agenda-timeline-activity"><strong>{blockingEvent.title}</strong><small>Aquesta sessió no es fa</small></div></div><span className="agenda-session-status notHeld">No es fa</span><CalendarRange size={15} /></div>{notesButton}</div>
       return <div className={`agenda-timeline-row ${group.isParallel ? 'parallel-session' : ''}`} key={bundle.session.id}><button className="agenda-timeline-session" onClick={() => onOpenTimetableClassroom?.(occurrence)} type="button"><span className="agenda-timeline-index">{group.sequence}</span><span className="agenda-timeline-dot" /><div className="agenda-timeline-date"><strong>{formatDate(occurrence.date, { weekday: true })}</strong><small>{occurrence.slot.startsAt} · {occurrence.slot.durationMinutes} min</small></div><div className="agenda-timeline-content"><span>{occurrence.slot.subject}</span><div className="agenda-timeline-activity"><strong>{occurrence.slot.subject}</strong><small>Sense activitats calendaritzades</small></div></div><CalendarRange size={15} /></button>{notesButton}</div>
     }
-    const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id })
+    const blockingEvent = getNoClassCalendarEvent(calendarEvents, sessionDate(bundle), bundle.session.classId, { sessionId: bundle.session.id, timetableSlotId: bundle.session.timetableSlotId })
     const load = bundle.detailsLoaded === false ? null : getSessionLoad(bundle.items, bundle.session.durationMinutes)
     const freeMinutes = load && bundle.session.status === 'planned'
       ? Math.max(0, load.programmableMinutes - load.plannedMinutes)
@@ -658,16 +660,19 @@ export function AgendaTimelineView({
     planningUnit: bundle.planningUnit, classItem: classes.find((item) => item.id === selectedClassId), subjects: timetableSubjects })
   const subjects = [...new Set([...timetableSubjects, ...groupBundles.map(subjectForBundle)].filter(Boolean))]
   const selectedClassSubject = classes.find((item) => item.id === selectedClassId)?.subject
-  const timetableCandidates = buildTimetableSessionCandidates({ calendarEvents, classId: selectedClassId,
+  const timetableAvailability = buildTimetableSessionCandidates({ calendarEvents, classId: selectedClassId,
     subject: activeSubject, from: range?.from || today, to: range?.to || addDays(today, 56),
     timetables: timetable ? [timetable] : [], slotsByTimetableId: timetable ? { [timetable.id]: slots } : {},
-  }).candidates.filter((candidate) => candidate.timetableSlotId && candidate.date >= today
-    && (activeSubject || !planningSubjectsMatch(candidate.subject, selectedClassSubject))
+  })
+  const timetableCandidates = [...timetableAvailability.candidates, ...timetableAvailability.blockedCandidates]
+    .filter((candidate) => candidate.timetableSlotId
+    && (candidate.blockingEvent || candidate.date >= today)
+    && (candidate.blockingEvent || activeSubject || !planningSubjectsMatch(candidate.subject, selectedClassSubject))
     && !groupBundles.some((bundle) => bundle.session.startsAt === candidate.startsAt
       && planningSubjectsMatch(subjectForBundle(bundle), candidate.subject)))
   const timetableBundles = timetableCandidates.map((candidate) => ({
     application: { subject: candidate.subject },
-    session: { ...candidate, id: `timetable_${candidate.date}_${candidate.timetableSlotId}`, classId: selectedClassId, status: 'planned' },
+    session: { ...candidate, id: `timetable_${candidate.date}_${candidate.timetableSlotId}`, classId: selectedClassId, status: candidate.blockingEvent ? 'notHeld' : 'planned' },
     items: [], results: [],
     timetableOccurrence: { ...candidate, id: `timetable_${candidate.date}_${candidate.timetableSlotId}`, slot: slots.find((slot) => slot.id === candidate.timetableSlotId) },
   }))
