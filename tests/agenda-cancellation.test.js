@@ -60,10 +60,11 @@ test('conserva durades ajustades i indicacions sense vincle a Programació', () 
   first.items.unshift(createSessionItem({ ownerUid: application.ownerUid, applicationId: application.id,
     sessionId: first.session.id, title: 'Agafar la bata', type: 'indication', order: 0 }, { now }))
   const preview = build(setup([first]))
-  const moved = preview.sessions.find((b) => b.items.length)
-  assert.deepEqual(moved.items.map((i) => [i.title, i.plannedMinutes]), [['Agafar la bata', null], ['Àtoms', 40], ['Presentació', 15]])
+  const fixed = preview.sessions.find((b) => b.session.id === first.session.id)
+  const moved = preview.sessions.find((b) => b.session.id !== first.session.id && b.items.length)
+  assert.deepEqual(fixed.items, [first.items.find(item => item.title === 'Presentació')])
+  assert.deepEqual(moved.items.map((i) => [i.title, i.plannedMinutes]), [['Agafar la bata', null], ['Àtoms', 40]])
   assert.equal(moved.items[1].sourcePlanningUnitId, application.planningUnitId)
-  assert.equal(moved.items[2].sourceActivityId, null)
 })
 test('no altera historial, resultats ni sessions futures amb Mode aula obert', () => {
   for (const extra of [{ status: 'held' }, { classroomOpenedAt: now }, { attendanceConfirmedAt: now }, { applicationNotes: [{ id: 'note-fictional', text: 'Nota fictícia', authorUid: application.ownerUid }] }]) {

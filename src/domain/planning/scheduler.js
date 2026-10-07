@@ -27,6 +27,11 @@ export function resolveSchedulingStartDate({ academicYear, startDate }) {
   return startDate
 }
 
+// Les activitats pròpies representen cites del dia, no contingut redistribuïble de la UP.
+function isFixedAgendaItem(item) {
+  return item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item)
+}
+
 function compareOrder(left, right) {
   return Number(left.order) - Number(right.order) || String(left.id).localeCompare(String(right.id))
 }
@@ -608,9 +613,9 @@ export function buildActivitySessionDistribution({
       return { ...item, segmentCount: segmentCounts.get(item.activity.id), segmentIndex }
     })
   }
-  const scheduledLogicalDrafts = logicalDrafts.filter((draft) => draft.items.length > 0)
+  const scheduledLogicalDrafts = logicalDrafts.filter((draft) => draft.items.length > 0 || draft.drafts.some((physical) => physical.existingItems.some(isFixedAgendaItem)))
   const logicalSessionIndex = new Map(scheduledLogicalDrafts.map((draft, index) => [draft, index + 1]))
-  const sessions = drafts.filter((draft) => (logicalByDraft.get(draft)?.items || []).length > 0).map((draft) => {
+  const sessions = drafts.filter((draft) => (logicalByDraft.get(draft)?.items || []).length > 0 || draft.existingItems.some(isFixedAgendaItem)).map((draft) => {
     const logical = logicalByDraft.get(draft)
     const logicalItems = logical?.items || []
     const session = draft.session || createCalendarSession(
@@ -649,7 +654,7 @@ export function buildActivitySessionDistribution({
       candidate: draft.candidate,
       existingItems: draft.existingItems,
       isExisting: draft.isExisting,
-      items: [...fixedItems, ...items],
+      items: [...fixedItems, ...draft.existingItems.filter(isFixedAgendaItem), ...items],
       logicalSessionIndex: logicalSessionIndex.get(logical),
       parallelSubgroupCount: logical?.drafts.filter((item) => item.candidate.subgroupId).length || 0,
       programmableMinutes: getProgrammableMinutes(session.durationMinutes, marginMinutes),
@@ -708,7 +713,7 @@ export function buildActivitySessionReflow({
   if (!fromDate) throw new Error('Cal indicar des de quina data es reorganitzen les sessions')
   const allReflowableBundles = existingSessionBundles
     .filter((bundle) => canReflowSession(bundle, fromDate, options.now)
-      && !(bundle.items || []).some((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item))
+      && !(bundle.items || []).some(isFixedAgendaItem)
       && (sessionMatchesPlanningSubject(bundle, application.subject)
         || !(bundle.session.classroomOpenedAt || bundle.session.attendanceConfirmedAt
           || bundle.session.classroomClosedAt || (bundle.results || []).length)))
@@ -849,6 +854,7 @@ export function buildAgendaRecoveryReflow({
     && (options.currentDateKey === targetDate
       || new Date(options.now || new Date().toISOString()).getTime() <= targetEndsAt)
     && targetBundle.items.length === 1
+    && !targetBundle.items.some(isFixedAgendaItem)
   if (!targetCanReflow && !canCorrectCurrentSession) {
     throw new Error('Aquesta sessió ja té dades de classe i es conserva com a historial.')
   }
@@ -880,7 +886,7 @@ export function buildAgendaRecoveryReflow({
     type: recoveryItem.type || 'activity',
   }]
   displacedItems.forEach((item, index) => {
-    if (isBabeliumItem(item)) return
+    if (isBabeliumItem(item) || isFixedAgendaItem(item)) return
     const key = `agenda-displaced:${item.id || index}`
     activityMeta.set(key, {
       sourceActivityId: item.sourceActivityId || null,
@@ -900,13 +906,13 @@ export function buildAgendaRecoveryReflow({
     activities,
     application,
     candidates,
-    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
+    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: (bundle.items || []).filter(isFixedAgendaItem) })),
     options,
   })
   let provisionalSessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
-      if (isBabeliumItem(item)) return item
+      if (isBabeliumItem(item) || isFixedAgendaItem(item)) return item
       const meta = activityMeta.get(item.sourceActivityId)
       return createSessionItem({
         ...item,
@@ -984,7 +990,7 @@ export function buildAgendaRecoveryReflow({
   for (const group of groupParallelSessionBundles(provisionalSessions)) {
     const representativeItems = group.bundles[0]?.items || []
     representativeItems.forEach((item, itemIndex) => {
-      if (isBabeliumItem(item)) return
+      if (isBabeliumItem(item) || isFixedAgendaItem(item)) return
       if (!item.sourceActivityId) return
       const segmentIndex = (nextIndexByActivityId[item.sourceActivityId] || 0) + 1
       nextIndexByActivityId[item.sourceActivityId] = segmentIndex
@@ -1019,7 +1025,7 @@ export function buildAgendaRecoveryReflow({
     kind: 'agenda-recovery',
     recoveryItem,
     recoveryMinutes: minutes,
-    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
+    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []).filter((item) => !isFixedAgendaItem(item)), ...(bundle.removedBabeliumItems || [])]),
     removedSessions: reflowableBundles
       .map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
@@ -1107,7 +1113,7 @@ function buildAgendaItemsReflow({
   logicalGroups.forEach((group, groupIndex) => {
     const representativeItems = [...(group.bundles[0]?.items || [])].sort(compareOrder)
     representativeItems.forEach((item, itemIndex) => {
-      if (isBabeliumItem(item)) return
+      if (isBabeliumItem(item) || isFixedAgendaItem(item)) return
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
       const physicalItem = group === targetGroup
         ? [...physicalTarget.items].sort(compareOrder)[itemIndex] : null
@@ -1176,13 +1182,13 @@ function buildAgendaItemsReflow({
     activities,
     application,
     candidates,
-    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: [] })),
+    existingSessionBundles: reflowableBundles.map((bundle) => ({ ...bundle, items: (bundle.items || []).filter(isFixedAgendaItem) })),
     options,
   })
   const provisionalSessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
-      if (isBabeliumItem(item)) return item
+      if (isBabeliumItem(item) || isFixedAgendaItem(item)) return item
       const meta = activityMeta.get(item.sourceActivityId)
       return createSessionItem({
         ...item,
@@ -1249,7 +1255,7 @@ function buildAgendaItemsReflow({
   if (cancellation) {
     for (const bundle of reflowableBundles) {
       if (!getSessionBlockingEvent(options.calendarEvents || [], bundle.session)) continue
-      sessions.push({ isExisting: true, session: bundle.session, items: [] })
+      sessions.push({ isExisting: true, session: bundle.session, items: (bundle.items || []).filter(isFixedAgendaItem) })
     }
     sessions.sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   }
@@ -1260,7 +1266,7 @@ function buildAgendaItemsReflow({
     changedTargetResults: [],
     activityMinutesChanges,
     editedItem: targetItem,
-    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []), ...(bundle.removedBabeliumItems || [])]),
+    removedItems: reflowableBundles.flatMap((bundle) => [...(bundle.items || []).filter((item) => !isFixedAgendaItem(item)), ...(bundle.removedBabeliumItems || [])]),
     removedResults: reflowableBundles.flatMap((bundle) => bundle.results || []),
     removedSessions: reflowableBundles.map((bundle) => bundle.session)
       .filter((session) => !usedSessionIds.has(session.id)),
@@ -1338,7 +1344,8 @@ export function buildAgendaSessionReplacement({
   const minutes = Number(plannedMinutes)
   const capacity = Math.min(...targets.map((bundle) =>
     getProgrammableMinutes(bundle.session.durationMinutes, 5)
-      - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0)))
+      - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0)
+      - (bundle.items || []).filter(isFixedAgendaItem).reduce((total, item) => total + Number(item.plannedMinutes || 0), 0)))
   if (!String(title || '').trim() || !Number.isFinite(minutes) || minutes <= 0 || minutes > capacity) {
     throw new Error(`Cal indicar un títol i una durada entre 1 i ${capacity} minuts.`)
   }
@@ -1355,19 +1362,19 @@ export function buildAgendaSessionReplacement({
     isExisting: true,
     session: bundle.session,
     items: [
-      ...(bundle.items || []).filter(isBabeliumItem),
+      ...(bundle.items || []).filter((item) => isBabeliumItem(item) || isFixedAgendaItem(item)),
       createSessionItem({
         applicationId: application.id, ownerUid: application.ownerUid,
         sessionId: bundle.session.id, type: 'activity', title: replacementActivity?.title || title.trim(),
         sourceActivityId: replacementActivity?.id || null,
         sourcePlanningUnitId: replacementActivity?.planningUnitId || null,
-        plannedMinutes: minutes, order: (bundle.items || []).filter(isBabeliumItem).length,
+        plannedMinutes: minutes, order: Math.max(-1, ...(bundle.items || []).filter((item) => isBabeliumItem(item) || isFixedAgendaItem(item)).map((item) => Number(item.order) || 0)) + 1,
       }, options),
     ],
   }))
   const base = {
     changedLockedItems: [], changedTargetResults: [],
-    removedItems: [...originalItems.filter((item) => !isBabeliumItem(item)),
+    removedItems: [...originalItems.filter((item) => !isBabeliumItem(item) && !isFixedAgendaItem(item)),
       ...targets.flatMap((bundle) => bundle.removedBabeliumItems || [])],
     removedResults: [], removedSessions: [], unscheduled: [], sessions: replacementSessions,
   }
@@ -1435,7 +1442,7 @@ export function buildAgendaSessionReplacement({
       existingSessionBundles: adjustedBundles.map((bundle) => targetIds.has(bundle.session.id)
         ? { ...bundle, items: [] } : bundle),
       additionalActivities: (adjustedBundles.find((bundle) => bundle.session.id === targetSessionId)?.items || [])
-        .filter((item) => !isBabeliumItem(item)),
+        .filter((item) => !isBabeliumItem(item) && !isFixedAgendaItem(item)),
       startAfterTarget: true, targetSessionId: targets.find((bundle) => bundle.session.startsAt === lastStartsAt).session.id,
     })
     reflow = {
@@ -1537,6 +1544,7 @@ export function buildAgendaContinuationReflow(input) {
     const targetItemIndex = physicalTarget?.items.findIndex((item) => item.id === input.targetItemId) ?? -1
     const targetItem = targetItemIndex >= 0 ? physicalTarget.items[targetItemIndex] : null
     const movedMinutes = Number(input.continuationMinutes)
+    if (targetItem && isFixedAgendaItem(targetItem)) throw new Error('Aquesta activitat pròpia està fixada a aquesta sessió i no es pot traslladar.')
     if (!targetItem || !Number.isFinite(movedMinutes) || movedMinutes <= 0) {
       throw new Error('No s’ha trobat el fragment que vols continuar.')
     }

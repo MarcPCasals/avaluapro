@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, buildActivitySessionReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, buildSessionActivityAddition, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -278,4 +278,32 @@ test('recalcular la Programació conserva una sessió amb una activitat pròpia'
   assert(!result.removedSessions.some(session => session.id === target.session.id))
   assert(!result.removedItems.some(item => item.id === addition.item.id))
   assert.deepEqual(customBundle, original)
+})
+
+
+test('compactar i editar activitats al voltant d’una xerrada manté la cita i reserva els seus minuts', () => {
+  const first = bundle('first', '', [['exam', 20]], { startsAt: '2026-10-05T08:30:00' })
+  const fixed = createSessionItem({ id: 'talk', ownerUid: 'teacher', applicationId: 'app', sessionId: 'later', title: 'Xerrada', type: 'activity', plannedMinutes: 30, order: 0 }, options)
+  const later = bundle('later', '', [['lab', 40]], { startsAt: '2026-10-09T08:30:00' })
+  later.items.unshift(fixed)
+  const base = { application, targetSessionId: 'first', existingSessionBundles: [first, later], options,
+    candidates: [{ date: '2026-10-12', startsAt: '2026-10-12T08:30:00', durationMinutes: 60 }] }
+  for (const preview of [buildAgendaRecoveryReflow({ ...base, recoveryItem: first.items[0], recoveryMinutes: 10 }), buildAgendaSessionCompaction(base), buildAgendaItemChangeReflow({ ...base, targetItemId: first.items[0].id, changes: { plannedMinutes: 40 } }), buildAgendaSessionReplacement({ ...base, title: 'Activitat pròpia nova', plannedMinutes: 55, disposition: 'postpone' })]) {
+    const talk = preview.sessions.find(bundle => bundle.items.some(item => item.id === fixed.id))
+    assert.equal(talk.session.startsAt, later.session.startsAt)
+    assert.deepEqual(talk.items.find(item => item.id === fixed.id), fixed)
+    assert.equal(preview.sessions.flatMap(bundle => bundle.items).filter(item => item.id === fixed.id).length, 1)
+    assert(!preview.removedItems.some(item => item.id === fixed.id))
+    assert(talk.items.reduce((total, item) => total + Number(item.plannedMinutes || 0), 0) <= 55)
+  }
+  for (const disposition of ['remove', 'postpone']) {
+    const replacement = buildAgendaSessionReplacement({ ...base, targetSessionId: 'later', title: 'Prova', plannedMinutes: 20, disposition })
+    const unchanged = replacement.sessions.find(bundle => bundle.session.id === 'later').items.find(item => item.id === fixed.id)
+    assert.deepEqual(unchanged, fixed)
+    assert(!replacement.removedItems.some(item => item.id === fixed.id))
+  }
+  assert.throws(() => buildAgendaSessionReplacement({ ...base, targetSessionId: 'later', title: 'Prova', plannedMinutes: 30 }), /25 minuts/)
+  const sameDay = buildAgendaSessionCompaction({ ...base, targetSessionId: 'later' })
+  assert.deepEqual(sameDay.sessions.find(bundle => bundle.session.id === 'later').items.find(item => item.id === fixed.id), fixed)
+  assert.throws(() => buildAgendaContinuationReflow({ ...base, targetSessionId: 'later', targetItemId: fixed.id, continuationMinutes: 10, moveFromTarget: true }), /fixada/)
 })
