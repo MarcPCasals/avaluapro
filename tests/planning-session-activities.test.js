@@ -36,7 +36,8 @@ test('una retirada al mig grup B continua disponible encara que A ja tingui la p
 test('afegir una part limita la durada als minuts pendents i renumera els fragments', () => {
   const data = input([bundle('target'), bundle('later', '', [['exam', 20]], { startsAt: '2026-10-12T08:30:00' })])
   assert.equal(getSessionActivityChoices(data)[0].remainingMinutes, 10)
-  assert.throws(() => buildSessionActivityAddition(data, 'exam', 11, options), /màxim 10/)
+  assert.equal(getSessionActivityChoices(data)[0].availableMinutes, 30)
+  assert.throws(() => buildSessionActivityAddition(data, 'exam', 31, options), /màxim 30/)
   const added = buildSessionActivityAddition(data, 'exam', 10, options)
   assert.equal(added.item.segmentIndex, 1)
   assert.equal(added.item.segmentCount, 2)
@@ -107,7 +108,8 @@ test('un altre grup o franja no allibera minuts, i les activitats realment fetes
   for (const extra of [{ classIds: ['other'] }, { timetableSlotId: 'other-slot' }]) {
     const data = { ...input([bundle('target'), bundle('planned', '', [['exam', 30]])]),
       calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-09', ...extra }] }
-    assert.equal(getSessionActivityChoices(data)[0].available, false)
+    assert.equal(getSessionActivityChoices(data)[0].available, true)
+    assert.equal(getSessionActivityChoices(data)[0].remainingMinutes, 0)
   }
   const held = bundle('held', '', [['exam', 30]], { status: 'held', startsAt: '2026-10-07T08:30:00' })
   held.results.push({ sessionItemId: held.items[0].id, status: 'completed' })
@@ -166,4 +168,72 @@ test('no reordena sessions anul·lades ni amb dades de classe i no sobrepassa el
     calendarEvents: [{ type: 'cancellation', startsOn: '2026-10-09', classIds: ['fictional'] }] }), /no es pot/)
   assert.deepEqual(moveAgendaSessionItem(data, 'target-atoms', 'up', options).changedItems, [])
   assert.deepEqual(moveAgendaSessionItem(data, 'target-theory', 'down', options).changedItems, [])
+})
+
+
+test('les activitats futures ja calendaritzades es poden traslladar sense duplicar minuts', () => {
+  const data = input([bundle('target'), bundle('future', '', [['exam', 30], ['lab', 20]], { startsAt: '2026-10-12T08:30:00' })])
+  const choice = getSessionActivityChoices(data)[0]
+  assert.equal(choice.available, true)
+  assert.equal(choice.remainingMinutes, 0)
+  assert.equal(choice.availableMinutes, 30)
+  const before = structuredClone(data)
+  const moved = buildSessionActivityAddition(data, 'exam', 30, options)
+  assert.equal(moved.item.plannedMinutes, 30)
+  assert.deepEqual(moved.removedItems.map(item => item.id), ['future-exam'])
+  assert.equal(moved.changedItems.some(item => item.sourceActivityId === 'lab'), false)
+  assert.equal(moved.item.segmentCount, 1)
+  assert.deepEqual(data, before)
+})
+
+test('traslladar una part només redueix els minuts necessaris de la sessió futura', () => {
+  const data = input([bundle('target'), bundle('future', '', [['exam', 30]], { startsAt: '2026-10-12T08:30:00' })])
+  const moved = buildSessionActivityAddition(data, 'exam', 10, options)
+  assert.equal(moved.item.plannedMinutes, 10)
+  assert.equal(moved.changedItems[0].plannedMinutes, 20)
+  assert.equal(moved.changedItems[0].segmentIndex, 2)
+  assert.deepEqual(moved.removedItems, [])
+})
+
+test('els minuts ja impartits continuen protegits quan hi ha fragments futurs', () => {
+  const data = input([bundle('target'), bundle('past', '', [['exam', 10]], { status: 'held', startsAt: '2026-10-01T08:30:00' }),
+    bundle('future', '', [['exam', 20]], { startsAt: '2026-10-12T08:30:00' })])
+  assert.equal(getSessionActivityChoices(data)[0].availableMinutes, 20)
+  const moved = buildSessionActivityAddition(data, 'exam', 20, options)
+  assert.ok(moved.removedItems.every(item => item.sessionId === 'future'))
+  assert.ok(moved.changedItems.every(item => item.sessionId !== 'past' || item.plannedMinutes === 10))
+})
+
+test('traslladar al mig grup A conserva la programació de B', () => {
+  const data = input([bundle('target-A', 'A'), bundle('future-A', 'A', [['exam', 30]], { startsAt: '2026-10-12T08:30:00' }),
+    bundle('future-B', 'B', [['exam', 30]], { startsAt: '2026-10-12T11:30:00' })])
+  const moved = buildSessionActivityAddition(data, 'exam', 30, options)
+  assert.deepEqual(moved.removedItems.map(item => item.id), ['future-A-exam'])
+  assert.ok(moved.changedItems.every(item => item.sessionId !== 'future-B'))
+})
+
+test('traslladar d’un parell de mitjos grups a una sessió sencera compta els minuts una sola vegada', () => {
+  const data = input([bundle('target'), bundle('future-A', 'A', [['exam', 30]], { startsAt: '2026-10-12T08:30:00' }),
+    bundle('future-B', 'B', [['exam', 30]], { startsAt: '2026-10-12T11:30:00' })])
+  const moved = buildSessionActivityAddition(data, 'exam', 30, options)
+  assert.deepEqual(moved.removedItems.map(item => item.id), ['future-A-exam', 'future-B-exam'])
+  assert.equal(moved.item.plannedMinutes, 30)
+})
+
+test('un element sense temps també es trasllada des d’una altra sessió futura', () => {
+  const data = { ...input([bundle('target'), bundle('future', '', [['note', null]], { startsAt: '2026-10-12T08:30:00' })]),
+    activities: [{ id: 'note', title: 'Indicació', type: 'indication', plannedMinutes: null }] }
+  const moved = buildSessionActivityAddition(data, 'note', null, options)
+  assert.equal(moved.item.plannedMinutes, null)
+  assert.deepEqual(moved.removedItems.map(item => item.id), ['future-note'])
+})
+
+
+test('una activitat passada sencera queda marcada com acabada sense perdre els codis originals de la UP', () => {
+  const data = input([bundle('target'), bundle('past', '', [['exam', 30]], { status: 'held', startsAt: '2026-10-01T08:30:00' })])
+  const choices = getSessionActivityChoices(data)
+  assert.equal(choices[0].completed, true)
+  assert.equal(choices[0].available, false)
+  assert.equal(choices[1].code, 'A2')
+  assert.deepEqual(choices.filter(choice => !choice.completed).map(choice => choice.id), ['lab'])
 })
