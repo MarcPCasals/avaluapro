@@ -35,6 +35,7 @@ import {
   buildAgendaContinuationReflow,
   getSessionActivityChoices,
   buildSessionActivityAddition,
+  buildOwnSessionActivityChange,
   createSessionItem,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
@@ -2058,13 +2059,15 @@ export function useAgendaWorkspace(user, classes = []) {
     const targetBundle = setup.existingSessionBundles.find((candidate) =>
       candidate.session.id === bundle.session.id)
     if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
-    if (typeof changes.fixedToSession === 'boolean') {
+    if (typeof changes.fixedToSession === 'boolean' || !item.sourceActivityId) {
       const currentItem = targetBundle.items.find((candidate) => candidate.id === item.id)
       if (!currentItem || currentItem.sourceActivityId || currentItem.type !== 'activity' || isBabeliumItem(currentItem)
         || !getAgendaSessionItemRemovalState(targetBundle, currentItem).canRemove) {
         throw new Error('Només pots fixar o desfixar activitats pròpies de sessions sense dades de classe.')
       }
-      const updatedItem = createSessionItem({ ...currentItem, fixedToSession: changes.fixedToSession, updatedAt: new Date().toISOString() })
+      const updatedItem = typeof changes.fixedToSession === 'boolean' && changes.title == null && changes.plannedMinutes == null
+        ? createSessionItem({ ...currentItem, fixedToSession: changes.fixedToSession, updatedAt: new Date().toISOString() })
+        : buildOwnSessionActivityChange(targetBundle, currentItem.id, changes)
       await persist([{ entity: updatedItem, context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: targetBundle.session.id } }])
       const update = (current) => ({ ...current, items: current.items.map((candidate) => candidate.id === updatedItem.id ? { ...candidate, ...updatedItem } : candidate) })
       setSessionBundles((current) => current.map(update))

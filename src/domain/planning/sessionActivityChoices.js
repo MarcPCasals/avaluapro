@@ -1,4 +1,5 @@
 import { createSessionItem } from './model.js'
+import { isBabeliumItem } from './babelium.js'
 import { getSessionLoad } from './rules.js'
 import { groupParallelSessionBundles, isUnperformedNoClassBundle, summarizeAssignedActivityProgress, summarizeCompletedActivityIds } from './scheduler.js'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday.js'
@@ -121,4 +122,24 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
     .filter((bundle) => isUnperformedNoClassBundle(bundle, input.calendarEvents))
     .flatMap((bundle) => bundle.items.filter((part) => part.sourceActivityId === activity.id))
   return { item, activity, changedItems, removedItems: [...removedItems, ...transferredRemoved] }
+}
+
+
+/** Edita una activitat pròpia en la seva sessió sense alterar la font ni la fixació. */
+export function buildOwnSessionActivityChange(bundle, itemId, changes, options = {}) {
+  const item = bundle.items.find((candidate) => candidate.id === itemId)
+  if (!item || item.sourceActivityId || item.type !== 'activity' || isBabeliumItem(item)
+    || !getAgendaSessionItemRemovalState(bundle, item, options).canRemove) {
+    throw new Error('Aquesta activitat no es pot modificar perquè no és una activitat pròpia editable.')
+  }
+  const title = String(changes.title ?? item.title).trim()
+  const minutes = Number(changes.plannedMinutes ?? item.plannedMinutes)
+  const load = getSessionLoad(bundle.items.filter((candidate) => candidate.id !== item.id), bundle.session.durationMinutes)
+  const capacity = Math.max(0, load.programmableMinutes - load.plannedMinutes)
+  if (!title || !Number.isFinite(minutes) || minutes <= 0 || minutes > capacity) {
+    throw new Error(`Escriu un títol i indica una durada entre 1 i ${capacity} minuts. Allibera espai si necessites més temps.`)
+  }
+  return createSessionItem({ ...item, title, plannedMinutes: minutes,
+    ...(typeof changes.fixedToSession === 'boolean' ? { fixedToSession: changes.fixedToSession } : {}),
+    updatedAt: options.now || new Date().toISOString() }, options)
 }

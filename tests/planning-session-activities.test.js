@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, buildSessionActivityAddition, buildOwnSessionActivityChange, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -334,4 +334,25 @@ test('desfixar una activitat permet redistribuir-la sense tornar-la a fixar en d
   assert.equal(fixedPreview.sessions.find(bundle => bundle.items.some(item => item.id === custom.id)).session.id, 'later')
   assert.equal(buildSessionActivityAddition(input([bundle('target')]), { title: 'Nova' }, 15, options).item.fixedToSession, false)
   assert.equal(buildSessionActivityAddition(input([bundle('target')]), { title: 'Nova', fixedToSession: true }, 15, options).item.fixedToSession, true)
+})
+
+
+test('editar el text i els minuts d’una activitat pròpia conserva la sessió i la fixació', () => {
+  for (const fixedToSession of [true, false]) {
+    const target = bundle('target', '', [['exam', 20]])
+    const added = buildSessionActivityAddition(input([target]), { title: 'Sortida', fixedToSession }, 30, options).item
+    target.items.push(added)
+    const before = structuredClone(target)
+    const edited = buildOwnSessionActivityChange(target, added.id, { title: '  Xerrada  ', plannedMinutes: 35 }, options)
+    assert.equal(edited.title, 'Xerrada')
+    assert.equal(edited.plannedMinutes, 35)
+    assert.equal(edited.sessionId, added.sessionId)
+    assert.equal(edited.id, added.id)
+    assert.equal(edited.fixedToSession, fixedToSession)
+    assert.equal(edited.sourceActivityId, null)
+    assert.deepEqual(target, before)
+    assert.throws(() => buildOwnSessionActivityChange(target, added.id, { plannedMinutes: 36 }, options), /35 minuts/)
+    assert.throws(() => buildOwnSessionActivityChange(target, added.id, { title: ' ' }, options), /títol/)
+    assert.throws(() => buildOwnSessionActivityChange({ ...target, session: { ...target.session, status: 'held' } }, added.id, { title: 'Canvi' }, options), /no es pot modificar/)
+  }
 })

@@ -187,7 +187,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
     try {
       await onSaveItem(item, { title: editTitle.trim(), plannedMinutes: Number(editMinutes) })
       setEditItemId('')
-      setEditNotice('Activitat desada i cronologia futura reajustada.')
+      setEditNotice(item.sourceActivityId ? 'Activitat desada i cronologia futura reajustada.' : 'Activitat pròpia desada en aquesta sessió.')
     } catch (error) {
       setEditError(error.message || 'No s’ha pogut desar el temps de l’activitat.')
     } finally {
@@ -246,7 +246,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
               {editItemId === item.id && <form className="agenda-session-item-editor" onSubmit={(event) => saveItem(event, item)}>
                 <label>Títol de l’activitat<input disabled={busy} required value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
                 <label>Minuts previstos<input autoFocus disabled={busy} min="1" required type="number" value={editMinutes} onChange={(event) => setEditMinutes(event.target.value)} /></label>
-                <p>Les activitats següents es desplaçaran o s’avançaran per encaixar el nou temps. La programació original es conservarà.</p>
+                <p>{item.sourceActivityId ? 'Les activitats següents es desplaçaran o s’avançaran per encaixar el nou temps. La programació original es conservarà.' : 'El canvi es desa només en aquesta sessió i conserva el dia, l’hora i l’estat de fixació. La Programació no es modifica.'}</p>
                 <div><button className="primary-action compact" disabled={busy || !editTitle.trim() || !Number.isFinite(Number(editMinutes)) || Number(editMinutes) <= 0} type="submit">{saving && <Loader2 className="spin" size={15} />}Desar i reajustar</button><button className="secondary-action compact" disabled={busy} onClick={() => { setEditItemId(''); setEditError('') }} type="button">Cancel·lar</button></div>
                 {editError && <p role="alert">{editError}</p>}
               </form>}
@@ -260,7 +260,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
               {onSaveItem && item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && <button className="agenda-session-item-edit" aria-label={`${item.fixedToSession === false ? 'Fixar' : 'Desfixar'} activitat: ${item.title}`} aria-pressed={item.fixedToSession !== false} disabled={busy || !removalState.canRemove} onClick={() => toggleFixed(item)} title={item.fixedToSession === false ? 'Fixar a aquest dia i hora' : 'Desfixar: permetre redistribuir l’activitat'} type="button">{item.fixedToSession === false ? <Pin size={17} /> : <PinOff size={17} />}</button>}
               {canMoveUp && <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>}
               {canMoveDown && <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>}
-              {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || (item.combinedItems || [item]).some((part) => !part.sourceActivityId)} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && item.sourceActivityId ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
+              {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || isBabeliumItem(item) || (!item.sourceActivityId && item.type !== 'activity')} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && !isBabeliumItem(item) ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}
               {onRemoveItem && <button aria-label={`Treure de la sessió: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-trash" disabled={busy || !removalState.canRemove} onClick={() => { setRemovalItemId(item.id); setRemovalError(''); setEditItemId(''); setEditNotice('') }} title={removalState.canRemove ? (isBabeliumItem(item) ? 'Treure Babèlium només d’aquesta sessió' : 'Treure de la calendarització i conservar') : removalState.reason || 'Aquesta sessió té dades de classe i es conserva a l’historial.'} type="button"><Trash2 size={17} /></button>}
             </div>}
           </li>
