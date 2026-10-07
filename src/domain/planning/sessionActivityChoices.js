@@ -59,7 +59,7 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
       throw new Error(`Escriu l’activitat i indica una durada entre 1 i ${freeMinutes} minuts.`)
     }
     const item = createSessionItem({ ownerUid: target.session.ownerUid, applicationId: input.application.id,
-      sessionId: target.session.id, title, type: 'activity', plannedMinutes: minutes,
+      sessionId: target.session.id, title, type: 'activity', plannedMinutes: minutes, fixedToSession: Boolean(activityId.fixedToSession),
       order: Math.max(-1, ...target.items.map((current) => Number(current.order) || 0)) + 1 }, options)
     return { item, activity: null, changedItems: [], removedItems: [] }
   }

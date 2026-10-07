@@ -35,6 +35,7 @@ import {
   buildAgendaContinuationReflow,
   getSessionActivityChoices,
   buildSessionActivityAddition,
+  createSessionItem,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
   buildAgendaSessionReplacement,
@@ -2057,6 +2058,19 @@ export function useAgendaWorkspace(user, classes = []) {
     const targetBundle = setup.existingSessionBundles.find((candidate) =>
       candidate.session.id === bundle.session.id)
     if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
+    if (typeof changes.fixedToSession === 'boolean') {
+      const currentItem = targetBundle.items.find((candidate) => candidate.id === item.id)
+      if (!currentItem || currentItem.sourceActivityId || currentItem.type !== 'activity' || isBabeliumItem(currentItem)
+        || !getAgendaSessionItemRemovalState(targetBundle, currentItem).canRemove) {
+        throw new Error('Només pots fixar o desfixar activitats pròpies de sessions sense dades de classe.')
+      }
+      const updatedItem = createSessionItem({ ...currentItem, fixedToSession: changes.fixedToSession, updatedAt: new Date().toISOString() })
+      await persist([{ entity: updatedItem, context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: targetBundle.session.id } }])
+      const update = (current) => ({ ...current, items: current.items.map((candidate) => candidate.id === updatedItem.id ? { ...candidate, ...updatedItem } : candidate) })
+      setSessionBundles((current) => current.map(update))
+      return { sessions: [update(targetBundle)], setup, changedTargetResults: targetBundle.results || [] }
+    }
+
     const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
       calendarEventId: session.calendarEventId,
       date: String(session.startsAt).slice(0, 10),
@@ -2089,7 +2103,7 @@ export function useAgendaWorkspace(user, classes = []) {
       throw new Error('No hi ha prou sessions disponibles per reajustar totes les activitats posteriors.')
     }
     return persistAgendaReflowPreview({ ...preview, setup })
-  }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
+  }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview, persist])
 
   /** Omple els minuts lliures d'una sessió avançant la seqüència posterior. */
   const compactAgendaSession = useCallback(async (bundle) => {

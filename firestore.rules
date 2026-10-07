@@ -1477,6 +1477,7 @@ service cloud.firestore {
         && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
         && request.resource.data.planningUnitId == upId
         && request.resource.data.type in ['activity', 'indication', 'transition']
+        && (!('fixedToSession' in request.resource.data) || request.resource.data.fixedToSession is bool)
         && request.resource.data.evidenceMode in ['none', 'final', 'perSession']
         && request.resource.data.pedagogicalType in [
           'explanation', 'priorKnowledge', 'motivation', 'situation', 'hypothesis',
@@ -1607,7 +1608,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'applicationId', 'createdAt', 'entityType', 'id', 'order', 'ownerUid',
           'plannedMinutes', 'schemaVersion', 'segmentCount', 'segmentIndex',
-          'sessionId', 'sourceActivityId', 'sourcePlanningUnitId', 'title', 'type', 'updatedAt'
+          'sessionId', 'sourceActivityId', 'sourcePlanningUnitId', 'title', 'type', 'updatedAt', 'fixedToSession'
         ])
         && request.resource.data.id == itemId
         && request.resource.data.entityType == 'sessionItem'
@@ -1616,6 +1617,7 @@ service cloud.firestore {
         && request.resource.data.applicationId == applicationId
         && request.resource.data.sessionId == sessionId
         && request.resource.data.type in ['activity', 'indication', 'transition']
+        && (!('fixedToSession' in request.resource.data) || request.resource.data.fixedToSession is bool)
         && (!('sourcePlanningUnitId' in request.resource.data)
           || request.resource.data.sourcePlanningUnitId == null
           || request.resource.data.sourcePlanningUnitId is string)

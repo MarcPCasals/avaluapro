@@ -269,7 +269,7 @@ test('les activitats pròpies respecten Babèlium, les anul·lacions i les sessi
 
 test('recalcular la Programació conserva una sessió amb una activitat pròpia', () => {
   const target = bundle('target', '', [['exam', 30]])
-  const addition = buildSessionActivityAddition(input([target]), { title: 'Debat' }, 25, options)
+  const addition = buildSessionActivityAddition(input([target]), { title: 'Debat', fixedToSession: true }, 25, options)
   const customBundle = { ...target, items: [...target.items, addition.item] }
   const original = structuredClone(customBundle)
   const result = buildActivitySessionReflow({ application, activities, existingSessionBundles: [customBundle],
@@ -306,4 +306,32 @@ test('compactar i editar activitats al voltant d’una xerrada manté la cita i 
   const sameDay = buildAgendaSessionCompaction({ ...base, targetSessionId: 'later' })
   assert.deepEqual(sameDay.sessions.find(bundle => bundle.session.id === 'later').items.find(item => item.id === fixed.id), fixed)
   assert.throws(() => buildAgendaContinuationReflow({ ...base, targetSessionId: 'later', targetItemId: fixed.id, continuationMinutes: 10, moveFromTarget: true }), /fixada/)
+})
+
+
+test('desfixar una activitat permet redistribuir-la sense tornar-la a fixar en desar els fragments', () => {
+  const first = bundle('first', '', [['exam', 20]], { startsAt: '2026-10-05T08:30:00' })
+  const later = bundle('later', '', [], { startsAt: '2026-10-09T08:30:00' })
+  const custom = createSessionItem({ id: 'custom', ownerUid: 'teacher', applicationId: 'app', sessionId: 'later',
+    title: 'Debat flexible', type: 'activity', plannedMinutes: 30, fixedToSession: false, order: 0 }, options)
+  later.items.push(custom)
+  const base = { application, targetSessionId: 'first', existingSessionBundles: [first, later], options }
+  const preview = buildAgendaSessionCompaction(base)
+  const moved = preview.sessions.flatMap(bundle => bundle.items).filter(item => item.title === custom.title)
+  assert.equal(moved[0].sessionId, 'first')
+  assert.equal(moved[0].fixedToSession, false)
+  assert.equal(moved[0].sourceActivityId, null)
+  const reloaded = buildAgendaSessionCompaction({ ...base, existingSessionBundles: preview.sessions })
+  assert.equal(reloaded.sessions.flatMap(bundle => bundle.items).find(item => item.title === custom.title).fixedToSession, false)
+  const smart = buildActivitySessionReflow({ ...base, activities: [], fromDate: '2026-10-04' })
+  const smartMoved = smart.sessions.flatMap(bundle => bundle.items).find(item => item.title === custom.title)
+  assert.equal(smartMoved.sessionId, 'first')
+  assert.equal(smartMoved.fixedToSession, false)
+  assert.equal(smartMoved.sourceActivityId, null)
+  assert.throws(() => buildActivitySessionReflow({ application, activities: [], existingSessionBundles: [{ ...later, session: { ...later.session, durationMinutes: 20 } }], fromDate: '2026-10-04', options }), /No hi ha prou temps/)
+  const pinned = { ...later, items: [{ ...custom, fixedToSession: true }] }
+  const fixedPreview = buildAgendaSessionCompaction({ ...base, existingSessionBundles: [first, pinned] })
+  assert.equal(fixedPreview.sessions.find(bundle => bundle.items.some(item => item.id === custom.id)).session.id, 'later')
+  assert.equal(buildSessionActivityAddition(input([bundle('target')]), { title: 'Nova' }, 15, options).item.fixedToSession, false)
+  assert.equal(buildSessionActivityAddition(input([bundle('target')]), { title: 'Nova', fixedToSession: true }, 15, options).item.fixedToSession, true)
 })

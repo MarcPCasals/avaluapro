@@ -29,7 +29,7 @@ export function resolveSchedulingStartDate({ academicYear, startDate }) {
 
 // Les activitats pròpies representen cites del dia, no contingut redistribuïble de la UP.
 function isFixedAgendaItem(item) {
-  return item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item)
+  return item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && item.fixedToSession !== false
 }
 
 function compareOrder(left, right) {
@@ -771,8 +771,12 @@ export function buildActivitySessionReflow({
       )
     }
   }
+  const flexibleOwnItems = groupParallelSessionBundles(allReflowableBundles)
+    .flatMap((group) => (group.bundles[0].items || []).filter((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item)))
+  const ownByKey = new Map(flexibleOwnItems.map((item) => [`own:${item.id}`, item]))
+  const ownActivities = [...ownByKey].map(([id, item]) => ({ id, title: item.title, type: item.type, plannedMinutes: item.plannedMinutes }))
   const distribution = buildActivitySessionDistribution({
-    activities: remainingActivities,
+    activities: [...ownActivities, ...remainingActivities],
     application,
     calendarEvents,
     candidates: candidates.filter((candidate) => availableCandidateSet.has(candidate)),
@@ -780,9 +784,14 @@ export function buildActivitySessionReflow({
     marginMinutes,
     options,
   })
+  if (distribution.unscheduled.some((activity) => ownByKey.has(activity.activityId))) {
+    throw new Error('No hi ha prou temps per conservar totes les activitats pròpies desfixades. No s’ha desat cap canvi.')
+  }
   const sessions = distribution.sessions.map((bundle) => ({
     ...bundle,
     items: bundle.items.map((item) => {
+      if (ownByKey.has(item.sourceActivityId)) return createSessionItem({ ...item, sourceActivityId: null, sourcePlanningUnitId: null, fixedToSession: false }, options)
+
       const offset = segmentOffsetByActivityId[item.sourceActivityId] || 0
       if (!offset) return item
       return createSessionItem({
@@ -893,12 +902,14 @@ export function buildAgendaRecoveryReflow({
       sourcePlanningUnitId: item.sourcePlanningUnitId || null,
       title: item.title,
       type: item.type || 'activity',
+        fixedToSession: item.fixedToSession,
     })
     activities.push({
       id: key,
       plannedMinutes: item.plannedMinutes,
       title: item.title,
       type: item.type || 'activity',
+        fixedToSession: item.fixedToSession,
     })
   })
 
@@ -920,6 +931,7 @@ export function buildAgendaRecoveryReflow({
         sourcePlanningUnitId: meta?.sourcePlanningUnitId || null,
         title: meta?.title || item.title,
         type: meta?.type || item.type,
+        fixedToSession: meta?.fixedToSession,
       }, options)
     }),
   }))
@@ -1093,6 +1105,7 @@ function buildAgendaItemsReflow({
     sourcePlanningUnitId = null,
     title,
     type = 'activity',
+    fixedToSession,
   }, fallbackKey) => {
     const sourceKey = sourceActivityId || fallbackKey
     let activity = activityBySourceKey.get(sourceKey)
@@ -1101,7 +1114,7 @@ function buildAgendaItemsReflow({
       activity = { id: key, plannedMinutes: 0, untimed: plannedMinutes == null, sourceKey, title, type }
       activityBySourceKey.set(sourceKey, activity)
       activitySequence.push(activity)
-      activityMeta.set(key, { sourceActivityId, sourcePlanningUnitId, title, type })
+      activityMeta.set(key, { sourceActivityId, sourcePlanningUnitId, title, type, fixedToSession })
     }
     activity.plannedMinutes += Number(plannedMinutes) || 0
     return activity
@@ -1132,6 +1145,7 @@ function buildAgendaItemsReflow({
         sourcePlanningUnitId: item.sourcePlanningUnitId || null,
         title,
         type: item.type || 'activity',
+        fixedToSession: item.fixedToSession,
       }, `unlinked:${groupIndex}:${itemIndex}:${item.id}`)
       if (itemChange) {
         activity.title = title
@@ -1196,6 +1210,7 @@ function buildAgendaItemsReflow({
         sourcePlanningUnitId: meta?.sourcePlanningUnitId || null,
         title: meta?.title || item.title,
         type: meta?.type || item.type,
+        fixedToSession: meta?.fixedToSession,
       }, options)
     }),
   }))
@@ -1324,7 +1339,7 @@ export function getAgendaReplacementActivityOptions({
 /** Substitueix una sessió sense alterar la programació mestra ni l'historial. */
 export function buildAgendaSessionReplacement({
   application, candidates = [], existingSessionBundles = [], options = {},
-  targetSessionId, title, plannedMinutes, disposition = 'postpone', replacementActivity = null,
+  targetSessionId, title, plannedMinutes, disposition = 'postpone', replacementActivity = null, fixedToSession = false,
 }) {
   const targetBundle = existingSessionBundles.find((bundle) =>
     bundle.session.id === targetSessionId && bundle.session.applicationId === application?.id)
@@ -1368,6 +1383,7 @@ export function buildAgendaSessionReplacement({
         sessionId: bundle.session.id, type: 'activity', title: replacementActivity?.title || title.trim(),
         sourceActivityId: replacementActivity?.id || null,
         sourcePlanningUnitId: replacementActivity?.planningUnitId || null,
+        fixedToSession: replacementActivity ? undefined : fixedToSession,
         plannedMinutes: minutes, order: Math.max(-1, ...(bundle.items || []).filter((item) => isBabeliumItem(item) || isFixedAgendaItem(item)).map((item) => Number(item.order) || 0)) + 1,
       }, options),
     ],

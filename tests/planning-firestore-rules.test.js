@@ -1240,3 +1240,12 @@ describe('Recorregut local-first de la UP', () => {
     assert.equal(newActivities.docs[0].data().teacherMaterials[0].label, 'Àudio')
   })
 })
+
+
+test('la fixació d’una activitat de sessió admet només un booleà', async () => {
+  const db = authDb(OWNER)
+  const ref = doc(sessionRef(db), 'items', 'plan-session-item-one')
+  await assertSucceeds(setDoc(ref, sessionItemData({ fixedToSession: true })))
+  await assertSucceeds(updateDoc(ref, { fixedToSession: false }))
+  await assertFails(updateDoc(ref, { fixedToSession: 'true' }))
+})

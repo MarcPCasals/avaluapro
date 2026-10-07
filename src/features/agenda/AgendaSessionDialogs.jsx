@@ -45,6 +45,7 @@ export function AgendaSessionAdjustDialog({
   const [replacementActivitiesLoaded, setReplacementActivitiesLoaded] = useState(false)
   const [replacementActivitiesLoading, setReplacementActivitiesLoading] = useState(false)
   const [replacementSource, setReplacementSource] = useState('planning')
+  const [replacementFixed, setReplacementFixed] = useState(false)
   const [replacementText, setReplacementText] = useState('')
   const customReplacement = replacementSource === 'custom'
   const [replacementActivityId, setReplacementActivityId] = useState('')
@@ -53,7 +54,7 @@ export function AgendaSessionAdjustDialog({
   const matchingReplacementActivities = replacementActivities.filter((activity) =>
     `${activity.code} ${activity.title}`.toLocaleLowerCase('ca').includes(replacementSearch.trim().toLocaleLowerCase('ca')))
 
-  const fixedMinutes = bundle.items.filter((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item))
+  const fixedMinutes = bundle.items.filter((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && item.fixedToSession !== false)
     .reduce((total, item) => total + Number(item.plannedMinutes || 0), 0)
   const replacementCapacity = Math.max(0, bundle.session.durationMinutes - 5 - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0) - fixedMinutes)
   const [replacementMinutes, setReplacementMinutes] = useState(
@@ -140,6 +141,7 @@ export function AgendaSessionAdjustDialog({
       setReplacementPreview(await onBuildReplacement(bundle, {
         plannedMinutes: Number(replacementMinutes), disposition, replacementActivityId: customReplacement ? '' : replacementActivityId,
         title: customReplacement ? replacementText : selectedReplacementActivity?.title,
+        fixedToSession: customReplacement && replacementFixed,
       }))
     } catch (previewError) {
       setError(previewError.message || 'No s’ha pogut preparar la substitució.')
@@ -213,7 +215,7 @@ export function AgendaSessionAdjustDialog({
       {action === 'replacement' && <section className="agenda-adjust-panel" role="tabpanel">
         <div className="agenda-adjust-heading"><Edit3 size={21} /><div><strong>Triar una activitat per a aquesta sessió</strong><p>{dateLabel(bundle.session.startsAt)} · {String(bundle.session.startsAt).slice(11, 16)}</p></div></div>
         <label>Tipus d’activitat<select disabled={busy} value={replacementSource} onChange={(event) => { setReplacementSource(event.target.value); setReplacementPreview(null) }}><option value="planning">Activitat de la Programació</option><option value="custom">Activitat pròpia · només en aquesta sessió</option></select></label>
-        {customReplacement && <><label>Què faràs a classe?<textarea disabled={busy} value={replacementText} onChange={(event) => { setReplacementText(event.target.value); setReplacementPreview(null) }} /></label><p>Aquesta activitat queda fixada al dia i l’hora d’aquesta sessió. Els reajustaments no la traslladen. No modifica la Programació.</p></>}
+        {customReplacement && <><label>Què faràs a classe?<textarea disabled={busy} value={replacementText} onChange={(event) => { setReplacementText(event.target.value); setReplacementPreview(null) }} /></label><label><input type="checkbox" checked={replacementFixed} disabled={busy} onChange={(event) => { setReplacementFixed(event.target.checked); setReplacementPreview(null) }} />Fixar al dia i l’hora d’aquesta sessió</label><p>Si la fixes, els reajustaments no la traslladaran. No modifica la Programació.</p></>}
         {!customReplacement && (replacementActivitiesLoading ? <p role="status"><Loader2 className="spin" size={16} /> Carregant les activitats de la Programació…</p> : <>
           <label>Cercar per codi o títol<input disabled={busy} placeholder="A13" value={replacementSearch} onChange={(event) => setReplacementSearch(event.target.value)} /></label>
           <label>Activitat de la Programació<select disabled={busy} value={replacementActivityId} onChange={(event) => selectReplacementActivity(event.target.value)}><option value="">Tria una activitat</option>{[...new Map([...(selectedReplacementActivity ? [selectedReplacementActivity] : []), ...matchingReplacementActivities].map((activity) => [activity.id, activity])).values()].map((activity) => <option disabled={activity.availableMinutes <= 0} key={activity.id} value={activity.id}>{activity.code} · {activity.title} · {activity.availableMinutes > 0 ? `${activity.availableMinutes} min disponibles` : 'Sense minuts pendents'}</option>)}</select></label>

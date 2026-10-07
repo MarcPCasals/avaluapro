@@ -1,6 +1,6 @@
 import {
   AlertTriangle, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Bell, CalendarDays, CalendarPlus, CalendarRange, ChevronDown, Clock3, Edit3,
-  ExternalLink, Flag, History, Layers3, ListChecks, Loader2, MapPin, Moon, Plus, RotateCcw, StickyNote, Trash2,
+  ExternalLink, Flag, History, Layers3, ListChecks, Loader2, MapPin, Moon, Pin, PinOff, Plus, RotateCcw, StickyNote, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
@@ -169,6 +169,16 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       setEditNotice('Activitat afegida a aquesta sessió. La programació original es conserva.')
     } finally { setSaving(false) }
   }
+  const toggleFixed = async (item) => {
+    setSaving(true)
+    setEditError('')
+    try {
+      const fixedToSession = item.fixedToSession === false
+      await onSaveItem(item, { fixedToSession })
+      setEditNotice(fixedToSession ? 'Activitat fixada al dia i l’hora de la sessió.' : 'Activitat desfixada. Es podrà redistribuir amb els reajustaments.')
+    } catch (error) { setEditError(error.message || 'No s’ha pogut canviar la fixació.') }
+    finally { setSaving(false) }
+  }
   const saveItem = async (event, item) => {
     event.preventDefault()
     setSaving(true)
@@ -244,6 +254,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
               </div>}
             </div>
             {(onRemoveItem || onSaveItem || onMoveItem) && <div className="agenda-session-item-tools">
+              {onSaveItem && item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && <button className="agenda-session-item-edit" aria-label={`${item.fixedToSession === false ? 'Fixar' : 'Desfixar'} activitat: ${item.title}`} aria-pressed={item.fixedToSession !== false} disabled={busy || !removalState.canRemove} onClick={() => toggleFixed(item)} title={item.fixedToSession === false ? 'Fixar a aquest dia i hora' : 'Desfixar: permetre redistribuir l’activitat'} type="button">{item.fixedToSession === false ? <Pin size={17} /> : <PinOff size={17} />}</button>}
               {onMoveItem && <>
                 <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || isBabeliumItem(item) || !removalState.canRemove || itemIndex === 0 || (visibleItems[itemIndex - 1] && isBabeliumItem(visibleItems[itemIndex - 1]))} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>
                 <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy || !canReorderAgendaSession(bundle, calendarEvents) || isBabeliumItem(item) || !removalState.canRemove || itemIndex === visibleItems.length - 1} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>

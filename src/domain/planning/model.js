@@ -639,6 +639,7 @@ export function createSessionItem(input, options = {}) {
     sourceActivityId,
     sourcePlanningUnitId: sourceActivityId ? optionalText(input.sourcePlanningUnitId) : null,
     title: requiredText(input.title, "títol de l'element"),
+    ...(input.fixedToSession != null ? { fixedToSession: Boolean(input.fixedToSession) } : {}),
     order: normalizedOrder(input.order),
     plannedMinutes: optionalMinutes(input.plannedMinutes, 'temps previst'),
     segmentIndex: sourceActivityId ? Math.max(1, Number(input.segmentIndex) || 1) : null,
