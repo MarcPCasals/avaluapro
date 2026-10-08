@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
+import { compareGroupPlanning } from '../../domain/planning/directionView'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
 const ROLE_LABELS = {
@@ -171,7 +172,8 @@ export function SharedSession({ items, results, session }) {
                 <strong>{item.title}</strong>
                 <small>
                   {item.plannedMinutes ? `${item.plannedMinutes} min previstos` : 'Sense temps'}
-                  {result?.actualMinutes ? ` · ${result.actualMinutes} min reals` : ''}
+                  {result?.actualMinutes != null ? ` · ${result.actualMinutes} min reals (${Number(result.actualMinutes) - Number(item.plannedMinutes || 0) >= 0 ? '+' : ''}${Number(result.actualMinutes) - Number(item.plannedMinutes || 0)} min)` : ''}
+                  {!item.sourceActivityId ? ' · Afegida a la sessió' : ''}
                 </small>
               </div>
               {result && (
@@ -195,7 +197,7 @@ export function SharedSession({ items, results, session }) {
   )
 }
 
-function ApplicationView({ applications, classes }) {
+function ApplicationView({ applications, classes, activities = [] }) {
   const classById = new Map(classes.map((item) => [item.id, item]))
   if (applications.length === 0) {
     return (
@@ -209,7 +211,7 @@ function ApplicationView({ applications, classes }) {
 
   return (
     <div className="planning-shared-applications">
-      {applications.map(({ application, sessions }, applicationIndex) => (
+      {applications.map(({ application, sessions, overrides = [] }, applicationIndex) => (
         <details open={applicationIndex === 0} key={application.id}>
           <summary>
             <div>
@@ -219,6 +221,7 @@ function ApplicationView({ applications, classes }) {
             <ChevronDown size={17} />
           </summary>
           <div className="planning-shared-sessions">
+            <GroupChanges activities={activities} overrides={overrides} />
             {sessions.map((bundle) => <SharedSession {...bundle} key={bundle.session.id} />)}
           </div>
         </details>
@@ -227,12 +230,24 @@ function ApplicationView({ applications, classes }) {
   )
 }
 
+function GroupChanges({ activities, overrides }) {
+  const changes = compareGroupPlanning(activities, overrides)
+  return <section className="planning-direction-changes">
+    <h3>Canvis respecte de la programació base</h3>
+    <p>Comparació dels ajustos del grup amb la UP base actual. Les sessions mostren la temporització actual i els minuts reals registrats.</p>
+    {changes.length === 0 ? <p>No hi ha ajustos específics d’aquest grup.</p> : changes.map((activity) => <article key={activity.id}>
+      <strong>{activity.title}</strong>
+      <dl>{activity.changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><del>{change.before}</del><span> → {change.after}</span></dd></div>)}</dl>
+    </article>)}
+  </section>
+}
+
 /**
  * Vista única per a qualsevol accés compartit. Només rep estructura, sessions
  * i reflexions pedagògiques; les notes privades i les incidències individuals
  * no formen part de les propietats d'aquest component.
  */
-export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program' }) {
+export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program', liveApplications, onShare }) {
   const [tab, setTab] = useState(initialTab)
   const [applications, setApplications] = useState(null)
   const [loading, setLoading] = useState(initialTab === 'applications')
@@ -250,7 +265,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
 
   const openApplications = async () => {
     setTab('applications')
-    if (applications) return
+    if (liveApplications || applications) return
     setLoading(true)
     setError('')
     try {
@@ -269,6 +284,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <Eye size={18} />
           <span><small>{ROLE_LABELS[role] || 'Programació compartida'}</small><strong>{unit.code} · {unit.title}</strong></span>
         </div>
+        {onShare && <button className="secondary-action compact" onClick={onShare} type="button">Compartir enllaç amb direcció</button>}
         <nav aria-label="Contingut compartit" role="tablist">
           <ContextualTab aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} help="Mostra l’estructura, el currículum i la seqüència completa de la programació compartida." helpTitle="Programació compartida" onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
             Programació
@@ -276,7 +292,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <ContextualTab aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} help="Presenta la mateixa UP amb format documental per facilitar-ne la lectura i la revisió." helpTitle="Document de la UP" onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button">
             <FileText size={13} />Document
           </ContextualTab>
-          {loadApplications && (
+          {(loadApplications || liveApplications) && (
             <ContextualTab aria-selected={tab === 'applications'} className={tab === 'applications' ? 'active' : ''} help="Consulta com s’ha aplicat aquesta programació a les classes, amb sessions i resultats reals, sense modificar la UP." helpTitle="Aplicació real" onClick={openApplications} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'applications' ? 0 : -1} type="button">
               Aplicació real
             </ContextualTab>
@@ -284,15 +300,15 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
         </nav>
       </header>
       {tab === 'program' ? (
-        <div role="tabpanel"><BaseProgramView activities={activities} phases={phases} unit={unit} /></div>
+        <div role="tabpanel"><BaseProgramView activities={activities} phases={phases} unit={unit} />{liveApplications && <ApplicationView activities={activities} applications={liveApplications} classes={classes} />}</div>
       ) : tab === 'document' ? (
         <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>
-      ) : loading ? (
+      ) : loading && !liveApplications ? (
         <div className="planning-shared-loading"><Loader2 className="spin" size={22} />Carregant les sessions…</div>
       ) : error ? (
         <p className="planning-sharing-error">{error}</p>
       ) : (
-        <div role="tabpanel"><ApplicationView applications={applications || []} classes={classes} /></div>
+        <div role="tabpanel"><ApplicationView activities={activities} applications={liveApplications || applications || []} classes={classes} /></div>
       )}
     </section>
   )

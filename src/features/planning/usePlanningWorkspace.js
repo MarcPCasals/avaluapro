@@ -1233,6 +1233,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       )))
       return {
         application,
+        overrides: await loadPlanningActivityOverrides(planningUnit.id, application.id),
         sessions: sessions.map((session, index) => ({
           items: detailResults[index].entities
             .filter((entity) => entity.entityType === 'sessionItem')

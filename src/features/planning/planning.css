@@ -883,3 +883,16 @@
 .planning-resource-option.already-assigned .planning-resource-option-text { color: #64748b; }
 .planning-resource-option.already-assigned { background: #f8fafc; border-radius: 6px; padding: 5px 7px; }
 .planning-resource-option.already-assigned input { opacity: 1; cursor: pointer; }
+
+.planning-direction-page { min-height: 100vh; background: #fbfbfe; }
+.planning-direction-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 22px; color: #6d28d9; background: #f5f3ff; font-size: 12px; }
+.planning-direction-link { display: grid; gap: 9px; border: 1px solid #ddd6fe; border-radius: 12px; padding: 14px; background: #faf5ff; }
+.planning-direction-link p, .planning-direction-changes > p { margin: 0; color: #64748b; font-size: 12px; line-height: 1.5; }
+.planning-direction-link input { width: 100%; min-width: 0; padding: 10px; border: 1px solid #ddd6fe; border-radius: 8px; background: white; }
+.planning-direction-changes { display: grid; gap: 12px; padding: 14px; border: 1px solid #ddd6fe; border-radius: 10px; background: #faf5ff; }
+.planning-direction-changes h3 { margin: 0; color: #6d28d9; font-size: 15px; }
+.planning-direction-changes article { padding: 12px; border-radius: 8px; background: white; }
+.planning-direction-changes dl { display: grid; gap: 8px; margin-bottom: 0; }
+.planning-direction-changes dt { color: #475569; font-size: 11px; font-weight: 800; }
+.planning-direction-changes dd { margin: 3px 0 0; font-size: 12px; color: #6d28d9; overflow-wrap: anywhere; }
+.planning-direction-changes del { color: #64748b; }

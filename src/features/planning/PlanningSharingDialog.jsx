@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { buildPlanningDirectionUrl } from '../../domain/planning/directionView'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 
 const ROLE_OPTIONS = [
@@ -51,6 +52,12 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
   const [draft, setDraft] = useState(emptyDraft)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const link = buildPlanningDirectionUrl(unit.id)
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(link); setCopied(true) }
+    catch { setError('Copia l’enllaç seleccionant el text del camp.') }
+  }
   const classById = useMemo(() => new Map(classes.map((item) => [item.id, item])), [classes])
 
   const edit = (grant) => setDraft({
@@ -114,6 +121,12 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
           L’accés queda vinculat al correu exacte. AvaluaPro no envia cap missatge: la persona veurà aquesta UP quan entri amb aquest compte.
         </p>
 
+        <section className="planning-direction-link">
+          <strong>Enllaç de consulta en directe</strong>
+          <p>Autoritza el correu de direcció amb «Direcció · lectura» i comparteix aquest enllaç. Obrirà només aquesta vista; els canvis desats al núvol hi apareixeran automàticament.</p>
+          <input aria-label="Enllaç de direcció" readOnly value={link} onFocus={(event) => event.target.select()} />
+          <button className="secondary-action" onClick={copyLink} type="button">{copied ? 'Enllaç copiat' : 'Copiar enllaç'}</button>
+        </section>
         <form onSubmit={save}>
           <label>
             Correu de la persona convidada
