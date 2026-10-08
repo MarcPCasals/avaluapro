@@ -1,4 +1,5 @@
 import { createSessionItem } from './model.js'
+import { isFixedAgendaItem } from './agendaItems.js'
 import { isBabeliumItem } from './babelium.js'
 import { getSessionLoad } from './rules.js'
 import { groupParallelSessionBundles, isUnperformedNoClassBundle, summarizeAssignedActivityProgress, summarizeCompletedActivityIds } from './scheduler.js'
@@ -24,7 +25,7 @@ export function getSessionActivityChoices({ activities, application, existingSes
     .filter(bundle => !isUnperformedNoClassBundle(bundle, calendarEvents))
   const movableIds = new Set(movableBundles(application, target, bundles, options).map(bundle => bundle.session.id))
   const { assignedMinutesByActivityId, assignedSourceActivityIds } = summarizeAssignedActivityProgress(bundles)
-  const fixed = summarizeAssignedActivityProgress(bundles.filter(bundle => !movableIds.has(bundle.session.id)))
+  const fixed = summarizeAssignedActivityProgress(bundles.map(bundle => movableIds.has(bundle.session.id) ? { ...bundle, items: bundle.items.filter(isFixedAgendaItem) } : bundle))
   const history = summarizeAssignedActivityProgress(bundles.filter(bundle => bundle.session.id !== target.session.id && !movableIds.has(bundle.session.id)))
   const completed = new Set([...manuallyCompletedSourceActivityIds, ...summarizeCompletedActivityIds(bundles)])
   return activities.map((activity, index) => {
@@ -83,7 +84,7 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
     .filter(bundle => !isUnperformedNoClassBundle(bundle, input.calendarEvents))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt)))
   for (const group of sourceGroups) {
-    const parts = group.bundles.map(bundle => bundle.items.filter(part => part.sourceActivityId === activity.id))
+    const parts = group.bundles.map(bundle => bundle.items.filter(part => part.sourceActivityId === activity.id && !isFixedAgendaItem(part)))
     for (let index = 0; index < Math.max(0, ...parts.map(list => list.length)) && toMove > 0; index += 1) {
       const copies = parts.flatMap(list => list[index] ? [list[index]] : [])
       const moved = minutes === null ? 1 : Math.min(toMove, ...copies.map(part => Number(part.plannedMinutes) || 0))
@@ -105,7 +106,7 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
     ] }))
     .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
   const groups = groupParallelSessionBundles(bundles).flatMap((group) => {
-    const parts = group.bundles.map((bundle) => bundle.items.filter((part) => part.sourceActivityId === activity.id))
+    const parts = group.bundles.map((bundle) => bundle.items.filter((part) => part.sourceActivityId === activity.id && !isFixedAgendaItem(part)))
     return Array.from({ length: Math.max(0, ...parts.map((list) => list.length)) }, (_, index) => parts.flatMap((list) => list[index] ? [list[index]] : []))
   })
   const changedItems = [...transferredChanges.values()]
@@ -127,10 +128,15 @@ export function buildSessionActivityAddition(input, activityId, plannedMinutes, 
 
 /** Edita una activitat pròpia en la seva sessió sense alterar la font ni la fixació. */
 export function buildOwnSessionActivityChange(bundle, itemId, changes, options = {}) {
+  if (bundle.items.find((item) => item.id === itemId)?.sourceActivityId) throw new Error('Aquesta activitat no és pròpia.')
+  return buildSessionActivityInPlaceChange(bundle, itemId, changes, options)
+}
+
+export function buildSessionActivityInPlaceChange(bundle, itemId, changes, options = {}) {
   const item = bundle.items.find((candidate) => candidate.id === itemId)
-  if (!item || item.sourceActivityId || item.type !== 'activity' || isBabeliumItem(item)
+  if (!item || isBabeliumItem(item)
     || !getAgendaSessionItemRemovalState(bundle, item, options).canRemove) {
-    throw new Error('Aquesta activitat no es pot modificar perquè no és una activitat pròpia editable.')
+    throw new Error('Aquesta activitat no es pot modificar perquè no és una activitat editable.')
   }
   const title = String(changes.title ?? item.title).trim()
   const minutes = Number(changes.plannedMinutes ?? item.plannedMinutes)
@@ -142,4 +148,15 @@ export function buildOwnSessionActivityChange(bundle, itemId, changes, options =
   return createSessionItem({ ...item, title, plannedMinutes: minutes,
     ...(typeof changes.fixedToSession === 'boolean' ? { fixedToSession: changes.fixedToSession } : {}),
     updatedAt: options.now || new Date().toISOString() }, options)
+}
+
+
+export function buildSessionActivityPinChanges(bundle, visibleItem, fixedToSession, options = {}) {
+  const ids = (visibleItem.combinedItems || [visibleItem]).map((item) => item.id)
+  const items = ids.map((id) => bundle.items.find((item) => item.id === id))
+  if (typeof fixedToSession !== 'boolean' || items.some((item) => !item || isBabeliumItem(item)
+    || !getAgendaSessionItemRemovalState(bundle, item, options).canRemove)) {
+    throw new Error('Només pots modificar la fixació en sessions sense dades de classe.')
+  }
+  return items.map((item) => createSessionItem({ ...item, fixedToSession, updatedAt: options.now || new Date().toISOString() }, options))
 }

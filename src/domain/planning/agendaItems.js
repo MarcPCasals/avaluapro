@@ -2,6 +2,12 @@ import { isBabeliumItem } from './babelium.js'
 import { createSessionItem } from './model.js'
 import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
 
+/** Les activitats pròpies antigues conserven la fixació aplicada abans del botó. */
+export function isFixedAgendaItem(item) {
+  return !isBabeliumItem(item) && (item.fixedToSession === true
+    || (item.type === 'activity' && !item.sourceActivityId && item.fixedToSession == null))
+}
+
 export function canReorderAgendaSession(bundle, calendarEvents = []) {
   const session = bundle.session
   return session.status === 'planned' && !session.classroomOpenedAt && !session.attendanceConfirmedAt
@@ -38,7 +44,7 @@ export function combineAgendaSessionItems(items = [], planningUnitId = '') {
     const minutes = Number(item.plannedMinutes)
     const canCombine = title && !isBabeliumItem(item) && item.plannedMinutes != null
       && Number.isFinite(minutes) && minutes > 0
-    const key = JSON.stringify([title, item.type, item.sourcePlanningUnitId || planningUnitId])
+    const key = JSON.stringify([title, item.type, item.sourcePlanningUnitId || planningUnitId, isFixedAgendaItem(item)])
     const current = canCombine ? byTitle.get(key) : null
     if (!current) {
       const entry = { ...item }

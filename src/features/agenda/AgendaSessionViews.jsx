@@ -5,7 +5,7 @@ import {
 import { useEffect, useState } from 'react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, canReorderAgendaSession, isBabeliumItem, combineAgendaSessionItems, groupParallelSessionBundles, getClassPlanningSubjects, resolvePlanningSubject, planningSubjectsMatch, sessionMatchesPlanningSubject, buildTimetableSessionCandidates } from '../../domain/planning'
+import { getEffectiveActivityMaterialLinks, getClassroomPromptState, getSessionLoad, isFixedAgendaItem, canReorderAgendaSession, isBabeliumItem, combineAgendaSessionItems, groupParallelSessionBundles, getClassPlanningSubjects, resolvePlanningSubject, planningSubjectsMatch, sessionMatchesPlanningSubject, buildTimetableSessionCandidates } from '../../domain/planning'
 import {
   calendarEventCoversSchoolWeek,
   calendarEventTargetsSession,
@@ -173,7 +173,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
     setSaving(true)
     setEditError('')
     try {
-      const fixedToSession = item.fixedToSession === false
+      const fixedToSession = !isFixedAgendaItem(item)
       await onSaveItem(item, { fixedToSession })
       setEditNotice(fixedToSession ? 'Activitat fixada al dia i l’hora de la sessió.' : 'Activitat desfixada. Es podrà redistribuir amb els reajustaments.')
     } catch (error) { setEditError(error.message || 'No s’ha pogut canviar la fixació.') }
@@ -232,7 +232,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         {moveError && <p role="alert">{moveError}</p>}
         {moving && <p role="status"><Loader2 className="spin" size={14} /> Desant l’ordre…</p>}
         {activityError && <p role="alert">{activityError}</p>}
-        {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} customCapacity={Math.max(0, sessionLoad.programmableMinutes - bundle.items.filter((item) => isBabeliumItem(item) || (item.type === 'activity' && !item.sourceActivityId && item.fixedToSession !== false)).reduce((sum, item) => sum + Number(item.plannedMinutes || 0), 0))} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
+        {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} customCapacity={Math.max(0, sessionLoad.programmableMinutes - bundle.items.filter((item) => isBabeliumItem(item) || isFixedAgendaItem(item)).reduce((sum, item) => sum + Number(item.plannedMinutes || 0), 0))} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
         {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item, itemIndex) => {
           const description = item.sourceActivity?.description?.trim()
           const removalState = getAgendaSessionItemRemovalState(bundle, item)
@@ -257,7 +257,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
               </div>}
             </div>
             {(onRemoveItem || onSaveItem || onMoveItem) && <div className="agenda-session-item-tools">
-              {onSaveItem && item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && <button className="agenda-session-item-edit" aria-label={`${item.fixedToSession === false ? 'Fixar' : 'Desfixar'} activitat: ${item.title}`} aria-pressed={item.fixedToSession !== false} disabled={busy || !removalState.canRemove} onClick={() => toggleFixed(item)} title={item.fixedToSession === false ? 'Fixar a aquest dia i hora' : 'Desfixar: permetre redistribuir l’activitat'} type="button">{item.fixedToSession === false ? <Pin size={17} /> : <PinOff size={17} />}</button>}
+              {onSaveItem && !isBabeliumItem(item) && <button className="agenda-session-item-edit" aria-label={`${!isFixedAgendaItem(item) ? 'Fixar' : 'Desfixar'} activitat: ${item.title}`} aria-pressed={isFixedAgendaItem(item)} disabled={busy || !removalState.canRemove} onClick={() => toggleFixed(item)} title={!isFixedAgendaItem(item) ? 'Fixar a aquest dia i hora' : 'Desfixar: permetre redistribuir l’activitat'} type="button">{!isFixedAgendaItem(item) ? <Pin size={17} /> : <PinOff size={17} />}</button>}
               {canMoveUp && <button aria-label={`Moure amunt: ${item.title}`} title="Moure amunt" className="agenda-session-item-edit" disabled={busy} onClick={() => moveItem(item, 'up')} type="button"><ArrowUp size={17} /></button>}
               {canMoveDown && <button aria-label={`Moure avall: ${item.title}`} title="Moure avall" className="agenda-session-item-edit" disabled={busy} onClick={() => moveItem(item, 'down')} type="button"><ArrowDown size={17} /></button>}
               {onSaveItem && <button aria-label={`Editar activitat: ${item.title}${item.segmentCount > 1 ? ` · part ${item.segmentIndex}/${item.segmentCount}` : ''}`} className="agenda-session-item-edit" disabled={busy || !removalState.canRemove || isBabeliumItem(item) || (!item.sourceActivityId && item.type !== 'activity')} onClick={() => { setEditItemId(item.id); setEditTitle(item.title); setEditMinutes(item.plannedMinutes || ''); setEditError(''); setEditNotice(''); setRemovalItemId('') }} title={removalState.canRemove && !isBabeliumItem(item) ? 'Editar títol i minuts' : removalState.reason || 'Aquesta activitat es conserva a l’historial.'} type="button"><Edit3 size={17} /></button>}

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, buildOwnSessionActivityChange, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaOwnActivityInsertion, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, isFixedAgendaItem, buildSessionActivityPinChanges, buildSessionActivityAddition, buildOwnSessionActivityChange, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaOwnActivityInsertion, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -403,4 +403,77 @@ test('inserir 15 minuts propis en una sessió plena desplaça tot el contingut i
   assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, candidates: [] }), /No hi ha prou classes/)
   assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, targetSessionId: 'next', plannedMinutes: 31 }), /30 minuts/)
   assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, existingSessionBundles: [{ ...first, session: { ...first.session, status: 'held' } }, next] }), /no es pot modificar/)
+})
+
+
+test('una pràctica programada fixada conserva la data i l’activitat anterior continua després', () => {
+  const first = bundle('first', '', [['exam', 55]])
+  const lab = bundle('lab-day', '', [['lab', 55]], { startsAt: '2026-10-12T08:30:00' })
+  lab.items[0].fixedToSession = true
+  const original = structuredClone(lab.items[0])
+  const base = { application, targetSessionId: 'first', existingSessionBundles: [first, lab], options,
+    activityMinutesById: { exam: 55, lab: 55 },
+    candidates: [{ date: '2026-10-16', startsAt: '2026-10-16T08:30:00', durationMinutes: 60 }] }
+  const preview = buildAgendaItemChangeReflow({ ...base, targetItemId: first.items[0].id, changes: { plannedMinutes: 70 } })
+  const pinned = preview.sessions.find(b => b.session.id === 'lab-day')
+  assert.deepEqual(pinned.items.find(i => i.id === original.id), original)
+  assert(!preview.removedItems.some(i => i.id === original.id))
+  assert.equal(preview.sessions.flatMap(b => b.items).filter(i => i.sourceActivityId === 'lab').reduce((n,i) => n+i.plannedMinutes,0), 55)
+  const overflow = preview.sessions.find(b => b.session.startsAt.startsWith('2026-10-16'))
+  assert.equal(overflow.items.find(i => i.sourceActivityId === 'exam').plannedMinutes, 15)
+  assert.equal(preview.activityMinutesChanges.exam, 70)
+  assert.deepEqual(preview.unscheduled, [])
+  assert.throws(() => buildAgendaContinuationReflow({ ...base, targetSessionId: 'lab-day', targetItemId: original.id, continuationMinutes: 15, moveFromTarget: true }), /fixada/)
+})
+
+test('els minuts fixats d’una font parcial no es dupliquen en redistribuir', () => {
+  const first = bundle('first', '', [['lab', 40]])
+  const later = bundle('later', '', [['lab', 15]], { startsAt: '2026-10-12T08:30:00' })
+  later.items[0].fixedToSession = true
+  const preview = buildAgendaSessionCompaction({ application, targetSessionId: 'first', existingSessionBundles: [first,later], options, activityMinutesById: { lab: 55 } })
+  assert.equal(preview.sessions.flatMap(b => b.items).reduce((n,i) => n+i.plannedMinutes,0),55)
+  assert.equal(preview.sessions.find(b => b.session.id === 'later').items.find(i => i.id === later.items[0].id).plannedMinutes,15)
+})
+
+test('fixar i desfixar conserva la font, agrupa fragments i impedeix traslladar una pràctica fixada', () => {
+  const target = bundle('target')
+  const later = bundle('later', '', [['lab',50]], { startsAt: '2026-10-12T08:30:00' })
+  const copy = structuredClone(later)
+  const pinned = buildSessionActivityPinChanges(later,later.items[0],true,options)
+  assert.equal(isFixedAgendaItem(pinned[0]),true)
+  assert.equal(pinned[0].sourceActivityId,'lab')
+  assert.equal(pinned[0].id,later.items[0].id)
+  later.items=pinned
+  const choice = getSessionActivityChoices({ ...input([target,later]),options }).find(i => i.id==='lab')
+  assert.equal(choice.available,false)
+  assert.equal(choice.completed,false)
+  assert.throws(() => buildSessionActivityAddition({ ...input([target,later]),options },'lab',15,options), /calendaritzada/)
+  later.items=buildSessionActivityPinChanges(later,later.items[0],false,options)
+  assert.equal(getSessionActivityChoices({ ...input([target,later]),options }).find(i=>i.id==='lab').available,true)
+  const extra=createSessionItem({ ...later.items[0],id:'second',plannedMinutes:10 },options)
+  later.items.push(extra)
+  const combined=combineAgendaSessionItems(later.items)[0]
+  assert.equal(buildSessionActivityPinChanges(later,combined,true,options).length,2)
+  for(const type of ['indication','transition']) {
+    const entry=createSessionItem({ ...copy.items[0],type },options)
+    assert.equal(isFixedAgendaItem(buildSessionActivityPinChanges({ ...copy,items:[entry] },entry,true,options)[0]),true)
+  }
+  assert.throws(() => buildSessionActivityPinChanges({ ...copy,session:{ ...copy.session,status:'held' } },copy.items[0],true,options), /dades de classe/)
+})
+
+
+test('recuperar, substituir i inserir contingut respecta un laboratori programat fixat', () => {
+  const first = bundle('first', '', [['exam',55]])
+  const lab = bundle('lab-day', '', [['lab',55]], { startsAt:'2026-10-12T08:30:00' })
+  lab.items[0].fixedToSession=true
+  const base={ application, targetSessionId:'first',existingSessionBundles:[first,lab],options,
+    activityMinutesById:{exam:55,lab:55},candidates:[{date:'2026-10-16',startsAt:'2026-10-16T08:30:00',durationMinutes:60}, {date:'2026-10-19',startsAt:'2026-10-19T08:30:00',durationMinutes:60}] }
+  const previews=[buildAgendaRecoveryReflow({...base,recoveryItem:first.items[0],recoveryMinutes:15}),
+    buildAgendaSessionReplacement({...base,title:'Xerrada',plannedMinutes:15,disposition:'postpone'}),
+    buildAgendaOwnActivityInsertion({...base,title:'Xerrada',plannedMinutes:15})]
+  for(const preview of previews) {
+    assert.deepEqual(preview.sessions.find(b=>b.session.id==='lab-day').items.find(i=>i.id===lab.items[0].id),lab.items[0])
+    assert.equal(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='lab').reduce((n,i)=>n+i.plannedMinutes,0),55)
+    assert(!preview.removedItems.some(i=>i.id===lab.items[0].id))
+  }
 })

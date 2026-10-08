@@ -36,7 +36,9 @@ import {
   getSessionActivityChoices,
   buildSessionActivityAddition,
   buildOwnSessionActivityChange,
-  createSessionItem,
+  buildSessionActivityInPlaceChange,
+  buildSessionActivityPinChanges,
+  isFixedAgendaItem,
   buildAgendaItemChangeReflow,
   buildAgendaRecoveryReflow,
   buildAgendaSessionReplacement,
@@ -2084,17 +2086,26 @@ export function useAgendaWorkspace(user, classes = []) {
     const targetBundle = setup.existingSessionBundles.find((candidate) =>
       candidate.session.id === bundle.session.id)
     if (!targetBundle) throw new Error('No s’ha trobat la sessió dins de la cronologia actual.')
-    if (typeof changes.fixedToSession === 'boolean' || !item.sourceActivityId) {
+    if (typeof changes.fixedToSession === 'boolean' || !item.sourceActivityId || isFixedAgendaItem(item)) {
       const currentItem = targetBundle.items.find((candidate) => candidate.id === item.id)
-      if (!currentItem || currentItem.sourceActivityId || currentItem.type !== 'activity' || isBabeliumItem(currentItem)
+      if (!currentItem || isBabeliumItem(currentItem)
         || !getAgendaSessionItemRemovalState(targetBundle, currentItem).canRemove) {
-        throw new Error('Només pots fixar o desfixar activitats pròpies de sessions sense dades de classe.')
+        throw new Error('Només pots modificar la fixació en sessions sense dades de classe.')
       }
-      const updatedItem = typeof changes.fixedToSession === 'boolean' && changes.title == null && changes.plannedMinutes == null
-        ? createSessionItem({ ...currentItem, fixedToSession: changes.fixedToSession, updatedAt: new Date().toISOString() })
-        : buildOwnSessionActivityChange(targetBundle, currentItem.id, changes)
-      await persist([{ entity: updatedItem, context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: targetBundle.session.id } }])
-      const update = (current) => ({ ...current, items: current.items.map((candidate) => candidate.id === updatedItem.id ? { ...candidate, ...updatedItem } : candidate) })
+      const updatedItems = typeof changes.fixedToSession === 'boolean' && changes.title == null && changes.plannedMinutes == null
+        ? buildSessionActivityPinChanges(targetBundle, item, changes.fixedToSession)
+        : [(currentItem.sourceActivityId ? buildSessionActivityInPlaceChange : buildOwnSessionActivityChange)(targetBundle, currentItem.id, changes)]
+      const entries = updatedItems.map((entity) => ({ entity, context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: targetBundle.session.id } }))
+      if (currentItem.sourceActivityId && changes.plannedMinutes != null) {
+        const budget = getAgendaActivityMinutesById(setup.activities, setup.activityOverrides)[currentItem.sourceActivityId]
+        entries.push({ entity: createGroupActivityOverride({ activityId: currentItem.sourceActivityId,
+          applicationId: setup.application.id, ownerUid: setup.planningUnit.ownerUid,
+          changes: { agendaPlannedMinutes: Math.max(0, Number(budget || 0) + Number(changes.plannedMinutes) - Number(currentItem.plannedMinutes || 0)) } }),
+          context: { applicationId: setup.application.id, planningUnitId: setup.planningUnit.id } })
+      }
+      await persist(entries)
+      const changed = new Map(updatedItems.map((candidate) => [candidate.id, candidate]))
+      const update = (current) => ({ ...current, items: current.items.map((candidate) => changed.has(candidate.id) ? { ...candidate, ...changed.get(candidate.id) } : candidate) })
       setSessionBundles((current) => current.map(update))
       return { sessions: [update(targetBundle)], setup, changedTargetResults: targetBundle.results || [] }
     }

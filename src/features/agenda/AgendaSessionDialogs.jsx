@@ -4,7 +4,8 @@ import {
   History, RotateCcw,
 } from 'lucide-react'
 import { FormattedText } from '../../components/FormattedText'
-import { BABELIUM_MINUTES, isBabeliumItem } from '../../domain/planning/babelium'
+import { isFixedAgendaItem } from '../../domain/planning/agendaItems'
+import { BABELIUM_MINUTES } from '../../domain/planning/babelium'
 import { Modal } from '../../components/Modal'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
@@ -54,7 +55,7 @@ export function AgendaSessionAdjustDialog({
   const matchingReplacementActivities = replacementActivities.filter((activity) =>
     `${activity.code} ${activity.title}`.toLocaleLowerCase('ca').includes(replacementSearch.trim().toLocaleLowerCase('ca')))
 
-  const fixedMinutes = bundle.items.filter((item) => item.type === 'activity' && !item.sourceActivityId && !isBabeliumItem(item) && item.fixedToSession !== false)
+  const fixedMinutes = bundle.items.filter(isFixedAgendaItem)
     .reduce((total, item) => total + Number(item.plannedMinutes || 0), 0)
   const replacementCapacity = Math.max(0, bundle.session.durationMinutes - 5 - (bundle.session.babeliumEnabled ? BABELIUM_MINUTES : 0) - fixedMinutes)
   const [replacementMinutes, setReplacementMinutes] = useState(
@@ -222,7 +223,7 @@ export function AgendaSessionAdjustDialog({
           {selectedReplacementActivity && <div className="agenda-adjust-preview"><CheckCircle2 size={18} /><div><strong>{selectedReplacementActivity.code} · {selectedReplacementActivity.title}</strong>{selectedReplacementActivity.description && <FormattedText as="p" text={selectedReplacementActivity.description} />}<p>Conserva els materials i el vincle amb l’activitat original. Si ja estava prevista més endavant, se’n traslladaran els minuts triats per evitar duplicar-la.</p>{Number(replacementMinutes) < selectedReplacementActivity.availableMinutes && <p>Només en faràs {replacementMinutes || '—'} minuts en aquesta sessió. La resta manté la seva previsió o queda pendent de calendaritzar.</p>}</div></div>}
         </>)}
         <label>Minuts previstos<input disabled={busy} min="1" max={Math.min(replacementCapacity, customReplacement ? Infinity : selectedReplacementActivity?.availableMinutes || 0)} type="number" value={replacementMinutes} onChange={(event) => { setReplacementMinutes(event.target.value); setReplacementPreview(null) }} /></label>
-        {fixedMinutes > 0 && <p>Les activitats pròpies es mantenen fixades en aquesta sessió ({fixedMinutes} min). Queden {replacementCapacity} min per a la substitució.</p>}
+        {fixedMinutes > 0 && <p>Les activitats fixades es mantenen en aquesta sessió ({fixedMinutes} min). Queden {replacementCapacity} min per a la substitució.</p>}
         <label>Què fem amb les activitats previstes?<select disabled={busy} value={disposition} onChange={(event) => { setDisposition(event.target.value); setReplacementPreview(null) }}><option value="postpone">Ajornar-les a les classes següents</option><option value="remove">Retirar-les de la cronologia</option></select></label>
         <div className="agenda-adjust-preview"><ArrowRight size={18} /><div><strong>{disposition === 'postpone' ? 'El contingut passarà a les classes següents' : 'Les sessions següents conservaran la seva distribució'}</strong><p>{disposition === 'postpone' ? 'Les activitats d’aquesta sessió es traslladaran a la següent classe disponible i la resta es reajustarà en cadena.' : 'Es retirarà només el contingut previst d’aquesta sessió.'} L’ajornament reajusta les sessions de la mateixa UP. La Programació original es conserva. Si hi ha Babelium, es manté a la sessió.</p></div></div>
         {replacementPreview && <div className="agenda-continuation-preview"><header><CheckCircle2 size={17} /><strong>{replacementPreview.sessions.length} {replacementPreview.sessions.length === 1 ? 'sessió afectada' : 'sessions afectades'}</strong></header>{replacementPreview.sessions.map((candidate) => <div key={candidate.session.id}><span>{dateLabel(candidate.session.startsAt)} · {String(candidate.session.startsAt).slice(11, 16)}</span><strong>{candidate.items.map((current) => `${current.title} · ${current.plannedMinutes || 0} min`).join(' · ') || 'Sessió sense activitats previstes'}</strong><small>{candidate.isExisting ? 'Sessió reajustada' : 'Nova sessió necessària'}</small></div>)}{replacementPreview.removedSessions.length > 0 && <p>{replacementPreview.removedSessions.length} sessions buides es retiraran de la cronologia.</p>}</div>}
