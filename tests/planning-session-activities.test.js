@@ -356,3 +356,21 @@ test('editar el text i els minuts d’una activitat pròpia conserva la sessió 
     assert.throws(() => buildOwnSessionActivityChange({ ...target, session: { ...target.session, status: 'held' } }, added.id, { title: 'Canvi' }, options), /no es pot modificar/)
   }
 })
+
+
+test('continuar des de Mode aula posa 15 minuts al principi i conserva la classe actual', () => {
+  const current = bundle('current', '', [['exam', 30]], { startsAt: '2026-10-04T08:30:00', status: 'held', classroomOpenedAt: options.now })
+  const next = bundle('next', '', [['lab', 50]], { startsAt: '2026-10-09T08:30:00' })
+  const before = structuredClone(current)
+  const preview = buildAgendaContinuationReflow({ application, existingSessionBundles: [current, next],
+    targetSessionId: current.session.id, targetItemId: current.items[0].id, moveFromTarget: false,
+    activityMinutesById: { exam: 30, lab: 50 }, options,
+    additionalActivities: [{ sourceActivityId: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 15 }],
+    candidates: [{ date: '2026-10-12', startsAt: '2026-10-12T08:30:00', durationMinutes: 60 }] })
+  assert.deepEqual(preview.sessions[0].items.map(item => [item.sourceActivityId, item.plannedMinutes]), [['exam', 15], ['lab', 40]])
+  assert.deepEqual(preview.sessions[1].items.map(item => [item.sourceActivityId, item.plannedMinutes]), [['lab', 10]])
+  assert.equal(preview.activityMinutesChanges.exam, 45)
+  assert(!preview.removedItems.some(item => item.sessionId === current.session.id))
+  assert.deepEqual(current, before)
+  assert.deepEqual(preview.unscheduled, [])
+})

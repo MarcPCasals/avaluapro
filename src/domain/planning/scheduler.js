@@ -1607,8 +1607,23 @@ export function buildAgendaContinuationReflow(input) {
       removedResults: [...result.removedResults, ...removedTargetResults],
     }
   }
+  const target = (input.existingSessionBundles || []).find((bundle) => bundle.session.id === input.targetSessionId)
+  const currentItem = target?.items.find((item) => item.id === input.targetItemId)
+  const budgets = { ...input.activityMinutesById }
+  const activityMinutesChanges = {}
+  if (input.targetItemId) {
+    if (!currentItem?.sourceActivityId) throw new Error('No s’ha trobat l’activitat actual que vols continuar.')
+    const sourceId = currentItem.sourceActivityId
+    const extraMinutes = (input.additionalActivities || []).filter((activity) => activity.sourceActivityId === sourceId)
+      .reduce((total, activity) => total + Number(activity.plannedMinutes || 0), 0)
+    const assigned = summarizeAssignedActivityProgress(input.existingSessionBundles).assignedMinutesByActivityId[sourceId] || 0
+    budgets[sourceId] = Math.max(Number(budgets[sourceId]) || 0, assigned) + extraMinutes
+    activityMinutesChanges[sourceId] = budgets[sourceId]
+  }
+  const preview = buildAgendaItemsReflow({ ...input, activityMinutesById: budgets, startAfterTarget: true, targetItemId: '' })
   return {
-    ...buildAgendaItemsReflow({ ...input, startAfterTarget: true }),
+    ...preview,
+    activityMinutesChanges: { ...preview.activityMinutesChanges, ...activityMinutesChanges },
     kind: 'agenda-continuation',
   }
 }

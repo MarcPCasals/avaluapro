@@ -78,8 +78,7 @@ export function AgendaSessionAdjustDialog({
     && !bundle.session.classroomClosedAt && !(bundle.results || []).length
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const movesFromFutureSession = bundle.session.status === 'planned'
-    && new Date(bundle.session.startsAt).getTime() > dialogOpenedAt
+  const movesFromFutureSession = canReplace
   const recoveryItem = recoveryOptions.find((candidate) => candidate.id === recoveryItemId)
     || recoveryOptions[0]
     || null

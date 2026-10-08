@@ -2161,9 +2161,8 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview])
 
   /**
-   * Una continuació no altera el temps ideal de la UP. Refà tota la part
-   * futura perquè dos fragments de la mateixa activitat dins d'una sessió es
-   * fusionin i la suma mai no superi la durada definida a la Programació.
+   * Una continuació amplia només el temps de l’Agenda del grup. Refà la part
+   * futura, fusiona els fragments repetits i conserva la Programació original.
    */
   const buildContinuationPreview = useCallback(async (bundle, item, minutes) => {
     if (!item?.sourceActivityId || Number(minutes) <= 0) {
@@ -2204,7 +2203,9 @@ export function useAgendaWorkspace(user, classes = []) {
       continuationMinutes: Number(minutes),
       existingSessionBundles: setup.existingSessionBundles,
       moveFromTarget: bundle.session.status === 'planned'
-        && new Date(bundle.session.startsAt).getTime() > Date.now(),
+        && new Date(bundle.session.startsAt).getTime() > Date.now()
+        && !bundle.session.classroomOpenedAt && !bundle.session.attendanceConfirmedAt
+        && !bundle.session.classroomClosedAt && !(bundle.results || []).length,
       options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetItemId: item.id,
       targetSessionId: bundle.session.id,
