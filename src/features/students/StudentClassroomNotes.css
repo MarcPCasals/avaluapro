@@ -1,0 +1,10 @@
+.student-overview-classroom-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.student-overview-classroom-counts span { padding: 4px 8px; border-radius: 8px; font-size: 12px; font-weight: 750; }
+.student-overview-classroom-counts .positive { background: #dcfce7; color: #166534; }
+.student-overview-classroom-counts .incident { background: #fee2e2; color: #991b1b; }
+.student-overview-classroom-history { max-height: 230px; overflow-y: auto; overscroll-behavior: contain; }
+.student-overview-classroom-history article { padding: 8px 10px; margin-bottom: 8px; border-left: 3px solid; border-radius: 6px; }
+.student-overview-classroom-history article.positive { border-color: #16a34a; background: #f0fdf4; }
+.student-overview-classroom-history article.incident { border-color: #dc2626; background: #fef2f2; }
+.student-overview-classroom-history small { font-size: 11px; color: #475569; font-weight: 700; }
+.student-overview-classroom-history p { margin: 5px 0 0; color: #334155; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }

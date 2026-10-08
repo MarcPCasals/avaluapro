@@ -30640,14 +30640,14 @@ button.profile-followup-card:focus-visible {
 
 .student-overview-table {
   width: 100%;
-  min-width: 1540px;
+  min-width: 1860px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
 
 .student-overview-table.has-tutoring-columns {
-  min-width: 2360px;
+  min-width: 2680px;
 }
 
 .student-overview-table col.student { width: 190px; }
@@ -30656,6 +30656,8 @@ button.profile-followup-card:focus-visible {
 .student-overview-table col.learning { width: 280px; }
 .student-overview-table col.absences { width: 220px; }
 .student-overview-table col.annotations { width: 270px; }
+.student-overview-table col.classroom-notes { width: 320px; }
+
 .student-overview-table col.tutoring-notes,
 .student-overview-table col.registry,
 .student-overview-table col.other-records { width: 280px; }

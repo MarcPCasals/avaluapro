@@ -1,5 +1,7 @@
 import { getDiagnosisLabels, getDominantDiagnosis } from '../data/studentAnnotations'
 
+import { formatClassroomNoteDate } from './studentClassroomNotes.js'
+
 const HEADER_COLOR = '#1E3A5F'
 const HEADER_TEXT_COLOR = '#FFFFFF'
 const BORDER_COLOR = '#D9E2EC'
@@ -19,6 +21,7 @@ const BASE_COLUMNS = [
   { title: 'Absències (hores)', width: 18 },
   { title: 'Última absència', width: 28 },
   { title: 'Última anotació de seguiment', width: 42 },
+  { title: 'Notes del Mode aula', width: 55 },
 ]
 
 const TUTORING_COLUMNS = [
@@ -141,6 +144,8 @@ function getDataRow(row, index, showTutoringColumns) {
     numberCell(absenceHours || 0, { ...baseStyle, format: '0.##' }),
     textCell(absenceRecords[0] ? `${formatDate(absenceRecords[0].date)}${absenceRecords[0].time ? ` · ${absenceRecords[0].time}` : ''}` : '', baseStyle),
     textCell(latestTrackingNote?.text, baseStyle),
+    textCell(joinNotes(row.classroomNotes || [], (note) =>
+      `${formatClassroomNoteDate(note)} · ${note.type === 'positive' ? 'Positiva' : 'Negativa · incidència'} · ${note.text}`), baseStyle),
   ]
 
   if (!showTutoringColumns) return baseCells

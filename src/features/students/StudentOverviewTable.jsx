@@ -1,3 +1,4 @@
+import './StudentClassroomNotes.css'
 import {
   AlertCircle,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   getDominantDiagnosis,
   resolveProgressReason,
 } from '../../data/studentAnnotations.js'
+import { formatClassroomNoteDate } from '../../lib/studentClassroomNotes.js'
 import { formatAbsenceDateTime, formatAbsenceHours } from '../../lib/attendance.js'
 
 const OTHER_TUTORING_TYPES = [
@@ -92,6 +94,7 @@ export function StudentOverviewTable({
             <col className="learning" />
             <col className="absences" />
             <col className="annotations" />
+            <col className="classroom-notes" />
             {showTutoringColumns && <col className="tutoring-notes" />}
             {showTutoringColumns && <col className="registry" />}
             {showTutoringColumns && <col className="other-records" />}
@@ -104,6 +107,7 @@ export function StudentOverviewTable({
               <th><span>Avaluació i seguiment</span><small>Fonts: avaluació i seguiment</small></th>
               <th><span>Absències</span><small>Font: control d’assistència</small></th>
               <th><span>Anotacions de seguiment</span><small>Font: seguiment de tasques</small></th>
+              <th><span>Notes del Mode aula</span><small>Font: registres de cada sessió</small></th>
               {showTutoringColumns && <th><span>Anotacions de tutoria</span><small>Fonts: equip educatiu i tutoria</small></th>}
               {showTutoringColumns && <th><span>Registre tutorial</span><small>Font: registre tutorial</small></th>}
               {showTutoringColumns && <th><span>Agenda i incidències</span><small>Font: altres registres tutorials</small></th>}
@@ -114,6 +118,7 @@ export function StudentOverviewTable({
               const {
                 absenceHours = 0,
                 absenceRecords = [],
+                classroomNotes = [],
                 importantRecords = [],
                 latestTeamNote = null,
                 latestTrackingNote = null,
@@ -195,6 +200,24 @@ export function StudentOverviewTable({
                       <small><MessageCircle size={13} /> Veure i afegir</small>
                     </button>
                   </td>
+                  <td>
+                    {classroomNotes.length === 0 ? <em>Sense notes de sessió</em> : (
+                      <div className="student-overview-classroom-notes">
+                        <div className="student-overview-classroom-counts">
+                          <span className="positive">{classroomNotes.filter((note) => note.type === 'positive').length} positiva{classroomNotes.filter((note) => note.type === 'positive').length === 1 ? '' : 's'}</span>
+                          <span className="incident">{classroomNotes.filter((note) => note.type === 'incident').length} negativa{classroomNotes.filter((note) => note.type === 'incident').length === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="student-overview-classroom-history" role="region" aria-label={`Notes del Mode aula de ${student.name}`} tabIndex={0}>
+                          {classroomNotes.map((note) => (
+                            <article className={note.type} key={note.id}>
+                              <small>{formatClassroomNoteDate(note)} · {note.type === 'positive' ? 'Positiva' : 'Negativa · incidència'}</small>
+                              <p>{note.text}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </td>
                   {showTutoringColumns && (
                     <td>
                       <button className="student-overview-cell-button" onClick={() => onOpenAnnotations(student.id)} type="button">
@@ -248,7 +271,7 @@ export function StudentOverviewTable({
         <summary><ChevronDown size={15} /> Què s’actualitza a cada lloc?</summary>
         <p>
           Perfil i informació general modifiquen la fitxa de l’alumne. Les absències venen del control d’assistència
-          i les anotacions de seguiment, de les pantalles d’avaluació i tasques.
+          i les anotacions de seguiment, de les pantalles d’avaluació i tasques. Les notes del Mode aula mostren totes les entrades positives i negatives registrades per alumne a les sessions d’aquest grup, de més recent a més antiga.
           {showTutoringColumns && ' En aquest grup tutorial, les anotacions d’equip i tutoria, el registre qualitatiu i els registres d’agenda o incidències es mostren en columnes separades.'}
           {' '}Aquesta pantalla no en crea còpies.
         </p>

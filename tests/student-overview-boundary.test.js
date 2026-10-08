@@ -29,7 +29,7 @@ test('la vista real conserva totes les accions d’origen', () => {
   )
 })
 
-test('el component compartit manté les sis columnes base i les tres tutorials', () => {
+test('el component compartit manté les set columnes base i les tres tutorials', () => {
   const baseHeadings = [
     'Alumne',
     'Perfil',
@@ -37,6 +37,7 @@ test('el component compartit manté les sis columnes base i les tres tutorials',
     'Avaluació i seguiment',
     'Absències',
     'Anotacions de seguiment',
+    'Notes del Mode aula',
   ]
   const tutoringHeadings = ['Anotacions de tutoria', 'Registre tutorial', 'Agenda i incidències']
 

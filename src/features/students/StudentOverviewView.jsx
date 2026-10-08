@@ -12,6 +12,7 @@ import { ContextualHelp } from '../../components/ContextualHelp'
 import { buildStudentProfiles } from '../../lib/analytics'
 import { getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
+import { getStudentClassroomNotes } from '../../lib/studentClassroomNotes.js'
 import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { StudentAnnotationsModal } from './StudentAnnotationsModal'
@@ -291,6 +292,7 @@ export function StudentOverviewView() {
         return {
           absenceHours: getStudentAbsenceHours(absenceRecords, student.id, activeClassId),
           absenceRecords: studentAbsenceRecords,
+          classroomNotes: getStudentClassroomNotes(behaviorEvents, student.id, activeClassId),
           importantRecords,
           latestTeamNote: latestByDate(notes.filter((note) => note.type === 'team')),
           latestTrackingNote: latestByDate(notes.filter((note) => note.type === 'tracking')),
@@ -303,7 +305,7 @@ export function StudentOverviewView() {
         }
       })
       .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca', { numeric: true }))
-  }, [absenceRecords, activeClassId, agendaNotes, profilesByStudentId, students, tutorialRecords])
+  }, [absenceRecords, activeClassId, agendaNotes, behaviorEvents, profilesByStudentId, students, tutorialRecords])
 
   const rows = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('ca')

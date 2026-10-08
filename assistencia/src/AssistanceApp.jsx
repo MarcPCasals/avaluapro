@@ -148,7 +148,12 @@ function AssistanceApp() {
       (!query || student.displayName.toLocaleLowerCase('ca').includes(query))
     ))
   }, [activeClassId, dataset.students, search])
-  const overviewRows = useMemo(() => visibleStudents.map((student) => ({
+  const overviewRows = useMemo(() => visibleStudents.map((student, index) => ({
+    classroomNotes: index === 0 ? [
+      { id: 'synthetic-note-positive', date: '2026-10-08', type: 'positive', text: 'Ha ajudat el grup a completar l’activitat. Exemple fictici.' },
+      { id: 'synthetic-note-negative', date: '2026-10-06', type: 'incident', text: 'Ha interromput l’explicació. Exemple fictici.' },
+      { id: 'synthetic-note-older', date: '2026-10-02', type: 'positive', text: 'Ha participat amb una bona pregunta. Exemple fictici.' },
+    ] : [],
     absenceHours: student.absenceHours,
     absenceRecords: [],
     importantRecords: [],
