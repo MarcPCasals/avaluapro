@@ -6,6 +6,9 @@ import { installModuleLoadRecovery } from './lib/moduleLoadRecovery.js'
 
 // eslint-disable-next-line react-refresh/only-export-components
 const PlanningDirectionPage = lazy(() => import('./features/planning/PlanningDirectionPage.jsx'))
+// eslint-disable-next-line react-refresh/only-export-components
+const StudentOverviewDirectionPage = lazy(() => import('./features/students/StudentOverviewDirectionPage.jsx'))
+const studentShareId = new URLSearchParams(window.location.search).get('students-view')
 const directionUnitId = new URLSearchParams(window.location.search).get('planning-view')
 
 // Si hi ha una publicació nova mentre la pestanya continua oberta, recupera
@@ -14,6 +17,6 @@ installModuleLoadRecovery()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Suspense fallback={<p>Carregant…</p>}>{directionUnitId ? <PlanningDirectionPage unitId={directionUnitId} /> : <App />}</Suspense>
+    <Suspense fallback={<p>Carregant…</p>}>{studentShareId ? <StudentOverviewDirectionPage shareId={studentShareId} /> : directionUnitId ? <PlanningDirectionPage unitId={directionUnitId} /> : <App />}</Suspense>
   </StrictMode>,
 )

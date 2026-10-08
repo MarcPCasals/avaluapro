@@ -5,6 +5,7 @@ import {
   Filter,
   Search,
   Star,
+  Share2,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
@@ -16,6 +17,9 @@ import { getStudentClassroomNotes } from '../../lib/studentClassroomNotes.js'
 import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { StudentAnnotationsModal } from './StudentAnnotationsModal'
+import { buildStudentOverviewSnapshot } from '../../lib/studentOverviewSharing.js'
+import * as studentOverviewSharingService from '../../data/cloud/studentOverviewShares.js'
+import { StudentOverviewSharingDialog } from './StudentOverviewSharingDialog'
 import { StudentOverviewTable } from './StudentOverviewTable'
 import { StudentProfileModal } from './StudentProfileModal'
 
@@ -252,6 +256,7 @@ export function StudentOverviewView() {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
+  const [sharing, setSharing] = useState(false)
   const [search, setSearch] = useState('')
   const [onlyAttention, setOnlyAttention] = useState(false)
   const [exportingExcel, setExportingExcel] = useState(false)
@@ -292,6 +297,8 @@ export function StudentOverviewView() {
         return {
           absenceHours: getStudentAbsenceHours(absenceRecords, student.id, activeClassId),
           absenceRecords: studentAbsenceRecords,
+          trackingNotes: notes.filter((note) => note.type === 'tracking'),
+          tutoringNotes: notes.filter((note) => note.type === 'team' || note.type === 'tutoring'),
           classroomNotes: getStudentClassroomNotes(behaviorEvents, student.id, activeClassId),
           importantRecords,
           latestTeamNote: latestByDate(notes.filter((note) => note.type === 'team')),
@@ -383,6 +390,7 @@ export function StudentOverviewView() {
           />
         </label>
         <div className="student-overview-toolbar-actions">
+          <button type="button" disabled={!activeClass || allRows.length === 0} onClick={() => setSharing(true)}><Share2 size={17} /> Compartir consulta amb direcció</button>
           <button
             className="student-overview-excel-button"
             disabled={allRows.length === 0 || exportingExcel}
@@ -413,6 +421,7 @@ export function StudentOverviewView() {
         showTutoringColumns={showTutoringColumns}
       />
 
+      {sharing && activeClass && <StudentOverviewSharingDialog service={studentOverviewSharingService} classId={activeClassId} className={activeClass.name} onClose={() => setSharing(false)} getSnapshot={() => buildStudentOverviewSnapshot({ activeClass, activeUt, rows: allRows, showTutoringColumns })} />}
       {selectedProfileStudent && (
         <StudentProfileModal
           mode="evaluation"

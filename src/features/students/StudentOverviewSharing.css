@@ -1,0 +1,28 @@
+.student-sharing-dialog { display: grid; gap: 16px; }
+.student-sharing-dialog > p { margin: 0; color: #475569; line-height: 1.5; }
+.student-sharing-dialog form, .student-sharing-dialog label { display: grid; gap: 8px; }
+.student-sharing-dialog input, .student-consultation input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; background: white; }
+.student-sharing-dialog article { display: grid; gap: 8px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; overflow-wrap: anywhere; }
+.student-sharing-dialog article > div, .student-sharing-link { display: flex; gap: 10px; flex-wrap: wrap; }
+.student-sharing-link input { flex: 1; min-width: 180px; }
+.student-sharing-dialog small { color: #64748b; }
+.student-sharing-dialog [role=alert], .student-direction-page > [role=alert] { padding: 12px; color: #991b1b; background: #fef2f2; border-radius: 8px; }
+.student-direction-page { padding: 20px; min-height: 100vh; background: #f8fafc; color: #0f172a; }
+.student-direction-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.student-consultation > header { padding: 16px; border: 1px solid #dbeafe; border-radius: 12px; background: #eff6ff; margin-bottom: 16px; }
+.student-consultation > header h1 { margin: 0; font-size: 24px; }
+.student-consultation > label { display: grid; gap: 6px; max-width: 360px; margin-bottom: 16px; }
+.student-consultation-history article { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+.student-consultation-history small { display: block; margin-top: 4px; color: #64748b; }
+.student-consultation-history p, .student-consultation-profile p, .student-overview-readonly-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.student-sharing-shell .modal-backdrop, .student-consultation .modal-backdrop { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.45); }
+.student-sharing-shell .modal-panel, .student-consultation .modal-panel { width: min(800px, 100%); max-height: 90vh; overflow: auto; background: white; border-radius: 14px; box-shadow: 0 20px 60px #0f172a40; }
+.student-sharing-shell .modal-header, .student-consultation .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; border-bottom: 1px solid #e2e8f0; }
+.student-sharing-shell .modal-header h2, .student-consultation .modal-header h2 { margin: 0; font-size: 20px; }
+.student-sharing-shell .modal-close, .student-consultation .modal-close { display: grid; place-items: center; padding: 6px; border: 0; border-radius: 6px; background: #f1f5f9; cursor: pointer; }
+.student-sharing-shell .modal-body, .student-consultation .modal-body { padding: 18px; }
+.student-sharing-shell .primary-action, .student-sharing-shell .secondary-action { padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1; font: inherit; font-weight: 650; cursor: pointer; }
+.student-sharing-shell .primary-action { border-color: #2563eb; background: #2563eb; color: white; }
+.student-sharing-shell .secondary-action { background: white; color: #1e40af; }
+.student-sharing-shell button:disabled { cursor: wait; opacity: .55; }

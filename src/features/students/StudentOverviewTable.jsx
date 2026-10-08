@@ -66,6 +66,8 @@ function SourceEditor({ label, onSave, placeholder, value }) {
 }
 
 export function StudentOverviewTable({
+  readOnly = false,
+  onOpenAbsences = () => {},
   onOpenAnnotations = () => {},
   onOpenOtherRecords = () => {},
   onOpenProfile = () => {},
@@ -163,17 +165,17 @@ export function StudentOverviewTable({
                           : <em>Sense diagnòstics marcats</em>}
                       </div>
                       {student.diagnosisNotes && <p>{student.diagnosisNotes}</p>}
-                      <small><PencilLine size={13} /> Editar a la font</small>
+                      <small><PencilLine size={13} /> {readOnly ? 'Veure perfil' : 'Editar a la font'}</small>
                     </button>
                   </td>
                   <td>
-                    <SourceEditor
+                    {readOnly ? <p className="student-overview-readonly-text">{student.personalNotes || 'Sense informació general'}</p> : <SourceEditor
                       key={`${student.id}-${student.personalNotes || ''}`}
                       label={`Informació general de ${student.name}`}
                       onSave={(personalNotes) => onSavePersonalNotes(student.id, personalNotes)}
                       placeholder="Sense informació general…"
                       value={student.personalNotes}
-                    />
+                    />}
                   </td>
                   <td>
                     <button className="student-overview-cell-button" onClick={() => onOpenAnnotations(student.id)} type="button">
@@ -193,19 +195,20 @@ export function StudentOverviewTable({
                         ? <small>Última: {formatAbsenceDateTime(absenceRecords[0])}</small>
                         : <em>Sense absències</em>}
                     </div>
+                    {readOnly && <button className="student-overview-cell-button" type="button" onClick={() => onOpenAbsences(student.id)}><small>Veure absències</small></button>}
                   </td>
                   <td>
                     <button className="student-overview-cell-button" onClick={() => onOpenAnnotations(student.id)} type="button">
                       {latestTrackingNote ? <p>{latestTrackingNote.text}</p> : <em>Sense anotacions</em>}
-                      <small><MessageCircle size={13} /> Veure i afegir</small>
+                      <small><MessageCircle size={13} /> {readOnly ? 'Veure el detall' : 'Veure i afegir'}</small>
                     </button>
                   </td>
                   <td>
                     {classroomNotes.length === 0 ? <em>Sense notes de sessió</em> : (
                       <div className="student-overview-classroom-notes">
                         <div className="student-overview-classroom-counts">
-                          <span className="positive">{classroomNotes.filter((note) => note.type === 'positive').length} positiva{classroomNotes.filter((note) => note.type === 'positive').length === 1 ? '' : 's'}</span>
-                          <span className="incident">{classroomNotes.filter((note) => note.type === 'incident').length} negativa{classroomNotes.filter((note) => note.type === 'incident').length === 1 ? '' : 's'}</span>
+                          <span className="positive">{classroomNotes.filter((note) => note.type === 'positive').length} {classroomNotes.filter((note) => note.type === 'positive').length === 1 ? 'positiva' : 'positives'}</span>
+                          <span className="incident">{classroomNotes.filter((note) => note.type === 'incident').length} {classroomNotes.filter((note) => note.type === 'incident').length === 1 ? 'negativa' : 'negatives'}</span>
                         </div>
                         <div className="student-overview-classroom-history" role="region" aria-label={`Notes del Mode aula de ${student.name}`} tabIndex={0}>
                           {classroomNotes.map((note) => (
@@ -227,7 +230,7 @@ export function StudentOverviewTable({
                             {latestTutoringNote && <p><b>Tutoria:</b> {latestTutoringNote.text}</p>}
                           </>
                         ) : <em>Sense anotacions de tutoria</em>}
-                        <small><MessageCircle size={13} /> Veure i afegir</small>
+                        <small><MessageCircle size={13} /> {readOnly ? 'Veure el detall' : 'Veure i afegir'}</small>
                       </button>
                     </td>
                   )}
@@ -244,7 +247,7 @@ export function StudentOverviewTable({
                           )}
                           {records.length === 0 && <em>Sense registres</em>}
                         </div>
-                        <small><ClipboardList size={13} /> Veure i afegir</small>
+                        <small><ClipboardList size={13} /> {readOnly ? 'Veure registre tutorial' : 'Veure i afegir'}</small>
                       </button>
                     </td>
                   )}
@@ -267,7 +270,7 @@ export function StudentOverviewTable({
         </table>
       </div>
 
-      <details className="student-overview-source-note">
+      {!readOnly && <details className="student-overview-source-note">
         <summary><ChevronDown size={15} /> Què s’actualitza a cada lloc?</summary>
         <p>
           Perfil i informació general modifiquen la fitxa de l’alumne. Les absències venen del control d’assistència
@@ -275,7 +278,7 @@ export function StudentOverviewTable({
           {showTutoringColumns && ' En aquest grup tutorial, les anotacions d’equip i tutoria, el registre qualitatiu i els registres d’agenda o incidències es mostren en columnes separades.'}
           {' '}Aquesta pantalla no en crea còpies.
         </p>
-      </details>
+      </details>}
     </>
   )
 }

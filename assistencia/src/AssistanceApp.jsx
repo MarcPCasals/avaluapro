@@ -14,6 +14,9 @@ import { CrossAnalysisTable } from '../../src/features/analytics/CrossAnalysisTa
 import { AbsenceControl } from '../../src/features/attendance/AbsenceControl.jsx'
 import { EvaluationTable } from '../../src/features/evaluation/EvaluationTable.jsx'
 import { SafeAssistanceExportPanel } from '../../src/features/data/SafeAssistanceExportPanel.jsx'
+import { StudentOverviewSharingDialog } from '../../src/features/students/StudentOverviewSharingDialog.jsx'
+import { StudentOverviewConsultation } from '../../src/features/students/StudentOverviewConsultation.jsx'
+import { buildStudentOverviewSnapshot } from '../../src/lib/studentOverviewSharing.js'
 import { StudentOverviewTable } from '../../src/features/students/StudentOverviewTable.jsx'
 import { TrackingTable } from '../../src/features/tracking/TrackingTable.jsx'
 import { SociometricSummaryPanel } from '../../src/features/tutoring/SociometricSummaryPanel.jsx'
@@ -30,6 +33,17 @@ import {
 } from '../../src/lib/attendance.js'
 import { assistanceDataset } from './assistanceDataset.js'
 import { SafeAssistancePackageImportPanel } from './SafeAssistancePackageImportPanel.jsx'
+
+let syntheticShares = []
+const syntheticSharingService = {
+  listStudentOverviewShares: async (classId) => syntheticShares.filter((share) => share.classId === classId),
+  saveStudentOverviewShare: async (value) => {
+    const share = { ...value, id: value.id || `synthetic-share-${syntheticShares.length + 1}`, enabled: true, updatedAt: new Date().toISOString() }
+    syntheticShares = [share, ...syntheticShares.filter((item) => item.id !== share.id)]
+    return share
+  },
+  revokeStudentOverviewShare: async (id) => { syntheticShares = syntheticShares.map((share) => share.id === id ? { ...share, enabled: false } : share) },
+}
 
 const LEVEL_SEQUENCE = ['A', 'B', 'C', 'D']
 const assistanceAdapter = createMemoryDataAdapter(assistanceDataset)
@@ -134,6 +148,8 @@ function AssistanceApp() {
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [cooperativeVariant, setCooperativeVariant] = useState(0)
   const [selectedCooperativeGroupId, setSelectedCooperativeGroupId] = useState('')
+  const [sharingPreview, setSharingPreview] = useState(false)
+  const [consultationPreview, setConsultationPreview] = useState(false)
   const [search, setSearch] = useState('')
   const [simulatedAction, setSimulatedAction] = useState('')
   const activeClass = dataset.classes.find((classItem) => classItem.id === activeClassId) || dataset.classes[0]
@@ -175,7 +191,9 @@ function AssistanceApp() {
         missing: Math.max(0, student.totalTasks - student.completedTasks),
       },
     },
-    records: [],
+    trackingNotes: [{ id: 'synthetic-tracking', type: 'tracking', date: '2026-10-08', text: 'Seguiment completament fictici.' }],
+    tutoringNotes: [],
+    records: index === 0 ? [{ id: 'synthetic-agreement', type: 'agreement', date: '2026-10-08', note: 'Acord tutorial fictici: revisar l’organització de les tasques.', followUpDate: '2026-10-15', followUpStatus: 'pending' }] : [],
     student: {
       ...student,
       diagnoses: [],
@@ -643,7 +661,7 @@ function AssistanceApp() {
         {activeSurface === 'safe-package' ? <div className="assistance-safe-package-layout">
           <SafeAssistancePackageImportPanel onLoadPackage={loadSafePackage} />
           <SafeAssistanceExportPanel state={safeExportDemoState} />
-        </div> : activeSurface === 'overview' ? <StudentOverviewTable
+        </div> : activeSurface === 'overview' ? <><button type="button" className="primary-action" onClick={() => setSharingPreview(true)}>Provar compartició amb direcció</button>{sharingPreview && <StudentOverviewSharingDialog service={syntheticSharingService} classId={activeClassId} className={activeClass.name} onClose={() => setSharingPreview(false)} getSnapshot={() => buildStudentOverviewSnapshot({ activeClass, rows: overviewRows, showTutoringColumns: true })} />}<button className="primary-action" type="button" onClick={() => setConsultationPreview((value) => !value)}>{consultationPreview ? 'Tornar a la vista docent' : 'Provar consulta de direcció'}</button>{consultationPreview ? <StudentOverviewConsultation snapshot={buildStudentOverviewSnapshot({ activeClass, rows: overviewRows, showTutoringColumns: true })} updatedAt="2026-10-08T10:00:00Z" expiresAtEpochMs={Date.now() + 86400000} /> : <StudentOverviewTable
           onOpenAnnotations={(studentId) => simulateAction(`S’obririen les fonts fictícies de ${studentId}.`)}
           onOpenOtherRecords={(studentId) => simulateAction(`S’obririen els altres registres ficticis de ${studentId}.`)}
           onOpenProfile={(studentId) => simulateAction(`S’obriria el perfil fictici de ${studentId}.`)}
@@ -654,7 +672,7 @@ function AssistanceApp() {
           }}
           rows={overviewRows}
           showTutoringColumns={activeClass.isTutoringGroup}
-        /> : activeSurface === 'evaluation' ? <EvaluationTable
+        />}</> : activeSurface === 'evaluation' ? <EvaluationTable
           activeClassId={activeClassId}
           competencies={dataset.evaluationCompetencies}
           marks={dataset.evaluationMarks}

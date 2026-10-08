@@ -2090,6 +2090,48 @@ service cloud.firestore {
       }
     }
 
+    // Consulta independent de l'alumnat. Cap accés al quadern original.
+    match /studentOverviewShares/{shareId} {
+      function shareOwner() {
+        return signedIn() && resource.data.ownerUid == request.auth.uid;
+      }
+      function validShare() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['ownerUid', 'classId', 'snapshot', 'authorizedEmails',
+            'expiresAtEpochMs', 'enabled', 'schemaVersion', 'updatedAt'])
+          && data.ownerUid == request.auth.uid
+          && data.classId is string && data.classId.size() > 0
+          && data.schemaVersion == 1
+          && data.enabled is bool
+          && data.expiresAtEpochMs is int
+          && data.authorizedEmails is list
+          && data.authorizedEmails.size() > 0 && data.authorizedEmails.size() <= 20
+          && data.updatedAt is string
+          && data.snapshot is map
+          && data.snapshot.keys().hasOnly(['className', 'subject', 'utName', 'showTutoringColumns', 'rows'])
+          && data.snapshot.className is string
+          && data.snapshot.subject is string
+          && data.snapshot.utName is string
+          && data.snapshot.showTutoringColumns is bool
+          && data.snapshot.rows is list && data.snapshot.rows.size() <= 100;
+      }
+      allow create: if signedIn() && validShare()
+        && request.resource.data.enabled == true
+        && request.resource.data.expiresAtEpochMs > request.time.toMillis();
+      allow get: if shareOwner() || (signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in resource.data.authorizedEmails
+        && resource.data.enabled == true
+        && request.time.toMillis() < resource.data.expiresAtEpochMs);
+      allow list: if shareOwner() && request.query.limit != null && request.query.limit <= 20;
+      allow update: if shareOwner() && validShare()
+        && request.resource.data.classId == resource.data.classId
+        && (request.resource.data.expiresAtEpochMs > request.time.toMillis()
+          || request.resource.data.expiresAtEpochMs == resource.data.expiresAtEpochMs);
+      allow delete: if shareOwner();
+    }
+
     match /users/{userId} {
       allow read, create, update, delete: if ownsUserDocument(userId);
 
