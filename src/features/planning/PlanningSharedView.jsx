@@ -5,6 +5,7 @@ import {
   Clock3,
   Eye,
   FileText,
+  ExternalLink,
   Loader2,
   ShieldCheck,
   Users,
@@ -13,7 +14,9 @@ import { useEffect, useState } from 'react'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
-import { compareGroupPlanning } from '../../domain/planning/directionView'
+import { buildDirectionActivityReports } from '../../domain/planning/directionView'
+import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
+import { getSessionLoad } from '../../domain/planning/rules'
 import { PlanningDocumentView } from './PlanningDocumentView'
 
 const ROLE_LABELS = {
@@ -65,40 +68,71 @@ function CurriculumBlock({ curriculum = {} }) {
   )
 }
 
-function SharedActivity({ activity }) {
-  return (
-    <article>
-      <div>
-        <span>{activityKindLabel(activity.type)}</span>
-        <strong>{activity.title}</strong>
-        {activity.description && <FormattedText as="p" text={activity.description} />}
-      </div>
-      <aside>
-        {activity.plannedMinutes && <span><Clock3 size={13} />{activity.plannedMinutes} min</span>}
-        {activity.grouping && <span><Users size={13} />{activity.grouping}</span>}
-        {activity.space && <span>{activity.space}</span>}
-      </aside>
-      {activity.diversityMeasures?.length > 0 && (
-        <section>
-          <ShieldCheck size={15} />
-          <div>
-            {activity.diversityMeasures.map((measure) => (
-              <p key={measure.id}>
-                <strong>{measure.label}</strong>
-                {measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}
-              </p>
-            ))}
-          </div>
-        </section>
-      )}
-    </article>
-  )
+const ACTIVITY_STATUS_LABELS = {
+  completed: 'Feta', scheduled: 'Programada', removed: 'Eliminada de la programació del grup',
+  partial: 'Programada parcialment', unscheduled: 'No entra completament a les sessions actuals', started: 'Iniciada', unplanned: 'Encara no programada',
 }
 
-function BaseProgramView({ activities, phases, unit }) {
+function TimePill({ originalMinutes, plannedMinutes, actualMinutes = null, sessionDuration = 60, registered = false }) {
+  const minutes = actualMinutes ?? plannedMinutes
+  const changed = minutes != null && originalMinutes != null && Number(minutes) !== Number(originalMinutes)
+  const status = minutes == null || Number(minutes) === 0 ? 'untimed' : getSessionLoad([{ plannedMinutes: minutes }], sessionDuration).status
+  return <span className={`planning-time-pill planning-direction-time ${status}`}>
+    <Clock3 size={13} aria-hidden="true" />
+    <span>{changed && <del>{originalMinutes} min previstos</del>}
+      <span>{minutes != null ? `${Number(Number(minutes).toFixed(1))} min` : 'Sense temps'}{actualMinutes != null ? registered ? ' reals registrats' : ' reals' : changed ? ' nous previstos' : ''}</span>
+    </span>
+  </span>
+}
+
+function MaterialLinks({ activity, unit }) {
+  const links = getEffectiveActivityMaterialLinks(activity, unit).filter((material) => /^https?:\/\//i.test(material.url))
+  if (!links.length) return null
+  return <div className="planning-direction-materials" aria-label="Materials de l’activitat">{links.map((material) => <a className={material.audience} href={material.url} key={`${material.audience}:${material.url}`} target="_blank" rel="noopener noreferrer">
+    <ExternalLink size={13} aria-hidden="true" /><span>{material.label || 'Material'}</span><small>{material.audience === 'teacher' ? 'Docent' : 'Alumnat'}{material.transversal ? ' · UP' : ''}</small>
+  </a>)}</div>
+}
+
+function OccurrenceList({ occurrences }) {
+  if (!occurrences.length) return null
+  return <ul className="planning-direction-occurrences">{occurrences.map(({ session, item, result, sessionNumber }) => {
+    const label = session.status === 'cancelled' ? 'Sessió cancel·lada' : session.status === 'notHeld' || result?.status === 'notHeld' ? 'No feta' : result?.status === 'skipped' ? 'Activitat omesa' : result?.status === 'completed' ? 'Feta' : result?.status === 'continued' ? 'Iniciada · continua' : session.status === 'held' ? 'Sessió feta · activitat sense resultat' : 'Programada'
+    return <li key={`${session.id}:${item.id}`}><strong>Sessió {sessionNumber}{session.subgroupId ? ` · Mig grup ${session.subgroupId}` : ''}</strong><span>{new Date(session.startsAt).toLocaleDateString('ca-AD', { day: 'numeric', month: 'long', timeZone: 'Europe/Andorra' })} · {String(session.startsAt).slice(11, 16)} · {label}</span><span>{item.segmentCount > 1 ? `Part ${item.segmentIndex || 1}/${item.segmentCount} · ` : ''}{item.plannedMinutes ?? 0} min previstos{result?.actualMinutes != null ? ` · ${result.actualMinutes} min reals` : ''}</span></li>
+  })}</ul>
+}
+
+function SharedActivity({ activity, report, unit, sessionDuration = 60 }) {
+  return <article className="planning-direction-activity">
+    <div className="planning-direction-activity-content">
+      <div className="planning-direction-activity-heading"><span>{activityKindLabel(activity.type)}</span>{report?.modified && <span className="planning-direction-modified">Activitat modificada</span>}</div>
+      <strong>{activity.title}</strong>
+      {activity.description && <FormattedText as="p" text={activity.description} />}
+      <MaterialLinks activity={activity} unit={unit} />
+    </div>
+    <aside className="planning-direction-meta">
+      <TimePill originalMinutes={report?.original.plannedMinutes ?? activity.plannedMinutes} plannedMinutes={report?.plannedMinutes ?? activity.plannedMinutes} actualMinutes={report?.actualMinutes} registered={report?.status !== 'completed'} sessionDuration={sessionDuration} />
+      {activity.grouping && <span className="planning-direction-meta-pill"><Users size={13} />{activity.grouping}</span>}
+      {activity.space && <span className="planning-direction-meta-pill">{activity.space}</span>}
+    </aside>
+    {activity.diversityMeasures?.length > 0 && <div className="planning-direction-adaptations"><ShieldCheck size={15} /><div>{activity.diversityMeasures.map((measure, index) => <p key={measure.id || index}><strong>{measure.label}</strong>{measure.studentNames?.length > 0 && <small>{measure.studentNames.join(' · ')}</small>}</p>)}</div></div>}
+    {report && <div className="planning-direction-progress">
+      <div><strong className={`planning-direction-status-pill ${report.status}`}>{ACTIVITY_STATUS_LABELS[report.status]}{report.manuallyCompleted ? ' · marca manual' : ''}</strong>{report.remainingMinutes > 0 && report.status !== 'removed' && <span>{Number(report.remainingMinutes.toFixed(1))} min pendents d’assignar</span>}</div>
+      <OccurrenceList occurrences={report.occurrences} />
+    </div>}
+    {report?.changes.length > 0 && <details className="planning-direction-inline-changes"><summary>Canvis d’aquesta activitat</summary><dl>{report.changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><del>{change.before}</del><span> → {change.after}</span></dd></div>)}</dl></details>}
+  </article>
+}
+
+function BaseProgramView({ activities, phases, unit, applications = [], initialApplicationId = '' }) {
+  const [selectedApplicationId, setSelectedApplicationId] = useState(initialApplicationId)
+  const [sessionDuration, setSessionDuration] = useState(60)
+  const bundle = applications.find((entry) => entry.application.id === selectedApplicationId) || applications[0]
+  const reports = bundle ? buildDirectionActivityReports(activities, bundle, phases) : []
+  const reportById = new Map(reports.map((report) => [report.original.id, report]))
+  const displayedActivities = reports.length ? reports.map((report) => report.activity) : activities
   const activitiesByPhase = new Map(phases.map((phase) => [
     phase.id,
-    activities.filter((activity) => activity.phaseId === phase.id),
+    displayedActivities.filter((activity) => activity.phaseId === phase.id).sort((a, b) => Number(a.order) - Number(b.order)),
   ]))
 
   return (
@@ -115,6 +149,10 @@ function BaseProgramView({ activities, phases, unit }) {
         </div>
       </section>
 
+      <div className="planning-direction-controls">
+        {applications.length > 0 && <label>Temporització del grup<select value={bundle?.application.id || ''} onChange={(event) => setSelectedApplicationId(event.target.value)}>{applications.map((entry, index) => <option value={entry.application.id} key={entry.application.id}>{entry.application.classLabel || `Grup ${index + 1}`}</option>)}</select></label>}
+        <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}><option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option></select></label>
+      </div>
       <section className="planning-shared-section">
         <header>
           <BookOpenText size={18} />
@@ -124,18 +162,21 @@ function BaseProgramView({ activities, phases, unit }) {
           {phases.map((phase) => {
             const phaseActivities = activitiesByPhase.get(phase.id) || []
             return (
-              <details open key={phase.id}>
+              <details open key={phase.id} className={`planning-direction-phase ${phase.kind || 'custom'}`}>
                 <summary>
                   <span>{phase.title}</span>
                   <small>{phaseActivities.length} elements</small>
                   <ChevronDown size={15} />
                 </summary>
-                <div>{phaseActivities.map((activity) => <SharedActivity activity={activity} key={activity.id} />)}</div>
+                <div>{phaseActivities.map((activity) => <SharedActivity activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} key={activity.id} />)}</div>
               </details>
             )
           })}
         </div>
       </section>
+
+      {displayedActivities.some((activity) => !phases.some((phase) => phase.id === activity.phaseId)) && <section className="planning-shared-phases"><details open><summary>Altres activitats</summary><div>{displayedActivities.filter((activity) => !phases.some((phase) => phase.id === activity.phaseId)).map((activity) => <SharedActivity key={activity.id} activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} />)}</div></details></section>}
+      {bundle && <SessionAdditions activities={activities} bundle={bundle} unit={unit} />}
 
       <section className="planning-shared-section">
         <header>
@@ -148,7 +189,7 @@ function BaseProgramView({ activities, phases, unit }) {
   )
 }
 
-export function SharedSession({ items, results, session }) {
+export function SharedSession({ items, results, session, activities = [], reports = [], unit }) {
   return (
     <article>
       <header>
@@ -166,15 +207,18 @@ export function SharedSession({ items, results, session }) {
         {(session.applicationNotes || []).length > 0 && <section className="planning-session-application-notes"><strong>Notes d’aplicació a l’aula</strong>{session.applicationNotes.map((note) => <p key={note.id}>{note.text}</p>)}</section>}
         {items.map((item) => {
           const result = results.find((candidate) => candidate.sessionItemId === item.id)
+          const report = reports.find((entry) => entry.original.id === item.sourceActivityId)
+          const activity = report?.activity || activities.find((entry) => entry.id === item.sourceActivityId)
+          const modified = report?.modified || (result?.actualMinutes != null && Number(result.actualMinutes) !== Number(item.plannedMinutes || 0))
           return (
             <section key={item.id}>
               <div>
                 <strong>{item.title}</strong>
-                <small>
-                  {item.plannedMinutes ? `${item.plannedMinutes} min previstos` : 'Sense temps'}
-                  {result?.actualMinutes != null ? ` · ${result.actualMinutes} min reals (${Number(result.actualMinutes) - Number(item.plannedMinutes || 0) >= 0 ? '+' : ''}${Number(result.actualMinutes) - Number(item.plannedMinutes || 0)} min)` : ''}
-                  {!item.sourceActivityId ? ' · Afegida a la sessió' : ''}
-                </small>
+                {modified && <span className="planning-direction-modified">Activitat modificada</span>}
+                <TimePill originalMinutes={item.plannedMinutes} plannedMinutes={item.plannedMinutes} actualMinutes={result?.actualMinutes} sessionDuration={session.durationMinutes} />
+                {!item.sourceActivityId && <small>Afegida a la sessió</small>}
+                <MaterialLinks activity={activity} unit={unit} />
+                {report?.changes.length > 0 && <details className="planning-direction-inline-changes"><summary>Canvis d’aquesta activitat</summary><dl>{report.changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><del>{change.before}</del> → {change.after}</dd></div>)}</dl></details>}
               </div>
               {result && (
                 <aside>
@@ -197,7 +241,7 @@ export function SharedSession({ items, results, session }) {
   )
 }
 
-function ApplicationView({ applications, classes, activities = [] }) {
+function ApplicationView({ applications, classes, activities = [], unit, phases }) {
   const classById = new Map(classes.map((item) => [item.id, item]))
   if (applications.length === 0) {
     return (
@@ -211,7 +255,9 @@ function ApplicationView({ applications, classes, activities = [] }) {
 
   return (
     <div className="planning-shared-applications">
-      {applications.map(({ application, sessions, overrides = [] }, applicationIndex) => (
+      {applications.map(({ application, sessions, overrides = [] }, applicationIndex) => {
+        const reports = buildDirectionActivityReports(activities, { application, sessions, overrides }, phases)
+        return (
         <details open={applicationIndex === 0} key={application.id}>
           <summary>
             <div>
@@ -221,25 +267,19 @@ function ApplicationView({ applications, classes, activities = [] }) {
             <ChevronDown size={17} />
           </summary>
           <div className="planning-shared-sessions">
-            <GroupChanges activities={activities} overrides={overrides} />
-            {sessions.map((bundle) => <SharedSession {...bundle} key={bundle.session.id} />)}
+            {sessions.map((bundle) => <SharedSession {...bundle} activities={activities} reports={reports} unit={unit} key={bundle.session.id} />)}
           </div>
         </details>
-      ))}
+      )})}
     </div>
   )
 }
 
-function GroupChanges({ activities, overrides }) {
-  const changes = compareGroupPlanning(activities, overrides)
-  return <section className="planning-direction-changes">
-    <h3>Canvis respecte de la programació base</h3>
-    <p>Comparació dels ajustos del grup amb la UP base actual. Les sessions mostren la temporització actual i els minuts reals registrats.</p>
-    {changes.length === 0 ? <p>No hi ha ajustos específics d’aquest grup.</p> : changes.map((activity) => <article key={activity.id}>
-      <strong>{activity.title}</strong>
-      <dl>{activity.changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><del>{change.before}</del><span> → {change.after}</span></dd></div>)}</dl>
-    </article>)}
-  </section>
+function SessionAdditions({ activities, bundle, unit }) {
+  const ids = new Set(activities.map((activity) => activity.id))
+  const additions = bundle.sessions.flatMap((entry, index) => (entry.items || []).filter((item) => !item.sourceActivityId || !ids.has(item.sourceActivityId)).map((item) => ({ session: entry.session, item, sessionNumber: index + 1, result: (entry.results || []).find((result) => result.sessionItemId === item.id) })))
+  if (!additions.length) return null
+  return <section className="planning-shared-phases"><details open><summary>Activitats afegides o retirades de la base</summary><div>{additions.map((occurrence) => <article className="planning-direction-activity" key={`${occurrence.session.id}:${occurrence.item.id}`}><div className="planning-direction-activity-content"><strong>{occurrence.item.title}</strong><span className="planning-direction-modified">{occurrence.item.sourceActivityId ? 'Retirada de la base o procedent d’una altra UP' : 'Afegida a la sessió'}</span><MaterialLinks activity={occurrence.item} unit={unit} /></div><aside className="planning-direction-meta"><TimePill originalMinutes={occurrence.item.plannedMinutes} plannedMinutes={occurrence.item.plannedMinutes} actualMinutes={occurrence.result?.actualMinutes} sessionDuration={occurrence.session.durationMinutes} /></aside><div className="planning-direction-progress"><OccurrenceList occurrences={[occurrence]} /></div></article>)}</div></details></section>
 }
 
 /**
@@ -247,21 +287,21 @@ function GroupChanges({ activities, overrides }) {
  * i reflexions pedagògiques; les notes privades i les incidències individuals
  * no formen part de les propietats d'aquest component.
  */
-export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program', liveApplications, onShare }) {
+export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program', liveApplications, onShare, initialApplicationId = '' }) {
   const [tab, setTab] = useState(initialTab)
   const [applications, setApplications] = useState(null)
   const [loading, setLoading] = useState(initialTab === 'applications')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (initialTab !== 'applications' || !loadApplications) return
+    if (!loadApplications || liveApplications) return
     let active = true
     loadApplications()
       .then((data) => { if (active) setApplications(data) })
       .catch((loadError) => { if (active) setError(loadError.message || 'No s’ha pogut carregar l’aplicació real.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [initialTab, loadApplications])
+  }, [initialTab, loadApplications, liveApplications])
 
   const openApplications = async () => {
     setTab('applications')
@@ -300,7 +340,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
         </nav>
       </header>
       {tab === 'program' ? (
-        <div role="tabpanel"><BaseProgramView activities={activities} phases={phases} unit={unit} />{liveApplications && <ApplicationView activities={activities} applications={liveApplications} classes={classes} />}</div>
+        <div role="tabpanel"><BaseProgramView key={`${unit.id}:${initialApplicationId}`} initialApplicationId={initialApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
       ) : tab === 'document' ? (
         <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>
       ) : loading && !liveApplications ? (
@@ -308,7 +348,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
       ) : error ? (
         <p className="planning-sharing-error">{error}</p>
       ) : (
-        <div role="tabpanel"><ApplicationView activities={activities} applications={liveApplications || applications || []} classes={classes} /></div>
+        <div role="tabpanel"><ApplicationView phases={phases} unit={unit} activities={activities} applications={liveApplications || applications || []} classes={classes} /></div>
       )}
     </section>
   )

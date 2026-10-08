@@ -573,8 +573,8 @@
 .planning-shared-phases article > div > span { color: #8b5cf6; font-size: 8px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
 .planning-shared-phases article strong { color: #334155; font-size: 11px; }
 .planning-shared-phases article p { margin: 0; color: #64748b; font-size: 10px; line-height: 1.45; }
-.planning-shared-phases article > aside { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
-.planning-shared-phases article > aside span { display: flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 7px; color: #64748b; background: #f1f5f9; font-size: 8px; font-weight: 850; }
+.planning-shared-phases article > aside { display: flex; flex-wrap: wrap; align-items: flex-start; align-self: start; justify-content: flex-end; gap: 5px; }
+.planning-shared-phases article > aside > span { display: flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 7px; color: #64748b; background: #f1f5f9; font-size: 8px; font-weight: 850; }
 .planning-shared-phases article > section { grid-column: 1 / 3; display: flex; align-items: flex-start; gap: 7px; border-left: 2px solid #a78bfa; padding: 7px 9px; color: #7c3aed; background: #faf5ff; }
 .planning-shared-phases article > section > div { display: grid; gap: 4px; }
 .planning-shared-phases article > section p { display: grid; gap: 1px; }
@@ -889,10 +889,56 @@
 .planning-direction-link { display: grid; gap: 9px; border: 1px solid #ddd6fe; border-radius: 12px; padding: 14px; background: #faf5ff; }
 .planning-direction-link p, .planning-direction-changes > p { margin: 0; color: #64748b; font-size: 12px; line-height: 1.5; }
 .planning-direction-link input { width: 100%; min-width: 0; padding: 10px; border: 1px solid #ddd6fe; border-radius: 8px; background: white; }
-.planning-direction-changes { display: grid; gap: 12px; padding: 14px; border: 1px solid #ddd6fe; border-radius: 10px; background: #faf5ff; }
-.planning-direction-changes h3 { margin: 0; color: #6d28d9; font-size: 15px; }
-.planning-direction-changes article { padding: 12px; border-radius: 8px; background: white; }
-.planning-direction-changes dl { display: grid; gap: 8px; margin-bottom: 0; }
-.planning-direction-changes dt { color: #475569; font-size: 11px; font-weight: 800; }
-.planning-direction-changes dd { margin: 3px 0 0; font-size: 12px; color: #6d28d9; overflow-wrap: anywhere; }
-.planning-direction-changes del { color: #64748b; }
+.planning-direction-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
+.planning-direction-controls label { display: flex; align-items: center; gap: 8px; color: #475569; font-size: 12px; font-weight: 800; }
+.planning-direction-controls select { max-width: 100%; padding: 7px; border: 1px solid #ddd6fe; border-radius: 7px; color: #6d28d9; background: white; }
+.planning-shared-phases .planning-direction-phase.preparation { border-left: 3px solid #60a5fa; }
+.planning-shared-phases .planning-direction-phase.resolution { border-left: 3px solid #a78bfa; }
+.planning-shared-phases .planning-direction-phase.closing { border-left: 3px solid #34d399; }
+.planning-direction-phase.preparation > summary { background: #eff6ff; }
+.planning-direction-phase.resolution > summary { background: #f5f3ff; }
+.planning-direction-phase.closing > summary { background: #ecfdf5; }
+.planning-direction-activity { min-width: 0; }
+.planning-direction-activity-content { min-width: 0; align-content: start; }
+.planning-direction-activity-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.planning-direction-activity-heading > span:first-child { color: #8b5cf6; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.planning-shared-view .planning-direction-modified { width: fit-content; display: inline-flex; align-self: start; border: 1px solid #fdba74; border-radius: 5px; padding: 3px 6px; color: #9a3412; background: #fff7ed; font-size: 10px; font-weight: 850; }
+.planning-shared-view .planning-direction-meta { align-self: start; align-items: flex-start; max-width: 320px; }
+.planning-shared-view .planning-direction-time { width: fit-content; align-self: start; display: inline-flex; align-items: center; height: auto; max-width: 100%; border-radius: 8px; padding: 7px 9px; gap: 7px; font-size: 11px; white-space: normal; }
+.planning-shared-view .planning-direction-time.green { color: #166534; background: #dcfce7; }
+.planning-shared-view .planning-direction-time.orange { color: #9a3412; background: #ffedd5; }
+.planning-shared-view .planning-direction-time.red { color: #991b1b; background: #fee2e2; }
+.planning-shared-view .planning-direction-time.untimed { color: #475569; background: #e2e8f0; }
+.planning-direction-time > span { display: grid; gap: 3px; }
+.planning-direction-time del { font-size: 10px; font-weight: 650; opacity: .75; }
+.planning-direction-time svg, .planning-direction-meta-pill svg { flex-shrink: 0; }
+.planning-direction-meta-pill { max-width: 230px; height: auto; align-self: start; white-space: normal; overflow-wrap: anywhere; }
+.planning-direction-materials { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.planning-direction-materials a { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; max-width: 100%; border: 1px solid #ddd6fe; border-radius: 7px; padding: 6px 8px; color: #6d28d9; background: #f5f3ff; font-size: 11px; text-decoration: none; overflow-wrap: anywhere; }
+.planning-direction-materials a.teacher { border-color: #fdba74; color: #9a3412; background: #fff7ed; }
+.planning-direction-materials a small { font-size: 9px; opacity: .8; }
+.planning-direction-materials a:hover { text-decoration: underline; }
+.planning-direction-adaptations { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 8px; border-left: 2px solid #a78bfa; padding: 8px 10px; color: #7c3aed; background: #faf5ff; }
+.planning-direction-adaptations p { display: grid; gap: 3px; }
+.planning-direction-progress { grid-column: 1 / -1; display: grid; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 9px; }
+.planning-direction-progress > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: #64748b; }
+.planning-shared-view .planning-direction-status-pill { border-radius: 5px; padding: 4px 7px; color: #475569; background: #f1f5f9; font-size: 10px; }
+.planning-shared-view .planning-direction-status-pill.completed { color: #166534; background: #dcfce7; }
+.planning-shared-view .planning-direction-status-pill.scheduled { color: #1e40af; background: #dbeafe; }
+.planning-shared-view .planning-direction-status-pill.removed { color: #991b1b; background: #fee2e2; }
+.planning-shared-view .planning-direction-status-pill.unscheduled, .planning-shared-view .planning-direction-status-pill.partial { color: #9a3412; background: #ffedd5; }
+.planning-direction-occurrences { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.planning-direction-occurrences li { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; font-size: 11px; color: #64748b; }
+.planning-shared-view .planning-direction-occurrences li strong { color: #6d28d9; font-size: 11px; }
+.planning-direction-inline-changes { grid-column: 1 / -1; min-width: 0; border: 1px solid #fed7aa; border-radius: 8px; background: #fffaf5; }
+.planning-shared-view .planning-direction-inline-changes > summary { justify-content: flex-start; padding: 8px 10px; color: #9a3412; font-size: 11px; font-weight: 800; }
+.planning-direction-inline-changes dl { display: grid; gap: 8px; margin: 0; padding: 10px; }
+.planning-direction-inline-changes dt { color: #475569; font-size: 11px; font-weight: 800; }
+.planning-direction-inline-changes dd { margin: 3px 0 0; color: #6d28d9; font-size: 11px; overflow-wrap: anywhere; }
+.planning-direction-inline-changes del { color: #64748b; }
+.planning-shared-view .planning-shared-sessions > article > div > section { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 600px) {
+  .planning-direction-controls label { width: 100%; justify-content: space-between; }
+  .planning-shared-view .planning-direction-meta { max-width: 100%; justify-content: flex-start; }
+  .planning-direction-occurrences li { display: grid; gap: 3px; }
+}

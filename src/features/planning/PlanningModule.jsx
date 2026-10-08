@@ -38,7 +38,7 @@ function SyncBadge({ isOnline, sync }) {
   )
 }
 
-function PlanningPreviewDialog({ activities, classes, loadApplications, onClose, onShare, phases, unit, initialTab = 'program' }) {
+function PlanningPreviewDialog({ activities, classes, loadApplications, onClose, onShare, phases, unit, initialApplicationId, initialTab = 'program' }) {
   const dialogRef = useDialogAccessibility(onClose)
   const [liveData, setLiveData] = useState(null)
   useEffect(() => subscribePlanningDirection(unit.id, setLiveData, () => setLiveData(null)), [unit.id])
@@ -46,7 +46,7 @@ function PlanningPreviewDialog({ activities, classes, loadApplications, onClose,
     <div className="planning-dialog-backdrop">
       <section aria-label="Vista de direcció" aria-modal="true" className="planning-preview-dialog" ref={dialogRef} role="dialog" tabIndex="-1">
         <button aria-label="Tancar vista de direcció" className="planning-preview-close" onClick={onClose} type="button"><X size={18} /></button>
-        <PlanningSharedView initialTab={initialTab} activities={activities} classes={classes} liveApplications={liveData?.applications} loadApplications={loadApplications} onShare={onShare} phases={phases} role="owner" unit={unit} />
+        <PlanningSharedView initialApplicationId={initialApplicationId} initialTab={initialTab} activities={activities} classes={classes} liveApplications={liveData?.applications} loadApplications={loadApplications} onShare={onShare} phases={phases} role="owner" unit={unit} />
       </section>
     </div>
   )
@@ -852,6 +852,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
               </>
             ) : workspace.activePlanningUnit ? (
               <PlanningSharedView
+                initialApplicationId={workspace.activeApplication?.id}
                 activities={workspace.activities}
                 classes={classes}
                 loadApplications={workspace.canReadActiveApplications ? workspace.loadApplicationOverview : null}
@@ -886,7 +887,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
-      {['preview', 'application-preview'].includes(dialog) && workspace.activePlanningUnit && <PlanningPreviewDialog onShare={workspace.activeRole === 'owner' ? () => setDialog('sharing') : undefined} initialTab={dialog === 'application-preview' ? 'applications' : 'program'} activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
+      {['preview', 'application-preview'].includes(dialog) && workspace.activePlanningUnit && <PlanningPreviewDialog initialApplicationId={workspace.activeApplication?.id} onShare={workspace.activeRole === 'owner' ? () => setDialog('sharing') : undefined} initialTab={dialog === 'application-preview' ? 'applications' : 'program'} activities={workspace.activities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
       {connectedDecision && <ConnectedChangeDialog activeClassName={activeClass?.name || 'aquesta classe'} onChoose={resolveConnectedDecision} otherClassNames={otherConnectedClassLabels} supportsCurrentClass={connectedDecision.supportsCurrentClass} />}
     </section>
