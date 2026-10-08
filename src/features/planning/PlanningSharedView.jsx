@@ -1,25 +1,19 @@
 import {
   BookOpenText,
-  CalendarDays,
   ChevronDown,
   Clock3,
   Eye,
-  FileText,
   ExternalLink,
   Loader2,
   ShieldCheck,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { ContextualTab } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
-import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { orderPlanningPhases } from '../../domain/planning/phaseSequence'
-import { applyPlanningActivityOverrides } from '../../domain/planning/classPlanning'
 import { buildDirectionActivityReports, selectDirectionApplication } from '../../domain/planning/directionView'
 import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
 import { getSessionLoad } from '../../domain/planning/rules'
-import { PlanningDocumentView } from './PlanningDocumentView'
 
 const ROLE_LABELS = {
   directionReader: 'Vista de direcció',
@@ -27,17 +21,6 @@ const ROLE_LABELS = {
   planningEditor: 'Coedició de la UP',
   tutoringCollaborator: 'Cotutoria · UP compartida i agenda pròpia',
   owner: 'Vista compartida',
-}
-
-const STATUS_LABELS = {
-  active: 'Activa',
-  archived: 'Arxivada',
-  cancelled: 'Cancel·lada',
-  completed: 'Completada',
-  draft: 'Esborrany',
-  held: 'Feta',
-  notHeld: 'No feta',
-  planned: 'Prevista',
 }
 
 function activityKindLabel(type) {
@@ -195,92 +178,6 @@ function BaseProgramView({ activities, phases, unit, applications = [], selected
   )
 }
 
-export function SharedSession({ items, results, session, activities = [], reports = [], unit }) {
-  return (
-    <article>
-      <header>
-        <div>
-          <strong>{new Date(session.startsAt).toLocaleDateString('ca-AD', {
-            day: 'numeric',
-            month: 'long',
-            weekday: 'long',
-          })}</strong>
-          <span>{String(session.startsAt).slice(11, 16)} · {session.durationMinutes} min</span>
-        </div>
-        <span className={`status ${session.status}`}>{STATUS_LABELS[session.status] || session.status}</span>
-      </header>
-      <div>
-        {(session.applicationNotes || []).length > 0 && <section className="planning-session-application-notes"><strong>Notes d’aplicació a l’aula</strong>{session.applicationNotes.map((note) => <p key={note.id}>{note.text}</p>)}</section>}
-        {items.map((item) => {
-          const result = results.find((candidate) => candidate.sessionItemId === item.id)
-          const report = reports.find((entry) => entry.original.id === item.sourceActivityId)
-          const activity = report?.activity || activities.find((entry) => entry.id === item.sourceActivityId)
-          const modified = report?.modified || (result?.actualMinutes != null && Number(result.actualMinutes) !== Number(item.plannedMinutes || 0))
-          return (
-            <section key={item.id}>
-              <div>
-                <strong>{item.title}</strong>
-                {modified && <span className="planning-direction-modified">Activitat modificada</span>}
-                <TimePill originalMinutes={item.plannedMinutes} plannedMinutes={item.plannedMinutes} actualMinutes={result?.actualMinutes} sessionDuration={session.durationMinutes} />
-                {!item.sourceActivityId && <small>Afegida a la sessió</small>}
-                <MaterialLinks activity={activity} unit={unit} />
-                {report?.changes.length > 0 && <details className="planning-direction-inline-changes"><summary>Canvis d’aquesta activitat</summary><dl>{report.changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><del>{change.before}</del> → {change.after}</dd></div>)}</dl></details>}
-              </div>
-              {result && (
-                <aside>
-                  {result.pedagogicalReflection && (
-                    <p><strong>Reflexió pedagògica</strong>{result.pedagogicalReflection}</p>
-                  )}
-                  {result.applicationComment && (
-                    <p><strong>Aplicació real</strong>{result.applicationComment}</p>
-                  )}
-                  {result.missingMaterials?.length > 0 && (
-                    <p><strong>Materials que han faltat</strong>{result.missingMaterials.join(' · ')}</p>
-                  )}
-                </aside>
-              )}
-            </section>
-          )
-        })}
-      </div>
-    </article>
-  )
-}
-
-function ApplicationView({ applications, classes, activities = [], unit, phases }) {
-  const classById = new Map(classes.map((item) => [item.id, item]))
-  if (applications.length === 0) {
-    return (
-      <div className="planning-shared-empty large">
-        <CalendarDays size={26} />
-        <strong>Encara no hi ha cap aplicació de grup</strong>
-        <p>Quan la UP es calendaritzi, direcció podrà consultar aquí les sessions i les reflexions pedagògiques.</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="planning-shared-applications">
-      {applications.map(({ application, sessions, overrides = [] }, applicationIndex) => {
-        const reports = buildDirectionActivityReports(activities, { application, sessions, overrides }, phases)
-        return (
-        <details open={applicationIndex === 0} key={application.id}>
-          <summary>
-            <div>
-              <span>{application.classLabel || classById.get(application.classId)?.name || `Grup ${applicationIndex + 1}`}</span>
-              <small>{STATUS_LABELS[application.status] || application.status} · {sessions.length} sessions</small>
-            </div>
-            <ChevronDown size={17} />
-          </summary>
-          <div className="planning-shared-sessions">
-            {sessions.map((bundle) => <SharedSession {...bundle} activities={activities} reports={reports} unit={unit} key={bundle.session.id} />)}
-          </div>
-        </details>
-      )})}
-    </div>
-  )
-}
-
 function SessionAdditions({ activities, bundle, unit }) {
   const ids = new Set(activities.map((activity) => activity.id))
   const additions = bundle.sessions.flatMap((entry, index) => (entry.items || []).filter((item) => !item.sourceActivityId || !ids.has(item.sourceActivityId)).map((item) => ({ session: entry.session, item, sessionNumber: index + 1, result: (entry.results || []).find((result) => result.sessionItemId === item.id) })))
@@ -293,39 +190,23 @@ function SessionAdditions({ activities, bundle, unit }) {
  * i reflexions pedagògiques; les notes privades i les incidències individuals
  * no formen part de les propietats d'aquest component.
  */
-export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program', liveApplications, onShare, initialApplicationId = '' }) {
-  const [tab, setTab] = useState(initialTab)
+export function PlanningSharedView({ activities, loadApplications, phases, role, unit, liveApplications, onShare, initialApplicationId = '' }) {
   const [applications, setApplications] = useState(null)
   const [selectedApplicationId, setSelectedApplicationId] = useState(initialApplicationId)
-  const [loading, setLoading] = useState(initialTab === 'applications')
+  const [loading, setLoading] = useState(Boolean(loadApplications && !liveApplications))
   const [error, setError] = useState('')
   const availableApplications = liveApplications || applications || []
   const selectedBundle = selectDirectionApplication(availableApplications, selectedApplicationId)
-  const documentActivities = selectedBundle ? applyPlanningActivityOverrides(activities, selectedBundle.overrides) : activities
 
   useEffect(() => {
     if (!loadApplications || liveApplications) return
     let active = true
     loadApplications()
       .then((data) => { if (active) setApplications(data) })
-      .catch((loadError) => { if (active) setError(loadError.message || 'No s’ha pogut carregar l’aplicació real.') })
+      .catch((loadError) => { if (active) setError(loadError.message || 'No s’ha pogut carregar la programació del grup.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [initialTab, loadApplications, liveApplications])
-
-  const openApplications = async () => {
-    setTab('applications')
-    if (liveApplications || applications) return
-    setLoading(true)
-    setError('')
-    try {
-      setApplications(await loadApplications())
-    } catch (operationError) {
-      setError(operationError.message || 'No s’ha pogut carregar l’aplicació real.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [loadApplications, liveApplications])
 
   return (
     <section className="planning-shared-view">
@@ -335,31 +216,10 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <span><small>{ROLE_LABELS[role] || 'Programació compartida'}</small><strong>{unit.code} · {unit.title}</strong></span>
         </div>
         {onShare && <button className="secondary-action compact" onClick={() => onShare(selectedBundle?.application.id || selectedApplicationId)} type="button">Compartir enllaç amb direcció</button>}
-        <nav aria-label="Contingut compartit" role="tablist">
-          <ContextualTab aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} help="Mostra l’estructura, el currículum i la seqüència completa de la programació compartida." helpTitle="Programació compartida" onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
-            Programació
-          </ContextualTab>
-          <ContextualTab aria-selected={tab === 'document'} className={tab === 'document' ? 'active' : ''} help="Presenta la mateixa UP amb format documental per facilitar-ne la lectura i la revisió." helpTitle="Document de la UP" onClick={() => setTab('document')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'document' ? 0 : -1} type="button">
-            <FileText size={13} />Document
-          </ContextualTab>
-          {(loadApplications || liveApplications) && (
-            <ContextualTab aria-selected={tab === 'applications'} className={tab === 'applications' ? 'active' : ''} help="Consulta com s’ha aplicat aquesta programació a les classes, amb sessions i resultats reals, sense modificar la UP." helpTitle="Aplicació real" onClick={openApplications} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'applications' ? 0 : -1} type="button">
-              Aplicació real
-            </ContextualTab>
-          )}
-        </nav>
       </header>
-      {tab === 'program' ? (
-        <div role="tabpanel">{error && <p className="planning-sharing-error" role="alert">{error}</p>}<BaseProgramView readOnly={role === 'directionReader'} selectedApplicationId={selectedApplicationId} onApplicationChange={setSelectedApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
-      ) : tab === 'document' ? (
-        <div role="tabpanel">{selectedApplicationId && !selectedBundle ? <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible.</p> : <PlanningDocumentView activities={documentActivities} phases={orderPlanningPhases(phases)} unit={unit} />}</div>
-      ) : loading && !liveApplications ? (
-        <div className="planning-shared-loading"><Loader2 className="spin" size={22} />Carregant les sessions…</div>
-      ) : error ? (
-        <p className="planning-sharing-error">{error}</p>
-      ) : (
-        <div role="tabpanel"><ApplicationView phases={phases} unit={unit} activities={activities} applications={liveApplications || applications || []} classes={classes} /></div>
-      )}
+      {error && <p className="planning-sharing-error" role="alert">{error}</p>}
+      {loading && !liveApplications && <div className="planning-shared-loading" role="status"><Loader2 className="spin" size={22} />Carregant la programació del grup…</div>}
+      <BaseProgramView readOnly={role === 'directionReader'} selectedApplicationId={selectedApplicationId} onApplicationChange={setSelectedApplicationId} activities={activities} phases={phases} unit={unit} applications={availableApplications} />
     </section>
   )
 }
