@@ -19,7 +19,7 @@ test('no date preserves non-expiring access and invalid dates are rejected', () 
   for (const date of ['2026-02-30', '08/10/2026', 'invalid']) assert.throws(() => planningExpiryFromDate(date))
 })
 test('grant normalizes expiry and clearing the date removes a previous expiry', () => {
-  const base = { ownerUid: 'teacher', planningUnitId: 'up', granteeEmail: 'direction@example.com', role: 'directionReader', expiresAtEpochMs: planningExpiryFromDate('2026-10-08') }
+  const base = { ownerUid: 'teacher', planningUnitId: 'up', granteeEmail: 'direction@educand.ad', role: 'directionReader', classIds: ['class-1'], expiresAtEpochMs: planningExpiryFromDate('2026-10-08') }
   const grant = createAccessGrant(base)
   assert.equal(grant.expiresAtEpochMs, base.expiresAtEpochMs)
   assert.equal('expiresAtEpochMs' in createAccessGrant({ ...grant, expiresAtEpochMs: null }), false)

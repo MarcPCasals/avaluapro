@@ -1213,12 +1213,26 @@ service cloud.firestore {
         && planningUnitData(upId).ownerUid == request.auth.uid;
     }
 
+    function isVerifiedGoogleAccount() {
+      return signedIn()
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com';
+    }
+
+    function validDirectionAccess(grant) {
+      return isVerifiedGoogleAccount()
+        && request.auth.token.email.matches('[^@]+@educand[.]ad')
+        && grant.classIds is list && grant.classIds.size() == 1;
+    }
+
     function hasActivePlanningGrant(upId) {
       return signedIn()
         && request.auth.token.email is string
         && planningUnitData(upId).accessByEmail is map
         && request.auth.token.email in planningUnitData(upId).accessByEmail
         && planningUnitData(upId).accessByEmail[request.auth.token.email].status == 'active'
+        && (planningUnitData(upId).accessByEmail[request.auth.token.email].role != 'directionReader'
+          || validDirectionAccess(planningUnitData(upId).accessByEmail[request.auth.token.email]))
         && (planningUnitData(upId).accessByEmail[request.auth.token.email].get('expiresAtEpochMs', null) == null
           || (planningUnitData(upId).accessByEmail[request.auth.token.email].expiresAtEpochMs is int
             && request.time.toMillis() < planningUnitData(upId).accessByEmail[request.auth.token.email].expiresAtEpochMs));
@@ -1266,13 +1280,15 @@ service cloud.firestore {
         || (
           hasActivePlanningGrant(upId)
           && (
-            planningGrantRole(upId) == 'directionReader'
+            (planningGrantRole(upId) == 'directionReader'
+              && classId in planningGrantClassIds(upId))
             || (
               planningGrantRole(upId) == 'tutoringCollaborator'
               && managerUid == request.auth.uid
             )
             || (
-              planningGrantClassIds(upId) is list
+              planningGrantRole(upId) == 'planningAgendaEditor'
+              && planningGrantClassIds(upId) is list
               && classId in planningGrantClassIds(upId)
             )
           )
@@ -1525,6 +1541,9 @@ service cloud.firestore {
         && request.resource.data.planningUnitId == upId
         && request.resource.data.granteeEmail == grantEmail
         && request.resource.data.classIds is list
+        && (request.resource.data.role != 'directionReader'
+          || request.resource.data.status == 'revoked'
+          || (grantEmail.matches('[^@]+@educand[.]ad') && request.resource.data.classIds.size() == 1))
         && request.resource.data.role in ['directionReader', 'planningEditor', 'planningAgendaEditor', 'tutoringCollaborator']
         && request.resource.data.status in ['active', 'revoked']
         && request.resource.data.createdAt is string
@@ -1689,7 +1708,7 @@ service cloud.firestore {
       allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
       allow list: if signedIn()
         && request.auth.token.email is string
-        && request.auth.token.email in resource.data.authorizedEmails;
+        && resource.data.accessByEmail[request.auth.token.email].role in ['planningEditor', 'planningAgendaEditor', 'tutoringCollaborator'];
       allow update: if (
           isPlanningOwner(upId)
           && validPlanningUnitOwnerUpdate(upId)
@@ -1706,6 +1725,7 @@ service cloud.firestore {
             && request.auth.token.email is string
             && grantEmail == request.auth.token.email
             && resource.data.granteeEmail == request.auth.token.email
+            && (resource.data.role != 'directionReader' || (hasActivePlanningGrant(upId) && validDirectionAccess(resource.data)))
           );
         allow list: if isPlanningOwner(upId);
         allow create, update: if isPlanningOwner(upId)

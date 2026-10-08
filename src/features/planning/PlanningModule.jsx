@@ -517,7 +517,6 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
     if (resourcesPending) await saveUnitResources(unitValues.resourceSections)
     return action()
   }
-  const [sharedApplicationId, setSharedApplicationId] = useState('')
   const [dialog, setDialog] = useState(null)
   const [showUtManager, setShowUtManager] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -839,7 +838,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                   onOpenHistory={() => setDialog('history')}
                   onOpenApplication={workspace.canReadActiveApplications ? () => setDialog('application-preview') : null}
                   onOpenPreview={() => setDialog('preview')}
-                  onOpenSharing={() => { setSharedApplicationId(workspace.activeApplication?.id || ''); setDialog('sharing') }}
+                  onOpenSharing={() => setDialog('sharing')}
                   onReactivate={(unit) => withConnectedConfirmation(() => workspace.saveUnit(unit, { status: 'draft' }))}
                   values={unitValues}
                   onChange={updateUnitDraft}
@@ -889,9 +888,9 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       )} phases={workspace.phases} students={students} />}
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={(values) => workspace.duplicateUnitToAcademicYear(values, { classId: activeClassId, classLabel: activeClass?.name })} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
-      {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog applicationId={sharedApplicationId || workspace.activeApplication?.id} classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
+      {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog applications={workspace.applications.filter((application) => application.planningUnitId === workspace.activePlanningUnit.id && application.status !== 'archived')} classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
       {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
-      {['preview', 'application-preview'].includes(dialog) && workspace.activePlanningUnit && <PlanningPreviewDialog currentApplication={workspace.activeApplication} currentOverrides={workspace.activityOverrides} initialApplicationId={workspace.activeApplication?.id} onShare={workspace.activeRole === 'owner' ? (applicationId) => { setSharedApplicationId(applicationId); setDialog('sharing') } : undefined} initialTab={dialog === 'application-preview' ? 'applications' : 'program'} activities={workspace.baseActivities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
+      {['preview', 'application-preview'].includes(dialog) && workspace.activePlanningUnit && <PlanningPreviewDialog currentApplication={workspace.activeApplication} currentOverrides={workspace.activityOverrides} initialApplicationId={workspace.activeApplication?.id} onShare={workspace.activeRole === 'owner' ? () => setDialog('sharing') : undefined} initialTab={dialog === 'application-preview' ? 'applications' : 'program'} activities={workspace.baseActivities} classes={classes} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
       {connectedDecision && <ConnectedChangeDialog activeClassName={activeClass?.name || 'aquesta classe'} onChoose={resolveConnectedDecision} otherClassNames={otherConnectedClassLabels} supportsCurrentClass={connectedDecision.supportsCurrentClass} />}
     </section>

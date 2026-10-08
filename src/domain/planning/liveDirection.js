@@ -1,5 +1,5 @@
 /** Subscriu exclusivament la UP i les aplicacions pedagògiques autoritzades. */
-export function subscribeDirectionGraph({ db, doc, collection, onSnapshot }, unitId, onChange, onError) {
+export function subscribeDirectionGraph({ db, doc, collection, onSnapshot }, unitId, onChange, onError, { applicationId = '' } = {}) {
   const reference = doc(db, 'planningUnits', unitId)
   const state = { unit: null, phases: [], activities: [], applications: [], fromCache: true }
   const stops = new Map()
@@ -45,8 +45,9 @@ export function subscribeDirectionGraph({ db, doc, collection, onSnapshot }, uni
   for (const field of ['phases', 'activities']) watch(field, collection(reference, field), (snapshot) => {
     state[field] = rows(snapshot).sort((a, b) => Number(a.order) - Number(b.order))
   })
-  watch('applications', collection(reference, 'applications'), (snapshot) => {
-    const applications = rows(snapshot)
+  watch('applications', applicationId ? doc(reference, 'applications', applicationId) : collection(reference, 'applications'), (snapshot) => {
+    if (applicationId && !snapshot.exists()) { fail(new Error('La programació d’aquesta classe no està disponible.')); return }
+    const applications = applicationId ? [{ ...snapshot.data(), id: snapshot.id }] : rows(snapshot)
     reconcile('app/', applications.map((item) => item.id))
     state.applications = applications.map((application) => ({
       ...(state.applications.find((item) => item.application.id === application.id) || { sessions: [], overrides: [] }), application,

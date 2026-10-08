@@ -7,6 +7,7 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -65,7 +66,7 @@ const SESSION_ONE = 'plan-session-one'
 let testEnv
 
 function authDb(user) {
-  return testEnv.authenticatedContext(user.uid, { email: user.email }).firestore()
+  return testEnv.authenticatedContext(user.uid, { email: user.email, email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore()
 }
 
 function planningUnitData(overrides = {}) {
@@ -81,7 +82,7 @@ function planningUnitData(overrides = {}) {
       title: 'Paisatge sonor',
     }, { now: NOW }),
     accessByEmail: {
-      [DIRECTION.email]: { classIds: [], role: 'directionReader', status: 'active' },
+      [DIRECTION.email]: { classIds: [CLASS_ONE], role: 'directionReader', status: 'active' },
       [EDITOR.email]: { classIds: [], role: 'planningEditor', status: 'active' },
       [AGENDA_EDITOR.email]: { classIds: [CLASS_ONE], role: 'planningAgendaEditor', status: 'active' },
       [TUTORING_COLLABORATOR.email]: { classIds: [], role: 'tutoringCollaborator', status: 'active' },
@@ -101,7 +102,7 @@ function accessGrantData(user, role, classIds = [], overrides = {}) {
       granteeEmail: user.email,
       granteeUid: user.uid,
       role,
-      classIds,
+      classIds: role === 'directionReader' ? [CLASS_ONE] : classIds,
     }, { now: NOW }),
     ...overrides,
   }
@@ -340,7 +341,8 @@ describe('Planificació compartida', () => {
     await assertSucceeds(getDoc(upRef(db)))
     await assertSucceeds(getDoc(doc(upRef(db), 'phases', 'plan-phase-one')))
     await assertSucceeds(getDoc(appRef(db)))
-    await assertSucceeds(getDocs(collection(upRef(db), 'applications')))
+    await assertFails(getDocs(collection(upRef(db), 'applications')))
+    await assertSucceeds(getDocs(query(collection(upRef(db), 'applications'), where('classId', '==', CLASS_ONE))))
     await assertSucceeds(getDocs(collection(appRef(db), 'activityOverrides')))
     await assertSucceeds(getDocs(collection(appRef(db), 'sessions')))
     await assertSucceeds(getDocs(collection(sessionRef(db), 'items')))
@@ -351,10 +353,98 @@ describe('Planificació compartida', () => {
     await assertFails(updateDoc(sessionRef(db), { status: 'held', updatedAt: NOW }))
   })
 
+  test('direcció només pot llegir la classe autoritzada, també davant peticions directes', async () => {
+    const db = authDb(DIRECTION)
+    await assertFails(getDoc(appRef(db, APP_TWO)))
+    await assertFails(getDocs(collection(appRef(db, APP_TWO), 'activityOverrides')))
+    await assertFails(getDocs(collection(appRef(db, APP_TWO), 'sessions')))
+    await assertFails(getDocs(collection(doc(appRef(db, APP_TWO), 'sessions', 'other-session'), 'items')))
+    await assertFails(getDocs(collection(doc(appRef(db, APP_TWO), 'sessions', 'other-session'), 'results')))
+    await assertFails(getDocs(query(collection(upRef(db), 'applications'), where('classId', '==', CLASS_TWO))))
+    await assertFails(getDoc(appRef(authDb(THIRD))))
+    await assertFails(getDoc(upRef(testEnv.unauthenticatedContext().firestore())))
+  })
+
+  test('el correu exacte també ha de ser verificat, de Google i d’educand', async () => {
+    for (const claims of [
+      { email: DIRECTION.email, email_verified: false, firebase: { sign_in_provider: 'google.com' } },
+      { email: DIRECTION.email, email_verified: true, firebase: { sign_in_provider: 'password' } },
+      { email: DIRECTION.email, email_verified: true, firebase: { sign_in_provider: 'custom' } },
+      { email: DIRECTION.email },
+    ]) {
+      const db = testEnv.authenticatedContext(DIRECTION.uid, claims).firestore()
+      await assertFails(getDoc(upRef(db)))
+      await assertFails(getDoc(appRef(db)))
+      await assertFails(getDoc(doc(upRef(db), 'accessGrants', DIRECTION.email)))
+      await assertFails(getDoc(sessionRef(db)))
+      await assertFails(getDocs(collection(upRef(db), 'activities')))
+    }
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(upRef(context.firestore()), new FieldPath('accessByEmail', 'external@gmail.com'), { classIds: [CLASS_ONE], role: 'directionReader', status: 'active' }, 'authorizedEmails', [DIRECTION.email, 'external@gmail.com'])
+    })
+    const outside = authDb({ uid: 'outside', email: 'external@gmail.com' })
+    await assertFails(getDoc(upRef(outside)))
+    await assertFails(getDoc(appRef(outside)))
+  })
+
+  test('les concessions antigues sense classe o amb més d’una classe queden bloquejades', async () => {
+    for (const classIds of [[], [CLASS_ONE, CLASS_TWO]]) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await updateDoc(upRef(context.firestore()), new FieldPath('accessByEmail', DIRECTION.email), { classIds, role: 'directionReader', status: 'active' })
+      })
+      await assertFails(getDoc(upRef(authDb(DIRECTION))))
+      await assertFails(getDoc(appRef(authDb(DIRECTION))))
+    }
+  })
+
+  test('el propietari pot revocar una concessió antiga que ja no compleix el nou format', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore()
+      await updateDoc(doc(upRef(db), 'accessGrants', DIRECTION.email), { classIds: [] })
+      await updateDoc(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [], role: 'directionReader', status: 'active' })
+    })
+    const db = authDb(OWNER)
+    const batch = writeBatch(db)
+    batch.update(doc(upRef(db), 'accessGrants', DIRECTION.email), { status: 'revoked' })
+    batch.update(upRef(db), 'accessByEmail', {
+      [EDITOR.email]: { classIds: [], role: 'planningEditor', status: 'active' },
+      [AGENDA_EDITOR.email]: { classIds: [CLASS_ONE], role: 'planningAgendaEditor', status: 'active' },
+      [TUTORING_COLLABORATOR.email]: { classIds: [], role: 'tutoringCollaborator', status: 'active' },
+    }, 'authorizedEmails', [EDITOR.email, AGENDA_EDITOR.email, TUTORING_COLLABORATOR.email])
+    await assertSucceeds(batch.commit())
+    await assertFails(getDoc(upRef(authDb(DIRECTION))))
+  })
+
+  test('crear una concessió exigeix una sola classe i un correu educand', async () => {
+    for (const [email, classIds] of [[DIRECTION.email, []], [DIRECTION.email, [CLASS_ONE, CLASS_TWO]], ['external@gmail.com', [CLASS_ONE]]]) {
+      const db = authDb(OWNER)
+      const batch = writeBatch(db)
+      batch.set(doc(upRef(db), 'accessGrants', email), { ...accessGrantData(DIRECTION, 'directionReader'), granteeEmail: email, classIds })
+      batch.update(upRef(db), new FieldPath('accessByEmail', email), { classIds, role: 'directionReader', status: 'active' }, 'authorizedEmails', arrayUnion(email))
+      await assertFails(batch.commit())
+    }
+  })
+
+  test('canviar la classe de la concessió retira l’accés anterior; revocar bloqueja tots els descendents', async () => {
+    const db = authDb(OWNER)
+    const batch = writeBatch(db)
+    batch.set(doc(upRef(db), 'accessGrants', DIRECTION.email), { ...accessGrantData(DIRECTION, 'directionReader'), classIds: [CLASS_TWO] })
+    batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [CLASS_TWO], role: 'directionReader', status: 'active' })
+    await assertSucceeds(batch.commit())
+    await assertFails(getDoc(appRef(authDb(DIRECTION))))
+    await assertSucceeds(getDoc(appRef(authDb(DIRECTION), APP_TWO)))
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(upRef(context.firestore()), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [CLASS_TWO], role: 'directionReader', status: 'revoked' })
+    })
+    await assertFails(getDoc(upRef(authDb(DIRECTION))))
+    await assertFails(getDoc(appRef(authDb(DIRECTION), APP_TWO)))
+    await assertFails(getDocs(collection(appRef(authDb(DIRECTION), APP_TWO), 'sessions')))
+  })
+
   test('la caducitat bloqueja la UP i tota l’aplicació; el propietari conserva l’accés', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const expiry = Date.now() - 1000
-      const grant = { classIds: [], role: 'directionReader', status: 'active', expiresAtEpochMs: expiry }
+      const grant = { classIds: [CLASS_ONE], role: 'directionReader', status: 'active', expiresAtEpochMs: expiry }
       await updateDoc(upRef(context.firestore()), new FieldPath('accessByEmail', DIRECTION.email), grant)
     })
     const db = authDb(DIRECTION)
@@ -374,29 +464,29 @@ describe('Planificació compartida', () => {
     const save = async (grantExpiry, mapExpiry) => {
       const batch = writeBatch(db)
       batch.set(grantReference, { ...accessGrantData(DIRECTION, 'directionReader'), expiresAtEpochMs: grantExpiry })
-      batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [], role: 'directionReader', status: 'active', expiresAtEpochMs: mapExpiry })
+      batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [CLASS_ONE], role: 'directionReader', status: 'active', expiresAtEpochMs: mapExpiry })
       return batch.commit()
     }
     await assertFails(save(expiry, expiry + 1))
     await assertFails(save(Date.now() - 1000, Date.now() - 1000))
     await assertSucceeds(save(expiry, expiry))
     await assertSucceeds(getDoc(upRef(authDb(DIRECTION))))
-    await assertSucceeds(getDocs(collection(upRef(authDb(DIRECTION)), 'applications')))
+    await assertSucceeds(getDoc(appRef(authDb(DIRECTION))))
     const batch = writeBatch(db)
     batch.set(grantReference, accessGrantData(DIRECTION, 'directionReader'))
-    batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [], role: 'directionReader', status: 'active' })
+    batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [CLASS_ONE], role: 'directionReader', status: 'active' })
     await assertSucceeds(batch.commit())
     await assertSucceeds(getDoc(upRef(authDb(DIRECTION))))
   })
 
   test('les consultes de llistat han d’estar limitades a les UP autoritzades', async () => {
-    const db = authDb(DIRECTION)
+    const db = authDb(EDITOR)
     const sharedQuery = query(
       collection(db, 'planningUnits'),
-      where('authorizedEmails', 'array-contains', DIRECTION.email),
-      orderBy('updatedAt', 'desc'),
+      where(new FieldPath('accessByEmail', EDITOR.email, 'role'), 'in', ['planningEditor', 'planningAgendaEditor', 'tutoringCollaborator']),
       limit(20),
     )
+    await assertFails(getDocs(query(collection(authDb(DIRECTION), 'planningUnits'), where('authorizedEmails', 'array-contains', DIRECTION.email))))
     const snapshot = await assertSucceeds(getDocs(sharedQuery))
     assert.equal(snapshot.size, 1)
     await assertFails(getDocs(collection(db, 'planningUnits')))

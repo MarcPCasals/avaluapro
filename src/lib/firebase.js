@@ -634,10 +634,12 @@ export function observeFirebaseUser(callback, onError) {
   return () => unsubscribe()
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle({ educandOnly = false } = {}) {
+  const provider = educandOnly ? new GoogleAuthProvider() : googleProvider
+  if (educandOnly) provider.setCustomParameters({ hd: 'educand.ad', prompt: 'select_account' })
   try {
     await authReady
-    const credential = await signInWithPopup(auth, googleProvider)
+    const credential = await signInWithPopup(auth, provider)
     return toCloudUser(credential.user)
   } catch (error) {
     const code = String(error?.code || '')
@@ -649,7 +651,7 @@ export async function signInWithGoogle() {
 
     if (shouldTryRedirect) {
       try {
-        await signInWithRedirect(auth, googleProvider)
+        await signInWithRedirect(auth, provider)
         return null
       } catch (redirectError) {
         throw new Error(getFirebaseAuthErrorMessage(redirectError), { cause: redirectError })

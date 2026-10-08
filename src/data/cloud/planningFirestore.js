@@ -300,11 +300,18 @@ export async function loadOwnedPlanningUnits(ownerUid, filters = {}) {
 }
 
 export async function loadSharedPlanningUnits(email, filters = {}) {
+  // El camp del correu té un índex simple automàtic. Evitem índexs compostos
+  // diferents per a cada persona i ordenem les UP compartides després de llegir-les.
+  // Direcció consulta únicament els enllaços que li ha compartit el docent.
   const snapshot = await readPlanningQuery('units.shared', query(
     collection(firebaseDb, 'planningUnits'),
-    ...planningUnitQueryConstraints({ ...filters, sharedEmail: email }),
+    where(new FieldPath('accessByEmail', normalizeEmail(email), 'role'), 'in', ['planningEditor', 'planningAgendaEditor', 'tutoringCollaborator']),
+    limit(filters.maxItems || 100),
   ))
   return mapSnapshot(snapshot)
+    .filter((unit) => (!filters.academicYearId || unit.academicYearId === filters.academicYearId)
+      && (!filters.temporalUnitId || unit.temporalUnitId === filters.temporalUnitId))
+    .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
 }
 
 export async function loadPlanningUnitStructure(planningUnitId) {

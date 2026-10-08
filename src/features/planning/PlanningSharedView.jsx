@@ -125,8 +125,8 @@ function SharedActivity({ activity, report, unit, sequenceNumber, sessionDuratio
   </article>
 }
 
-function BaseProgramView({ activities, phases, unit, applications = [], selectedApplicationId, onApplicationChange }) {
-  const [sessionDuration, setSessionDuration] = useState(60)
+function BaseProgramView({ activities, phases, unit, applications = [], selectedApplicationId, onApplicationChange, readOnly = false }) {
+  const sessionDuration = 60
   const bundle = selectDirectionApplication(applications, selectedApplicationId)
   const reports = bundle ? buildDirectionActivityReports(activities, bundle, phases) : []
   const reportById = new Map(reports.map((report) => [report.original.id, report]))
@@ -156,10 +156,10 @@ function BaseProgramView({ activities, phases, unit, applications = [], selected
       </section>
 
       <div className="planning-direction-controls">
-        {applications.length > 0 && <label>Temporització del grup<select value={bundle?.application.id || ''} onChange={(event) => onApplicationChange(event.target.value)}>{!bundle && <option value="">Grup pendent de carregar</option>}{applications.map((entry, index) => <option value={entry.application.id} key={entry.application.id}>{entry.application.classLabel || `Grup ${index + 1}`}</option>)}</select></label>}
-        <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}><option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option></select></label>
+        {!readOnly && applications.length > 0 && <label>Temporització del grup<select value={bundle?.application.id || ''} onChange={(event) => onApplicationChange(event.target.value)}>{!bundle && <option value="">Grup pendent de carregar</option>}{applications.map((entry, index) => <option value={entry.application.id} key={entry.application.id}>{entry.application.classLabel || `Grup ${index + 1}`}</option>)}</select></label>}
+        {readOnly && bundle && <strong>Programació de {bundle.application.classLabel || 'la classe autoritzada'}</strong>}
       </div>
-      {selectedApplicationId && !bundle && <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible. Espera que es carregui o selecciona un grup.</p>}
+      {selectedApplicationId && !bundle && <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible. Espera que es carregui la classe autoritzada.</p>}
       {(!selectedApplicationId || bundle) && <section className="planning-shared-section">
         <header>
           <BookOpenText size={18} />
@@ -350,7 +350,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
         </nav>
       </header>
       {tab === 'program' ? (
-        <div role="tabpanel">{error && <p className="planning-sharing-error" role="alert">{error}</p>}<BaseProgramView selectedApplicationId={selectedApplicationId} onApplicationChange={setSelectedApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
+        <div role="tabpanel">{error && <p className="planning-sharing-error" role="alert">{error}</p>}<BaseProgramView readOnly={role === 'directionReader'} selectedApplicationId={selectedApplicationId} onApplicationChange={setSelectedApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
       ) : tab === 'document' ? (
         <div role="tabpanel">{selectedApplicationId && !selectedBundle ? <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible.</p> : <PlanningDocumentView activities={documentActivities} phases={orderPlanningPhases(phases)} unit={unit} />}</div>
       ) : loading && !liveApplications ? (

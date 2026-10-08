@@ -1858,6 +1858,7 @@ test('direcció llegeix la programació real però no notes privades, incidènci
     actorUid: 'direction-1',
     ownerUid: 'teacher-1',
     grantRole: 'directionReader',
+    hasLinkedGroupAccess: true,
   })
 
   assert.equal(permissions.canReadPlanningUnit, true)
@@ -1867,6 +1868,13 @@ test('direcció llegeix la programació real però no notes privades, incidènci
   assert.equal(permissions.canReadPrivateNotes, false)
   assert.equal(permissions.canReadIndividualIncidents, false)
   assert.equal(permissions.canReadFullDiagnoses, false)
+})
+
+
+test('direcció no obté accés implícit a les altres classes de la UP', () => {
+  const permissions = getPlanningPermissions({ actorUid: 'direction-1', ownerUid: 'teacher-1', grantRole: 'directionReader', hasLinkedGroupAccess: false })
+  assert.equal(permissions.canReadGroupApplication, false)
+  assert.equal(permissions.canReadPedagogicalReflections, false)
 })
 
 test('editar la UP no dona accés automàtic a l’Agenda ni a l’alumnat', () => {
@@ -1988,7 +1996,7 @@ test('totes les entitats principals declaren tipus i versió d’esquema', () =>
     createCalendarSession({ ownerUid: 'teacher-1', applicationId: 'application-1', classId: 'class-1', startsAt: '2026-09-22T09:30:00+02:00', durationMinutes: 60 }, sharedOptions),
     createSessionItem({ ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: 'session-1', type: 'indication', title: 'Preparar la bata', order: 1 }, sharedOptions),
     createActivityResult({ ownerUid: 'teacher-1', applicationId: 'application-1', sessionId: 'session-1', sessionItemId: 'item-1', status: 'continued', actualMinutes: 50 }, sharedOptions),
-    createAccessGrant({ ownerUid: 'teacher-1', planningUnitId: 'up-1', granteeEmail: 'DIRECCIO@EXAMPLE.TEST', role: 'directionReader' }, sharedOptions),
+    createAccessGrant({ ownerUid: 'teacher-1', planningUnitId: 'up-1', granteeEmail: 'DIRECCIO@EDUCAND.AD', role: 'directionReader', classIds: ['class-1'] }, sharedOptions),
     createPlanningPrivateNote({ ownerUid: 'teacher-1', planningUnitId: 'up-1', sessionId: 'session-1', text: 'Recordatori només per al docent.' }, sharedOptions),
   ]
 
@@ -1998,7 +2006,7 @@ test('totes les entitats principals declaren tipus i versió d’esquema', () =>
   )
   assert.ok(entities.every((entity) => entity.schemaVersion === PLANNING_SCHEMA_VERSION))
   assert.ok(entities.every((entity) => entity.id.startsWith('plan-')))
-  assert.equal(entities.at(-2).granteeEmail, 'direccio@example.test')
+  assert.equal(entities.at(-2).granteeEmail, 'direccio@educand.ad')
   assert.equal('privateNote' in entities.at(-3), false)
   assert.equal(entities.at(-1).entityType, 'planningPrivateNote')
 })

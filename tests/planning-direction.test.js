@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { buildPlanningDirectionUrl, compareGroupPlanning, selectDirectionApplication, withCurrentDirectionApplication } from '../src/domain/planning/directionView.js'
+import { validateDirectionGrant, directionIdentityAllowed, directionGrantAllowsApplication } from '../src/domain/planning/directionAccess.js'
 import { subscribeDirectionGraph } from '../src/domain/planning/liveDirection.js'
 
 test('link opens a single read-only UP without inheriting other query parameters', () => {
@@ -50,7 +51,7 @@ test('compares final adjustments, zero minutes, adaptations, order and agenda bu
 function harness() {
   const listeners = new Map()
   const dependencies = { db: '', doc: (...parts) => parts.join('/').replace(/^\//, ''), collection: (...parts) => parts.join('/'), onSnapshot: (ref, options, next, error) => { listeners.set(ref, { next, error }); return () => listeners.delete(ref) } }
-  const emit = (ref, rows, fromCache = false) => listeners.get(ref).next({ metadata: { fromCache }, exists: () => true, id: 'up', data: () => rows, docs: Array.isArray(rows) ? rows.map((row) => ({ id: row.id, data: () => row })) : [] })
+  const emit = (ref, rows, fromCache = false) => listeners.get(ref).next({ metadata: { fromCache }, exists: () => true, id: ref.split('/').at(-1), data: () => rows, docs: Array.isArray(rows) ? rows.map((row) => ({ id: row.id, data: () => row })) : [] })
   return { listeners, dependencies, emit }
 }
 test('live graph updates nested sessions and detaches removed applications and revoked access', () => {
@@ -82,4 +83,45 @@ test('unmount closes every listener and cached responses are identified', () => 
   assert.equal(latest.unit.title, 'UP autoritzada')
   stop()
   assert.equal(h.listeners.size, 0)
+})
+
+
+test('direction sharing requires one class and verified Google educand identity', () => {
+  assert.doesNotThrow(() => validateDirectionGrant('DIRECCIO@educand.ad', ['class-1']))
+  for (const email of ['direction@gmail.com', 'direction@educand.ad.example', 'invalid']) {
+    assert.throws(() => validateDirectionGrant(email, ['class-1']))
+  }
+  assert.throws(() => validateDirectionGrant('direction@educand.ad', []))
+  assert.throws(() => validateDirectionGrant('direction@educand.ad', ['a', 'b']))
+  const valid = { email: 'direction@educand.ad', email_verified: true, firebase: { sign_in_provider: 'google.com' } }
+  assert.equal(directionIdentityAllowed(valid), true)
+  assert.equal(directionIdentityAllowed({ ...valid, email_verified: false }), false)
+  assert.equal(directionIdentityAllowed({ ...valid, email: 'direction@gmail.com' }), false)
+  assert.equal(directionIdentityAllowed({ ...valid, firebase: { sign_in_provider: 'custom' } }), false)
+})
+
+test('shared link listens only to its selected application, never all classes', () => {
+  const h = harness()
+  let latest
+  const stop = subscribeDirectionGraph(h.dependencies, 'up', (value) => { latest = value }, assert.fail, { applicationId: 'g' })
+  assert.equal(h.listeners.has('planningUnits/up/applications'), false)
+  assert.equal(h.listeners.has('planningUnits/up/applications/g'), true)
+  h.emit('planningUnits/up/applications/g', { classId: 'class-1' })
+  assert.equal(latest.applications[0].application.id, 'g')
+  assert.equal(latest.applications[0].application.classId, 'class-1')
+  h.emit('planningUnits/up/applications/g/activityOverrides', [{ id: 'o', activityId: 'a', changes: { plannedMinutes: 65 } }])
+  assert.equal(latest.applications[0].overrides[0].changes.plannedMinutes, 65)
+  assert.equal([...h.listeners.keys()].some((path) => path.includes('applications/other')), false)
+  stop()
+  assert.equal(h.listeners.size, 0)
+})
+
+test('a live grant change clears access when the class or status changes', () => {
+  const grant = { role: 'directionReader', classIds: ['one'], status: 'active' }
+  const application = { classId: 'one' }
+  assert.equal(directionGrantAllowsApplication(grant, application), true)
+  assert.equal(directionGrantAllowsApplication({ ...grant, classIds: ['two'] }, application), false)
+  assert.equal(directionGrantAllowsApplication({ ...grant, status: 'revoked' }, application), false)
+  assert.equal(directionGrantAllowsApplication({ ...grant, classIds: [] }, application), false)
+  assert.equal(directionGrantAllowsApplication({ ...grant, role: 'planningEditor' }, application), false)
 })

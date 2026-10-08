@@ -41,8 +41,8 @@ export function getPlanningPermissions({
     return {
       ...NO_ACCESS,
       canReadPlanningUnit: true,
-      canReadGroupApplication: true,
-      canReadPedagogicalReflections: true,
+      canReadGroupApplication: hasLinkedGroupAccess,
+      canReadPedagogicalReflections: hasLinkedGroupAccess,
     }
   }
 

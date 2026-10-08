@@ -1,3 +1,4 @@
+import { validateDirectionGrant } from '../../domain/planning/directionAccess'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   applyPlanningCloudOperation,
@@ -332,11 +333,11 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       const role = unit.ownerUid === user?.uid
         ? 'owner'
         : unit.accessByEmail?.[userEmail]?.role || ''
-      const allowedClassIds = role === 'planningAgendaEditor'
+      const allowedClassIds = ['planningAgendaEditor', 'directionReader'].includes(role)
         ? unit.accessByEmail?.[userEmail]?.classIds || []
         : []
       if (!['owner', 'directionReader', 'planningAgendaEditor', 'tutoringCollaborator'].includes(role)) return []
-      if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
+      if (['planningAgendaEditor', 'directionReader'].includes(role) && allowedClassIds.length === 0) return []
       // La UP de tutoria és comuna, però cada docent només carrega la seva
       // aplicació: calendari, ajustos i sessions continuen sent personals.
       if (role === 'tutoringCollaborator' || (role === 'owner' && unit.tutoringSpaceId)) {
@@ -1082,9 +1083,13 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     const cleanEmail = String(email || '').trim().toLowerCase()
     if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Escriu el correu complet de la persona convidada.')
     if (cleanEmail === userEmail) throw new Error('El teu compte ja és el propietari de la UP.')
-    const allowedClassIds = role === 'planningAgendaEditor' ? [...new Set(classIds.filter(Boolean))] : []
+    const allowedClassIds = ['planningAgendaEditor', 'directionReader'].includes(role) ? [...new Set(classIds.filter(Boolean))] : []
     if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) {
       throw new Error('Selecciona almenys un grup per compartir l’Agenda.')
+    }
+    if (role === 'directionReader') {
+      validateDirectionGrant(cleanEmail, allowedClassIds)
+      if (!applications.some((application) => application.planningUnitId === activePlanningUnit.id && application.classId === allowedClassIds[0] && application.status !== 'archived')) throw new Error('Aquesta classe no està connectada amb la UP.')
     }
     const syncSummary = await synchronize()
     if (syncSummary.conflictCount || syncSummary.pendingCount) {
@@ -1106,7 +1111,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     await refreshActiveUnitFromCloud()
     setAccessGrants(await loadPlanningAccessGrants(activePlanningUnit.id))
     return grant
-  }, [accessGrants, activePlanningUnit, activeRole, isOnline, refreshActiveUnitFromCloud, synchronize, userEmail])
+  }, [accessGrants, activePlanningUnit, activeRole, applications, isOnline, refreshActiveUnitFromCloud, synchronize, userEmail])
 
   /**
    * Manté la coedició tutorial alineada amb els membres de la cotutoria. Només
@@ -1178,10 +1183,10 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       ? 'owner'
       : planningUnit.accessByEmail?.[userEmail]?.role || ''
     if (!['owner', 'directionReader', 'planningAgendaEditor', 'tutoringCollaborator'].includes(role)) return []
-    const allowedClassIds = role === 'planningAgendaEditor'
+    const allowedClassIds = ['planningAgendaEditor', 'directionReader'].includes(role)
       ? planningUnit.accessByEmail?.[userEmail]?.classIds || []
       : []
-    if (role === 'planningAgendaEditor' && allowedClassIds.length === 0) return []
+    if (['planningAgendaEditor', 'directionReader'].includes(role) && allowedClassIds.length === 0) return []
     const applicationResults = role === 'tutoringCollaborator'
       || (role === 'owner' && planningUnit.tutoringSpaceId)
       ? [await repository.loadScope(

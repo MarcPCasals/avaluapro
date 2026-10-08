@@ -9,12 +9,13 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { planningExpiryDate, planningExpiryFromDate, isPlanningAccessExpired } from '../../domain/planning/accessExpiry'
+import { validateDirectionGrant } from '../../domain/planning/directionAccess'
 import { buildPlanningDirectionUrl } from '../../domain/planning/directionView'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 
 const ROLE_OPTIONS = [
   {
-    description: 'Pot consultar la UP i l’aplicació real, sense editar res.',
+    description: 'Només pot consultar la programació i les sessions de la classe escollida, amb el seu compte verificat @educand.ad.',
     label: 'Direcció · lectura',
     value: 'directionReader',
   },
@@ -48,20 +49,22 @@ function roleLabel(role) {
  * revocar són operacions atòmiques al núvol perquè el document de la concessió
  * i la llista autoritzada de la UP no puguin quedar desalineats.
  */
-export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSave, unit, applicationId }) {
+export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSave, unit, applications = [] }) {
   const dialogRef = useDialogAccessibility(onClose)
   const [draft, setDraft] = useState(emptyDraft)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const link = buildPlanningDirectionUrl(unit.id, undefined, applicationId)
+  const [createdLink, setCreatedLink] = useState(null)
+  const connectedClasses = [...new Map(applications.map((application) => [application.classId, application])).values()]
+  const updateDraft = (update) => { setCreatedLink(null); setCopied(false); setDraft(update) }
   const copyLink = async () => {
-    try { await navigator.clipboard.writeText(link); setCopied(true) }
+    try { await navigator.clipboard.writeText(createdLink.url); setCopied(true) }
     catch { setError('Copia l’enllaç seleccionant el text del camp.') }
   }
   const classById = useMemo(() => new Map(classes.map((item) => [item.id, item])), [classes])
 
-  const edit = (grant) => setDraft({
+  const edit = (grant) => updateDraft({
     classIds: grant.classIds || [],
     email: grant.granteeEmail,
     expiresOn: planningExpiryDate(grant.expiresAtEpochMs),
@@ -76,7 +79,15 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
     try {
       const expiresAtEpochMs = planningExpiryFromDate(selectedExpiryDate)
       if (expiresAtEpochMs != null && expiresAtEpochMs <= Date.now()) throw new Error('Tria una data de caducitat d’avui o posterior.')
-      await onSave({ ...draft, expiresAtEpochMs })
+      const email = draft.email.trim().toLowerCase()
+      const selectedClassIds = draft.classIds
+      const application = connectedClasses.find((entry) => entry.classId === selectedClassIds[0])
+      if (draft.role === 'directionReader') {
+        validateDirectionGrant(email, selectedClassIds)
+        if (!application) throw new Error('Selecciona una classe connectada amb aquesta UP.')
+      }
+      await onSave({ ...draft, email, expiresAtEpochMs })
+      if (draft.role === 'directionReader') setCreatedLink({ url: buildPlanningDirectionUrl(unit.id, undefined, application.id), email, className: application.classLabel || classById.get(application.classId)?.name || 'Classe autoritzada' })
       setDraft(emptyDraft())
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut desar l’accés.')
@@ -91,6 +102,7 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
     try {
       await onRevoke(grant)
       if (draft.email === grant.granteeEmail) setDraft(emptyDraft())
+      if (createdLink?.email === grant.granteeEmail) setCreatedLink(null)
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut retirar l’accés.')
     } finally {
@@ -98,7 +110,7 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
     }
   }
 
-  const toggleClass = (classId) => setDraft((current) => ({
+  const toggleClass = (classId) => updateDraft((current) => ({
     ...current,
     classIds: current.classIds.includes(classId)
       ? current.classIds.filter((id) => id !== classId)
@@ -123,22 +135,30 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
           </div>
         </header>
         <p className="planning-sharing-intro">
-          L’accés queda vinculat al correu exacte. AvaluaPro no envia cap missatge: la persona veurà aquesta UP quan entri amb aquest compte.
+          Tria la classe i autoritza el correu exacte. La consulta de direcció requereix un compte Google verificat @educand.ad. AvaluaPro no envia cap missatge.
         </p>
 
-        <section className="planning-direction-link">
-          <strong>Enllaç de consulta en directe</strong>
-          <p>Autoritza el correu de direcció amb «Direcció · lectura» i comparteix aquest enllaç. Obrirà només aquesta vista; els canvis desats al núvol hi apareixeran automàticament.</p>
-          <input aria-label="Enllaç de direcció" readOnly value={link} onFocus={(event) => event.target.select()} />
+        {createdLink && <section className="planning-direction-link">
+          <strong>Enllaç de consulta · {createdLink.className}</strong>
+          <p>Accés autoritzat a {createdLink.email} amb el seu compte Google d’educand verificat, per consultar aquesta classe. Els canvis desats hi apareixeran en directe.</p>
+          <input aria-label="Enllaç de direcció" readOnly value={createdLink.url} onFocus={(event) => event.target.select()} />
           <button className="secondary-action" onClick={copyLink} type="button">{copied ? 'Enllaç copiat' : 'Copiar enllaç'}</button>
-        </section>
+        </section>}
         <form onSubmit={save}>
+          {draft.role === 'directionReader' && <label>
+            Classe que vols compartir
+            <select aria-label="Classe que vols compartir" required value={draft.classIds[0] || ''} onChange={(event) => { const classId = event.target.value; updateDraft((current) => ({ ...current, classIds: classId ? [classId] : [] })) }}>
+              <option value="">Tria una classe</option>
+              {connectedClasses.map((application) => <option key={application.classId} value={application.classId}>{application.classLabel || classById.get(application.classId)?.name || 'Classe connectada'}</option>)}
+            </select>
+            <small>{connectedClasses.length ? 'L’enllaç i l’accés quedaran limitats a la programació d’aquesta classe dins d’aquesta UP.' : 'No hi ha cap classe connectada amb aquesta UP.'}</small>
+          </label>}
           <label>
             Correu de la persona convidada
             <input
               autoComplete="email"
-              onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
-              placeholder="nom@centre.ad"
+              onChange={(event) => { const email = event.currentTarget.value; updateDraft((current) => ({ ...current, email })) }}
+              placeholder={draft.role === 'directionReader' ? 'nom@educand.ad' : 'nom@centre.ad'}
               required
               type="email"
               value={draft.email}
@@ -146,7 +166,7 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
           </label>
           <label>
             Data de caducitat de l’accés (opcional)
-            <input name="expiresOn" type="date" value={draft.expiresOn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, expiresOn: value })) }} onInput={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, expiresOn: value })) }} />
+            <input name="expiresOn" type="date" value={draft.expiresOn} onChange={(event) => { const value = event.currentTarget.value; updateDraft((current) => ({ ...current, expiresOn: value })) }} onInput={(event) => { const value = event.currentTarget.value; updateDraft((current) => ({ ...current, expiresOn: value })) }} />
             <small>L’enllaç funcionarà per a aquest correu fins al final del dia indicat, en hora d’Andorra. Sense data, l’accés no caduca.</small>
           </label>
           <fieldset>
@@ -157,9 +177,9 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
                   <input
                     checked={draft.role === option.value}
                     name="sharing-role"
-                    onChange={() => setDraft((current) => ({
+                    onChange={() => updateDraft((current) => ({
                       ...current,
-                      classIds: option.value === 'planningAgendaEditor' ? current.classIds : [],
+                      classIds: [],
                       role: option.value,
                     }))}
                     type="radio"
@@ -191,9 +211,9 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
           {error && <p className="planning-sharing-error" role="alert">{error}</p>}
           <div className="planning-dialog-actions">
             <button className="secondary-action" disabled={Boolean(busy)} onClick={onClose} type="button">Tancar</button>
-            <button className="primary-action" disabled={Boolean(busy) || !draft.email.trim()} type="submit">
+            <button className="primary-action" disabled={Boolean(busy) || !draft.email.trim() || (draft.role === 'directionReader' && draft.classIds.length !== 1)} type="submit">
               {busy === 'save' ? <Loader2 className="spin" size={16} /> : <UserRoundPlus size={16} />}
-              Desar accés
+              {draft.role === 'directionReader' ? 'Crear enllaç i autoritzar accés' : 'Desar accés'}
             </button>
           </div>
         </form>
@@ -207,9 +227,10 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
               <div>
                 <strong>{grant.granteeEmail}</strong>
                 <span>{roleLabel(grant.role)}</span>
+                {grant.role === 'directionReader' && grant.classIds?.length !== 1 && <small>Accés antic bloquejat: edita’l i selecciona una classe.</small>}
                 <small>{grant.expiresAtEpochMs ? `${isPlanningAccessExpired(grant) ? 'Accés caducat' : 'Caduca'} · ${new Date(grant.expiresAtEpochMs - 1).toLocaleDateString('ca-AD', { timeZone: 'Europe/Andorra' })}` : 'Sense caducitat'}</small>
-                {grant.role === 'planningAgendaEditor' && (
-                  <small>{grant.classIds.map((classId) => classById.get(classId)?.name || 'Grup autoritzat').join(' · ')}</small>
+                {['planningAgendaEditor', 'directionReader'].includes(grant.role) && (
+                  <small>{(grant.classIds || []).map((classId) => classById.get(classId)?.name || connectedClasses.find((application) => application.classId === classId)?.classLabel || 'Classe autoritzada').join(' · ')}</small>
                 )}
               </div>
               <button

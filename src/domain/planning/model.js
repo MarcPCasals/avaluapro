@@ -1,3 +1,4 @@
+import { validateDirectionGrant } from './directionAccess.js'
 import { normalizeActivityResourceSelections } from './resources.js'
 import {
   ACCESS_ROLES,
@@ -670,17 +671,20 @@ export function createActivityResult(input, options = {}) {
 
 export function createAccessGrant(input, options = {}) {
   const role = enumValue(input.role, ACCESS_ROLES, 'rol de compartició')
+  const granteeEmail = normalizedEmail(input.granteeEmail, 'correu convidat')
+  const classIds = textList(input.classIds)
+  if (role === 'directionReader') validateDirectionGrant(granteeEmail, classIds)
   if (role === 'owner') throw new Error('El propietari es defineix a la UP, no mitjançant una invitació')
   if (input.expiresAtEpochMs != null && (!Number.isSafeInteger(input.expiresAtEpochMs) || input.expiresAtEpochMs <= 0)) throw new Error('La data de caducitat no és vàlida.')
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.ACCESS_GRANT, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
     planningUnitId: requiredText(input.planningUnitId, 'UP compartida'),
-    granteeEmail: normalizedEmail(input.granteeEmail, 'correu convidat'),
+    granteeEmail,
     granteeUid: optionalText(input.granteeUid),
     ...(input.expiresAtEpochMs != null ? { expiresAtEpochMs: input.expiresAtEpochMs } : {}),
     role,
-    classIds: textList(input.classIds),
+    classIds,
     status: enumValue(input.status || 'active', ['active', 'revoked'], "estat de l'accés"),
   }
 }
