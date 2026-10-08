@@ -42,6 +42,7 @@ import {
   buildAgendaSessionReplacement,
   getAgendaReplacementActivityOptions,
   buildAgendaSessionCompaction,
+  buildAgendaOwnActivityInsertion,
   buildActivitySessionDistribution,
   buildActivitySessionReflow,
   buildTimetableSessionCandidates,
@@ -1741,7 +1742,7 @@ export function useAgendaWorkspace(user, classes = []) {
       manuallyCompletedSourceActivityIds: getManuallyCompletedActivityIds(setup.activityOverrides) })
   }, [loadSchedulingSetup])
 
-  const addSessionActivity = useCallback(async (bundle, activityId, minutes) => {
+  const addPlanningSessionActivity = useCallback(async (bundle, activityId, minutes) => {
     const setup = await loadSchedulingSetup({ applicationId: bundle.application.id,
       classId: bundle.session.classId, planningUnitId: bundle.planningUnit.id })
     const target = setup.existingSessionBundles.find(({ session }) => session.id === bundle.session.id)
@@ -2049,6 +2050,30 @@ export function useAgendaWorkspace(user, classes = []) {
    * Canvia un fragment futur i compacta automàticament tota la cronologia
    * posterior. La font de Programació es manté intacta.
    */
+  const addSessionActivity = useCallback(async (bundle, activityId, minutes) => {
+    if (!activityId || typeof activityId !== 'object') return addPlanningSessionActivity(bundle, activityId, minutes)
+    if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu.')
+    const setup = await loadSchedulingSetup({ applicationId: bundle.application.id,
+      classId: bundle.session.classId, planningUnitId: bundle.planningUnit.id })
+    const occupiedCandidateKeys = setup.existingSessions.map((session) => getSessionCandidateKey({
+      calendarEventId: session.calendarEventId, date: String(session.startsAt).slice(0, 10),
+      startsAt: session.startsAt, timetableSlotId: session.timetableSlotId,
+    }))
+    const proposal = buildTimetableSessionCandidates({ calendarEvents: setup.calendarEvents,
+      classId: bundle.session.classId, subject: getSchedulingSubject(setup), from: String(bundle.session.startsAt).slice(0, 10),
+      to: activeAcademicYear.endsOn, occupiedCandidateKeys, slotsByTimetableId: setup.slotsByTimetableId, timetables: setup.timetables })
+    const preview = buildAgendaOwnActivityInsertion({ application: setup.application,
+      activityMinutesById: getAgendaActivityMinutesById(setup.activities, setup.activityOverrides),
+      existingSessionBundles: setup.existingSessionBundles, targetSessionId: bundle.session.id,
+      candidates: proposal.candidates.filter((candidate) => candidate.startsAt > bundle.session.startsAt),
+      title: activityId.title, plannedMinutes: minutes, fixedToSession: activityId.fixedToSession,
+      options: { now: new Date().toISOString(), calendarEvents: setup.calendarEvents } })
+    await persistAgendaReflowPreview({ ...preview, setup })
+    const updated = preview.sessions.find((candidate) => candidate.session.id === bundle.session.id)
+    const activityById = new Map(setup.activities.map((activity) => [activity.id, activity]))
+    return { ...bundle, session: updated.session, items: updated.items.map((item) => ({ ...item, sourceActivity: activityById.get(item.sourceActivityId) || null })) }
+  }, [activeAcademicYear, addPlanningSessionActivity, loadSchedulingSetup, persistAgendaReflowPreview])
+
   const saveSessionItemChange = useCallback(async (bundle, item, changes) => {
     if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu per reajustar l’Agenda.')
     const setup = await loadSchedulingSetup({

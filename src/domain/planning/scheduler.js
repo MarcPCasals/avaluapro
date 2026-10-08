@@ -638,7 +638,7 @@ export function buildActivitySessionDistribution({
     const items = logicalItems.map(({ activity, plannedMinutes, segmentCount, segmentIndex }, order) => (
       createSessionItem({
         applicationId: application.id,
-        order: draft.existingItems.length + fixedItems.length + order,
+        order: Math.max(-1, ...draft.existingItems.map((item) => Number(item.order) || 0)) + fixedItems.length + order + 1,
         ownerUid: application.ownerUid,
         plannedMinutes,
         segmentCount,
@@ -1635,4 +1635,35 @@ export function getSessionCandidateKey(candidate) {
 /** Mou només el contingut ja programat, mantenint l'ordre real de l'Agenda. */
 export function buildAgendaCancellationReflow(input) {
   return { ...buildAgendaItemsReflow({ ...input, cancellation: true }), kind: 'agenda-cancellation' }
+}
+
+
+/** Insereix una activitat pròpia a la sessió triada i ajorna només el contingut mòbil. */
+export function buildAgendaOwnActivityInsertion(input) {
+  const target = input.existingSessionBundles.find((bundle) => bundle.session.id === input.targetSessionId)
+  const now = input.options?.now || new Date().toISOString()
+  if (!target || !canReflowSession(target, String(target.session.startsAt).slice(0, 10), now)
+    || target.session.classroomOpenedAt || target.session.attendanceConfirmedAt || target.session.classroomClosedAt
+    || target.results?.length || getSessionBlockingEvent(input.options?.calendarEvents || [], target.session)) {
+    throw new Error('Aquesta sessió no es pot modificar perquè no es fa o ja té dades de classe.')
+  }
+  const title = String(input.title || '').trim()
+  const minutes = Number(input.plannedMinutes)
+  const fixedItems = (target.items || []).filter(isFixedAgendaItem)
+  const capacity = getProgrammableMinutes(target.session.durationMinutes, 5)
+    - (target.session.babeliumEnabled || target.items.some(isBabeliumItem) ? BABELIUM_MINUTES : 0)
+    - fixedItems.reduce((sum, item) => sum + Number(item.plannedMinutes || 0), 0)
+  if (!title || !Number.isFinite(minutes) || minutes <= 0 || minutes > capacity) {
+    throw new Error(`Escriu l’activitat i indica una durada entre 1 i ${Math.max(0, capacity)} minuts. Les activitats fixades conserven el seu temps.`)
+  }
+  // Es reserva el dia només durant aquesta inserció, també quan el docent la deixa desfixada.
+  const reserved = createSessionItem({ ownerUid: target.session.ownerUid, applicationId: input.application.id,
+    sessionId: target.session.id, title, type: 'activity', plannedMinutes: minutes, fixedToSession: true,
+    order: Math.max(-1, ...fixedItems.map((item) => Number(item.order) || 0)) + 1 }, input.options)
+  const preview = buildAgendaItemsReflow({ ...input, existingSessionBundles: input.existingSessionBundles.map((bundle) =>
+    bundle.session.id === target.session.id ? { ...bundle, items: [...bundle.items, reserved] } : bundle) })
+  if (preview.unscheduled.length) throw new Error('No hi ha prou classes disponibles per desplaçar totes les activitats. No s’ha desat cap canvi.')
+  return { ...preview, kind: 'agenda-own-insertion', sessions: preview.sessions.map((bundle) => ({ ...bundle,
+    items: bundle.items.map((item) => item.id === reserved.id ? createSessionItem({ ...item, fixedToSession: Boolean(input.fixedToSession) }, input.options) : item),
+  })) }
 }

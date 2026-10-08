@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionActivityChoices, buildSessionActivityAddition, buildOwnSessionActivityChange, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
+import { getSessionActivityChoices, buildSessionActivityAddition, buildOwnSessionActivityChange, buildActivitySessionReflow, buildAgendaRecoveryReflow, buildAgendaOwnActivityInsertion, buildAgendaSessionCompaction, buildAgendaItemChangeReflow, buildAgendaSessionReplacement, buildAgendaContinuationReflow, createCalendarSession, createSessionItem, createBabeliumItem, moveAgendaSessionItem, combineAgendaSessionItems } from '../src/domain/planning/index.js'
 const application = { id: 'app', planningUnitId: 'up', classId: 'fictional', ownerUid: 'teacher' }
 const options = { now: '2026-10-04T10:00:00Z' }
 const activities = [{ id: 'exam', title: 'Prova fictícia', type: 'activity', plannedMinutes: 30 },
@@ -373,4 +373,34 @@ test('continuar des de Mode aula posa 15 minuts al principi i conserva la classe
   assert(!preview.removedItems.some(item => item.sessionId === current.session.id))
   assert.deepEqual(current, before)
   assert.deepEqual(preview.unscheduled, [])
+})
+
+
+test('inserir 15 minuts propis en una sessió plena desplaça tot el contingut i respecta les cites fixades', () => {
+  const first = bundle('first', '', [['exam', 55]], { startsAt: '2026-10-09T08:30:00' })
+  const next = bundle('next', '', [['lab', 50]], { startsAt: '2026-10-12T08:30:00' })
+  const fixed = createSessionItem({ id: 'talk', ownerUid: 'teacher', applicationId: 'app', sessionId: 'next',
+    title: 'Xerrada fixa', type: 'activity', plannedMinutes: 25, fixedToSession: true, order: 0 }, options)
+  next.items.push(fixed)
+  const base = { application, targetSessionId: 'first', existingSessionBundles: [first, next], options,
+    activityMinutesById: { exam: 55, lab: 50 }, title: 'Acabar presentació', plannedMinutes: 15,
+    candidates: [{ date: '2026-10-16', startsAt: '2026-10-16T08:30:00', durationMinutes: 60 }] }
+  const original = structuredClone(base)
+  for (const fixedToSession of [false, true]) {
+    const preview = buildAgendaOwnActivityInsertion({ ...base, fixedToSession })
+    const current = preview.sessions.find(bundle => bundle.session.id === 'first')
+    const own = current.items.find(item => item.title === base.title)
+    assert.equal(own.plannedMinutes, 15)
+    assert.equal(own.fixedToSession, fixedToSession)
+    assert.equal(own.sourceActivityId, null)
+    assert.equal([...current.items].sort((a,b) => a.order-b.order)[0].id, own.id)
+    for (const sourceId of ['exam', 'lab']) assert.equal(preview.sessions.flatMap(bundle => bundle.items)
+      .filter(item => item.sourceActivityId === sourceId).reduce((sum,item) => sum+item.plannedMinutes,0), base.activityMinutesById[sourceId])
+    assert.deepEqual(preview.sessions.find(bundle => bundle.session.id === 'next').items.find(item => item.id === fixed.id), fixed)
+    assert(preview.sessions.every(bundle => bundle.items.reduce((sum,item) => sum+Number(item.plannedMinutes || 0),0) <= 55))
+    assert.deepEqual(base, original)
+  }
+  assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, candidates: [] }), /No hi ha prou classes/)
+  assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, targetSessionId: 'next', plannedMinutes: 31 }), /30 minuts/)
+  assert.throws(() => buildAgendaOwnActivityInsertion({ ...base, existingSessionBundles: [{ ...first, session: { ...first.session, status: 'held' } }, next] }), /no es pot modificar/)
 })

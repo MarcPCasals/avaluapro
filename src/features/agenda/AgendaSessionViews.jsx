@@ -232,7 +232,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         {moveError && <p role="alert">{moveError}</p>}
         {moving && <p role="status"><Loader2 className="spin" size={14} /> Desant l’ordre…</p>}
         {activityError && <p role="alert">{activityError}</p>}
-        {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
+        {activityChoices && <AgendaSessionActivityPicker choices={activityChoices} customCapacity={Math.max(0, sessionLoad.programmableMinutes - bundle.items.filter((item) => isBabeliumItem(item) || (item.type === 'activity' && !item.sourceActivityId && item.fixedToSession !== false)).reduce((sum, item) => sum + Number(item.plannedMinutes || 0), 0))} freeMinutes={freeMinutes} busy={busy} onAdd={addActivity} onClose={() => setActivityChoices(null)} />}
         {visibleItems.length === 0 ? <p className="agenda-session-muted">Aquesta sessió encara no té cap activitat.</p> : <ol>{visibleItems.map((item, itemIndex) => {
           const description = item.sourceActivity?.description?.trim()
           const removalState = getAgendaSessionItemRemovalState(bundle, item)
