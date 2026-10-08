@@ -6,7 +6,7 @@ import { subscribePlanningDirection } from '../../data/cloud/planningDirectionSu
 import { PlanningSharedView } from './PlanningSharedView'
 import './planning.css'
 
-export default function PlanningDirectionPage({ unitId }) {
+export default function PlanningDirectionPage({ unitId, applicationId = '' }) {
   const [user, setUser] = useState(undefined)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -50,6 +50,6 @@ export default function PlanningDirectionPage({ unitId }) {
     </div>
     {error && <p className="planning-sharing-error" role="alert">{error}</p>}
     {user === null && <div className="planning-shared-empty large"><h1>Programació compartida</h1><p>Entra amb el compte Google autoritzat pel docent per consultar aquesta pantalla.</p><button className="primary-action" onClick={login} type="button">Entrar amb Google</button></div>}
-    {data?.unit && <PlanningSharedView activities={data.activities} phases={data.phases} unit={data.unit} role="directionReader" liveApplications={data.applications} />}
+    {data?.unit && <PlanningSharedView key={unitId} initialApplicationId={applicationId} activities={data.activities} phases={data.phases} unit={data.unit} role="directionReader" liveApplications={data.applications} />}
   </main>
 }

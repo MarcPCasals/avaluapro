@@ -2,12 +2,29 @@ import { PEDAGOGICAL_TYPE_LABELS } from './documents.js'
 import { groupParallelSessionBundles, summarizeAssignedActivityProgress, summarizeCompletedActivityIds } from './scheduler.js'
 import { getAgendaActivityMinutesById, getManuallyCompletedActivityIds, applyPlanningActivityOverrides } from './classPlanning.js'
 
-export function buildPlanningDirectionUrl(unitId, origin = globalThis.location?.href) {
+export function buildPlanningDirectionUrl(unitId, origin = globalThis.location?.href, applicationId = '') {
   const url = new URL(origin)
   url.search = ''
   url.hash = ''
   url.searchParams.set('planning-view', unitId)
+  if (applicationId) url.searchParams.set('planning-group', applicationId)
   return url.href
+}
+
+/** Un grup demanat mai no es substitueix silenciosament per un altre. */
+export function selectDirectionApplication(applications = [], applicationId = '') {
+  if (applicationId) return applications.find((entry) => entry.application.id === applicationId) || null
+  return applications.find((entry) => entry.application.status !== 'archived') || null
+}
+
+/** La previsualització conserva els canvis locals del mateix grup que l'editor. */
+export function withCurrentDirectionApplication(applications = [], application, overrides = []) {
+  if (!application) return applications
+  const current = applications.find((entry) => entry.application.id === application.id)
+  const mergedOverrides = [...new Map([...(current?.overrides || []), ...overrides]
+    .map((override) => [override.id || `${override.activityId}:${override.updatedAt || override.createdAt || ''}`, override])).values()]
+  const snapshot = { ...current, application, overrides: mergedOverrides, sessions: current?.sessions || [] }
+  return current ? applications.map((entry) => entry === current ? snapshot : entry) : [...applications, snapshot]
 }
 
 const FIELDS = [

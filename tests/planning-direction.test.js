@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPlanningDirectionUrl, compareGroupPlanning } from '../src/domain/planning/directionView.js'
+import { buildPlanningDirectionUrl, compareGroupPlanning, selectDirectionApplication, withCurrentDirectionApplication } from '../src/domain/planning/directionView.js'
 import { subscribeDirectionGraph } from '../src/domain/planning/liveDirection.js'
 
 test('link opens a single read-only UP without inheriting other query parameters', () => {
@@ -8,6 +8,33 @@ test('link opens a single read-only UP without inheriting other query parameters
   assert.equal(url.searchParams.get('planning-view'), 'up 1')
   assert.equal(url.searchParams.size, 1)
   assert.equal(url.hash, '')
+})
+test('link retains the selected group and never falls back to another group while loading', () => {
+  const url = new URL(buildPlanningDirectionUrl('up', 'https://example.com/?old=private', 'actual-group'))
+  assert.equal(url.searchParams.get('planning-group'), 'actual-group')
+  assert.equal(url.searchParams.size, 2)
+  const other = { application: { id: 'other', status: 'active' }, overrides: [], sessions: [] }
+  assert.equal(selectDirectionApplication([other], 'actual-group'), null)
+  const actual = { application: { id: 'actual-group' }, overrides: [], sessions: [] }
+  assert.equal(selectDirectionApplication([other, actual], 'actual-group'), actual)
+})
+test('preview uses original activities and the selected group changes including pending local edits', () => {
+  const originals = [{ id: 'a', title: 'Original', plannedMinutes: 55, studentMaterials: [] }]
+  const cloud = [{ application: { id: 'other' }, overrides: [], sessions: [] }, {
+    application: { id: 'actual-group' }, sessions: [{ session: { id: 's' } }],
+    overrides: [{ id: 'old', activityId: 'a', changes: { plannedMinutes: 60 }, updatedAt: '1' }],
+  }]
+  const local = [{ id: 'pending', activityId: 'a', changes: { plannedMinutes: 70, studentMaterials: [{ kind: 'link', url: 'https://example.com/current' }] }, updatedAt: '2' }]
+  const preview = withCurrentDirectionApplication(cloud, { id: 'actual-group' }, local)
+  const selected = selectDirectionApplication(preview, 'actual-group')
+  assert.equal(selected.sessions[0].session.id, 's')
+  const changes = compareGroupPlanning(originals, selected.overrides)[0].changes
+  assert.deepEqual(changes.find((change) => change.label === 'Minuts previstos'), { label: 'Minuts previstos', before: '55', after: '70' })
+  assert.match(changes.find((change) => change.label === 'Materials de l’alumnat').after, /current/)
+  assert.equal(originals[0].plannedMinutes, 55)
+  assert.equal(cloud[1].overrides.length, 1)
+  assert.equal(preview[0], cloud[0])
+  assert.equal(withCurrentDirectionApplication([], { id: 'actual-group' }, local)[0].overrides.length, 1)
 })
 test('compares final adjustments, zero minutes, adaptations, order and agenda budget', () => {
   const original = [{ id: 'a', title: 'Prova', plannedMinutes: 55, order: 1, diversityMeasures: [] }]

@@ -1234,7 +1234,14 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       )))
       return {
         application,
-        overrides: await loadPlanningActivityOverrides(planningUnit.id, application.id),
+        overrides: (await repository.loadScope(
+          `application:${application.id}:overrides`,
+          async () => withPlanningRemoteContext(
+            await loadPlanningActivityOverrides(planningUnit.id, application.id),
+            { applicationId: application.id, planningUnitId: planningUnit.id },
+          ),
+          { completeSnapshot: true },
+        )).entities,
         sessions: sessions.map((session, index) => ({
           items: detailResults[index].entities
             .filter((entity) => entity.entityType === 'sessionItem')
@@ -1293,6 +1300,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     accessGrants,
     academicYears,
     activities: effectiveActivities,
+    baseActivities: activities,
     activityOverrides,
     activeAcademicYear,
     activeAcademicYearId,

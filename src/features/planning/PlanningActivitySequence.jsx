@@ -1,3 +1,4 @@
+import { orderPlanningPhases } from '../../domain/planning/phaseSequence'
 import { normalizeActivityResourceSelections } from '../../domain/planning/resources'
 import { useMemo, useState } from 'react'
 import {
@@ -18,21 +19,6 @@ const TYPE_DETAILS = {
   activity: { icon: BookOpenText, label: 'Activitat' },
   indication: { icon: Layers3, label: 'Indicació' },
   transition: { icon: ArrowRight, label: 'Pausa o transició' },
-}
-
-function orderedPhases(phases) {
-  const byParent = (phases || []).reduce((result, phase) => {
-    const key = phase.parentPhaseId || 'root'
-    result[key] = [...(result[key] || []), phase].sort((left, right) => Number(left.order) - Number(right.order))
-    return result
-  }, {})
-  const flattened = []
-  const visit = (phase, depth) => {
-    flattened.push({ ...phase, depth })
-    ;(byParent[phase.id] || []).forEach((child) => visit(child, depth + 1))
-  }
-  ;(byParent.root || []).forEach((phase) => visit(phase, 0))
-  return flattened
 }
 
 function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
@@ -180,7 +166,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
   const [phaseMoveBusy, setPhaseMoveBusy] = useState(false)
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
-  const flatPhases = useMemo(() => orderedPhases(phases), [phases])
+  const flatPhases = useMemo(() => orderPlanningPhases(phases), [phases])
   const completedCount = activities.filter((activity) => completedActivityIds.has(activity.id)).length
   const rootPhaseNumberById = useMemo(() => new Map(flatPhases
     .filter((phase) => phase.depth === 0)

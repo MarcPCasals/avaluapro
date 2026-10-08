@@ -14,7 +14,9 @@ import { useEffect, useState } from 'react'
 import { ContextualTab } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
-import { buildDirectionActivityReports } from '../../domain/planning/directionView'
+import { orderPlanningPhases } from '../../domain/planning/phaseSequence'
+import { applyPlanningActivityOverrides } from '../../domain/planning/classPlanning'
+import { buildDirectionActivityReports, selectDirectionApplication } from '../../domain/planning/directionView'
 import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
 import { getSessionLoad } from '../../domain/planning/rules'
 import { PlanningDocumentView } from './PlanningDocumentView'
@@ -101,11 +103,11 @@ function OccurrenceList({ occurrences }) {
   })}</ul>
 }
 
-function SharedActivity({ activity, report, unit, sessionDuration = 60 }) {
+function SharedActivity({ activity, report, unit, sequenceNumber, sessionDuration = 60 }) {
   return <article className="planning-direction-activity">
     <div className="planning-direction-activity-content">
       <div className="planning-direction-activity-heading"><span>{activityKindLabel(activity.type)}</span>{report?.modified && <span className="planning-direction-modified">Activitat modificada</span>}</div>
-      <strong>{activity.title}</strong>
+      <strong>{sequenceNumber && <span className="planning-sequence-code">A{sequenceNumber}</span>}{activity.title}</strong>
       {activity.description && <FormattedText as="p" text={activity.description} />}
       <MaterialLinks activity={activity} unit={unit} />
     </div>
@@ -123,14 +125,18 @@ function SharedActivity({ activity, report, unit, sessionDuration = 60 }) {
   </article>
 }
 
-function BaseProgramView({ activities, phases, unit, applications = [], initialApplicationId = '' }) {
-  const [selectedApplicationId, setSelectedApplicationId] = useState(initialApplicationId)
+function BaseProgramView({ activities, phases, unit, applications = [], selectedApplicationId, onApplicationChange }) {
   const [sessionDuration, setSessionDuration] = useState(60)
-  const bundle = applications.find((entry) => entry.application.id === selectedApplicationId) || applications[0]
+  const bundle = selectDirectionApplication(applications, selectedApplicationId)
   const reports = bundle ? buildDirectionActivityReports(activities, bundle, phases) : []
   const reportById = new Map(reports.map((report) => [report.original.id, report]))
   const displayedActivities = reports.length ? reports.map((report) => report.activity) : activities
-  const activitiesByPhase = new Map(phases.map((phase) => [
+  const flatPhases = orderPlanningPhases(phases)
+  const sequenceNumbers = new Map(flatPhases.flatMap((phase) => displayedActivities
+    .filter((activity) => activity.phaseId === phase.id && reportById.get(activity.id)?.status !== 'removed')
+    .sort((a, b) => Number(a.order) - Number(b.order))).map((activity, index) => [activity.id, index + 1]))
+  const rootNumbers = new Map(flatPhases.filter((phase) => phase.depth === 0).map((phase, index) => [phase.id, index + 1]))
+  const activitiesByPhase = new Map(flatPhases.map((phase) => [
     phase.id,
     displayedActivities.filter((activity) => activity.phaseId === phase.id).sort((a, b) => Number(a.order) - Number(b.order)),
   ]))
@@ -150,32 +156,32 @@ function BaseProgramView({ activities, phases, unit, applications = [], initialA
       </section>
 
       <div className="planning-direction-controls">
-        {applications.length > 0 && <label>Temporització del grup<select value={bundle?.application.id || ''} onChange={(event) => setSelectedApplicationId(event.target.value)}>{applications.map((entry, index) => <option value={entry.application.id} key={entry.application.id}>{entry.application.classLabel || `Grup ${index + 1}`}</option>)}</select></label>}
+        {applications.length > 0 && <label>Temporització del grup<select value={bundle?.application.id || ''} onChange={(event) => onApplicationChange(event.target.value)}>{!bundle && <option value="">Grup pendent de carregar</option>}{applications.map((entry, index) => <option value={entry.application.id} key={entry.application.id}>{entry.application.classLabel || `Grup ${index + 1}`}</option>)}</select></label>}
         <label>Franja de referència<select value={sessionDuration} onChange={(event) => setSessionDuration(Number(event.target.value))}><option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option></select></label>
       </div>
-      <section className="planning-shared-section">
+      {selectedApplicationId && !bundle && <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible. Espera que es carregui o selecciona un grup.</p>}
+      {(!selectedApplicationId || bundle) && <section className="planning-shared-section">
         <header>
           <BookOpenText size={18} />
           <div><strong>Seqüència d’activitats</strong><span>{activities.length} elements</span></div>
         </header>
         <div className="planning-shared-phases">
-          {phases.map((phase) => {
+          {flatPhases.map((phase) => {
             const phaseActivities = activitiesByPhase.get(phase.id) || []
             return (
-              <details open key={phase.id} className={`planning-direction-phase ${phase.kind || 'custom'}`}>
+              <details open key={phase.id} style={{ marginLeft: `${Math.min(phase.depth, 3) * 16}px` }} className={`planning-direction-phase ${phase.kind || 'custom'}`}>
                 <summary>
-                  <span>{phase.title}</span>
+                  <span>{phase.depth === 0 ? `FASE ${rootNumbers.get(phase.id)} — ${phase.title.toLocaleUpperCase('ca')}` : phase.title}</span>
                   <small>{phaseActivities.length} elements</small>
                   <ChevronDown size={15} />
                 </summary>
-                <div>{phaseActivities.map((activity) => <SharedActivity activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} key={activity.id} />)}</div>
+                <div>{phaseActivities.map((activity) => <SharedActivity sequenceNumber={sequenceNumbers.get(activity.id)} activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} key={activity.id} />)}</div>
               </details>
             )
           })}
         </div>
-      </section>
-
-      {displayedActivities.some((activity) => !phases.some((phase) => phase.id === activity.phaseId)) && <section className="planning-shared-phases"><details open><summary>Altres activitats</summary><div>{displayedActivities.filter((activity) => !phases.some((phase) => phase.id === activity.phaseId)).map((activity) => <SharedActivity key={activity.id} activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} />)}</div></details></section>}
+      </section>}
+      {(!selectedApplicationId || bundle) && displayedActivities.some((activity) => !phases.some((phase) => phase.id === activity.phaseId)) && <section className="planning-shared-phases"><details open><summary>Altres activitats</summary><div>{displayedActivities.filter((activity) => !phases.some((phase) => phase.id === activity.phaseId)).map((activity) => <SharedActivity key={activity.id} activity={activity} report={reportById.get(activity.id)} unit={unit} sessionDuration={sessionDuration} />)}</div></details></section>}
       {bundle && <SessionAdditions activities={activities} bundle={bundle} unit={unit} />}
 
       <section className="planning-shared-section">
@@ -290,8 +296,12 @@ function SessionAdditions({ activities, bundle, unit }) {
 export function PlanningSharedView({ activities, classes = [], loadApplications, phases, role, unit, initialTab = 'program', liveApplications, onShare, initialApplicationId = '' }) {
   const [tab, setTab] = useState(initialTab)
   const [applications, setApplications] = useState(null)
+  const [selectedApplicationId, setSelectedApplicationId] = useState(initialApplicationId)
   const [loading, setLoading] = useState(initialTab === 'applications')
   const [error, setError] = useState('')
+  const availableApplications = liveApplications || applications || []
+  const selectedBundle = selectDirectionApplication(availableApplications, selectedApplicationId)
+  const documentActivities = selectedBundle ? applyPlanningActivityOverrides(activities, selectedBundle.overrides) : activities
 
   useEffect(() => {
     if (!loadApplications || liveApplications) return
@@ -324,7 +334,7 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
           <Eye size={18} />
           <span><small>{ROLE_LABELS[role] || 'Programació compartida'}</small><strong>{unit.code} · {unit.title}</strong></span>
         </div>
-        {onShare && <button className="secondary-action compact" onClick={onShare} type="button">Compartir enllaç amb direcció</button>}
+        {onShare && <button className="secondary-action compact" onClick={() => onShare(selectedBundle?.application.id || selectedApplicationId)} type="button">Compartir enllaç amb direcció</button>}
         <nav aria-label="Contingut compartit" role="tablist">
           <ContextualTab aria-selected={tab === 'program'} className={tab === 'program' ? 'active' : ''} help="Mostra l’estructura, el currículum i la seqüència completa de la programació compartida." helpTitle="Programació compartida" onClick={() => setTab('program')} onKeyDown={moveHorizontalTabFocus} role="tab" tabIndex={tab === 'program' ? 0 : -1} type="button">
             Programació
@@ -340,9 +350,9 @@ export function PlanningSharedView({ activities, classes = [], loadApplications,
         </nav>
       </header>
       {tab === 'program' ? (
-        <div role="tabpanel"><BaseProgramView key={`${unit.id}:${initialApplicationId}`} initialApplicationId={initialApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
+        <div role="tabpanel">{error && <p className="planning-sharing-error" role="alert">{error}</p>}<BaseProgramView selectedApplicationId={selectedApplicationId} onApplicationChange={setSelectedApplicationId} activities={activities} phases={phases} unit={unit} applications={liveApplications || applications || []} /></div>
       ) : tab === 'document' ? (
-        <div role="tabpanel"><PlanningDocumentView activities={activities} phases={phases} unit={unit} /></div>
+        <div role="tabpanel">{selectedApplicationId && !selectedBundle ? <p className="planning-sharing-error" role="status">La programació d’aquest grup encara no està disponible.</p> : <PlanningDocumentView activities={documentActivities} phases={orderPlanningPhases(phases)} unit={unit} />}</div>
       ) : loading && !liveApplications ? (
         <div className="planning-shared-loading"><Loader2 className="spin" size={22} />Carregant les sessions…</div>
       ) : error ? (

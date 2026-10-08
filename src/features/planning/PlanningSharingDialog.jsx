@@ -48,13 +48,13 @@ function roleLabel(role) {
  * revocar són operacions atòmiques al núvol perquè el document de la concessió
  * i la llista autoritzada de la UP no puguin quedar desalineats.
  */
-export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSave, unit }) {
+export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSave, unit, applicationId }) {
   const dialogRef = useDialogAccessibility(onClose)
   const [draft, setDraft] = useState(emptyDraft)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const link = buildPlanningDirectionUrl(unit.id)
+  const link = buildPlanningDirectionUrl(unit.id, undefined, applicationId)
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(link); setCopied(true) }
     catch { setError('Copia l’enllaç seleccionant el text del camp.') }

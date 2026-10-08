@@ -2,6 +2,29 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { movePlanningPhaseInSequence } from '../src/domain/planning/rules.js'
 import { orderActivitiesForScheduling } from '../src/domain/planning/scheduler.js'
+import { orderPlanningPhases } from '../src/domain/planning/phaseSequence.js'
+
+test('editor i direcció recorren la fase mare abans de subfases encara que arribin ordenades globalment', () => {
+  const incoming = [
+    { id: 'motivation', parentPhaseId: 'preparation', order: 0 },
+    { id: 'detail', parentPhaseId: 'resolution', order: 0 },
+    { id: 'preparation', order: 0 },
+    { id: 'knowledge', parentPhaseId: 'preparation', order: 1 },
+    { id: 'resolution', order: 1 },
+  ]
+  assert.deepEqual(orderPlanningPhases(incoming).map(({ id, depth }) => [id, depth]), [
+    ['preparation', 0], ['motivation', 1], ['knowledge', 1], ['resolution', 0], ['detail', 1],
+  ])
+  assert.deepEqual(orderActivitiesForScheduling(incoming, [
+    { id: 'a2', phaseId: 'motivation', order: 0 }, { id: 'a1', phaseId: 'preparation', order: 1 },
+  ]).map((activity) => activity.id), ['a1', 'a2'])
+  assert.equal(incoming[0].depth, undefined)
+})
+
+test('conserva fases orfes i evita cicles sense duplicar fases', () => {
+  const incoming = [{ id: 'orphan', parentPhaseId: 'gone', order: 0 }, { id: 'a', parentPhaseId: 'b' }, { id: 'b', parentPhaseId: 'a' }]
+  assert.deepEqual(orderPlanningPhases(incoming).map((phase) => phase.id), ['orphan', 'a', 'b'])
+})
 
 const phases = [
   { id: 'root', planningUnitId: 'up', parentPhaseId: null, order: 0, title: 'Resolució' },
