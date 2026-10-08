@@ -892,12 +892,23 @@
 .planning-direction-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
 .planning-direction-controls label { display: flex; align-items: center; gap: 8px; color: #475569; font-size: 12px; font-weight: 800; }
 .planning-direction-controls select { max-width: 100%; padding: 7px; border: 1px solid #ddd6fe; border-radius: 7px; color: #6d28d9; background: white; }
-.planning-shared-phases .planning-direction-phase.preparation { border-left: 3px solid #60a5fa; }
-.planning-shared-phases .planning-direction-phase.resolution { border-left: 3px solid #a78bfa; }
-.planning-shared-phases .planning-direction-phase.closing { border-left: 3px solid #34d399; }
+.planning-shared-phases .planning-direction-phase.preparation { --direction-phase-color: #60a5fa; border-left: 3px solid #60a5fa; }
+.planning-shared-phases .planning-direction-phase.resolution { --direction-phase-color: #a78bfa; border-left: 3px solid #a78bfa; }
+.planning-shared-phases .planning-direction-phase.closing { --direction-phase-color: #34d399; border-left: 3px solid #34d399; }
 .planning-direction-phase.preparation > summary { background: #eff6ff; }
 .planning-direction-phase.resolution > summary { background: #f5f3ff; }
 .planning-direction-phase.closing > summary { background: #ecfdf5; }
+.planning-shared-phases > details > div { gap: 14px; padding: 14px; background: #f1f5f9; }
+.planning-shared-phases > details > div > .planning-direction-activity {
+  border: 1px solid #cbd5e1;
+  border-left: 3px solid var(--direction-phase-color, #cbd5e1);
+  border-radius: 10px;
+  padding: 16px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+}
+.planning-direction-activity-content > strong { display: flex; align-items: baseline; gap: 7px; }
+.planning-direction-activity-content > strong > .planning-sequence-code { flex-shrink: 0; }
 .planning-direction-activity { min-width: 0; }
 .planning-direction-activity-content { min-width: 0; align-content: start; }
 .planning-direction-activity-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -938,6 +949,8 @@
 .planning-direction-inline-changes del { color: #64748b; }
 .planning-shared-view .planning-shared-sessions > article > div > section { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 600px) {
+  .planning-shared-phases > details > div { gap: 12px; padding: 9px; }
+  .planning-shared-phases > details > div > .planning-direction-activity { padding: 12px; }
   .planning-direction-controls label { width: 100%; justify-content: space-between; }
   .planning-shared-view .planning-direction-meta { max-width: 100%; justify-content: flex-start; }
   .planning-direction-occurrences li { display: grid; gap: 3px; }
