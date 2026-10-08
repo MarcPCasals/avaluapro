@@ -6,7 +6,7 @@ let env
 before(async () => { env = await initializeTestEnvironment({ projectId: 'avaluapro-student-consultation-test', firestore: { rules: await readFile(new URL('../firestore.rules', import.meta.url), 'utf8') } }) })
 beforeEach(async () => { await env.clearFirestore() })
 after(async () => { await env?.cleanup() })
-const db = (uid, email, verified = true) => env.authenticatedContext(uid, { email, email_verified: verified }).firestore()
+const db = (uid, email, verified = true, provider = 'google.com') => env.authenticatedContext(uid, { email, email_verified: verified, firebase: { sign_in_provider: provider } }).firestore()
 const owner = () => db('owner', 'owner@educand.ad')
 const direction = () => db('direction', 'direction@educand.ad')
 const ref = (database) => doc(database, 'studentOverviewShares', 'share-1')
@@ -49,4 +49,15 @@ test('la caducitat, la revocació i el canvi de destinataris es compleixen al se
   await assertSucceeds(updateDoc(ref(owner()), { enabled: false }))
   await assertSucceeds(updateDoc(ref(owner()), { enabled: true, expiresAtEpochMs: Date.now() + 86400000 }))
   await assertSucceeds(getDoc(ref(db('new', 'new@educand.ad'))))
+})
+
+test('només Google educand autoritzat, també per enllaços anteriors amb correus externs', async () => {
+  await setDoc(ref(owner()), data({ authorizedEmails: ['direction@educand.ad', 'external@example.com', 'fake@educand.ad.evil', 'other@sub.educand.ad'] }))
+  await assertSucceeds(getDoc(ref(direction())))
+  for (const email of ['external@example.com', 'fake@educand.ad.evil', 'other@sub.educand.ad']) {
+    await assertFails(getDoc(ref(db('external', email))))
+  }
+  for (const provider of ['password', 'custom', 'anonymous']) {
+    await assertFails(getDoc(ref(db('same-email', 'direction@educand.ad', true, provider))))
+  }
 })

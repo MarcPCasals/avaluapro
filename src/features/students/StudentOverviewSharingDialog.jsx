@@ -51,10 +51,10 @@ export function StudentOverviewSharingDialog({ classId, className, onClose, getS
   }
   return <div className="student-sharing-shell"><Modal title={`Compartir consulta · ${className}`} onClose={onClose} size="lg">
     <div className="student-sharing-dialog">
-      <p>Direcció podrà consultar aquest grup i obrir els detalls, sense editar ni entrar al teu quadern. L’accés queda vinculat als correus que autoritzis.</p>
+      <p>Direcció podrà consultar aquest grup i obrir els detalls, sense editar ni entrar al teu quadern. Només hi podran entrar amb un compte Google verificat @educand.ad que coincideixi amb un dels correus que autoritzis.</p>
       <p>Es comparteix la informació actual de tots els alumnes del grup. Per incorporar canvis posteriors, prem «Actualitzar informació i accés» en un enllaç existent. La caducitat s’aplica al final del dia triat, en hora d’Andorra.</p>
       <form onSubmit={save}>
-        <label>Correus autoritzats de direcció<input required type="text" value={draft.emails} onChange={(event) => setDraft({ ...draft, emails: event.target.value })} placeholder="Separa els correus amb comes" /></label>
+        <label>Correus autoritzats de direcció<input required type="text" value={draft.emails} onChange={(event) => setDraft({ ...draft, emails: event.target.value })} placeholder="Correus @educand.ad separats amb comes" /></label>
         <label>Caduca el<input required name="expiresOn" type="date" value={draft.expiresOn} onChange={(event) => setDraft({ ...draft, expiresOn: event.target.value })} /></label>
         <button className="primary-action" disabled={busy} type="submit">{busy ? 'Desant…' : draft.id ? 'Actualitzar informació i accés' : 'Crear enllaç de consulta'}</button>
         {draft.id && <button type="button" className="secondary-action" onClick={() => setDraft({ id: '', emails: '', expiresOn: '' })}>Preparar un altre enllaç</button>}

@@ -2138,9 +2138,9 @@ service cloud.firestore {
       allow create: if signedIn() && validShare()
         && request.resource.data.enabled == true
         && request.resource.data.expiresAtEpochMs > request.time.toMillis();
-      allow get: if shareOwner() || (signedIn()
+      allow get: if shareOwner() || (isVerifiedGoogleAccount()
         && request.auth.token.email is string
-        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('[^@]+@educand[.]ad')
         && request.auth.token.email.lower() in resource.data.authorizedEmails
         && resource.data.enabled == true
         && request.time.toMillis() < resource.data.expiresAtEpochMs);

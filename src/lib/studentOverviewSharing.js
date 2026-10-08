@@ -1,3 +1,4 @@
+import { isEducandEmail, directionIdentityAllowed } from '../domain/planning/directionAccess.js'
 import { planningExpiryFromDate } from '../domain/planning/accessExpiry.js'
 
 function fields(source = {}, keys) {
@@ -45,8 +46,8 @@ export function buildStudentOverviewSnapshot({ activeClass, activeUt, rows, show
 
 export function studentOverviewShareAccess(emails, expiresOn, now = Date.now()) {
   const authorizedEmails = [...new Set(String(emails).split(/[\s,;]+/).map((email) => email.trim().toLowerCase()).filter(Boolean))]
-  if (!authorizedEmails.length || authorizedEmails.length > 20 || authorizedEmails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
-    throw new Error('Indica entre 1 i 20 correus vàlids de direcció.')
+  if (!authorizedEmails.length || authorizedEmails.length > 20 || authorizedEmails.some((email) => !isEducandEmail(email))) {
+    throw new Error('Indica entre 1 i 20 correus de direcció @educand.ad.')
   }
   const expiresAtEpochMs = planningExpiryFromDate(expiresOn)
   if (!expiresAtEpochMs || expiresAtEpochMs <= now) throw new Error('Tria una data de caducitat d’avui o posterior.')
@@ -57,4 +58,11 @@ export function buildStudentOverviewShareUrl(id, origin = window.location.origin
   const url = new URL('/', origin)
   url.searchParams.set('students-view', id)
   return url.href
+}
+
+/** El propietari gestiona l'enllaç, però la consulta també exigeix el correu autoritzat. */
+export function canReadStudentOverviewShare(share, claims, now = Date.now()) {
+  return directionIdentityAllowed(claims) && share?.enabled === true
+    && Number.isFinite(share.expiresAtEpochMs) && share.expiresAtEpochMs > now
+    && share.authorizedEmails?.includes(String(claims.email).toLowerCase()) === true
 }
