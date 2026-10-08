@@ -50,11 +50,15 @@ export async function getPlanningSyncSummary(uid, options = {}) {
   ])
   const quotaRetryAt = options.quotaRetryAt || activeQuotaRetry(pending, options.now || Date.now())
   if (conflicts.length === 0 && quotaRetryAt) {
+    const retryDate = new Date(quotaRetryAt)
+    const retryNotice = Number.isFinite(retryDate.getTime())
+      ? ` Pròxim intent automàtic: ${new Intl.DateTimeFormat('ca-AD', { dateStyle: 'short', timeStyle: 'short' }).format(retryDate)} (hora d’aquest dispositiu), mentre tinguis AvaluaPro obert i connexió a internet. Aquesta és l’hora del pròxim intent, no una hora garantida de resolució.`
+      : ''
     return {
       conflictCount: 0,
       errorKind: 'quota',
       label: 'Desat al dispositiu',
-      message: 'El canvi està protegit en aquest dispositiu. Firebase ha arribat temporalment al límit i AvaluaPro el sincronitzarà automàticament quan la quota torni a estar disponible.',
+      message: 'El canvi està protegit en aquest dispositiu i pendent de sincronitzar amb Firebase. Evita continuar aquesta mateixa feina en un altre dispositiu, perquè podria mostrar una versió anterior. Firebase ha arribat temporalment al límit i AvaluaPro tornarà a intentar la sincronització automàticament.' + retryNotice,
       pendingCount: pending.length,
       retryAvailableAt: quotaRetryAt,
       state: PLANNING_SYNC_STATES.PENDING,
