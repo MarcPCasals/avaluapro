@@ -245,7 +245,7 @@ export async function savePlanningAccessGrant(planningUnitId, grant) {
   batch.update(
     unitReference,
     new FieldPath('accessByEmail', email),
-    cleanForPlanningFirestore({ classIds: grant.classIds || [], role: grant.role, status: 'active' }),
+    cleanForPlanningFirestore({ classIds: grant.classIds || [], role: grant.role, status: 'active', ...(grant.expiresAtEpochMs != null ? { expiresAtEpochMs: grant.expiresAtEpochMs } : {}) }),
     'authorizedEmails',
     arrayUnion(email),
     'updatedAt',

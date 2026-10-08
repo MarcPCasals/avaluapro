@@ -351,6 +351,44 @@ describe('Planificació compartida', () => {
     await assertFails(updateDoc(sessionRef(db), { status: 'held', updatedAt: NOW }))
   })
 
+  test('la caducitat bloqueja la UP i tota l’aplicació; el propietari conserva l’accés', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const expiry = Date.now() - 1000
+      const grant = { classIds: [], role: 'directionReader', status: 'active', expiresAtEpochMs: expiry }
+      await updateDoc(upRef(context.firestore()), new FieldPath('accessByEmail', DIRECTION.email), grant)
+    })
+    const db = authDb(DIRECTION)
+    await assertFails(getDoc(upRef(db)))
+    await assertFails(getDoc(doc(upRef(db), 'activities', 'plan-activity-one')))
+    await assertFails(getDocs(collection(upRef(db), 'applications')))
+    await assertFails(getDocs(collection(appRef(db), 'activityOverrides')))
+    await assertFails(getDoc(sessionRef(db)))
+    await assertFails(getDocs(collection(sessionRef(db), 'results')))
+    await assertSucceeds(getDoc(upRef(authDb(OWNER))))
+  })
+
+  test('el desament de caducitat és atòmic i no accepta dates passades o diferents', async () => {
+    const db = authDb(OWNER)
+    const expiry = Date.now() + 3600000
+    const grantReference = doc(upRef(db), 'accessGrants', DIRECTION.email)
+    const save = async (grantExpiry, mapExpiry) => {
+      const batch = writeBatch(db)
+      batch.set(grantReference, { ...accessGrantData(DIRECTION, 'directionReader'), expiresAtEpochMs: grantExpiry })
+      batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [], role: 'directionReader', status: 'active', expiresAtEpochMs: mapExpiry })
+      return batch.commit()
+    }
+    await assertFails(save(expiry, expiry + 1))
+    await assertFails(save(Date.now() - 1000, Date.now() - 1000))
+    await assertSucceeds(save(expiry, expiry))
+    await assertSucceeds(getDoc(upRef(authDb(DIRECTION))))
+    await assertSucceeds(getDocs(collection(upRef(authDb(DIRECTION)), 'applications')))
+    const batch = writeBatch(db)
+    batch.set(grantReference, accessGrantData(DIRECTION, 'directionReader'))
+    batch.update(upRef(db), new FieldPath('accessByEmail', DIRECTION.email), { classIds: [], role: 'directionReader', status: 'active' })
+    await assertSucceeds(batch.commit())
+    await assertSucceeds(getDoc(upRef(authDb(DIRECTION))))
+  })
+
   test('les consultes de llistat han d’estar limitades a les UP autoritzades', async () => {
     const db = authDb(DIRECTION)
     const sharedQuery = query(

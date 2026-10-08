@@ -1218,7 +1218,10 @@ service cloud.firestore {
         && request.auth.token.email is string
         && planningUnitData(upId).accessByEmail is map
         && request.auth.token.email in planningUnitData(upId).accessByEmail
-        && planningUnitData(upId).accessByEmail[request.auth.token.email].status == 'active';
+        && planningUnitData(upId).accessByEmail[request.auth.token.email].status == 'active'
+        && (planningUnitData(upId).accessByEmail[request.auth.token.email].get('expiresAtEpochMs', null) == null
+          || (planningUnitData(upId).accessByEmail[request.auth.token.email].expiresAtEpochMs is int
+            && request.time.toMillis() < planningUnitData(upId).accessByEmail[request.auth.token.email].expiresAtEpochMs));
     }
 
     function planningGrantRole(upId) {
@@ -1511,8 +1514,11 @@ service cloud.firestore {
     function validPlanningGrant(upId, grantEmail) {
       return request.resource.data.keys().hasOnly([
           'classIds', 'createdAt', 'entityType', 'granteeEmail', 'granteeUid',
-          'id', 'ownerUid', 'planningUnitId', 'role', 'schemaVersion', 'status', 'updatedAt'
+          'id', 'ownerUid', 'planningUnitId', 'role', 'schemaVersion', 'status', 'updatedAt', 'expiresAtEpochMs'
         ])
+        && (request.resource.data.get('expiresAtEpochMs', null) == null
+          || (request.resource.data.expiresAtEpochMs is int
+            && request.resource.data.expiresAtEpochMs > request.time.toMillis()))
         && request.resource.data.entityType == 'accessGrant'
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == planningUnitData(upId).ownerUid
@@ -1533,6 +1539,7 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].role == request.resource.data.role
           && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].classIds == request.resource.data.classIds
           && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].status == 'active'
+          && getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.accessByEmail[grantEmail].get('expiresAtEpochMs', null) == request.resource.data.get('expiresAtEpochMs', null)
         ) || (
           request.resource.data.status == 'revoked'
           && !(grantEmail in getAfter(/databases/$(database)/documents/planningUnits/$(upId)).data.authorizedEmails)

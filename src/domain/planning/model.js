@@ -671,12 +671,14 @@ export function createActivityResult(input, options = {}) {
 export function createAccessGrant(input, options = {}) {
   const role = enumValue(input.role, ACCESS_ROLES, 'rol de compartició')
   if (role === 'owner') throw new Error('El propietari es defineix a la UP, no mitjançant una invitació')
+  if (input.expiresAtEpochMs != null && (!Number.isSafeInteger(input.expiresAtEpochMs) || input.expiresAtEpochMs <= 0)) throw new Error('La data de caducitat no és vàlida.')
   return {
     ...entityBase(PLANNING_ENTITY_TYPES.ACCESS_GRANT, input, options),
     ownerUid: requiredText(input.ownerUid, 'propietari'),
     planningUnitId: requiredText(input.planningUnitId, 'UP compartida'),
     granteeEmail: normalizedEmail(input.granteeEmail, 'correu convidat'),
     granteeUid: optionalText(input.granteeUid),
+    ...(input.expiresAtEpochMs != null ? { expiresAtEpochMs: input.expiresAtEpochMs } : {}),
     role,
     classIds: textList(input.classIds),
     status: enumValue(input.status || 'active', ['active', 'revoked'], "estat de l'accés"),

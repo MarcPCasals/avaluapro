@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { planningExpiryDate, planningExpiryFromDate, isPlanningAccessExpired } from '../../domain/planning/accessExpiry'
 import { buildPlanningDirectionUrl } from '../../domain/planning/directionView'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 
@@ -35,7 +36,7 @@ const ROLE_OPTIONS = [
 ]
 
 function emptyDraft() {
-  return { classIds: [], email: '', role: 'directionReader' }
+  return { classIds: [], email: '', role: 'directionReader', expiresOn: '' }
 }
 
 function roleLabel(role) {
@@ -63,15 +64,19 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
   const edit = (grant) => setDraft({
     classIds: grant.classIds || [],
     email: grant.granteeEmail,
+    expiresOn: planningExpiryDate(grant.expiresAtEpochMs),
     role: grant.role,
   })
 
   const save = async (event) => {
     event.preventDefault()
+    const selectedExpiryDate = new FormData(event.currentTarget).get('expiresOn') || ''
     setBusy('save')
     setError('')
     try {
-      await onSave(draft)
+      const expiresAtEpochMs = planningExpiryFromDate(selectedExpiryDate)
+      if (expiresAtEpochMs != null && expiresAtEpochMs <= Date.now()) throw new Error('Tria una data de caducitat d’avui o posterior.')
+      await onSave({ ...draft, expiresAtEpochMs })
       setDraft(emptyDraft())
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut desar l’accés.')
@@ -139,6 +144,11 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
               value={draft.email}
             />
           </label>
+          <label>
+            Data de caducitat de l’accés (opcional)
+            <input name="expiresOn" type="date" value={draft.expiresOn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, expiresOn: value })) }} onInput={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, expiresOn: value })) }} />
+            <small>L’enllaç funcionarà per a aquest correu fins al final del dia indicat, en hora d’Andorra. Sense data, l’accés no caduca.</small>
+          </label>
           <fieldset>
             <legend>Què podrà fer?</legend>
             <div className="planning-sharing-roles">
@@ -197,6 +207,7 @@ export function PlanningSharingDialog({ classes, grants, onClose, onRevoke, onSa
               <div>
                 <strong>{grant.granteeEmail}</strong>
                 <span>{roleLabel(grant.role)}</span>
+                <small>{grant.expiresAtEpochMs ? `${isPlanningAccessExpired(grant) ? 'Accés caducat' : 'Caduca'} · ${new Date(grant.expiresAtEpochMs - 1).toLocaleDateString('ca-AD', { timeZone: 'Europe/Andorra' })}` : 'Sense caducitat'}</small>
                 {grant.role === 'planningAgendaEditor' && (
                   <small>{grant.classIds.map((classId) => classById.get(classId)?.name || 'Grup autoritzat').join(' · ')}</small>
                 )}

@@ -1076,7 +1076,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return unit
   }, [activePlanningUnitId, repository, user])
 
-  const saveAccessGrant = useCallback(async ({ classIds = [], email, role }) => {
+  const saveAccessGrant = useCallback(async ({ classIds = [], email, role, expiresAtEpochMs = null }) => {
     if (!activePlanningUnit || activeRole !== 'owner') throw new Error('Només el propietari pot gestionar els accessos.')
     if (!isOnline) throw new Error('Cal connexió per canviar qui pot accedir a la UP.')
     const cleanEmail = String(email || '').trim().toLowerCase()
@@ -1094,6 +1094,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     const grant = createAccessGrant({
       ...(current || {}),
       classIds: allowedClassIds,
+      expiresAtEpochMs,
       granteeEmail: cleanEmail,
       ownerUid: activePlanningUnit.ownerUid,
       planningUnitId: activePlanningUnit.id,

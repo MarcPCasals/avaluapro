@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { signInWithGoogle, signOutFromGoogle } from '../../lib/firebase'
+import { isPlanningAccessExpired } from '../../domain/planning/accessExpiry'
 import { subscribePlanningDirection } from '../../data/cloud/planningDirectionSubscription'
 import { PlanningSharedView } from './PlanningSharedView'
 import './planning.css'
@@ -12,10 +13,32 @@ export default function PlanningDirectionPage({ unitId }) {
   useEffect(() => onAuthStateChanged(getAuth(), (next) => { setData(null); setError(''); setUser(next) }), [])
   useEffect(() => {
     if (!user) return
-    return subscribePlanningDirection(unitId, setData, () => {
+    let timer
+    let stopped = false
+    let stop = () => {}
+    const expire = () => {
+      stopped = true
+      stop()
       setData(null)
-      setError('No tens accés a aquesta programació, o l’accés ha estat retirat. Entra amb el correu que el docent ha autoritzat.')
+      setError('L’accés a aquesta programació ha caducat. Demana al docent que ampliï la data de caducitat.')
+    }
+    stop = subscribePlanningDirection(unitId, (next) => {
+      if (stopped) return
+      clearTimeout(timer)
+      const grant = next.unit?.ownerUid === user.uid ? null : next.unit?.accessByEmail?.[String(user.email || '').toLowerCase()]
+      const check = () => {
+        if (isPlanningAccessExpired(grant)) { expire(); return }
+        if (grant?.expiresAtEpochMs) timer = setTimeout(check, Math.min(grant.expiresAtEpochMs - Date.now(), 2147483647))
+      }
+      check()
+      if (!stopped) { setError(''); setData(next) }
+    }, () => {
+      stopped = true
+      clearTimeout(timer)
+      setData(null)
+      setError('No tens accés a aquesta programació, o l’accés ha caducat o ha estat retirat. Entra amb el correu que el docent ha autoritzat.')
     })
+    return () => { stopped = true; clearTimeout(timer); stop() }
   }, [unitId, user])
   const login = async () => {
     try { await signInWithGoogle() } catch (operationError) { setError(operationError.message) }
