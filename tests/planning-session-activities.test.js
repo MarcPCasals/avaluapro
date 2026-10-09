@@ -11,7 +11,7 @@ function bundle(id, subgroupId = '', items = [], extra = {}) {
   items: items.map(([activityId, minutes], order) => createSessionItem({ id: `${id}-${activityId}`, applicationId: 'app',
     sessionId: id, ownerUid: 'teacher', sourceActivityId: activityId, title: activityId, type: 'activity', plannedMinutes: minutes, order }, options)), results: [] }
 }
-function input(bundles) { return { application, activities, existingSessionBundles: bundles, targetSessionId: bundles[0].session.id } }
+function input(bundles) { return { application, activities, existingSessionBundles: bundles, targetSessionId: bundles[0].session.id, options } }
 test('retirar la prova allibera els minuts i permet recuperar-la sense tocar el laboratori ni la UP', () => {
   const original = bundle('session', '', [['exam', 30], ['lab', 25]])
   const removed = { ...original, items: original.items.filter((item) => item.sourceActivityId !== 'exam') }
@@ -476,4 +476,38 @@ test('recuperar, substituir i inserir contingut respecta un laboratori programat
     assert.equal(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='lab').reduce((n,i)=>n+i.plannedMinutes,0),55)
     assert(!preview.removedItems.some(i=>i.id===lab.items[0].id))
   }
+})
+
+
+test('un buit de 10 minuts salta el laboratori fixat però no divideix una presentació de 15 en 10 i 5', () => {
+  const first = bundle('first', '', [['exam',45]])
+  const labs = ['A','B'].map((half,index) => bundle(`lab-${half}`,half,[['lab',55]],
+    { startsAt:`2026-10-09T${15+index}:00:00`,parallelProgrammingKey:'lab-pair' }))
+  labs.forEach(b=>{ b.items[0].fixedToSession=true })
+  const next=bundle('next','',[['presentation',15],['other',40]],{startsAt:'2026-10-12T08:30:00'})
+  const data={application,targetSessionId:'first',existingSessionBundles:[first,...labs,next],options,
+    activityMinutesById:{exam:45,lab:55,presentation:15,other:40}}
+  const before=structuredClone(data)
+  const preview=buildAgendaSessionCompaction(data)
+  assert.equal(preview.sessions.find(b=>b.session.id==='first').items.reduce((n,i)=>n+i.plannedMinutes,0),45)
+  assert.match(preview.noAdvanceReason,/10 minuts lliures/)
+  assert.match(preview.noAdvanceReason,/presentation.*15 minuts/)
+  assert.match(preview.noAdvanceReason,/fragment de menys de 10 minuts/)
+  for(const lab of labs) assert.deepEqual(preview.sessions.find(b=>b.session.id===lab.session.id).items,lab.items)
+  assert.deepEqual(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='presentation').map(i=>[i.sessionId,i.plannedMinutes]),[['next',15]])
+  assert.deepEqual(data,before)
+  next.items[0].plannedMinutes=20
+  const fits=buildAgendaSessionCompaction({...data,activityMinutesById:{...data.activityMinutesById,presentation:20},candidates:[{date:'2026-10-16',startsAt:'2026-10-16T08:30:00',durationMinutes:60}]})
+  assert.equal(fits.sessions.find(b=>b.session.id==='first').items.find(i=>i.sourceActivityId==='presentation').plannedMinutes,10)
+  assert.deepEqual(fits.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='presentation').map(i=>i.plannedMinutes),[10,10])
+})
+
+test('si totes les activitats posteriors estan fixades, el missatge explica que no es poden avançar', () => {
+  const first=bundle('first','',[['exam',45]])
+  const next=bundle('next','',[['lab',50]],{startsAt:'2026-10-12T08:30:00'})
+  next.items[0].fixedToSession=true
+  const preview=buildAgendaSessionCompaction({application,targetSessionId:'first',existingSessionBundles:[first,next],options,activityMinutesById:{exam:45,lab:50}})
+  assert.match(preview.noAdvanceReason,/cap activitat posterior que es pugui avançar/)
+  assert.match(preview.noAdvanceReason,/fixades/)
+  assert.equal(preview.unfilledSessionGaps.length,0)
 })

@@ -2188,7 +2188,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const compactedMinutes = (compactedTarget?.items || []).reduce((total, item) =>
       total + (Number(item.plannedMinutes) || 0), 0)
     if (compactedMinutes <= previousMinutes) {
-      throw new Error('No hi ha cap activitat posterior disponible per omplir aquest buit.')
+      throw new Error(preview.noAdvanceReason)
     }
     if (preview.unscheduled.length > 0) {
       throw new Error('No hi ha prou sessions disponibles per compactar tota la cronologia.')

@@ -526,6 +526,17 @@ export function buildActivitySessionDistribution({
   ].sort((left, right) => left.candidate.startsAt.localeCompare(right.candidate.startsAt))
   const { logicalByDraft, logicalDrafts } = buildLogicalDrafts(drafts)
   const unscheduled = []
+  const unfilledSessionGaps = []
+  const skipSmallGap = (draft, activity, remainingMinutes) => {
+    unfilledSessionGaps.push({
+      sessionIds: draft.drafts.map((physical) => physical.session?.id).filter(Boolean),
+      title: activity.title,
+      availableMinutes: draft.remainingMinutes,
+      requiredMinutes: remainingMinutes < 2 * minimumFragmentMinutes ? remainingMinutes : minimumFragmentMinutes,
+    })
+    draft.remainingMinutes = 0
+    currentDraft = null
+  }
   let draftIndex = 0
   let currentDraft = null
 
@@ -572,8 +583,7 @@ export function buildActivitySessionDistribution({
       // divideixen si totes dues parts tenen almenys deu minuts.
       if (segmentMinutes < remainingMinutes) {
         if (plannedMinutes <= minimumFragmentMinutes) {
-          draft.remainingMinutes = 0
-          currentDraft = null
+          skipSmallGap(draft, activity, remainingMinutes)
           continue
         }
         const tailMinutes = remainingMinutes - segmentMinutes
@@ -583,8 +593,7 @@ export function buildActivitySessionDistribution({
       }
       if (plannedMinutes > minimumFragmentMinutes && segmentMinutes < minimumFragmentMinutes
         && remainingMinutes >= minimumFragmentMinutes) {
-        draft.remainingMinutes = 0
-        currentDraft = null
+        skipSmallGap(draft, activity, remainingMinutes)
         continue
       }
       draft.items.push({ activity, plannedMinutes: segmentMinutes })
@@ -666,6 +675,7 @@ export function buildActivitySessionDistribution({
     scheduledMinutes: logicalDrafts.reduce((total, draft) => total + draft.items.reduce(
       (sum, item) => sum + (Number(item.plannedMinutes) || 0), 0), 0),
     skippedAlreadyScheduled,
+    unfilledSessionGaps,
     unscheduled,
   }
 }
@@ -1537,7 +1547,12 @@ export function buildAgendaItemChangeReflow(input) {
 
 /** Omple els buits d'una sessió futura avançant el contingut posterior. */
 export function buildAgendaSessionCompaction(input) {
-  return { ...buildAgendaItemsReflow(input), kind: 'agenda-compaction' }
+  const preview = buildAgendaItemsReflow(input)
+  const gap = preview.unfilledSessionGaps.find((entry) => entry.sessionIds.includes(input.targetSessionId))
+  const noAdvanceReason = gap
+    ? `Queden ${gap.availableMinutes} minuts lliures, però «${gap.title}» necessita almenys ${gap.requiredMinutes} minuts en aquesta sessió. No es divideix perquè deixaria un fragment de menys de 10 minuts. Les activitats fixades es mantenen al seu dia i hora.`
+    : 'No hi ha cap activitat posterior que es pugui avançar. Les activitats fixades es mantenen al seu dia i hora.'
+  return { ...preview, kind: 'agenda-compaction', noAdvanceReason }
 }
 
 /**
