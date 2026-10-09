@@ -19,7 +19,11 @@ function dateLabel(startsAt) {
 export function AgendaSessionDetailDialog({ bundle, calendarEvents, classes, onAdjust, onClose, onOpenClassroom, onRemoveItem, onSaveItem, onMoveItem, onResolveGap, onLoadActivities, onAddActivity }) {
   return (
     <Modal onClose={onClose} panelClassName="agenda-dialog agenda-session-dialog" size="lg" title="Detall de la sessió">
-      <AgendaSessionDetail onMoveItem={onMoveItem} onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} onSaveItem={onSaveItem} onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async () => { if (await onResolveGap(bundle)) onClose() }} />
+      <AgendaSessionDetail onMoveItem={onMoveItem} onLoadActivities={onLoadActivities} onAddActivity={onAddActivity} onSaveItem={onSaveItem} onRemoveItem={onRemoveItem} bundle={bundle} calendarEvents={calendarEvents} classes={classes} onAdjust={() => { onClose(); onAdjust(bundle) }} onOpenClassroom={() => { onClose(); onOpenClassroom(bundle) }} onResolveGap={async (targetBundle, selection) => {
+        const result = await onResolveGap(targetBundle, selection)
+        if (result === true) onClose()
+        return result
+      }} />
     </Modal>
   )
 }

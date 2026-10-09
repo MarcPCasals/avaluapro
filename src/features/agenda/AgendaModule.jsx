@@ -829,7 +829,7 @@ export default function AgendaModule() {
       return true
     } catch (error) {
       workspace.setError(error.message || 'No s’ha pogut omplir el temps lliure de la sessió.')
-      return false
+      throw error
     }
   }
   const reloadCurrentWeek = () => workspace.loadSessionRange({ from: weekStart, includeDetails: false, to: addDateDays(weekStart, 4) })
