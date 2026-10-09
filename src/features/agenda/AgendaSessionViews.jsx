@@ -133,6 +133,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
   const [activityError, setActivityError] = useState('')
   const [resolvingGap, setResolvingGap] = useState(false)
   const [gapError, setGapError] = useState('')
+  const [gapChoice, setGapChoice] = useState(null)
   const [moving, setMoving] = useState(false)
   const [moveError, setMoveError] = useState('')
   const moveItem = async (item, direction) => {
@@ -143,11 +144,15 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
     finally { setMoving(false) }
   }
   const busy = removing || saving || loadingActivities || resolvingGap || moving
-  const resolveGap = async () => {
+  const resolveGap = async (selection = null) => {
     if (busy) return
     setResolvingGap(true)
     setGapError('')
-    try { await onResolveGap(bundle) }
+    try {
+      const result = await onResolveGap(bundle, selection)
+      if (result?.gapChoice) setGapChoice(result.gapChoice)
+      else if (result !== false) setGapChoice(null)
+    }
     catch (error) { setGapError(error.message || 'No s’ha pogut recalcular la cronologia.') }
     finally { setResolvingGap(false) }
   }
@@ -222,9 +227,16 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
         <span className={`agenda-session-status ${blockingEvent ? 'notHeld' : bundle.session.status}`}>{blockingEvent ? 'No es fa' : STATUS_LABELS[bundle.session.status]}</span>
       </header>
       {blockingEvent && <div className="agenda-session-calendar-blocked"><Moon size={18} /><div><strong>{blockingEvent.title}</strong><span>{CALENDAR_EVENT_LABELS[blockingEvent.type] || 'Canvi de calendari'} · aquesta sessió no es fa.</span>{blockingEvent.reason && <p>{blockingEvent.reason}</p>}</div></div>}
-      {!blockingEvent && bundle.session.status === 'planned' && freeMinutes > 0 && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{freeMinutes} min programables sense ocupar</strong><span>Pots avançar la propera activitat i, si cal, dividir-la per completar els {sessionLoad.programmableMinutes} minuts.</span></div>{onResolveGap && <button className="secondary-action compact" disabled={busy} aria-busy={resolvingGap} onClick={resolveGap} type="button">{resolvingGap ? <Loader2 aria-hidden="true" className="spin" size={14} /> : <ArrowLeft size={14} />}{resolvingGap ? 'Recalculant la cronologia…' : 'Avançar la propera activitat'}</button>}</div>}
+      {!blockingEvent && bundle.session.status === 'planned' && freeMinutes > 0 && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{freeMinutes} min programables sense ocupar</strong><span>Pots avançar la propera activitat i, si cal, dividir-la per completar els {sessionLoad.programmableMinutes} minuts.</span></div>{onResolveGap && <button className="secondary-action compact" disabled={busy} aria-busy={resolvingGap} onClick={() => resolveGap()} type="button">{resolvingGap ? <Loader2 aria-hidden="true" className="spin" size={14} /> : <ArrowLeft size={14} />}{resolvingGap ? 'Recalculant la cronologia…' : 'Avançar la propera activitat'}</button>}</div>}
       {!blockingEvent && bundle.session.status === 'planned' && bundle.session.babeliumEnabled && sessionLoad.plannedMinutes > sessionLoad.programmableMinutes && <div className="agenda-session-gap-warning"><AlertTriangle size={18} /><div><strong>{sessionLoad.plannedMinutes - sessionLoad.programmableMinutes} min per sobre del temps disponible</strong><span>Reorganitza les activitats amb la calendarització intel·ligent per respectar el bloc de Babèlium i el temps real de classe.</span></div></div>}
       {resolvingGap && <p className="agenda-session-edit-notice" role="status">Recalculant la cronologia… Espera un moment.</p>}
+      {gapChoice && <div className="agenda-session-gap-warning agenda-session-gap-choice" role="group" aria-label="Com vols avançar l’activitat?">
+        <div><strong>{gapChoice.title}</strong><p>Hi ha {gapChoice.availableMinutes} minuts lliures i l’activitat té {gapChoice.remainingMinutes} minuts pendents. Tria com vols avançar-la. El canvi afecta només l’agenda d’aquest grup; la Programació original es conserva.</p>
+          <button className="secondary-action compact" disabled={busy} type="button" onClick={() => resolveGap({ ...gapChoice, mode: 'reduce' })}>Reduir {gapChoice.reduceBy} min i avançar-la ({gapChoice.availableMinutes} min)</button>
+          <button className="secondary-action compact" disabled={busy} type="button" onClick={() => resolveGap({ ...gapChoice, mode: 'extend' })}>Ampliar {gapChoice.extendBy} min i repartir-la ({gapChoice.availableMinutes} + 10 min)</button>
+          <button className="secondary-action compact" disabled={busy} type="button" onClick={() => setGapChoice(null)}>Conservar els minuts i deixar el buit</button>
+        </div>
+      </div>}
       {gapError && <p role="alert">{gapError}</p>}
       {editNotice && <p className="agenda-session-edit-notice" role="status">{editNotice}</p>}
       <div className="agenda-session-activities">

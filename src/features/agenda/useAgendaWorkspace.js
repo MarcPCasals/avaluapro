@@ -2145,7 +2145,7 @@ export function useAgendaWorkspace(user, classes = []) {
   }, [activeAcademicYear, loadSchedulingSetup, persistAgendaReflowPreview, persist])
 
   /** Omple els minuts lliures d'una sessió avançant la seqüència posterior. */
-  const compactAgendaSession = useCallback(async (bundle) => {
+  const compactAgendaSession = useCallback(async (bundle, gapResolution = null) => {
     if (!activeAcademicYear) throw new Error('Cal tenir un curs actiu per reajustar l’Agenda.')
     const setup = await loadSchedulingSetup({
       applicationId: bundle.application.id,
@@ -2180,7 +2180,7 @@ export function useAgendaWorkspace(user, classes = []) {
       options: { currentDateKey: localDateKey(), now: new Date().toISOString(), calendarEvents: setup.calendarEvents },
       targetSessionId: targetBundle.session.id,
     }
-    const preview = buildAgendaSessionCompaction(reflowInput)
+    const preview = buildAgendaSessionCompaction({ ...reflowInput, gapResolution })
     const previousMinutes = targetBundle.items.reduce((total, item) =>
       total + (Number(item.plannedMinutes) || 0), 0)
     const compactedTarget = preview.sessions.find((candidate) =>
@@ -2188,6 +2188,7 @@ export function useAgendaWorkspace(user, classes = []) {
     const compactedMinutes = (compactedTarget?.items || []).reduce((total, item) =>
       total + (Number(item.plannedMinutes) || 0), 0)
     if (compactedMinutes <= previousMinutes) {
+      if (preview.gapChoice) return { gapChoice: preview.gapChoice }
       throw new Error(preview.noAdvanceReason)
     }
     if (preview.unscheduled.length > 0) {

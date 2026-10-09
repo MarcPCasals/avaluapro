@@ -812,9 +812,18 @@ export default function AgendaModule() {
     } : current)
     setTimelinePlanningRevision((revision) => revision + 1)
   }
-  const resolveSessionGap = async (bundle) => {
+  const resolveSessionGap = async (bundle, gapResolution) => {
     try {
-      await workspace.compactAgendaSession(bundle)
+      const result = await workspace.compactAgendaSession(bundle, gapResolution)
+      if (result.gapChoice) return result
+      const updated = result.sessions.find((candidate) => candidate.session.id === bundle.session.id)
+      const activityById = new Map(result.setup.activities.map((activity) => [activity.id, activity]))
+      setActiveBundle((current) => current?.session.id === bundle.session.id && updated ? {
+        ...current, session: updated.session,
+        items: updated.items.map((item) => ({ ...item, sourceActivity: activityById.get(item.sourceActivityId) || null })),
+        results: result.changedTargetResults || current.results || [],
+      } : current)
+      setTimelinePlanningRevision((revision) => revision + 1)
       setScheduleNotice('Buit resolt: la cronologia futura s’ha compactat automàticament.')
       await reloadActiveView()
       return true

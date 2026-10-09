@@ -531,6 +531,8 @@ export function buildActivitySessionDistribution({
     unfilledSessionGaps.push({
       sessionIds: draft.drafts.map((physical) => physical.session?.id).filter(Boolean),
       title: activity.title,
+      sourceKey: activity.sourceKey,
+      remainingMinutes,
       availableMinutes: draft.remainingMinutes,
       requiredMinutes: remainingMinutes < 2 * minimumFragmentMinutes ? remainingMinutes : minimumFragmentMinutes,
     })
@@ -1134,7 +1136,7 @@ function buildAgendaItemsReflow({
       if (isBabeliumItem(item) || isFixedAgendaItem(item)) return
       const isTarget = group === targetGroup && itemIndex === targetItemIndex
       const physicalItem = group === targetGroup
-        ? [...physicalTarget.items].sort(compareOrder)[itemIndex] : null
+        ? [...physicalTarget.items].sort(compareOrder)[itemIndex] : item
       const itemChange = itemChanges[physicalItem?.id] || (isTarget ? changes : null)
       const title = itemChange ? String(itemChange.title || item.title).trim() || item.title : item.title
       const newMinutes = itemChange ? Number(itemChange.plannedMinutes) : item.plannedMinutes
@@ -1549,10 +1551,39 @@ export function buildAgendaItemChangeReflow(input) {
 export function buildAgendaSessionCompaction(input) {
   const preview = buildAgendaItemsReflow(input)
   const gap = preview.unfilledSessionGaps.find((entry) => entry.sessionIds.includes(input.targetSessionId))
+  const futureItem = gap && groupParallelSessionBundles((input.existingSessionBundles || [])
+    .filter((bundle) => bundle.session.applicationId === input.application.id
+      && bundle.session.startsAt > preview.targetBundle.session.startsAt
+      && canReflowSession(bundle, String(preview.targetBundle.session.startsAt).slice(0, 10), input.options?.now))
+    .sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt)))
+    .flatMap((group) => [...group.bundles[0].items].sort(compareOrder)
+      .map((item) => ({ item, sessionId: group.bundles[0].session.id })))
+    .find(({ item }) => !isFixedAgendaItem(item) && !isBabeliumItem(item)
+      && (item.sourceActivityId === gap.sourceKey || gap.sourceKey?.endsWith(`:${item.id}`)))
+  const gapChoice = futureItem && gap.availableMinutes >= 10 && gap.remainingMinutes > gap.availableMinutes
+    && gap.remainingMinutes < 20 ? {
+      itemId: futureItem.item.id, sessionId: futureItem.sessionId, title: gap.title,
+      availableMinutes: gap.availableMinutes, remainingMinutes: gap.remainingMinutes,
+      reduceBy: gap.remainingMinutes - gap.availableMinutes,
+      extendBy: gap.availableMinutes + 10 - gap.remainingMinutes,
+    } : null
+  if (input.gapResolution) {
+    const selection = input.gapResolution
+    if (!gapChoice || selection.itemId !== gapChoice.itemId || selection.sessionId !== gapChoice.sessionId
+      || selection.availableMinutes !== gapChoice.availableMinutes || selection.remainingMinutes !== gapChoice.remainingMinutes
+      || !['reduce', 'extend'].includes(selection.mode)) {
+      throw new Error('La cronologia ha canviat. Torna a avançar l’activitat per revisar les opcions.')
+    }
+    const delta = selection.mode === 'reduce' ? -gapChoice.reduceBy : gapChoice.extendBy
+    const updated = buildAgendaItemsReflow({ ...input, itemChanges: {
+      [futureItem.item.id]: { plannedMinutes: Number(futureItem.item.plannedMinutes) + delta },
+    } })
+    return { ...updated, kind: 'agenda-compaction', gapChoice: null }
+  }
   const noAdvanceReason = gap
     ? `Queden ${gap.availableMinutes} minuts lliures, però «${gap.title}» necessita almenys ${gap.requiredMinutes} minuts en aquesta sessió. No es divideix perquè deixaria un fragment de menys de 10 minuts. Les activitats fixades es mantenen al seu dia i hora.`
     : 'No hi ha cap activitat posterior que es pugui avançar. Les activitats fixades es mantenen al seu dia i hora.'
-  return { ...preview, kind: 'agenda-compaction', noAdvanceReason }
+  return { ...preview, kind: 'agenda-compaction', noAdvanceReason, gapChoice }
 }
 
 /**

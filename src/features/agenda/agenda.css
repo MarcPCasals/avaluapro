@@ -707,3 +707,8 @@
 .agenda-session-activity-picker { margin: 12px 0; padding: 12px; background: #faf5ff; border: 1px solid #ede9fe; border-radius: 10px; }
 .agenda-session-activity-picker label { min-width: 0; }
 .agenda-session-activity-picker select { width: 100%; min-width: 0; border: 1px solid #ddd6fe; border-radius: 8px; padding: 8px 10px; background: #fff; color: #334155; font-size: 12px; }
+
+.agenda-session-gap-choice { grid-template-columns: minmax(0, 1fr); }
+.agenda-session-gap-choice > div { gap: 8px; }
+.agenda-session-gap-choice p { margin: 0; font-size: 11px; line-height: 1.5; }
+.agenda-session-gap-choice button { justify-self: start; max-width: 100%; white-space: normal; text-align: left; }

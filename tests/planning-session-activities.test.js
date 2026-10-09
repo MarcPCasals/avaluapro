@@ -511,3 +511,58 @@ test('si totes les activitats posteriors estan fixades, el missatge explica que 
   assert.match(preview.noAdvanceReason,/fixades/)
   assert.equal(preview.unfilledSessionGaps.length,0)
 })
+
+
+for (const mode of ['reduce','extend']) {
+  test(`l’usuari pot ${mode === 'reduce' ? 'sacrificar 5 minuts' : 'ampliar a 10 + 10'} per avançar una presentació de 15`, () => {
+    const first=bundle('first','',[['exam',45]])
+    const fixed=bundle('fixed','',[['lab',55]],{startsAt:'2026-10-09T15:00:00'})
+    fixed.items[0].fixedToSession=true
+    const next=bundle('next','',[['presentation',15],['other',40]],{startsAt:'2026-10-12T08:30:00'})
+    const data={application,targetSessionId:'first',existingSessionBundles:[first,fixed,next],options,
+      activityMinutesById:{exam:45,lab:55,presentation:15,other:40}}
+    const original=structuredClone(data)
+    const proposal=buildAgendaSessionCompaction(data)
+    assert.equal(proposal.gapChoice.reduceBy,5)
+    assert.equal(proposal.gapChoice.extendBy,5)
+    const result=buildAgendaSessionCompaction({...data,gapResolution:{...proposal.gapChoice,mode}})
+    const portions=result.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='presentation')
+    assert.equal(result.sessions.find(b=>b.session.id==='first').items.find(i=>i.sourceActivityId==='presentation').plannedMinutes,10)
+    assert.deepEqual(portions.map(i=>i.plannedMinutes),mode==='reduce'?[10]:[10,10])
+    assert.equal(result.activityMinutesChanges.presentation,mode==='reduce'?10:20)
+    assert.deepEqual(result.sessions.find(b=>b.session.id==='fixed').items,fixed.items)
+    assert.equal(result.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='other').reduce((n,i)=>n+i.plannedMinutes,0),40)
+    assert.deepEqual(result.unscheduled,[])
+    assert.deepEqual(data,original)
+    assert.throws(()=>buildAgendaSessionCompaction({...data,gapResolution:{...proposal.gapChoice,itemId:'stale',mode}}),/cronologia ha canviat/)
+  })
+}
+
+test('els fragments ja fets i fixats de la mateixa font es conserven en ampliar la part pendent',()=>{
+ const held=bundle('held','',[['presentation',25]],{status:'held',startsAt:'2026-10-05T08:30:00'})
+ const first=bundle('first','',[['exam',45]])
+ const fixed=bundle('fixed','',[['presentation',10]],{startsAt:'2026-10-09T15:00:00'})
+ fixed.items[0].fixedToSession=true
+ const next=bundle('next','',[['presentation',15]],{startsAt:'2026-10-12T08:30:00'})
+ const data={application,targetSessionId:'first',existingSessionBundles:[held,first,fixed,next],options,activityMinutesById:{exam:45,presentation:50}}
+ const proposal=buildAgendaSessionCompaction(data)
+ const result=buildAgendaSessionCompaction({...data,gapResolution:{...proposal.gapChoice,mode:'extend'}})
+ assert.equal(result.activityMinutesChanges.presentation,55)
+ assert.deepEqual(result.sessions.find(b=>b.session.id==='fixed').items.find(i=>i.id===fixed.items[0].id),fixed.items[0])
+ assert(!result.removedItems.some(i=>i.sessionId==='held'))
+ assert.deepEqual(result.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='presentation'&&!i.fixedToSession).map(i=>i.plannedMinutes),[10,10])
+})
+
+
+test('la tria amb mitjos grups conserva una única durada lògica encara que els paquets arribin desordenats',()=>{
+ const first=bundle('first','',[['exam',45]])
+ const a=bundle('A','A',[['presentation',15]],{startsAt:'2026-10-12T08:30:00',parallelProgrammingKey:'pair'})
+ const b=bundle('B','B',[['presentation',15]],{startsAt:'2026-10-12T09:30:00',parallelProgrammingKey:'pair'})
+ const data={application,targetSessionId:'first',existingSessionBundles:[b,first,a],options,activityMinutesById:{exam:45,presentation:15}}
+ const proposal=buildAgendaSessionCompaction(data)
+ const result=buildAgendaSessionCompaction({...data,gapResolution:{...proposal.gapChoice,mode:'extend'}})
+ assert.equal(result.activityMinutesChanges.presentation,20)
+ assert.equal(result.sessions.find(s=>s.session.id==='first').items.find(i=>i.sourceActivityId==='presentation').plannedMinutes,10)
+ for(const id of ['A','B']) assert.equal(result.sessions.find(s=>s.session.id===id).items.find(i=>i.sourceActivityId==='presentation').plannedMinutes,10)
+ assert.throws(()=>buildAgendaSessionCompaction({...data,gapResolution:{...proposal.gapChoice,remainingMinutes:16,mode:'reduce'}}),/cronologia ha canviat/)
+})
