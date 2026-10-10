@@ -1,3 +1,4 @@
+import { applyClassroomContinuationPreview } from '../../domain/planning/classroomContinuation'
 import { planningSubjectsMatch } from '../../domain/planning/subjects.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -966,15 +967,9 @@ export default function AgendaModule() {
   })
   const confirmClassroomContinuation = async (preview) => {
     const confirmed = await workspace.confirmContinuationPreview(preview)
-    const sourceItem = confirmed.changedExistingItems.find((item) => item.id === confirmed.item.id) || confirmed.item
+    const { sourceItem } = applyClassroomContinuationPreview(confirmed.bundle, confirmed)
     await activateClassroomEvidence(confirmed.bundle, { ...sourceItem, sourceActivity: confirmed.item.sourceActivity })
-    setActiveBundle((current) => {
-      if (!current || !confirmed.sourceResult) return current
-      const results = current.results.some((result) => result.id === confirmed.sourceResult.id)
-        ? current.results.map((result) => result.id === confirmed.sourceResult.id ? confirmed.sourceResult : result)
-        : [...current.results, confirmed.sourceResult]
-      return { ...current, results }
-    })
+    setActiveBundle((current) => applyClassroomContinuationPreview(current, confirmed).bundle)
     // El canvi de clau reinicia només la pantalla de classe i avança al primer
     // element pendent després d'haver registrat la continuació.
     setClassroomRevision((revision) => revision + 1)
