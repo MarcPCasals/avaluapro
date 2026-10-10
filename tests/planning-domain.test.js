@@ -1086,9 +1086,9 @@ test('una activitat repetida per mitjos grups no consta com acabada fins que tot
     { session: sessionB, items: [itemB], results: [] },
   ]
 
-  assert.deepEqual([...summarizeCompletedActivityIds(bundles)], [])
+  assert.deepEqual([...summarizeCompletedActivityIds(bundles, { now: '2026-09-25T11:00:00' })], [])
   bundles[1].results = [resultFor(sessionB, itemB, 'b')]
-  assert.deepEqual([...summarizeCompletedActivityIds(bundles)], ['shared-activity'])
+  assert.deepEqual([...summarizeCompletedActivityIds(bundles, { now: '2026-09-25T11:00:00' })], ['shared-activity'])
 })
 
 test('els mitjos grups del mateix dia reben la mateixa activitat sense avançar dues vegades la UP', () => {

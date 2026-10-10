@@ -27,7 +27,7 @@ export function getSessionActivityChoices({ activities, application, existingSes
   const { assignedMinutesByActivityId, assignedSourceActivityIds } = summarizeAssignedActivityProgress(bundles)
   const fixed = summarizeAssignedActivityProgress(bundles.map(bundle => movableIds.has(bundle.session.id) ? { ...bundle, items: bundle.items.filter(isFixedAgendaItem) } : bundle))
   const history = summarizeAssignedActivityProgress(bundles.filter(bundle => bundle.session.id !== target.session.id && !movableIds.has(bundle.session.id)))
-  const completed = new Set([...manuallyCompletedSourceActivityIds, ...summarizeCompletedActivityIds(bundles)])
+  const completed = new Set([...manuallyCompletedSourceActivityIds, ...summarizeCompletedActivityIds(bundles, options)])
   return activities.map((activity, index) => {
     const timed = Number(activity.plannedMinutes) > 0
     const assignedMinutes = assignedMinutesByActivityId[activity.id] || 0

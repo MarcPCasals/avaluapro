@@ -229,36 +229,43 @@ export function summarizeUnscheduledPlanningActivities({
 }
 
 /**
- * Una activitat es considera acabada quan el seu últim fragment té un
- * resultat «completed». Completar una part intermèdia no amaga els fragments
- * que encara resten per fer.
+ * Sense resultat explícit, una sessió acabada es dona per feta. Les excepcions
+ * registrades prevalen sobre el rellotge. Cal acabar tots els fragments finals
+ * (també els dels mitjos grups), no només la primera part d'una activitat.
+ * És un càlcul: no fabrica resultats ni modifica l'historial de Mode aula.
  */
-export function summarizeCompletedActivityIds(sessionBundles = []) {
-  const completedItemIds = new Set()
+export function summarizeCompletedActivityIds(sessionBundles = [], { now = new Date().toISOString() } = {}) {
+  const nowMs = new Date(now).getTime()
   const terminalItemsBySourceActivityId = new Map()
+  const incompleteSourceActivityIds = new Set()
   for (const bundle of sessionBundles) {
     if (!bundle?.session || ['cancelled', 'notHeld'].includes(bundle.session.status)) continue
-    ;(bundle.results || [])
-      .filter((result) => result.status === 'completed')
-      .forEach((result) => completedItemIds.add(result.sessionItemId))
+    const startsAtMs = bundle.session.startsAt ? new Date(bundle.session.startsAt).getTime() : NaN
+    const duration = Number(bundle.session.durationMinutes)
+    const elapsed = Number.isFinite(startsAtMs) && duration > 0
+      && startsAtMs + duration * 60_000 <= nowMs
+    const resultsByItemId = new Map((bundle.results || []).map((result) => [result.sessionItemId, result]))
     for (const item of bundle.items || []) {
       if (!item.sourceActivityId) continue
+      const result = resultsByItemId.get(item.id)
       const segmentIndex = Math.max(1, Number(item.segmentIndex) || 1)
       const segmentCount = Math.max(1, Number(item.segmentCount) || 1)
+      const completed = result ? result.status === 'completed' : elapsed
+      // Una continuació intermèdia es resol al fragment final; una omissió
+      // explícita o una part encara futura no es pot donar per impartida.
+      if (!completed && !(result?.status === 'continued' && segmentIndex < segmentCount)) {
+        incompleteSourceActivityIds.add(item.sourceActivityId)
+      }
       if (segmentIndex < segmentCount) continue
       terminalItemsBySourceActivityId.set(item.sourceActivityId, [
         ...(terminalItemsBySourceActivityId.get(item.sourceActivityId) || []),
-        item.id,
+        completed,
       ])
     }
   }
-  const completedSourceActivityIds = new Set()
-  for (const [sourceActivityId, terminalItemIds] of terminalItemsBySourceActivityId) {
-    if (terminalItemIds.length > 0 && terminalItemIds.every((itemId) => completedItemIds.has(itemId))) {
-      completedSourceActivityIds.add(sourceActivityId)
-    }
-  }
-  return completedSourceActivityIds
+  return new Set([...terminalItemsBySourceActivityId]
+    .filter(([id, completedParts]) => !incompleteSourceActivityIds.has(id) && completedParts.every(Boolean))
+    .map(([id]) => id))
 }
 
 /**

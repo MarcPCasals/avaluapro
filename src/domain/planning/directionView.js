@@ -66,14 +66,14 @@ export function compareGroupPlanning(activities, overrides = [], phases = []) {
 }
 
 /** Una activitat conserva tota la seqüència de sessions, també les cancel·lades. */
-export function buildDirectionActivityReports(activities = [], bundle = {}, phases = []) {
+export function buildDirectionActivityReports(activities = [], bundle = {}, phases = [], options = {}) {
   const overrides = bundle.overrides || []
   const sessions = [...(bundle.sessions || [])].sort((a, b) => String(a.session.startsAt).localeCompare(String(b.session.startsAt)))
   const effectiveById = new Map(applyPlanningActivityOverrides(activities, overrides).map((activity) => [activity.id, activity]))
   const changesById = new Map(compareGroupPlanning(activities, overrides, phases).map((item) => [item.id, item.changes]))
   const agendaMinutes = getAgendaActivityMinutesById(activities.map((item) => effectiveById.get(item.id) || item), overrides)
   const manualIds = getManuallyCompletedActivityIds(overrides)
-  const completedIds = summarizeCompletedActivityIds(sessions)
+  const completedIds = summarizeCompletedActivityIds(sessions, options)
   const validSessions = sessions.map((entry) => ({ ...entry, items: (entry.items || []).filter((item) => {
     const result = (entry.results || []).find((candidate) => candidate.sessionItemId === item.id)
     return !['notHeld', 'skipped'].includes(result?.status)

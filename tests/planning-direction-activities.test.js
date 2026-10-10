@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildDirectionActivityReports } from '../src/domain/planning/directionView.js'
+import { buildDirectionActivityReports as buildReports } from '../src/domain/planning/directionView.js'
 import { getEffectiveActivityMaterialLinks } from '../src/domain/planning/materials.js'
+
+// Freeze the clock before the scheduled sessions: expected states do not age.
+const buildDirectionActivityReports = (activities, bundle, phases) => buildReports(activities, bundle, phases, { now: '2026-10-08T08:00:00' })
 
 const activity = { id: 'a', title: 'Mostres', phaseId: 'p', plannedMinutes: 55, order: 0 }
 function session(id, status, minutes = 55, options = {}) {
