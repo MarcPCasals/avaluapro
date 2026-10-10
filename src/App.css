@@ -31459,3 +31459,14 @@ button.profile-followup-card:focus-visible {
   font-weight: 400;
   line-height: 1.6;
 }
+
+.reminder-date-calendar { display: grid; gap: 12px; border: 1px solid #fed7aa; border-radius: 12px; padding: 14px; background: #fffaf5; }
+.reminder-date-calendar > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.reminder-date-calendar > header strong { color: #334155; text-transform: capitalize; }
+.reminder-date-calendar button { min-height: 40px; border: 0; border-radius: 8px; color: #334155; background: transparent; cursor: pointer; }
+.reminder-date-calendar > header button { display: grid; place-items: center; min-width: 40px; }
+.reminder-date-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.reminder-date-weekday { padding: 5px 0; text-align: center; color: #64748b; font-size: 12px; font-weight: 800; }
+.reminder-date-calendar button:hover, .reminder-date-calendar button:focus-visible { background: #ffedd5; }
+.reminder-date-calendar button[aria-pressed="true"] { color: white; background: #f97316; font-weight: 900; }
+.reminder-date-calendar button:disabled { opacity: .5; cursor: wait; }

@@ -1,3 +1,4 @@
+import { ReminderDateCalendar } from './ReminderDateCalendar'
 import { Bell, BellRing, CheckCircle2, Clock3, Copy, Mail, Plus, Skull } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { getRecoveryEmailPreview, groupDailyRecoveryReminders } from '../../lib/classroomRecovery'
@@ -301,6 +302,27 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     }
   }
 
+  if (rescheduling) {
+    return (
+      <Modal key="reschedule" onClose={() => { if (!savingDate) setRescheduling(null) }} title="Reprogramar recordatori">
+        <form className="reminders-modal" onSubmit={saveRescheduling}>
+          <strong>{rescheduling.shared ? rescheduling.item.text : rescheduling.item.title}</strong>
+          {rescheduling.shared && <p className="reminder-kind-help">La nova data es compartirà amb la cotutora i tornarà a activar els avisos.</p>}
+          <ReminderDateCalendar key={rescheduling.date.slice(0, 7)} disabled={savingDate} onChange={(date) => setRescheduling(current => ({ ...current, date }))} value={rescheduling.date} />
+          <div className="reminder-form-grid">
+            <label>Data<input required type="date" value={rescheduling.date} disabled={savingDate} onChange={(event) => setRescheduling(current => ({ ...current, date: event.target.value }))} /></label>
+            <label>Hora<input type="time" value={rescheduling.time} disabled={savingDate} onChange={(event) => setRescheduling(current => ({ ...current, time: event.target.value }))} /></label>
+          </div>
+          {error && <p className="reminder-form-error" role="alert">{error}</p>}
+          <div className="reminder-row-actions">
+            <button className="primary-action compact" disabled={savingDate || !rescheduling.date} type="submit">{savingDate ? 'Desant…' : 'Desar nova data'}</button>
+            <button className="secondary-action compact" disabled={savingDate} onClick={() => setRescheduling(null)} type="button">Cancel·lar</button>
+          </div>
+        </form>
+      </Modal>
+    )
+  }
+
   if (emailPreview) {
     return (
       <Modal onClose={() => { if (!completingId) setEmailPreview(null) }} size="lg" title="Previsualitzar el correu">
@@ -402,20 +424,6 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
         </section>}
 
         {error && <p className="reminder-form-error" role="alert">{error}</p>}
-        {rescheduling && (
-          <form className="reminder-composer" onSubmit={saveRescheduling}>
-            <strong>Reprogramar: {rescheduling.shared ? rescheduling.item.text : rescheduling.item.title}</strong>
-            {rescheduling.shared && <p className="reminder-kind-help">La nova data es compartirà amb la cotutora i tornarà a activar els avisos.</p>}
-            <div className="reminder-form-grid">
-              <label>Data<input required type="date" value={rescheduling.date} disabled={savingDate} onChange={(event) => setRescheduling((current) => ({ ...current, date: event.target.value }))} /></label>
-              <label>Hora<input required type="time" value={rescheduling.time} disabled={savingDate} onChange={(event) => setRescheduling((current) => ({ ...current, time: event.target.value }))} /></label>
-            </div>
-            <div className="reminder-row-actions">
-              <button className="primary-action compact" disabled={savingDate} type="submit">{savingDate ? 'Desant…' : 'Desar nova data'}</button>
-              <button className="secondary-action compact" disabled={savingDate} onClick={() => setRescheduling(null)} type="button">Cancel·lar</button>
-            </div>
-          </form>
-        )}
         <section className={`reminder-list ${hasFocusedReminders ? 'focused' : ''}`}>
           <header>
             <strong>{showingRecoveries ? 'Recuperacions pendents' : hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
