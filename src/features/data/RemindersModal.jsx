@@ -186,7 +186,10 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     setCompletingId(emailPreview.reminderItem.id)
     setError('')
     try {
-      await markDone(emailPreview.reminderItem)
+      const dismissedAt = new Date().toISOString()
+      for (const note of emailPreview.reminderItem.recoveryNotes || [emailPreview.reminderItem.note]) {
+        await updateAgendaNote(note.id, { reminder: { ...note.reminder, dismissedAt } })
+      }
       setEmailPreview(null)
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut completar el recordatori.')
