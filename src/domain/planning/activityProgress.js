@@ -8,6 +8,10 @@ export function getPlanningActivityProgress(activities = [], bundles = [], overr
   const totals = new Map()
   const nowMs = new Date(now).getTime()
   const valid = bundles.filter(({ session }) => session && !['cancelled', 'notHeld'].includes(session.status))
+  const continuedActivityIds = new Set(valid.flatMap(({ items = [], results = [] }) => {
+    const continuedItemIds = new Set(results.filter(result => result.status === 'continued').map(result => result.sessionItemId))
+    return items.filter(item => continuedItemIds.has(item.id)).map(item => item.sourceActivityId).filter(Boolean)
+  }))
   for (const group of groupParallelSessionBundles(valid)) {
     const perBundle = group.bundles.map(({ session, items = [], results = [] }) => {
       const byActivity = new Map()
@@ -17,7 +21,8 @@ export function getPlanningActivityProgress(activities = [], bundles = [], overr
       for (const item of items) {
         if (!item.sourceActivityId) continue
         const result = resultByItem.get(item.id)
-        const completed = result ? result.status === 'completed' : elapsed
+        // «Continuar» afegeix un nou fragment: el temps del fragment origen ja s’ha consumit.
+        const completed = result ? ['completed', 'continued'].includes(result.status) : elapsed
         const entry = byActivity.get(item.sourceActivityId) || { assigned: 0, completed: 0, pending: false }
         const minutes = Math.max(0, Number(item.plannedMinutes) || 0)
         entry.assigned += minutes
@@ -46,6 +51,6 @@ export function getPlanningActivityProgress(activities = [], bundles = [], overr
     const remainingMinutes = budget > 0 ? Math.max(0, budget - total.completed) : null
     const completed = legacyCompleted.has(activity.id) || (totals.has(activity.id) && !total.pending && (budget === 0 || remainingMinutes === 0))
     const withdrawn = changesById.get(activity.id)?.withdrawnFromAgenda === true && total.assigned === 0
-    return [activity.id, { completed, withdrawn, completedMinutes: total.completed, remainingMinutes: completed || withdrawn ? 0 : remainingMinutes, hasHistory: total.completed > 0, hasSchedule: totals.has(activity.id) }]
+    return [activity.id, { completed, withdrawn, completedMinutes: total.completed, remainingMinutes: completed || withdrawn ? 0 : remainingMinutes, hasContinuation: continuedActivityIds.has(activity.id), hasHistory: total.completed > 0, hasSchedule: totals.has(activity.id) }]
   }))
 }

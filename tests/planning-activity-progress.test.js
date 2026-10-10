@@ -48,3 +48,18 @@ test('l’etiqueta de minuts pendents no modifica activitats, sessions ni adapta
   assert.equal(progress(bundles, overrides).lab.remainingMinutes, 40)
   assert.deepEqual({ activities, bundles, overrides }, before)
 })
+test('només una continuació explícita habilita l’etiqueta; una activitat futura o simplement fragmentada no', () => {
+  const next = bundle('next', future, [['atoms', 10], ['notebook', 15]])
+  const previous = bundle('previous', past, [['atoms', 40]])
+  let result = progress([previous, next])
+  assert.equal(result.atoms.hasContinuation, false)
+  assert.equal(result.notebook.hasContinuation, false)
+  previous.results = [{sessionItemId: 'previous-0', status: 'continued'}]
+  result = progress([previous, next])
+  assert.equal(result.atoms.hasContinuation, true)
+  assert.equal(result.atoms.remainingMinutes, 10)
+  assert.equal(result.atoms.completed, false)
+  assert.equal(result.notebook.hasContinuation, false)
+  next.results = [{sessionItemId: 'next-0', status: 'completed'}]
+  assert.equal(progress([previous, next]).atoms.completed, true)
+})

@@ -103,7 +103,7 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
             type="button"
           >Descripció<ChevronDown aria-hidden="true" className={descriptionExpanded ? 'expanded' : ''} size={13} /></button>
         )}
-        {progress?.hasSchedule && !progress.completed && !progress.withdrawn && progress.remainingMinutes != null && <span className="planning-agenda-progress" title="Minuts pendents segons la cronologia del grup. La durada original de Programació es conserva."><Clock3 size={12} />Agenda: {Math.round(progress.remainingMinutes * 10) / 10} min pendents</span>}
+        {progress?.hasContinuation && !progress.completed && !progress.withdrawn && progress.remainingMinutes != null && <span className="planning-agenda-progress" title="Minuts pendents segons la cronologia del grup. La durada original de Programació es conserva."><Clock3 size={12} />Agenda: {Math.round(progress.remainingMinutes * 10) / 10} min pendents</span>}
       </div>
       <div className="planning-activity-meta">
         {!isCompleted && !progress?.withdrawn && (
