@@ -5,7 +5,11 @@ const WEEKDAYS = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg']
 const dateKey = (year, month, day) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
 export function ReminderDateCalendar({ disabled = false, onChange, value }) {
-  const [month, setMonth] = useState(() => value.slice(0, 7))
+  const [month, setMonth] = useState(() => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value.slice(0, 7)
+    const today = new Date()
+    return dateKey(today.getFullYear(), today.getMonth(), 1).slice(0, 7)
+  })
   const [year, monthNumber] = month.split('-').map(Number)
   const firstDay = new Date(year, monthNumber - 1, 1, 12)
   const offset = (firstDay.getDay() + 6) % 7
