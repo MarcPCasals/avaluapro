@@ -77,22 +77,33 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
         type="button"
       ><Menu size={18} /></button>
       <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
-      <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
-        <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}</strong>
-        {activity.description && <FormattedText as="span" text={activity.description} />}
-        <small>
-          {activity.grouping && <span>{activity.grouping}</span>}
-          {activity.space && <span>{activity.space}</span>}
-          {resources.length > 0 && <span>{resources.length} {resources.length === 1 ? 'recurs de competències' : 'recursos de competències'}</span>}
-          {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
-          {competencyCount > 0 && <span>{competencyCount} {competencyCount === 1 ? 'competència' : 'competències'}</span>}
-          {criterionCount > 0 && <span>{criterionCount} {criterionCount === 1 ? 'criteri' : 'criteris'}</span>}
-          {competencyCount === 0 && activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador anterior' : 'indicadors anteriors'}</span>}
-          {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
-          {activity.groupOverride && <span className="planning-group-override-mark">Adaptada a aquest grup</span>}
-          {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
-        </small>
-      </button>
+      <div className="planning-activity-text">
+        <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
+          <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}</strong>
+          {activity.description && <FormattedText as="span" text={activity.description} />}
+          <small>
+            {activity.grouping && <span>{activity.grouping}</span>}
+            {activity.space && <span>{activity.space}</span>}
+            {resources.length > 0 && <span>{resources.length} {resources.length === 1 ? 'recurs de competències' : 'recursos de competències'}</span>}
+            {materialCount > 0 && <span>{materialCount} {materialCount === 1 ? 'material' : 'materials'}</span>}
+            {competencyCount > 0 && <span>{competencyCount} {competencyCount === 1 ? 'competència' : 'competències'}</span>}
+            {criterionCount > 0 && <span>{criterionCount} {criterionCount === 1 ? 'criteri' : 'criteris'}</span>}
+            {competencyCount === 0 && activity.indicatorIds?.length > 0 && <span>{activity.indicatorIds.length} {activity.indicatorIds.length === 1 ? 'indicador anterior' : 'indicadors anteriors'}</span>}
+            {activity.diversityMeasures?.length > 0 && <span>{activity.diversityMeasures.length} {activity.diversityMeasures.length === 1 ? 'mesura' : 'mesures'}</span>}
+            {activity.groupOverride && <span className="planning-group-override-mark">Adaptada a aquest grup</span>}
+            {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
+          </small>
+        </button>
+        {activity.description && (
+          <button
+            aria-controls={`planning-description-${activity.id}`}
+            aria-expanded={descriptionExpanded}
+            className="planning-description-toggle"
+            onClick={() => setDescriptionExpanded((current) => !current)}
+            type="button"
+          >Descripció<ChevronDown aria-hidden="true" className={descriptionExpanded ? 'expanded' : ''} size={13} /></button>
+        )}
+      </div>
       <div className="planning-activity-meta">
         {!isCompleted && (
           <button
@@ -113,15 +124,6 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
           >{completionBusy ? <Loader2 className="spin" size={13} /> : <RotateCcw size={13} />}Desfer fet</button>
         )}
         {isCompleted && !isManuallyCompleted && <span className="planning-completion-status"><CheckCircle2 size={13} />Feta automàticament</span>}
-        {activity.description && (
-          <button
-            aria-controls={`planning-description-${activity.id}`}
-            aria-expanded={descriptionExpanded}
-            className="planning-description-toggle"
-            onClick={() => setDescriptionExpanded((current) => !current)}
-            type="button"
-          >Descripció<ChevronDown aria-hidden="true" className={descriptionExpanded ? 'expanded' : ''} size={13} /></button>
-        )}
         <span className={`planning-time-pill ${load?.status || 'untimed'}`} title={load?.status === 'red' ? `Supera els ${programmableMinutes} minuts programables` : ''}>
           <Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}
         </span>

@@ -274,7 +274,8 @@
 .planning-activity-type { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #6d28d9; background: #ede9fe; }
 .planning-activity-type.indication { color: #0369a1; background: #e0f2fe; }
 .planning-activity-type.transition { color: #047857; background: #d1fae5; }
-.planning-activity-content { min-width: 0; display: grid; gap: 2px; border: 0; padding: 2px; color: #334155; background: transparent; text-align: left; }
+.planning-activity-text { min-width: 0; display: grid; justify-items: start; gap: 4px; }
+.planning-activity-content { width: 100%; min-width: 0; display: grid; gap: 2px; border: 0; padding: 2px; color: #334155; background: transparent; text-align: left; }
 .planning-activity-content > strong, .planning-activity-content > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .planning-activity-content > strong { font-size: 12px; }
 .planning-activity-content > span { color: #64748b; font-size: 10px; font-weight: 400; }
