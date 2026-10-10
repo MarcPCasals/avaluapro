@@ -39,7 +39,7 @@ import {
   getPlanningUnitsForClass,
 } from '../../domain/planning/classPlanning'
 import { applyImprovementProposals, movePlanningActivityInSequence, movePlanningPhaseInSequence } from '../../domain/planning/rules'
-import { summarizeCompletedActivityIds } from '../../domain/planning/scheduler'
+import { getPlanningActivityProgress } from '../../domain/planning/activityProgress'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 
@@ -923,7 +923,9 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       activityId: activity.id,
       applicationId: activeApplication.id,
       changeScope: 'groupOnly',
-      changes: { manuallyCompleted: Boolean(completed) },
+      changes: completed === 'withdrawn' || completed === 'restore'
+        ? { withdrawnFromAgenda: completed === 'withdrawn' }
+        : { manuallyCompleted: Boolean(completed) },
       ownerUid: activePlanningUnit.ownerUid,
     }, { now })
     await persist({
@@ -1259,10 +1261,10 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   }, [activePlanningUnit, repository, user, userEmail])
 
   const loadCompletedActivityIds = useCallback(async () => {
-    if (!repository || !activePlanningUnit || !activeApplication) return []
-    const temporalUnit = temporalUnits.find((item) => item.id === activePlanningUnit.temporalUnitId)
-    const from = temporalUnit?.startsOn ? `${temporalUnit.startsOn}T00:00:00` : '0000-01-01T00:00:00'
-    const to = temporalUnit?.endsOn ? `${temporalUnit.endsOn}T23:59:59` : '9999-12-31T23:59:59'
+    if (!repository || !activePlanningUnit || !activeApplication) return {}
+    // La història de la UP pot quedar fora de les dates actuals de la UT.
+    const from = '0000-01-01T00:00:00'
+    const to = '9999-12-31T23:59:59'
     const sessionResult = await repository.loadScope(
       `application:${activeApplication.id}:sessions`,
       async () => withPlanningRemoteContext(
@@ -1277,7 +1279,8 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       ),
       { completeSnapshot: true, snapshotRange: { field: 'startsAt', from, to } },
     )
-    const sessions = [...sessionResult.entities]
+    if (sessionResult.error && !sessionResult.entities.length) throw sessionResult.error
+    const sessions = sessionResult.entities.filter(session => session.entityType === 'calendarSession')
     const detailResults = await Promise.all(sessions.map((session) => repository.loadScope(
       `session:${session.id}:detail`,
       async () => {
@@ -1293,13 +1296,16 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       },
       { completeSnapshot: true },
     )))
+    for (const result of detailResults) {
+      if (result.error && !result.entities.some(entity => entity.entityType === 'sessionItem')) throw result.error
+    }
     const bundles = sessions.map((session, index) => ({
       items: detailResults[index].entities.filter((entity) => entity.entityType === 'sessionItem'),
       results: detailResults[index].entities.filter((entity) => entity.entityType === 'activityResult'),
       session,
     }))
-    return [...summarizeCompletedActivityIds(bundles)]
-  }, [activeApplication, activePlanningUnit, repository, temporalUnits])
+    return getPlanningActivityProgress(effectiveActivities, bundles, activityOverrides)
+  }, [activeApplication, activePlanningUnit, activityOverrides, effectiveActivities, repository])
 
   return {
     accessGrants,

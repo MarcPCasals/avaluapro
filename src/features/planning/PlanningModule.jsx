@@ -1,6 +1,6 @@
 import { acknowledgePlanningUnitDraft, getPlanningUnitDraftValues, updatePlanningUnitDraft } from '../../domain/planning/unitDraft'
 import { PlanningResourceCoverage } from './PlanningResourceCoverage'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown,
   Cloud, CloudOff, Copy, Eye, History, Lightbulb, Loader2,
@@ -297,17 +297,19 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
 
 function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange, onSaveResources, resourcesPending }) {
   const [busy, setBusy] = useState(false)
-  const [completedActivityIds, setCompletedActivityIds] = useState(() => new Set())
+  const [activityProgress, setActivityProgress] = useState({})
+  const completedActivityIds = useMemo(() => new Set(Object.entries(activityProgress).filter(([, progress]) => progress.completed).map(([id]) => id)), [activityProgress])
   const [completedActivitiesLoading, setCompletedActivitiesLoading] = useState(true)
   const [completionBusyId, setCompletionBusyId] = useState('')
+  const reportCompletionError = useEffectEvent((error) => onError(error))
   useEffect(() => {
     let active = true
     Promise.resolve(loadCompletedActivityIds?.())
-      .then((ids) => {
-        if (active) setCompletedActivityIds(new Set(ids || []))
+      .then((progress) => {
+        if (active) setActivityProgress(progress || {})
       })
-      .catch(() => {
-        if (active) setCompletedActivityIds(new Set())
+      .catch((error) => {
+        if (active) reportCompletionError(error)
       })
       .finally(() => {
         if (active) setCompletedActivitiesLoading(false)
@@ -419,6 +421,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       </details>
       <PlanningActivitySequence
         activities={activities}
+        activityProgress={activityProgress}
         completedActivityIds={allCompletedActivityIds}
         completedActivitiesLoading={completedActivitiesLoading}
         completionBusyId={completionBusyId}

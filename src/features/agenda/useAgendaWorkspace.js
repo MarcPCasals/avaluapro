@@ -1519,6 +1519,13 @@ export function useAgendaWorkspace(user, classes = []) {
     for (const result of removalStates.flatMap((state) => state.linkedResults)) {
       await repository.remove(result, context)
     }
+    // La retirada deixa una traça del grup; no modifica la UP base.
+    for (const activityId of new Set(parts.map(part => part.sourceActivityId).filter(Boolean))) {
+      await repository.save(createGroupActivityOverride({
+        activityId, applicationId: bundle.application.id, ownerUid: bundle.planningUnit.ownerUid,
+        changes: { withdrawnFromAgenda: true },
+      }), { applicationId: bundle.application.id, planningUnitId: bundle.planningUnit.id })
+    }
     for (const part of parts) await repository.remove(part, context)
     await refreshSync()
     await synchronize()
@@ -1760,6 +1767,10 @@ export function useAgendaWorkspace(user, classes = []) {
     }
     await persist([addition.item, ...addition.changedItems].map((entity) => ({ entity,
       context: { planningUnitId: setup.planningUnit.id, applicationId: setup.application.id, sessionId: entity.sessionId } })))
+    await persist({ entity: createGroupActivityOverride({
+      activityId, applicationId: setup.application.id, ownerUid: setup.planningUnit.ownerUid,
+      changes: { withdrawnFromAgenda: false },
+    }), context: { applicationId: setup.application.id, planningUnitId: setup.planningUnit.id } })
     const changes = new Map(addition.changedItems.map((item) => [item.id, item]))
     const removedIds = new Set(addition.removedItems.map((item) => item.id))
     const updateBundle = (current) => ({ ...current, items: [

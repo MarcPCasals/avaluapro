@@ -21,7 +21,7 @@ const TYPE_DETAILS = {
   transition: { icon: ArrowRight, label: 'Pausa o transició' },
 }
 
-function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
+function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [blockedLinks, setBlockedLinks] = useState([])
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
@@ -103,9 +103,10 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
             type="button"
           >Descripció<ChevronDown aria-hidden="true" className={descriptionExpanded ? 'expanded' : ''} size={13} /></button>
         )}
+        {progress?.hasSchedule && !progress.completed && !progress.withdrawn && progress.remainingMinutes != null && <span className="planning-agenda-progress" title="Minuts pendents segons la cronologia del grup. La durada original de Programació es conserva."><Clock3 size={12} />Agenda: {Math.round(progress.remainingMinutes * 10) / 10} min pendents</span>}
       </div>
       <div className="planning-activity-meta">
-        {!isCompleted && (
+        {!isCompleted && !progress?.withdrawn && (
           <button
             className="planning-completion-toggle"
             disabled={completionBusy}
@@ -123,6 +124,8 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
             type="button"
           >{completionBusy ? <Loader2 className="spin" size={13} /> : <RotateCcw size={13} />}Desfer fet</button>
         )}
+        {progress?.withdrawn && <><span className="planning-completion-status">Retirada de la cronologia</span><button className="planning-description-toggle" disabled={completionBusy} onClick={() => onSetManualCompletion(activity, 'restore')} type="button">Recuperar</button></>}
+        {progress && !progress.hasSchedule && !progress.withdrawn && !isCompleted && <button className="planning-description-toggle" disabled={completionBusy} onClick={() => onSetManualCompletion(activity, 'withdrawn')} title="Retirar dels pendents del grup conservant l’activitat" type="button">Retirar</button>}
         {isCompleted && !isManuallyCompleted && <span className="planning-completion-status"><CheckCircle2 size={13} />Feta automàticament</span>}
         <span className={`planning-time-pill ${load?.status || 'untimed'}`} title={load?.status === 'red' ? `Supera els ${programmableMinutes} minuts programables` : ''}>
           <Clock3 size={13} />{activity.plannedMinutes ? `${activity.plannedMinutes} min` : 'Sense temps'}
@@ -161,7 +164,7 @@ function ActivityRow({ activity, completionBusy, dragId, isCompleted, isManually
   )
 }
 
-export function PlanningActivitySequence({ activities, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onMovePhase, onSetManualCompletion, phases, planningUnit }) {
+export function PlanningActivitySequence({ activities, activityProgress = {}, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onMovePhase, onSetManualCompletion, phases, planningUnit }) {
   const [dragId, setDragId] = useState('')
   const [phaseDragId, setPhaseDragId] = useState('')
   const [phaseDropId, setPhaseDropId] = useState('')
@@ -169,7 +172,8 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
   const [sessionDuration, setSessionDuration] = useState(60)
   const [showCompleted, setShowCompleted] = useState(false)
   const flatPhases = useMemo(() => orderPlanningPhases(phases), [phases])
-  const completedCount = activities.filter((activity) => completedActivityIds.has(activity.id)).length
+  const excludedActivityIds = useMemo(() => new Set([...completedActivityIds, ...Object.keys(activityProgress).filter(id => activityProgress[id].withdrawn)]), [completedActivityIds, activityProgress])
+  const completedCount = activities.filter((activity) => excludedActivityIds.has(activity.id)).length
   const rootPhaseNumberById = useMemo(() => new Map(flatPhases
     .filter((phase) => phase.depth === 0)
     .map((phase, index) => [phase.id, index + 1])), [flatPhases])
@@ -179,8 +183,8 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
       .sort((left, right) => Number(left.order) - Number(right.order)))
     .map((activity, index) => [activity.id, index + 1])), [activities, flatPhases])
   const orderedActivities = useMemo(() => flatPhases.flatMap((phase) => activities
-    .filter((activity) => activity.phaseId === phase.id && (showCompleted || !completedActivityIds.has(activity.id)))
-    .sort((left, right) => Number(left.order) - Number(right.order))), [activities, completedActivityIds, flatPhases, showCompleted])
+    .filter((activity) => activity.phaseId === phase.id && (showCompleted || !excludedActivityIds.has(activity.id)))
+    .sort((left, right) => Number(left.order) - Number(right.order))), [activities, excludedActivityIds, flatPhases, showCompleted])
   const totals = useMemo(() => getPlanningTotals(phases, activities), [activities, phases])
   const programmableMinutes = getProgrammableMinutes(sessionDuration)
   const approximateSessions = totals.totalMinutes > 0 ? Math.ceil(totals.totalMinutes / programmableMinutes) : 0
@@ -296,7 +300,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
           {!completedActivitiesLoading && completedCount > 0 && (
             <button className="secondary-action compact" onClick={() => setShowCompleted((current) => !current)} type="button">
               {showCompleted ? <EyeOff size={15} /> : <Eye size={15} />}
-              {showCompleted ? 'Amagar fetes' : `Mostrar fetes (${completedCount})`}
+              {showCompleted ? 'Amagar fetes i retirades' : `Mostrar fetes i retirades (${completedCount})`}
             </button>
           )}
           <button className="secondary-action compact" onClick={onAddPhase} type="button"><Plus size={15} />Afegir fase</button>
@@ -316,7 +320,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
             .sort((left, right) => Number(left.order) - Number(right.order))
           const phaseActivities = showCompleted
             ? allPhaseActivities
-            : allPhaseActivities.filter((activity) => !completedActivityIds.has(activity.id))
+            : allPhaseActivities.filter((activity) => !excludedActivityIds.has(activity.id))
           if (!showCompleted && allPhaseActivities.length > 0 && phaseActivities.length === 0) return null
           const siblings = phaseSiblings(phase)
           const siblingIndex = siblings.findIndex((item) => item.id === phase.id)
@@ -395,6 +399,7 @@ export function PlanningActivitySequence({ activities, completedActivityIds = ne
                 {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
                   <ActivityRow
                     activity={activity}
+                    progress={activityProgress[activity.id]}
                     completionBusy={completionBusyId === activity.id}
                     dragId={dragId}
                     isCompleted={completedActivityIds.has(activity.id)}

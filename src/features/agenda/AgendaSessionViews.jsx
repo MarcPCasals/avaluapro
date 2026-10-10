@@ -206,7 +206,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
       await onRemoveItem(item)
       setRemovalItemId('')
       setActivityChoices(null)
-      setEditNotice(isBabeliumItem(item) ? 'Babèlium retirat només d’aquesta sessió. Les altres sessions de l’horari es conserven.' : 'Activitat retirada de la sessió i conservada fora del calendari. La pots recuperar amb «Afegir activitat».')
+      setEditNotice(isBabeliumItem(item) ? 'Babèlium retirat només d’aquesta sessió. Les altres sessions de l’horari es conserven.' : 'Activitat retirada de la sessió. Si no té altres sessions, també surt dels pendents de Programació. La pots recuperar amb «Afegir activitat».')
     } catch (error) {
       setRemovalError(error.message || 'No s’ha pogut treure l’activitat de la sessió.')
     } finally {
@@ -263,7 +263,7 @@ function SessionDetail({ bundle, calendarEvents = [], classes, onAdjust, onOpenC
                 {editError && <p role="alert">{editError}</p>}
               </form>}
               {confirmingRemoval && <div className="agenda-session-item-confirmation">
-                <p>{isBabeliumItem(item) ? 'Treure Babèlium només d’aquesta sessió? S’alliberaran els 30 minuts. Les altres sessions de l’horari es conservaran.' : 'Treure aquesta activitat de la calendarització d’aquesta sessió? Es conservarà a la programació i els minuts retirats quedaran disponibles a «Afegir activitat». Les altres sessions es conservaran.'}</p>
+                <p>{isBabeliumItem(item) ? 'Treure Babèlium només d’aquesta sessió? S’alliberaran els 30 minuts. Les altres sessions de l’horari es conservaran.' : 'Treure aquesta activitat de la calendarització d’aquesta sessió? Es conservarà com a retirada a Programació si no té altres sessions. La podràs recuperar amb «Afegir activitat». Les altres sessions es conservaran.'}</p>
                 <div><button className="secondary-action compact agenda-session-item-delete" disabled={busy} onClick={() => removeItem(item)} type="button">{removing ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}{isBabeliumItem(item) ? 'Treure Babèlium' : 'Treure i conservar'}</button><button className="secondary-action compact" disabled={busy} onClick={() => { setRemovalItemId(''); setRemovalError('') }} type="button">Cancel·lar</button></div>
                 {removalError && <p role="alert">{removalError}</p>}
               </div>}
