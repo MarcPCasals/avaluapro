@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSessionPersonalReminders, reminderMatchesFocus } from '../src/lib/reminders.js'
+import { getPendingRecoverySummary, getPendingReminderSummary, getSessionPersonalReminders, reminderMatchesFocus } from '../src/lib/reminders.js'
 
 test('un acces contextual mostra nomes els recordatoris seleccionats', () => {
   assert.equal(reminderMatchesFocus('agenda_1', []), true)
@@ -94,4 +94,29 @@ test('els recordatoris completats deixen de sortir al Mode aula', () => {
   })
 
   assert.equal(result.length, 0)
+})
+
+
+test('les recuperacions no sumen a la bombolla ni als avisos personals, però conserven una safata pròpia', () => {
+  const data = {
+    agendaNotes: [
+      { ...baseReminder, id: 'personal' },
+      { id: 'recovery', type: 'activityRecovery', studentId: 'synthetic-student', recovery: { status: 'pending' }, reminder: { date: '2000-01-01' } },
+    ],
+    tasks: [{ id: 'task', title: 'Tasca' }],
+    taskRecords: [{ id: 'linked', taskId: 'task', recoveryPending: true, recoveryNoteId: 'recovery', reminder: { date: '2000-01-01' } }],
+  }
+  const summary = getPendingReminderSummary(data)
+  assert.equal(summary.count, 1)
+  assert.equal(summary.dueCount, 1)
+  assert.deepEqual(summary.items.map(item => item.id), ['agenda_personal'])
+  assert.equal(getPendingRecoverySummary(data).count, 1)
+})
+
+test('completar el correu no amaga una recuperació pendent; completar la recuperació sí', () => {
+  const note = { id: 'recovery', type: 'activityRecovery', recovery: { status: 'pending' }, reminder: { date: '2000-01-01', dismissedAt: '2026-10-10T09:00:00Z' } }
+  assert.equal(getPendingRecoverySummary({ agendaNotes: [note] }).count, 1)
+  assert.equal(getPendingReminderSummary({ agendaNotes: [note] }).count, 0)
+  assert.equal(getPendingRecoverySummary({ agendaNotes: [{ ...note, recovery: { status: 'completed' } }] }).count, 0)
+  assert.equal(getPendingRecoverySummary({ agendaNotes: [{ ...note, recovery: { status: 'none' } }] }).count, 0)
 })

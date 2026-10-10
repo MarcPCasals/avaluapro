@@ -25,7 +25,7 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
 
   return [
     ...agendaNotes
-      .filter((note) => ['activityRecovery', 'agendaReminder', 'generalReminder'].includes(note.type)
+      .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type)
         && isPendingReminder(note.reminder))
       .map((note) => {
         const student = studentById.get(note.studentId)
@@ -57,7 +57,7 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
         title: task.reminder?.text || task.title,
       })),
     ...taskRecords
-      .filter((record) => isPendingReminder(record.reminder))
+      .filter((record) => isPendingReminder(record.reminder) && !(record.recoveryPending && record.recoveryNoteId))
       .map((record) => {
         const task = taskById.get(record.taskId)
         const student = studentById.get(record.studentId)
@@ -140,6 +140,25 @@ export function getPlanningReminderSummary({ agendaNotes = [], classes = [], pla
     count: items.filter((item) => item.status === 'pending').length,
     items,
   }
+}
+
+/** Recuperacions consultables encara que l’avís del correu ja estigui fet. */
+export function getPendingRecoverySummary({ agendaNotes = [], classes = [], students = [] }) {
+  const classById = new Map(classes.map(item => [item.id, item]))
+  const studentById = new Map(students.map(item => [item.id, item]))
+  const items = agendaNotes
+    .filter(note => note.type === 'activityRecovery'
+      && !['completed', 'none', 'cancelled'].includes(note.recovery?.status)
+      && !note.recovery?.recoveredAt
+      && (note.recovery?.status === 'pending' || note.reminder?.date))
+    .map(note => ({
+      id: `agenda_${note.id}`, kind: 'recovery', note, reminder: note.reminder,
+      classItem: classById.get(note.classId),
+      detail: studentById.has(note.studentId) ? `Alumne: ${studentById.get(note.studentId).name}` : '',
+      title: 'Recuperació pendent',
+    }))
+    .sort((a, b) => String(b.note.sessionStartsAt || b.note.createdAt || '').localeCompare(String(a.note.sessionStartsAt || a.note.createdAt || '')))
+  return { count: items.length, items }
 }
 
 export function getPendingReminderSummary({ agendaNotes = [], classes = [], students = [], taskRecords = [], tasks = [] }) {

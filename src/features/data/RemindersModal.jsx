@@ -2,7 +2,7 @@ import { Bell, BellRing, CheckCircle2, Clock3, Copy, Mail, Plus, Skull } from 'l
 import { useMemo, useState } from 'react'
 import { getRecoveryEmailPreview, groupDailyRecoveryReminders } from '../../lib/classroomRecovery'
 import { Modal } from '../../components/Modal'
-import { getLocalToday, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
+import { getLocalToday, getPendingRecoverySummary, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function formatReminderDate(reminder = {}) {
@@ -70,6 +70,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const [savingDate, setSavingDate] = useState(false)
   const [emailPreview, setEmailPreview] = useState(null)
   const [emailCopied, setEmailCopied] = useState(false)
+  const [activeTray, setActiveTray] = useState(null)
 
   const tutoringClasses = useMemo(
     () => classes.filter((classItem) => classItem.sharedTutoringSpaceId),
@@ -91,12 +92,17 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     () => getPendingReminderSummary({ agendaNotes, classes, students, taskRecords, tasks }),
     [agendaNotes, classes, students, taskRecords, tasks],
   )
-  const hasFocusedReminders = focusedReminderIds.length > 0
-  const dailySummaryItems = groupDailyRecoveryReminders(summary.items, sessionOptions, students)
-  const visibleSummaryItems = dailySummaryItems.filter((item) =>
-    reminderMatchesFocus(item.id, focusedReminderIds)
-    || item.recoveryNotes?.some((note) => focusedReminderIds.includes(`agenda_${note.id}`)))
-  const visibleCoordinationReminders = openCoordinationReminders.filter((item) =>
+  const recoverySummary = useMemo(
+    () => getPendingRecoverySummary({ agendaNotes, classes, students }),
+    [agendaNotes, classes, students],
+  )
+  const focusedRecovery = recoverySummary.items.some(item => focusedReminderIds.includes(item.id))
+  const showingRecoveries = activeTray === 'recovery' || (activeTray === null && focusedRecovery)
+  const hasFocusedReminders = !showingRecoveries && focusedReminderIds.length > 0
+  const dailySummaryItems = groupDailyRecoveryReminders(showingRecoveries ? recoverySummary.items : summary.items, sessionOptions, students)
+  const visibleSummaryItems = showingRecoveries ? dailySummaryItems : dailySummaryItems.filter((item) =>
+    reminderMatchesFocus(item.id, focusedReminderIds))
+  const visibleCoordinationReminders = showingRecoveries ? [] : openCoordinationReminders.filter((item) =>
     reminderMatchesFocus(`coordination_${item.id}`, focusedReminderIds))
   const visibleReminderCount = visibleSummaryItems.length + visibleCoordinationReminders.length
 
@@ -128,6 +134,19 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
       return
     }
     await updateTask(item.task.id, { reminder })
+  }
+
+  const completeVisibleReminder = async (item) => {
+    if (completingId) return
+    setCompletingId(item.id)
+    setError('')
+    try {
+      await markDone(item)
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut completar el recordatori.')
+    } finally {
+      setCompletingId('')
+    }
   }
 
   const startRescheduling = (item, shared = false) => {
@@ -293,7 +312,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
           </label>
           {error && <p className="reminder-form-error" role="alert">{error}</p>}
           <div className="reminder-row-actions">
-            <button className="secondary-action compact" disabled={Boolean(completingId)} onClick={() => setEmailPreview(null)} type="button">Tornar als recordatoris</button>
+            <button className="secondary-action compact" disabled={Boolean(completingId)} onClick={() => setEmailPreview(null)} type="button">{showingRecoveries ? 'Tornar a recuperacions' : 'Tornar als recordatoris'}</button>
             <button className="primary-action compact" onClick={copyRecoveryEmail} type="button"><Copy size={15} />{emailCopied ? 'Copiat' : 'Copiar text'}</button>
             <button className="secondary-action compact" disabled={Boolean(completingId)} onClick={completeRecoveryEmailReminder} type="button"><CheckCircle2 size={15} />{completingId ? 'Desant…' : 'Fet'}</button>
           </div>
@@ -303,9 +322,15 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   }
 
   return (
-    <Modal onClose={onClose} size="lg" title={hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori' : 'Recordatoris del dia' : 'Recordatoris'}>
+    <Modal onClose={onClose} size="lg" title={showingRecoveries ? 'Recuperacions pendents' : hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori' : 'Recordatoris del dia' : 'Recordatoris'}>
       <div className="reminders-modal">
-        {!hasFocusedReminders && <section className={`reminder-composer ${draft.kind}`}>
+        <div className="reminder-row-actions">
+          {showingRecoveries
+            ? <button className="secondary-action compact" onClick={() => setActiveTray('reminders')} type="button"><Bell size={15} />Tornar als recordatoris</button>
+            : <button className="secondary-action compact" onClick={() => setActiveTray('recovery')} type="button"><Mail size={15} />Recuperacions pendents ({groupDailyRecoveryReminders(recoverySummary.items, sessionOptions, students).length})</button>}
+        </div>
+        {showingRecoveries && <p className="reminder-kind-help">Consulta les activitats pendents de recuperar. Aquesta safata no suma al comptador de recordatoris.</p>}
+        {!showingRecoveries && !hasFocusedReminders && <section className={`reminder-composer ${draft.kind}`}>
           <header>
             {draft.kind === 'tutoring' ? <BellRing size={18} /> : <Bell size={18} />}
             <strong>Nou recordatori</strong>
@@ -393,11 +418,11 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
         )}
         <section className={`reminder-list ${hasFocusedReminders ? 'focused' : ''}`}>
           <header>
-            <strong>{hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
-            <span>{hasFocusedReminders ? visibleReminderCount : dailySummaryItems.length + openCoordinationReminders.length}</span>
+            <strong>{showingRecoveries ? 'Recuperacions pendents' : hasFocusedReminders ? visibleReminderCount === 1 ? 'Recordatori seleccionat' : 'Recordatoris seleccionats' : 'Recordatoris pendents'}</strong>
+            <span>{showingRecoveries || hasFocusedReminders ? visibleReminderCount : dailySummaryItems.length + openCoordinationReminders.length}</span>
           </header>
           {visibleReminderCount === 0 ? (
-            <p className="empty-list">{hasFocusedReminders ? 'Aquest recordatori ja no està pendent.' : 'No hi ha cap recordatori pendent.'}</p>
+            <p className="empty-list">{showingRecoveries ? 'No hi ha cap recuperació pendent.' : hasFocusedReminders ? 'Aquest recordatori ja no està pendent.' : 'No hi ha cap recordatori pendent.'}</p>
           ) : (
             <>
               {visibleSummaryItems.map((item) => (
@@ -413,9 +438,9 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                   {item.kind === 'recovery'
                     ? <button className="secondary-action compact" onClick={() => previewRecoveryEmail(item)} type="button"><Mail size={15} />Previsualitzar el correu</button>
                     : <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>}
-                  <button className="secondary-action compact" disabled={savingDate} onClick={() => markDone(item)} type="button">
+                  <button className="secondary-action compact" disabled={savingDate || Boolean(completingId)} onClick={() => completeVisibleReminder(item)} type="button">
                     <CheckCircle2 size={15} />
-                    Fet
+                    {showingRecoveries ? 'Recuperació feta' : 'Fet'}
                   </button>
                   </div>
                 </article>

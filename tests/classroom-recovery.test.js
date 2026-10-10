@@ -13,7 +13,7 @@ import {
   linkRecoveryToTaskRecords,
   reconcileMaterialPreparationReminders,
 } from '../src/lib/classroomRecovery.js'
-import { getPendingReminderSummary, getPersonalCalendarReminders, getPlanningReminderSummary } from '../src/lib/reminders.js'
+import { getPendingRecoverySummary, getPendingReminderSummary, getPersonalCalendarReminders, getPlanningReminderSummary } from '../src/lib/reminders.js'
 
 test('el correu usa només el nom de pila i incorpora activitats i enllaços', () => {
   const text = buildRecoveryEmail({
@@ -92,8 +92,9 @@ test('la preparació de materials queda separada dels recordatoris generals', ()
     students: [{ id: 'student-1', name: 'PUJOL FONT, Marta' }],
   })
   const planningSummary = getPlanningReminderSummary({ agendaNotes, planningUnitId: 'up-1' })
-  assert.equal(summary.count, 1)
-  assert.deepEqual(summary.items.map((item) => item.kind), ['recovery'])
+  assert.equal(summary.count, 0)
+  assert.deepEqual(summary.items, [])
+  assert.equal(getPendingRecoverySummary({ agendaNotes }).count, 1)
   assert.equal(planningSummary.count, 1)
   assert.deepEqual(planningSummary.items.map((item) => item.title), ['Imprimir: fitxa'])
 })
