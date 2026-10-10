@@ -175,9 +175,24 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
     setError('')
     setEmailCopied(false)
     setEmailPreview({
+      reminderItem: item,
       studentName: student?.name || 'Alumne',
       text: getRecoveryEmailPreview(item.note, student),
     })
+  }
+
+  const completeRecoveryEmailReminder = async () => {
+    if (!emailPreview?.reminderItem || completingId) return
+    setCompletingId(emailPreview.reminderItem.id)
+    setError('')
+    try {
+      await markDone(emailPreview.reminderItem)
+      setEmailPreview(null)
+    } catch (operationError) {
+      setError(operationError.message || 'No s’ha pogut completar el recordatori.')
+    } finally {
+      setCompletingId('')
+    }
   }
 
   const copyRecoveryEmail = async () => {
@@ -266,7 +281,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
 
   if (emailPreview) {
     return (
-      <Modal onClose={() => setEmailPreview(null)} size="lg" title="Previsualitzar el correu">
+      <Modal onClose={() => { if (!completingId) setEmailPreview(null) }} size="lg" title="Previsualitzar el correu">
         <div className="reminders-modal recovery-email-preview">
           <strong>{emailPreview.studentName}</strong>
           <label className="recovery-email-preview-field">
@@ -275,8 +290,9 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
           </label>
           {error && <p className="reminder-form-error" role="alert">{error}</p>}
           <div className="reminder-row-actions">
-            <button className="secondary-action compact" onClick={() => setEmailPreview(null)} type="button">Tornar als recordatoris</button>
+            <button className="secondary-action compact" disabled={Boolean(completingId)} onClick={() => setEmailPreview(null)} type="button">Tornar als recordatoris</button>
             <button className="primary-action compact" onClick={copyRecoveryEmail} type="button"><Copy size={15} />{emailCopied ? 'Copiat' : 'Copiar text'}</button>
+            <button className="secondary-action compact" disabled={Boolean(completingId)} onClick={completeRecoveryEmailReminder} type="button"><CheckCircle2 size={15} />{completingId ? 'Desant…' : 'Fet'}</button>
           </div>
         </div>
       </Modal>
