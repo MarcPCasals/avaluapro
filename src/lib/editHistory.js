@@ -1,6 +1,7 @@
+import { createEditHistoryBudget } from './editHistoryBudget.js'
 // Historial de la sessió: conserva només els documents modificats, mai tot el compte.
 export const EDIT_HISTORY_REFRESH_EVENT = 'avaluapro:edit-history-refresh'
-const LIMIT = 50
+const LIMIT = 20
 const clone = (value) => value == null ? null : structuredClone(value)
 function comparable(value) {
   if (!value) return null
@@ -10,13 +11,14 @@ function comparable(value) {
 }
 export const historyValuesEqual = (a, b) => JSON.stringify(comparable(a)) === JSON.stringify(comparable(b))
 
-export function createEditHistory() {
+export function createEditHistory({ budget = createEditHistoryBudget() } = {}) {
   const listeners = new Set()
   let past = [], future = [], active = null, running = 0, replaying = false, recording = true
   let snapshot = { canUndo: false, canRedo: false, busy: false, error: '', undoLabel: '', redoLabel: '' }
   function publish(error = '') {
-    snapshot = { canUndo: past.length > 0 && !running && !replaying, canRedo: future.length > 0 && !running && !replaying,
-      busy: Boolean(running || replaying), error, undoLabel: past.at(-1)?.label || '', redoLabel: future.at(-1)?.label || '' }
+    const allowance = budget?.check() || { allowed: true, retryAt: 0, message: '' }
+    snapshot = { canUndo: past.length > 0 && !running && !replaying && allowance.allowed, canRedo: future.length > 0 && !running && !replaying && allowance.allowed,
+      busy: Boolean(running || replaying), error, limitMessage: allowance.message, retryAt: allowance.retryAt, undoLabel: past.at(-1)?.label || '', redoLabel: future.at(-1)?.label || '' }
     listeners.forEach(listener => listener())
   }
   function record(adapter, key, before, after, metadata) {
@@ -46,6 +48,8 @@ export function createEditHistory() {
     const target = direction === 'undo' ? future : past
     const entry = source.at(-1)
     if (!entry) return false
+    const allowance = budget?.consume(entry.changes.length)
+    if (allowance && !allowance.allowed) { publish(allowance.message); return false }
     replaying = true
     publish()
     const completed = []
@@ -73,7 +77,7 @@ export function createEditHistory() {
       for (const adapter of groups.keys()) {
         try { await adapter.refresh?.() } catch { /* La còpia local i la cua ja estan desades. */ }
       }
-      globalThis.dispatchEvent?.(new Event(EDIT_HISTORY_REFRESH_EVENT))
+      globalThis.dispatchEvent?.(new CustomEvent(EDIT_HISTORY_REFRESH_EVENT, { detail: { planning: [...groups.keys()].some(adapter => adapter.id.startsWith('planning:')) } }))
       return true
     } catch (error) {
       // Els blocs que ja s'han desat es compensen si falla una altra base local.
@@ -94,7 +98,7 @@ export function createEditHistory() {
     }
     finally { replaying = false; publish(snapshot.error) }
   }
-  return { record, run, undo: () => replay('undo'), redo: () => replay('redo'),
+  return { record, run, refreshLimits: () => publish(), undo: () => replay('undo'), redo: () => replay('redo'),
     subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener) },
     getSnapshot: () => snapshot,
     clear: () => { past = []; future = []; if (active) active.changes.clear(); recording = false; active = running ? active : null; publish() },

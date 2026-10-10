@@ -34,6 +34,7 @@ export function withPlanningRemoteContext(entities = [], context = {}) {
 export function createPlanningRepository({
   applyRemoteOperation = missingRemotePlanningService,
   freshForMs = 0,
+  history = editHistory,
   isOnline = () => globalThis.navigator?.onLine !== false,
   uid,
 } = {}) {
@@ -42,6 +43,7 @@ export function createPlanningRepository({
   const freshScopes = new Map()
   const appliedRefreshTokens = new Map()
   const pendingScopeLoads = new Map()
+  let historyLocalRefreshUntil = 0
 
   function invalidateLoadedScopes() {
     freshScopes.clear()
@@ -53,7 +55,8 @@ export function createPlanningRepository({
     writeMany: (changes, side) => restorePlanningHistoryRows(uid, changes, side),
     refresh: async () => {
       invalidateLoadedScopes()
-      await flushPlanningOutbox(uid, applyRemoteOperation, { isOnline: isOnline() })
+      try { await flushPlanningOutbox(uid, applyRemoteOperation, { isOnline: isOnline() }) }
+      finally { historyLocalRefreshUntil = Date.now() + 5000 }
     },
   }
   async function mutate(entity, context = {}, remove = false) {
@@ -61,7 +64,7 @@ export function createPlanningRepository({
     const location = getPlanningEntityLocation(entity, { ...context, ownerUid: uid })
     const [before] = await historyAdapter.readMany([{ key: location.path }])
     const operation = await (remove ? deletePlanningEntityLocally : savePlanningEntityLocally)(uid, entity, context)
-    editHistory.record(historyAdapter, location.path, before, remove ? null : operation.value,
+    history.record(historyAdapter, location.path, before, remove ? null : operation.value,
       { ...location, entityType: entity.entityType })
     return operation
   }
@@ -75,7 +78,7 @@ export function createPlanningRepository({
           })
         : entities
       const cached = selectSnapshotEntities(await loadPlanningScope(uid, scopeKey))
-      if (!isOnline() || typeof loadRemote !== 'function') {
+      if ((!options.forceRemote && Date.now() < historyLocalRefreshUntil) || !isOnline() || typeof loadRemote !== 'function') {
         return { entities: cached, source: 'local' }
       }
       // La setmana, la cronologia i el curs s'emmagatzemen al mateix abast,
@@ -119,6 +122,8 @@ export function createPlanningRepository({
     save(entity, context) {
       return mutate(entity, context)
     },
+
+    resumeRemoteReads() { historyLocalRefreshUntil = 0 },
 
     status(options = {}) {
       return getPlanningSyncSummary(uid, { isOnline: isOnline(), ...options })

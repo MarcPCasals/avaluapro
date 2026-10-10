@@ -534,7 +534,8 @@ export default function AgendaModule() {
   })
 
   useEffect(() => {
-    const reloadHistoryRange = () => {
+    const reloadHistoryRange = (event) => {
+      if (!event.detail?.planning) return
       if (view !== 'week') return
       const range = calendarMode === 'month' ? monthSessionRange(monthKey)
         : { from: weekStart, to: addDateDays(weekStart, 4) }

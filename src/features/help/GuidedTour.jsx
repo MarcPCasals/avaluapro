@@ -261,7 +261,7 @@ const ownDataTourSteps = [
   {
     target: 'undo-button',
     title: '10. Desfer i refer',
-    text: 'Desfés o refés els canvis recents d’aquesta sessió, també de Programació i de la cronologia. Un canvi nou descarta els canvis pendents de refer. La cotutoria compartida, les comparticions i les eliminacions definitives no entren a l’historial.',
+    text: 'Desfés o refés les últimes 20 operacions d’aquesta sessió, també de Programació i de la cronologia. Hi ha un límit preventiu de 10 recuperacions per minut. Un canvi nou descarta els canvis pendents de refer. La cotutoria compartida, les comparticions i les eliminacions definitives no entren a l’historial.',
     mode: 'evaluation',
     placement: 'left',
   },

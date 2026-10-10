@@ -168,6 +168,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
 
   const refreshFromCloud = useCallback(async () => {
     if (!repository) return EMPTY_SYNC
+    repository.resumeRemoteReads()
     const summary = await synchronize()
     setRefreshRevision((current) => current + 1)
     return summary
@@ -223,10 +224,15 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       refreshFromCloud().catch(() => refreshSync({ error: 'planning/sync-error' }))
     }
     globalThis.addEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
-    globalThis.addEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+    const handleHistoryRefresh = (event) => {
+      if (!event.detail?.planning) return
+      setRefreshRevision((current) => current + 1)
+      refreshSync().catch(() => {})
+    }
+    globalThis.addEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleHistoryRefresh)
     return () => {
       globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
-      globalThis.removeEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+      globalThis.removeEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleHistoryRefresh)
     }
   }, [refreshFromCloud, refreshSync, repository])
 
