@@ -1,5 +1,9 @@
+import { editHistory } from '../lib/editHistory.js'
+import { getPlanningEntityLocation } from './planningEntityLocation.js'
 import {
   deletePlanningEntityLocally,
+  readPlanningHistoryRows,
+  restorePlanningHistoryRows,
   loadPlanningScope,
   mergePlanningRemoteScope,
   savePlanningEntityLocally,
@@ -41,6 +45,25 @@ export function createPlanningRepository({
 
   function invalidateLoadedScopes() {
     freshScopes.clear()
+  }
+
+  const historyAdapter = {
+    id: `planning:${uid}`,
+    readMany: (changes) => readPlanningHistoryRows(uid, changes),
+    writeMany: (changes, side) => restorePlanningHistoryRows(uid, changes, side),
+    refresh: async () => {
+      invalidateLoadedScopes()
+      await flushPlanningOutbox(uid, applyRemoteOperation, { isOnline: isOnline() })
+    },
+  }
+  async function mutate(entity, context = {}, remove = false) {
+    invalidateLoadedScopes()
+    const location = getPlanningEntityLocation(entity, { ...context, ownerUid: uid })
+    const [before] = await historyAdapter.readMany([{ key: location.path }])
+    const operation = await (remove ? deletePlanningEntityLocally : savePlanningEntityLocally)(uid, entity, context)
+    editHistory.record(historyAdapter, location.path, before, remove ? null : operation.value,
+      { ...location, entityType: entity.entityType })
+    return operation
   }
 
   return {
@@ -90,13 +113,11 @@ export function createPlanningRepository({
     },
 
     remove(entity, context) {
-      invalidateLoadedScopes()
-      return deletePlanningEntityLocally(uid, entity, context)
+      return mutate(entity, context, true)
     },
 
     save(entity, context) {
-      invalidateLoadedScopes()
-      return savePlanningEntityLocally(uid, entity, context)
+      return mutate(entity, context)
     },
 
     status(options = {}) {

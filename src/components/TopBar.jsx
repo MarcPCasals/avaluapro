@@ -1,3 +1,4 @@
+import { EditHistoryControls } from './EditHistoryControls'
 import {
   AlertCircle,
   BarChart3,
@@ -13,8 +14,6 @@ import {
   Loader2,
   MessageCircle,
   Plus,
-  RotateCcw,
-  RotateCw,
   Send,
   Settings,
   ShieldCheck,
@@ -679,12 +678,7 @@ export function TopBar() {
           type="file"
         />
         <span className="top-divider" />
-        <button className="icon-button disabled" data-tour="undo-button" title="Desfer, propera iteració" type="button">
-          <RotateCcw size={22} />
-        </button>
-        <button className="icon-button disabled" data-tour="redo-button" title="Refer, propera iteració" type="button">
-          <RotateCw size={22} />
-        </button>
+        <EditHistoryControls />
       </div>
       {showSettings && (
         <ClassSettingsModal classId={activeClassId} onClose={() => setShowSettings(false)} />

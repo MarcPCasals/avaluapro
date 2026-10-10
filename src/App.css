@@ -31470,3 +31470,17 @@ button.profile-followup-card:focus-visible {
 .reminder-date-calendar button:hover, .reminder-date-calendar button:focus-visible { background: #ffedd5; }
 .reminder-date-calendar button[aria-pressed="true"] { color: white; background: #f97316; font-weight: 900; }
 .reminder-date-calendar button:disabled { opacity: .5; cursor: wait; }
+
+.topbar-history-error {
+  position: fixed;
+  top: 76px;
+  right: 12px;
+  z-index: 1200;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  background: #172033;
+  color: #fde68a;
+  font-size: 13px;
+}

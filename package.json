@@ -44,7 +44,8 @@
     "test:cloud-sync": "node --test tests/cloud-startup.test.js tests/cloud-reconciliation.test.js tests/cloud-sync-diff.test.js tests/cloud-sync-queue.test.js tests/cross-device-refresh.test.js",
     "test:firestore-budget": "node --test tests/firestore-read-policy.test.js tests/single-tab-resource.test.js",
     "test:assistance-boundary": "npm run test:assistance-adapter && npm run test:student-overview-boundary && npm run test:evaluation-boundary && npm run test:tracking-boundary && npm run test:attendance-boundary && npm run test:analytics-boundary && npm run test:tutoring-boundary && npm run test:sociometry-boundary && npm run test:seating-boundary && npm run test:cooperative-groups-boundary && npm run test:safe-assistance-package && npm run test:safe-assistance-generator && npm run test:safe-assistance-export && npm run test:safe-assistance-import && npm run test:assistance-runbook && npm run test:assistance-entry && npm run test:assistance-operational-guard && npm run build:assistance && node scripts/check-assistance-boundary.mjs",
-    "test:security": "npm run test:assistance-boundary && npm run test:firestore-budget && npm run test:cloud-sync && npm run test:planning-sync && npm run test:shared-sync && npm run test:coordination && npm run test:retention && npm run test:purge && npm run test:classroom && npm run test:rules"
+    "test:security": "npm run test:assistance-boundary && npm run test:firestore-budget && npm run test:cloud-sync && npm run test:planning-sync && npm run test:shared-sync && npm run test:coordination && npm run test:retention && npm run test:purge && npm run test:classroom && npm run test:rules",
+    "test:edit-history": "node --test tests/edit-history.test.js tests/edit-history-store.test.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",

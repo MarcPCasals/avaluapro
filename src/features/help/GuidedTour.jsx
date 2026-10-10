@@ -261,7 +261,7 @@ const ownDataTourSteps = [
   {
     target: 'undo-button',
     title: '10. Desfer i refer',
-    text: 'Aquests botons quedaran reservats per recuperar canvis recents. Són una capa de seguretat quan es treballa ràpid a classe.',
+    text: 'Desfés o refés els canvis recents d’aquesta sessió, també de Programació i de la cronologia. Un canvi nou descarta els canvis pendents de refer. La cotutoria compartida, les comparticions i les eliminacions definitives no entren a l’historial.',
     mode: 'evaluation',
     placement: 'left',
   },

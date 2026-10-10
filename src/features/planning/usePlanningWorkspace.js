@@ -1,3 +1,4 @@
+import { EDIT_HISTORY_REFRESH_EVENT, editHistory } from '../../lib/editHistory'
 import { validateDirectionGrant } from '../../domain/planning/directionAccess'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -222,7 +223,11 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       refreshFromCloud().catch(() => refreshSync({ error: 'planning/sync-error' }))
     }
     globalThis.addEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
-    return () => globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+    globalThis.addEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+    return () => {
+      globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+      globalThis.removeEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+    }
   }, [refreshFromCloud, refreshSync, repository])
 
   useEffect(() => {
@@ -1307,7 +1312,33 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     return getPlanningActivityProgress(effectiveActivities, bundles, activityOverrides)
   }, [activeApplication, activePlanningUnit, activityOverrides, effectiveActivities, repository])
 
+  const historyActions = {
+    archiveUnit: useCallback((...args) => editHistory.run('Programació', () => archiveUnit(...args)), [archiveUnit]),
+    acceptImprovementSuggestions: useCallback((...args) => editHistory.run('Programació', () => acceptImprovementSuggestions(...args)), [acceptImprovementSuggestions]),
+    copyHistoricalActivity: useCallback((...args) => editHistory.run('Programació', () => copyHistoricalActivity(...args)), [copyHistoricalActivity]),
+    connectUnitToClass: useCallback((...args) => editHistory.run('Programació', () => connectUnitToClass(...args)), [connectUnitToClass]),
+    createTemporalUnit: useCallback((...args) => editHistory.run('Programació', () => createTemporalUnitForYear(...args)), [createTemporalUnitForYear]),
+    createUnit: useCallback((...args) => editHistory.run('Programació', () => createUnit(...args)), [createUnit]),
+    createYear: useCallback((...args) => editHistory.run('Programació', () => createYear(...args)), [createYear]),
+    duplicateUnitToAcademicYear: useCallback((...args) => editHistory.run('Programació', () => duplicateUnitToAcademicYear(...args)), [duplicateUnitToAcademicYear]),
+    importPlanningBundle: useCallback((...args) => editHistory.run('Programació', () => importPlanningBundle(...args)), [importPlanningBundle]),
+    importPlanningTable: useCallback((...args) => editHistory.run('Programació', () => importPlanningTable(...args)), [importPlanningTable]),
+    movePhase: useCallback((...args) => editHistory.run('Programació', () => movePhase(...args)), [movePhase]),
+    moveActivity: useCallback((...args) => editHistory.run('Programació', () => moveActivity(...args)), [moveActivity]),
+    moveActivityForActiveClass: useCallback((...args) => editHistory.run('Programació', () => moveActivityForActiveClass(...args)), [moveActivityForActiveClass]),
+    removeActivity: useCallback((...args) => editHistory.run('Programació', () => removeActivity(...args)), [removeActivity]),
+    removeActivityForActiveClass: useCallback((...args) => editHistory.run('Programació', () => removeActivityForActiveClass(...args)), [removeActivityForActiveClass]),
+    removePhase: useCallback((...args) => editHistory.run('Programació', () => removePhase(...args)), [removePhase]),
+    saveActivity: useCallback((...args) => editHistory.run('Programació', () => saveActivity(...args)), [saveActivity]),
+    saveActivityForActiveClass: useCallback((...args) => editHistory.run('Programació', () => saveActivityForActiveClass(...args)), [saveActivityForActiveClass]),
+    savePhase: useCallback((...args) => editHistory.run('Programació', () => savePhase(...args)), [savePhase]),
+    saveTemporalUnit: useCallback((...args) => editHistory.run('Programació', () => saveTemporalUnit(...args)), [saveTemporalUnit]),
+    saveUnit: useCallback((...args) => editHistory.run('Programació', () => saveUnit(...args)), [saveUnit]),
+    setActivityManualCompletion: useCallback((...args) => editHistory.run('Programació', () => setActivityManualCompletion(...args)), [setActivityManualCompletion]),
+  }
+
   return {
+    ...historyActions,
     accessGrants,
     academicYears,
     activities: effectiveActivities,
@@ -1321,21 +1352,15 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     activeRole,
     applications,
     applicationsLoading,
-    archiveUnit,
-    acceptImprovementSuggestions,
-    copyHistoricalActivity,
+
     canEditActiveUnit,
     canManageActiveAgenda,
     canReadActiveApplications,
     classPlanningUnits,
-    connectUnitToClass,
-    createTemporalUnit: createTemporalUnitForYear,
-    createUnit,
-    createYear,
-    duplicateUnitToAcademicYear,
+
+
     error,
-    importPlanningBundle,
-    importPlanningTable,
+
     isOnline,
     loading: loading || sharedLoading || applicationsLoading || activityOverridesLoading,
     loadHistoricalUnits,
@@ -1347,23 +1372,16 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     phases,
     ownedPlanningUnits: planningUnits,
     planningUnits: allPlanningUnits,
-    movePhase,
-    moveActivity,
-    moveActivityForActiveClass,
-    removeActivity,
-    removeActivityForActiveClass,
-    removePhase,
+
+
+
     refreshFromCloud,
     resolveConflicts,
-    saveActivity,
-    saveActivityForActiveClass,
+
     saveAccessGrant,
-    savePhase,
-    saveTemporalUnit,
-    saveUnit,
+
     setActiveAcademicYearId,
     setActivePlanningUnitId,
-    setActivityManualCompletion,
     setError,
     sharedPlanningUnits,
     sync,

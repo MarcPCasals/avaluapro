@@ -282,7 +282,7 @@ export function PlanningActivitySequence({ activities, activityProgress = {}, co
       activityCount ? `${activityCount} ${activityCount === 1 ? 'activitat' : 'activitats'}` : '',
     ].filter(Boolean).join(' i ')
     const message = contents
-      ? `Vols eliminar «${phase.title}» i també ${contents}? Aquesta acció no es pot desfer.`
+      ? `Vols eliminar «${phase.title}» i també ${contents}? Podràs recuperar aquest canvi amb el botó Desfer durant aquesta sessió.`
       : `Vols eliminar «${phase.title}»?`
     if (!globalThis.confirm?.(message)) return
     await onDeletePhase(phase)

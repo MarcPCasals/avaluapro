@@ -1,3 +1,4 @@
+import { EditHistoryFixture } from './src/EditHistoryFixture.jsx'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PlanningDirectionFixture } from './src/PlanningDirectionFixture.jsx'
@@ -9,6 +10,6 @@ installAssistanceRuntimeBoundary()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {new URLSearchParams(window.location.search).has('planning-direction-demo') ? <PlanningDirectionFixture /> : <AssistanceApp />}
+    {new URLSearchParams(window.location.search).has('edit-history-demo') ? <EditHistoryFixture /> : new URLSearchParams(window.location.search).has('planning-direction-demo') ? <PlanningDirectionFixture /> : <AssistanceApp />}
   </StrictMode>,
 )

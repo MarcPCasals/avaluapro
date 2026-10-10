@@ -1,3 +1,4 @@
+import { EDIT_HISTORY_REFRESH_EVENT, editHistory } from '../../lib/editHistory'
 import { saveCalendarEventWithAutomaticReflow } from './agendaCancellation.js'
 import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -250,7 +251,11 @@ export function useAgendaWorkspace(user, classes = []) {
       refreshFromCloud().catch(() => refreshSync({ error: 'planning/sync-error' }))
     }
     globalThis.addEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
-    return () => globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+    globalThis.addEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+    return () => {
+      globalThis.removeEventListener?.(CROSS_DEVICE_REFRESH_EVENT, handleCrossDeviceRefresh)
+      globalThis.removeEventListener?.(EDIT_HISTORY_REFRESH_EVENT, handleCrossDeviceRefresh)
+    }
   }, [refreshFromCloud, refreshSync, repository])
 
   useEffect(() => {
@@ -2290,9 +2295,36 @@ export function useAgendaWorkspace(user, classes = []) {
     [persistAgendaReflowPreview],
   )
 
+  const historyActions = {
+    applyClassroomTimingToPlanning: useCallback((...args) => editHistory.run('Agenda i cronologia', () => applyClassroomTimingToPlanning(...args)), [applyClassroomTimingToPlanning]),
+    addSessionActivity: useCallback((...args) => editHistory.run('Agenda i cronologia', () => addSessionActivity(...args)), [addSessionActivity]),
+    reorderSessionItem: useCallback((...args) => editHistory.run('Agenda i cronologia', () => reorderSessionItem(...args)), [reorderSessionItem]),
+    compactAgendaSession: useCallback((...args) => editHistory.run('Agenda i cronologia', () => compactAgendaSession(...args)), [compactAgendaSession]),
+    confirmAgendaRecoveryPreview: useCallback((...args) => editHistory.run('Agenda i cronologia', () => confirmAgendaRecoveryPreview(...args)), [confirmAgendaRecoveryPreview]),
+    confirmSessionReplacementPreview: useCallback((...args) => editHistory.run('Agenda i cronologia', () => confirmSessionReplacementPreview(...args)), [confirmSessionReplacementPreview]),
+    confirmContinuationPreview: useCallback((...args) => editHistory.run('Agenda i cronologia', () => confirmContinuationPreview(...args)), [confirmContinuationPreview]),
+    confirmSchedulingPreview: useCallback((...args) => editHistory.run('Agenda i cronologia', () => confirmSchedulingPreview(...args)), [confirmSchedulingPreview]),
+    closeClassroomSession: useCallback((...args) => editHistory.run('Agenda i cronologia', () => closeClassroomSession(...args)), [closeClassroomSession]),
+    createYear: useCallback((...args) => editHistory.run('Agenda i cronologia', () => createYear(...args)), [createYear]),
+    createTimetable: useCallback((...args) => editHistory.run('Agenda i cronologia', () => createTimetable(...args)), [createTimetable]),
+    moveSlot: useCallback((...args) => editHistory.run('Agenda i cronologia', () => moveSlot(...args)), [moveSlot]),
+    removeCalendarEvent: useCallback((...args) => editHistory.run('Agenda i cronologia', () => removeCalendarEvent(...args)), [removeCalendarEvent]),
+    removeSlot: useCallback((...args) => editHistory.run('Agenda i cronologia', () => removeSlot(...args)), [removeSlot]),
+    saveCalendarEvent: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveCalendarEvent(...args)), [saveCalendarEvent]),
+    saveActivityResult: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveActivityResult(...args)), [saveActivityResult]),
+    saveClassroomPrivateNote: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveClassroomPrivateNote(...args)), [saveClassroomPrivateNote]),
+    saveSessionClassroomState: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveSessionClassroomState(...args)), [saveSessionClassroomState]),
+    saveSessionItemChange: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveSessionItemChange(...args)), [saveSessionItemChange]),
+    removeSessionItem: useCallback((...args) => editHistory.run('Agenda i cronologia', () => removeSessionItem(...args)), [removeSessionItem]),
+    saveSessionStatus: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveSessionStatus(...args)), [saveSessionStatus]),
+    saveSlot: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveSlot(...args)), [saveSlot]),
+    saveTimetable: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveTimetable(...args)), [saveTimetable]),
+    saveTemporalUnit: useCallback((...args) => editHistory.run('Agenda i cronologia', () => saveTemporalUnit(...args)), [saveTemporalUnit]),
+  }
+
   return {
+    ...historyActions,
     academicYears,
-    applyClassroomTimingToPlanning,
     activeAcademicYear,
     activeAcademicYearId,
     activeTimetable,
@@ -2303,17 +2335,12 @@ export function useAgendaWorkspace(user, classes = []) {
     buildSessionReplacementPreview,
     loadSessionReplacementActivities,
     loadSessionActivityChoices,
-    addSessionActivity,
-    reorderSessionItem,
+
     buildContinuationPreview,
-    compactAgendaSession,
-    confirmAgendaRecoveryPreview,
-    confirmSessionReplacementPreview,
-    confirmContinuationPreview,
-    confirmSchedulingPreview,
-    closeClassroomSession,
-    createYear,
-    createTimetable,
+
+
+
+
     error,
     findNextClassroomSession,
     isOnline,
@@ -2327,22 +2354,15 @@ export function useAgendaWorkspace(user, classes = []) {
     loadSessionRange,
     loadUnscheduledPlanningActivities,
     loadTodaySessions,
-    moveSlot,
     ownedPlanningUnits: planningUnits,
     refreshFromCloud,
     resolveConflicts,
-    removeCalendarEvent,
-    removeSlot,
-    saveCalendarEvent,
-    saveActivityResult,
-    saveClassroomPrivateNote,
-    saveSessionClassroomState,
-    saveSessionItemChange,
-    removeSessionItem,
-    saveSessionStatus,
-    saveSlot,
-    saveTimetable,
-    saveTemporalUnit,
+
+
+
+
+
+
     setActiveAcademicYearId,
     setActiveTimetableId,
     setError,

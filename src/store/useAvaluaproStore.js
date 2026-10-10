@@ -1,3 +1,4 @@
+import { editHistory, historyValuesEqual } from '../lib/editHistory'
 import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
 import { create } from 'zustand'
 import { createId } from '../lib/ids'
@@ -1940,6 +1941,32 @@ function ensureSubjectStructureForClass(state, classId, subjectName, classUts) {
 
 export const useAvaluaproStore = create((set, get) => ({
   ...EMPTY_DATASET,
+  applyEditHistoryChanges: async (changes, side) => {
+    if (changes.some(change => !historyValuesEqual(
+      get()[change.metadata.collection].find(row => row.id === change.metadata.id) || null, change.expected,
+    ))) throw new Error('Aquestes dades han canviat després. No es poden sobreescriure amb l’historial.')
+    const collections = [...new Set(changes.map(change => change.metadata.collection))]
+    const patch = {}
+    for (const collection of collections) {
+      const rows = new Map(get()[collection].map(row => [row.id, row]))
+      for (const change of changes.filter(item => item.metadata.collection === collection)) {
+        if (change[side]) rows.set(change[side].id, structuredClone(change[side]))
+        else rows.delete(change.metadata.id)
+      }
+      patch[collection] = [...rows.values()]
+    }
+    const previous = Object.fromEntries(collections.map(collection => [collection, get()[collection]]))
+    const current = get()
+    const dataset = { ...current, ...patch }
+    const activeClassId = dataset.classes.some(row => row.id === current.ui.activeClassId)
+      ? current.ui.activeClassId : dataset.classes[0]?.id || ''
+    const ui = { ...current.ui, activeClassId, ...getClassTimelineSelection(dataset, activeClassId, current.ui) }
+    set({ ...patch, ui })
+    try {
+      await persistCollections(set, get, collections, { throwOnError: true })
+      writePreferences({ ...readPreferences(), ...ui })
+    } catch (error) { set({ ...previous, ui: current.ui }); throw error }
+  },
   ui: {
     activeClassId: '',
     activeSemesterId: '',
@@ -2638,7 +2665,7 @@ export const useAvaluaproStore = create((set, get) => ({
     nextOrdered.splice(targetIndex, 0, movedClass)
     const orderById = new Map(nextOrdered.map((classItem, index) => [classItem.id, index + 1]))
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       classes: current.classes.map((classItem) => ({
         ...classItem,
         order: orderById.get(classItem.id) || classItem.order,
@@ -2657,7 +2684,7 @@ export const useAvaluaproStore = create((set, get) => ({
     nextOrdered.splice(targetIndex, 0, movedClass)
     const orderById = new Map(nextOrdered.map((classItem, index) => [classItem.id, index + 1]))
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       classes: current.classes.map((classItem) => ({
         ...classItem,
         order: orderById.get(classItem.id) || classItem.order,
@@ -2754,13 +2781,13 @@ export const useAvaluaproStore = create((set, get) => ({
       order: semesterUts.length + 1,
     }
 
-    set((state) => ({ uts: [...state.uts, newUt], ui: { ...state.ui, activeUtId: newUt.id } }))
+    setWithEditHistory(set, get, (state) => ({ uts: [...state.uts, newUt], ui: { ...state.ui, activeUtId: newUt.id } }))
     await persistCollections(set, get, ['uts'])
     writePreferences({ ...readPreferences(), ...get().ui })
   },
 
   updateUt: async (utId, patch) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       uts: state.uts.map((ut) => (ut.id === utId ? { ...ut, ...patch } : ut)),
     }))
     await persistCollections(set, get, ['uts'])
@@ -2781,7 +2808,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const nextUt = remainingUts[0]
     const nextSemester = nextUt ? state.semesters.find((semester) => semester.id === nextUt.semesterId) : null
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       uts: current.uts.filter((item) => item.id !== utId),
       competencies: current.competencies.filter((competency) => competency.utId !== utId),
       criteria: current.criteria.filter((criterion) => !competencyIds.includes(criterion.competencyId)),
@@ -2855,7 +2882,7 @@ export const useAvaluaproStore = create((set, get) => ({
         ]
       : []
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       classes: [
         ...state.classes,
         {
@@ -2891,7 +2918,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const normalizedPatch = Object.prototype.hasOwnProperty.call(patch, 'subject')
       ? { ...patch, subject: canonicalizeSubjectName(patch.subject) }
       : patch
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const currentClass = state.classes.find((classItem) => classItem.id === classId)
       const subjectChanged =
         Object.prototype.hasOwnProperty.call(normalizedPatch, 'subject') && normalizedPatch.subject !== currentClass?.subject
@@ -3040,7 +3067,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateMark: async (studentId, criterionId, value) => {
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.marks.find(
         (mark) => mark.studentId === studentId && mark.criterionId === criterionId,
       )
@@ -3057,7 +3084,7 @@ export const useAvaluaproStore = create((set, get) => ({
   updateMarksBulk: async (updates) => {
     if (updates.length === 0) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const updateMap = new Map(updates.map((update) => [`${update.studentId}_${update.criterionId}`, update.value]))
       const touchedKeys = new Set(updateMap.keys())
       const marks = state.marks
@@ -3081,7 +3108,7 @@ export const useAvaluaproStore = create((set, get) => ({
   toggleCompetencyModification: async (studentId, competencyId) => {
     if (!studentId || !competencyId) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.marks.find(
         (mark) =>
           mark.type === 'competency-modification' &&
@@ -3110,7 +3137,7 @@ export const useAvaluaproStore = create((set, get) => ({
   setCompetencyModification: async (studentId, competencyId, modified) => {
     if (!studentId || !competencyId) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.marks.find(
         (mark) =>
           mark.type === 'competency-modification' &&
@@ -3154,7 +3181,7 @@ export const useAvaluaproStore = create((set, get) => ({
       await tombstoneSharedRowIfNeeded(state, 'tutorialMarks', existingMark)
     }
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.tutorialMarks.find(
         (mark) =>
           mark.classId === classId &&
@@ -3210,7 +3237,7 @@ export const useAvaluaproStore = create((set, get) => ({
       .filter((update) => update.classId && update.studentId && update.subject && update.competencyKey)
     if (cleanUpdates.length === 0) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const updateMap = new Map(
         cleanUpdates.map((update) => [
           `${update.classId}_${update.studentId}_${update.subject}_${update.competencyKey}`,
@@ -4327,7 +4354,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const cleanDate = date || new Date().toISOString().slice(0, 10)
     const now = new Date().toISOString()
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const nextRecord = {
         id: createId('trecord'),
         classId,
@@ -4389,7 +4416,7 @@ export const useAvaluaproStore = create((set, get) => ({
   updateTutorialRecord: async (recordId, patch = {}) => {
     if (!recordId) return
     const updatedAt = new Date().toISOString()
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tutorialRecords: state.tutorialRecords.map((record) =>
         record.id === recordId ? { ...record, ...patch, updatedAt } : record,
       ),
@@ -4403,7 +4430,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const record = state.tutorialRecords.find((item) => item.id === recordId)
     await tombstoneSharedRowIfNeeded(state, 'tutorialRecords', record)
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       tutorialRecords: current.tutorialRecords.filter((item) => item.id !== recordId),
     }))
     await persistCollections(set, get, ['tutorialRecords'])
@@ -4425,7 +4452,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const cleanStrength = Math.min(3, Math.max(1, Number(strength) || 2))
     const now = new Date().toISOString()
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.tutorialRelations.find(
         (relation) =>
           relation.classId === classId &&
@@ -4470,7 +4497,7 @@ export const useAvaluaproStore = create((set, get) => ({
     if (validRelations.length === 0) return
 
     const now = new Date().toISOString()
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const nextRelations = [...state.tutorialRelations]
       const indexByKey = new Map(
         nextRelations.map((relation, index) => [
@@ -4504,7 +4531,7 @@ export const useAvaluaproStore = create((set, get) => ({
           return
         }
 
-        indexByKey.set(key, nextRelations.length)
+        indexByKey.setWithEditHistory(set, get, key, nextRelations.length)
         nextRelations.push({
           id: createId('trel'),
           createdAt: relation.createdAt || now,
@@ -4523,7 +4550,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const relation = state.tutorialRelations.find((item) => item.id === relationId)
     await tombstoneSharedRowIfNeeded(state, 'tutorialRelations', relation)
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       tutorialRelations: current.tutorialRelations.filter((item) => item.id !== relationId),
     }))
     await persistCollections(set, get, ['tutorialRelations'])
@@ -4906,7 +4933,7 @@ export const useAvaluaproStore = create((set, get) => ({
       }
     })
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tutorialGroupSets: [
         {
           id: createId('tgroups'),
@@ -4937,7 +4964,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const groupSet = (state.tutorialGroupSets || []).find((item) => item.id === groupSetId)
     await tombstoneSharedRowIfNeeded(state, 'tutorialGroupSets', groupSet)
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       tutorialGroupSets: (current.tutorialGroupSets || []).filter((item) => item.id !== groupSetId),
     }))
     await persistCollections(set, get, ['tutorialGroupSets'])
@@ -4955,7 +4982,7 @@ export const useAvaluaproStore = create((set, get) => ({
       }))
       .filter((position) => position.studentId)
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = (state.tutorialSociogramLayouts || []).find((layout) => layout.classId === classId)
       const nextLayout = {
         id: existing?.id || createId('sociogram'),
@@ -4982,7 +5009,7 @@ export const useAvaluaproStore = create((set, get) => ({
       layouts.map((layout) => tombstoneSharedRowIfNeeded(state, 'tutorialSociogramLayouts', layout)),
     )
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       tutorialSociogramLayouts: (current.tutorialSociogramLayouts || []).filter(
         (layout) => layout.classId !== classId,
       ),
@@ -5002,7 +5029,7 @@ export const useAvaluaproStore = create((set, get) => ({
       await tombstoneSharedRowIfNeeded(state, 'tutorialStudentRoles', existingRole)
     }
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = (state.tutorialStudentRoles || []).find(
         (item) => item.classId === classId && item.studentId === studentId && item.role === role,
       )
@@ -5052,7 +5079,7 @@ export const useAvaluaproStore = create((set, get) => ({
       title: String(title || '').trim() || 'Disposició recomanada',
       updatedAt: now,
     }
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       return {
         tutorialSeatingPlans: [
           nextPlan,
@@ -5069,7 +5096,7 @@ export const useAvaluaproStore = create((set, get) => ({
   updateTutorialSeatingPlan: async (planId, patch) => {
     if (!planId || !patch) return
     const now = new Date().toISOString()
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const target = (state.tutorialSeatingPlans || []).find((plan) => plan.id === planId)
       if (!target) return {}
       return {
@@ -5098,7 +5125,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const plan = (state.tutorialSeatingPlans || []).find((item) => item.id === planId)
     if (!plan) return
     await tombstoneSharedRowIfNeeded(state, 'tutorialSeatingPlans', plan)
-    set((current) => {
+    setWithEditHistory(set, get, (current) => {
       const remainingPlans = (current.tutorialSeatingPlans || []).filter((item) => item.id !== planId)
       if (!plan.isActive) return { tutorialSeatingPlans: remainingPlans }
       const fallbackActivePlan = remainingPlans
@@ -5119,7 +5146,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const classId = get().ui.activeClassId
     const existingCompetencies = get().competencies.filter((competency) => competency.utId === utId)
     const competencyId = createId('comp')
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       competencies: [
         ...state.competencies,
         {
@@ -5140,7 +5167,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateCompetency: async (competencyId, patch) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       competencies: state.competencies.map((competency) =>
         competency.id === competencyId ? { ...competency, ...patch } : competency,
       ),
@@ -5152,7 +5179,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const criteriaIds = get()
       .criteria.filter((criterion) => criterion.competencyId === competencyId)
       .map((criterion) => criterion.id)
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       competencies: state.competencies.filter((competency) => competency.id !== competencyId),
       criteria: state.criteria.filter((criterion) => criterion.competencyId !== competencyId),
       indicators: state.indicators.filter((indicator) => !criteriaIds.includes(indicator.criterionId)),
@@ -5179,7 +5206,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     if (!isActive) {
       disabledNames.add(competencyName)
-      set((current) => ({
+      setWithEditHistory(set, get, (current) => ({
         uts: current.uts.map((item) =>
           item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
         ),
@@ -5195,7 +5222,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     disabledNames.delete(competencyName)
     if (existingCompetency) {
-      set((current) => ({
+      setWithEditHistory(set, get, (current) => ({
         uts: current.uts.map((item) =>
           item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
         ),
@@ -5227,7 +5254,7 @@ export const useAvaluaproStore = create((set, get) => ({
       rubric: { A: '', B: '', C: '', D: '' },
     }))
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       uts: current.uts.map((item) =>
         item.id === utId ? { ...item, disabledCompetencyNames: Array.from(disabledNames) } : item,
       ),
@@ -5239,7 +5266,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   addCriterion: async (competencyId) => {
     const existingCriteria = get().criteria.filter((criterion) => criterion.competencyId === competencyId)
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       criteria: [
         ...state.criteria,
         {
@@ -5254,7 +5281,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateCriterion: async (criterionId, patch) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       criteria: state.criteria.map((criterion) =>
         criterion.id === criterionId ? { ...criterion, ...patch } : criterion,
       ),
@@ -5263,7 +5290,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   deleteCriterion: async (criterionId) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       criteria: state.criteria.filter((criterion) => criterion.id !== criterionId),
       indicators: state.indicators.filter((indicator) => indicator.criterionId !== criterionId),
       marks: state.marks.filter((mark) => mark.criterionId !== criterionId),
@@ -5304,7 +5331,7 @@ export const useAvaluaproStore = create((set, get) => ({
         })
     })
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       competencies: [...state.competencies, ...copiedCompetencies],
       criteria: [...state.criteria, ...copiedCriteria],
     }))
@@ -5365,7 +5392,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     if (newCompetencies.length === 0) {
       if (requestedNames && targetUt) {
-        set((state) => ({
+        setWithEditHistory(set, get, (state) => ({
           uts: state.uts.map((ut) =>
             ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
           ),
@@ -5380,7 +5407,7 @@ export const useAvaluaproStore = create((set, get) => ({
       return
     }
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       uts: state.uts.map((ut) =>
         ut.id === utId ? { ...ut, disabledCompetencyNames: Array.from(disabledNames) } : ut,
       ),
@@ -5401,7 +5428,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const task = get().tasks.find((item) => item.id === taskId)
     if (!task) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.taskRecords.find(
         (record) => record.studentId === studentId && record.taskId === taskId,
       )
@@ -5445,7 +5472,7 @@ export const useAvaluaproStore = create((set, get) => ({
       : findAbsenceInSlot(state.absenceRecords, studentId, classId, timeParts.slotKey)
 
     if (existing) {
-      set((current) => ({
+      setWithEditHistory(set, get, (current) => ({
         absenceRecords: current.absenceRecords.filter((record) => record.id !== existing.id),
       }))
       await persistCollections(set, get, ['absenceRecords'])
@@ -5465,7 +5492,7 @@ export const useAvaluaproStore = create((set, get) => ({
       sessionStartsAt,
       source: options.source || null,
     }
-    set((current) => ({ absenceRecords: [...current.absenceRecords, record] }))
+    setWithEditHistory(set, get, (current) => ({ absenceRecords: [...current.absenceRecords, record] }))
     await persistCollections(set, get, ['absenceRecords'])
     return { registered: true, record }
   },
@@ -5474,7 +5501,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const task = get().tasks.find((item) => item.id === taskId)
     if (!task) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.taskRecords.find(
         (record) => record.studentId === studentId && record.taskId === taskId,
       )
@@ -5512,7 +5539,7 @@ export const useAvaluaproStore = create((set, get) => ({
       date: createdAt.slice(0, 10),
       createdAt,
     }
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       behaviorEvents: [...state.behaviorEvents, behaviorEvent],
     }))
     await persistCollections(set, get, ['behaviorEvents'])
@@ -5536,7 +5563,7 @@ export const useAvaluaproStore = create((set, get) => ({
     if (!cleanText) return
     const createdAt = new Date().toISOString()
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       agendaNotes: [
         ...state.agendaNotes,
         {
@@ -5653,7 +5680,7 @@ export const useAvaluaproStore = create((set, get) => ({
     const agendaNotes = existing
       ? state.agendaNotes.map((item) => item.id === note.id ? note : item)
       : [...state.agendaNotes, note]
-    set({ agendaNotes, taskRecords: linked.records })
+    setWithEditHistory(set, get, { agendaNotes, taskRecords: linked.records })
     const taskRecordsChanged = taskRecordsWithoutPreviousSelection.some((record, index) => record !== state.taskRecords[index])
       || linked.linkedCount > 0
     await persistCollections(set, get, taskRecordsChanged ? ['agendaNotes', 'taskRecords'] : ['agendaNotes'])
@@ -5674,7 +5701,7 @@ export const useAvaluaproStore = create((set, get) => ({
       reminder: note.reminder ? { ...note.reminder, dismissedAt: cancelledAt } : null,
       updatedAt: cancelledAt,
     }
-    set({
+    setWithEditHistory(set, get, {
       agendaNotes: state.agendaNotes.map((item) => item.id === note.id ? cancelled : item),
       taskRecords: clearRecoveryTaskLinks(state.taskRecords, note.id, 'DONE'),
     })
@@ -5693,7 +5720,7 @@ export const useAvaluaproStore = create((set, get) => ({
       reminder: note.reminder ? { ...note.reminder, dismissedAt: completedAt } : null,
       updatedAt: completedAt,
     }
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       agendaNotes: current.agendaNotes.map((item) => item.id === noteId ? completed : item),
       taskRecords: completeRecoveryTaskRecords(current.taskRecords, noteId, completedAt),
     }))
@@ -5703,7 +5730,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   updateAgendaNote: async (noteId, patch) => {
     const updatedAt = new Date().toISOString()
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       agendaNotes: state.agendaNotes.map((note) => (note.id === noteId ? { ...note, ...patch, updatedAt } : note)),
     }))
     await persistCollections(set, get, ['agendaNotes'])
@@ -5715,7 +5742,7 @@ export const useAvaluaproStore = create((set, get) => ({
     if (note?.type === 'team' || note?.type === 'tutoring') {
       await tombstoneSharedRowIfNeeded(state, 'agendaNotes', note)
     }
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       agendaNotes: state.agendaNotes.filter((note) => note.id !== noteId),
     }))
     await persistCollections(set, get, ['agendaNotes'])
@@ -5725,7 +5752,7 @@ export const useAvaluaproStore = create((set, get) => ({
     if (studentsToAdd.length === 0) return
     const createdAt = new Date().toISOString()
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       students: [
         ...state.students,
         ...studentsToAdd.map((student) => ({
@@ -5759,14 +5786,14 @@ export const useAvaluaproStore = create((set, get) => ({
     if (!get().classes.some((item) => item.id === classId)) throw new Error('No s’ha trobat la classe.')
     const createdAt = new Date().toISOString()
     const saved = createHalfGroupProposal({ ...proposal, students: get().students.filter((student) => student.classId === classId), id: createId('half_group_proposal'), createdAt })
-    set((state) => ({ classes: state.classes.map((item) => item.id === classId
+    setWithEditHistory(set, get, (state) => ({ classes: state.classes.map((item) => item.id === classId
       ? { ...item, halfGroupProposals: [...(item.halfGroupProposals || []), saved], updatedAt: createdAt } : item) }))
     await persistCollections(set, get, ['classes'], { throwOnError: true })
     return saved
   },
 
   deleteClassHalfGroupProposal: async (classId, proposalId) => {
-    set((state) => ({ classes: state.classes.map((item) => item.id === classId
+    setWithEditHistory(set, get, (state) => ({ classes: state.classes.map((item) => item.id === classId
       ? { ...item, halfGroupProposals: (item.halfGroupProposals || []).filter((proposal) => proposal.id !== proposalId), updatedAt: new Date().toISOString() } : item) }))
     await persistCollections(set, get, ['classes'], { throwOnError: true })
   },
@@ -5783,7 +5810,7 @@ export const useAvaluaproStore = create((set, get) => ({
       throw new Error('Els mitjos grups han de quedar equilibrats.')
     }
     const updatedAt = new Date().toISOString()
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       classes: state.classes.map((item) => item.id === classId
         ? { ...item, halfGroups: names, updatedAt } : item),
       students: state.students.map((student) => student.classId === classId
@@ -5794,7 +5821,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   updateStudent: async (studentId, patch) => {
     const updatedAt = new Date().toISOString()
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       students: state.students.map((student) =>
         student.id === studentId
           ? {
@@ -5815,7 +5842,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
     const updatedAt = new Date().toISOString()
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.studentAntecedents.find((antecedent) => antecedent.studentId === studentId)
       const nextAntecedent = {
         id: existing?.id || createId('ant'),
@@ -5847,7 +5874,7 @@ export const useAvaluaproStore = create((set, get) => ({
     if (cleanEntries.length === 0) return
     const updatedAt = new Date().toISOString()
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const studentsById = new Map(state.students.map((student) => [student.id, student]))
       const existingByStudentId = new Map(
         state.studentAntecedents.map((antecedent) => [antecedent.studentId, antecedent]),
@@ -5858,7 +5885,7 @@ export const useAvaluaproStore = create((set, get) => ({
         const student = studentsById.get(entry.studentId)
         if (!student) return
         const existing = existingByStudentId.get(entry.studentId)
-        nextByStudentId.set(entry.studentId, {
+        nextByStudentId.setWithEditHistory(set, get, entry.studentId, {
           id: existing?.id || createId('ant'),
           studentId: entry.studentId,
           classId: student.classId,
@@ -5885,7 +5912,7 @@ export const useAvaluaproStore = create((set, get) => ({
       antecedents.map((antecedent) => tombstoneSharedRowIfNeeded(state, 'studentAntecedents', antecedent)),
     )
 
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       studentAntecedents: current.studentAntecedents.filter((antecedent) => antecedent.studentId !== studentId),
     }))
     await persistCollections(set, get, ['studentAntecedents'])
@@ -6032,7 +6059,7 @@ export const useAvaluaproStore = create((set, get) => ({
   upsertSeatingChart: async ({ classId, halfGroup = 'all', imageData = '', manualLayout = null, mode = 'image', title }) => {
     if (!classId || (!imageData && !manualLayout)) return
 
-    set((state) => {
+    setWithEditHistory(set, get, (state) => {
       const existing = state.seatingCharts.find(
         (chart) => chart.classId === classId && chart.halfGroup === halfGroup,
       )
@@ -6057,7 +6084,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   deleteSeatingChart: async (chartId) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       seatingCharts: state.seatingCharts.filter((chart) => chart.id !== chartId),
     }))
     await persistCollections(set, get, ['seatingCharts'])
@@ -6071,7 +6098,7 @@ export const useAvaluaproStore = create((set, get) => ({
       (task) => task.classId === activeClassId && task.utId === activeUtId,
     )
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tasks: [
         ...state.tasks,
         {
@@ -6140,7 +6167,7 @@ export const useAvaluaproStore = create((set, get) => ({
         status: 'EXEMPT',
       } : record
     })
-    set((current) => ({
+    setWithEditHistory(set, get, (current) => ({
       tasks: activation.isNewTask ? [...current.tasks, activation.task] : current.tasks,
       taskRecords: [...current.taskRecords, ...records],
     }))
@@ -6151,7 +6178,7 @@ export const useAvaluaproStore = create((set, get) => ({
   addTasksToClasses: async ({ title, entries }) => {
     if (!title.trim() || entries.length === 0) return
 
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tasks: [
         ...state.tasks,
         ...entries.map((entry) => {
@@ -6173,14 +6200,14 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   updateTask: async (taskId, patch) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
     }))
     await persistCollections(set, get, ['tasks'])
   },
 
   deleteTask: async (taskId) => {
-    set((state) => ({
+    setWithEditHistory(set, get, (state) => ({
       tasks: state.tasks.filter((task) => task.id !== taskId),
       taskRecords: state.taskRecords.filter((record) => record.taskId !== taskId),
     }))
@@ -6225,3 +6252,66 @@ export const useAvaluaproStore = create((set, get) => ({
     set({ ...dataset, ui, profile, onboarding, backupMeta: null, status: 'ready', error: '' })
   },
 }))
+
+
+// Només accions locals reversibles. Comparticions, qüestionaris remots,
+// eliminacions definitives i restauracions de compte tenen un altre contracte.
+const reversibleActions = [
+  'reorderClass', 'reorderClassToIndex', 'addUt', 'updateUt', 'deleteUt',
+  'addClass', 'updateClass', 'updateMark', 'updateMarksBulk',
+  'toggleCompetencyModification', 'setCompetencyModification', 'updateTutorialMark', 'importTutorialMarks',
+  'addTutorialRecord', 'updateTutorialRecord', 'deleteTutorialRecord',
+  'upsertTutorialRelation', 'importTutorialRelations', 'deleteTutorialRelation',
+  'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
+  'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
+  'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive',
+  'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
+  'updateTaskRecord', 'toggleStudentAbsence', 'updateTaskRecordMeta', 'addBehaviorEvent',
+  'addAgendaNote', 'updateAgendaNote', 'deleteAgendaNote', 'saveClassroomRecovery', 'cancelClassroomRecovery', 'completeClassroomRecovery',
+  'addStudents', 'addStudentsFromText', 'saveClassHalfGroupProposal', 'deleteClassHalfGroupProposal', 'applyClassHalfGroups',
+  'updateStudent', 'upsertStudentAntecedent', 'bulkUpsertStudentAntecedents', 'deleteStudentAntecedent',
+  'upsertSeatingChart', 'deleteSeatingChart', 'addTask', 'activateClassroomTask', 'addTasksToClasses', 'updateTask', 'deleteTask',
+]
+const datasetHistoryAdapter = {
+  id: 'teacher-dataset',
+  readMany: async changes => changes.map(change => useAvaluaproStore.getState()[change.metadata.collection]
+    .find(row => row.id === change.metadata.id) || null),
+  writeMany: (changes, side) => useAvaluaproStore.getState().applyEditHistoryChanges(changes, side),
+}
+function setWithEditHistory(set, get, update) {
+  const before = get()
+  set(update)
+  const after = get()
+  const sharedClassIds = new Set([...before.classes, ...after.classes]
+    .filter(row => row.sharedTutoringSpaceId).map(row => row.id))
+  // La cotutoria té revisions i tombstones propis: no prometem una inversió local.
+  const touchesSharedData = sharedClassIds.size > 0 && COLLECTIONS.some(collection => before[collection] !== after[collection]
+    && [...before[collection], ...after[collection]].some(row => {
+      if (!sharedClassIds.has(row.classId || (collection === 'classes' ? row.id : ''))) return false
+      const previous = before[collection].find(item => item.id === row.id)
+      const next = after[collection].find(item => item.id === row.id)
+      return !historyValuesEqual(previous, next)
+    }))
+  if (touchesSharedData) { editHistory.clear(); return }
+  for (const collection of COLLECTIONS) {
+    if (before[collection] === after[collection]) continue
+    const oldRows = new Map(before[collection].map(row => [row.id, row]))
+    const nextRows = new Map(after[collection].map(row => [row.id, row]))
+    for (const id of new Set([...oldRows.keys(), ...nextRows.keys()])) {
+      editHistory.record(datasetHistoryAdapter, `${collection}:${id}`, oldRows.get(id), nextRows.get(id), { collection, id })
+    }
+  }
+}
+
+const originals = useAvaluaproStore.getState()
+useAvaluaproStore.setState(Object.fromEntries(reversibleActions.map(name => [name, (...args) =>
+  editHistory.run('Canvi del quadern', async () => {
+    return originals[name](...args)
+  }),
+])))
+useAvaluaproStore.subscribe((state, previous) => {
+  if (state.cloud.user?.uid !== previous.cloud.user?.uid || state.onboarding.demoMode !== previous.onboarding.demoMode) editHistory.clear()
+})
+for (const name of ['restoreBackup', 'restoreCloudBackup', 'pullFromCloud', 'deleteClass', 'deleteStudent', 'deleteOldTrackingData', 'resetToSeed', 'startOwnData']) {
+  useAvaluaproStore.setState({ [name]: (...args) => { editHistory.clear(); return originals[name](...args) } })
+}

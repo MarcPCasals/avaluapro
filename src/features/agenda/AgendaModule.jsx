@@ -1,3 +1,4 @@
+import { EDIT_HISTORY_REFRESH_EVENT } from '../../lib/editHistory'
 import { applyClassroomContinuationPreview } from '../../domain/planning/classroomContinuation'
 import { planningSubjectsMatch } from '../../domain/planning/subjects.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -531,6 +532,18 @@ export default function AgendaModule() {
     hasApplications: false,
     loading: false,
   })
+
+  useEffect(() => {
+    const reloadHistoryRange = () => {
+      if (view !== 'week') return
+      const range = calendarMode === 'month' ? monthSessionRange(monthKey)
+        : { from: weekStart, to: addDateDays(weekStart, 4) }
+      loadSessionRange({ ...range, includeDetails: false })
+        .catch((error) => setWorkspaceError(error.message || 'No s’ha pogut actualitzar el calendari.'))
+    }
+    globalThis.addEventListener(EDIT_HISTORY_REFRESH_EVENT, reloadHistoryRange)
+    return () => globalThis.removeEventListener(EDIT_HISTORY_REFRESH_EVENT, reloadHistoryRange)
+  }, [calendarMode, loadSessionRange, monthKey, setWorkspaceError, view, weekStart])
 
   useEffect(() => {
     if (view !== 'today' || !hasAgendaWorkspace) return undefined

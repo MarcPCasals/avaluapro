@@ -1,3 +1,4 @@
+import { historyValuesEqual } from '../../lib/editHistory.js'
 import { withoutPlanningViewContext } from '../cloud/planningCloudCompatibility.js'
 import { areCloudDocumentsEqual } from '../../lib/cloudSyncDiff.js'
 import { getSafeCloudSyncError } from '../../lib/cloudSyncQueue.js'
@@ -450,4 +451,49 @@ export async function clearPlanningLocalData(uid, { discardPending = false } = {
   } finally {
     db.close()
   }
+}
+
+/** Lectura puntual per comprovar que l'historial no trepitja edicions posteriors. */
+export async function readPlanningHistoryRows(uid, changes) {
+  const db = await openPlanningDatabase()
+  try {
+    const transaction = db.transaction(ENTITY_STORE, 'readonly')
+    return await Promise.all(changes.map(change => requestResult(
+      transaction.objectStore(ENTITY_STORE).get(getPlanningCacheKey(uid, change.key)),
+    ).then(row => row?.value || null)))
+  } finally { db.close() }
+}
+
+/** Restaura tota una cronologia i la seva cua dins una única transacció local. */
+export async function restorePlanningHistoryRows(uid, changes, side) {
+  const db = await openPlanningDatabase()
+  try {
+    const transaction = db.transaction([ENTITY_STORE, OUTBOX_STORE, CONFLICT_STORE], 'readwrite')
+    const done = transactionDone(transaction)
+    done.catch(() => {})
+    const entities = transaction.objectStore(ENTITY_STORE)
+    const outbox = transaction.objectStore(OUTBOX_STORE)
+    const queuedAt = new Date().toISOString()
+    for (const change of changes) {
+      const cacheKey = getPlanningCacheKey(uid, change.key)
+      const current = await requestResult(entities.get(cacheKey))
+      const pending = await requestResult(outbox.get(cacheKey))
+      const conflict = await requestResult(transaction.objectStore(CONFLICT_STORE).get(cacheKey))
+      if (conflict || !historyValuesEqual(current?.value || null, change.expected)) {
+        transaction.abort()
+        throw new Error('Aquestes dades han canviat o tenen un conflicte de sincronització. Resol-lo abans de desfer o refer.')
+      }
+      const value = change[side] ? { ...change[side], updatedAt: queuedAt } : null
+      const metadata = { ...change.metadata, cacheKey, uid }
+      if (value) entities.put({ ...metadata, localUpdatedAt: queuedAt, remoteUpdatedAt: current?.remoteUpdatedAt || '', value })
+      else entities.delete(cacheKey)
+      outbox.put({ ...metadata, attempts: 0,
+        baseUpdatedAt: pending?.baseUpdatedAt || current?.remoteUpdatedAt || '',
+        lastError: pending?.lastError || '', retryAt: pending?.retryAt || '',
+        operation: value ? 'upsert' : 'delete', queuedAt, revision: createRevision(), ...(value ? { value } : {}),
+      })
+      transaction.objectStore(CONFLICT_STORE).delete(cacheKey)
+    }
+    await done
+  } finally { db.close() }
 }
