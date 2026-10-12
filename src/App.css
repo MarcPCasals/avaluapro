@@ -31484,3 +31484,37 @@ button.profile-followup-card:focus-visible {
   color: #fde68a;
   font-size: 13px;
 }
+
+
+.tutorial-seating-version-context {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #dbe3ef;
+  background: #eff6ff;
+}
+
+.tutorial-seating-version-context > div {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tutorial-seating-version-context strong { font-size: 12px; color: #172033; }
+.tutorial-seating-version-context span { font-size: 11px; color: #475569; }
+.tutorial-seating-version-context button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+  color: #1e40af;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tutorial-seating-version-context button:disabled { opacity: .5; cursor: default; }
+.tutorial-seating-versions-compact article { grid-template-columns: minmax(0, 1fr); }

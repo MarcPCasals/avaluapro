@@ -69,3 +69,42 @@ test('la cotutoria compartida deixa l’historial buit en lloc de prometre una i
   await store.getState().updateStudent('synthetic-student', { name: 'Fictici modificat' })
   assert.equal(history.getSnapshot().canUndo, false)
 })
+
+
+test('modificar una disposició conserva la versió i persisteix els llocs i l’activació', async () => {
+  store.setState({ classes: [{ id: 'synthetic-class' }], tutorialSeatingPlans: [] })
+  const original = await store.getState().saveTutorialSeatingPlan({
+    classId: 'synthetic-class', isActive: true, title: 'Original',
+    contentUpdatedAt: '2025-01-01T00:00:00.000Z',
+    layout: { rows: 2 }, seats: [{ studentId: 'synthetic-student', x: 0, y: 0 }],
+  })
+  await store.getState().updateTutorialSeatingPlan(original.id, {
+    title: 'Modificada', layout: { rows: 3 }, seats: [{ studentId: 'synthetic-student', x: 2, y: 1 }],
+  })
+  const rows = store.getState().tutorialSeatingPlans
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].id, original.id)
+  assert.equal(rows[0].createdAt, original.createdAt)
+  assert.equal(rows[0].isActive, true)
+  assert.notEqual(rows[0].contentUpdatedAt, original.contentUpdatedAt)
+  assert.equal(rows[0].seats[0].x, 2)
+  assert.deepEqual((await db.loadDataset()).tutorialSeatingPlans, rows)
+})
+
+test('crear una versió conserva l’anterior i només canvia l’activa si es demana', async () => {
+  const original = store.getState().tutorialSeatingPlans[0]
+  const copy = await store.getState().saveTutorialSeatingPlan({
+    ...original, title: 'Nova versió', isActive: false,
+    seats: [{ studentId: 'synthetic-student', x: 1, y: 2 }],
+  })
+  assert.notEqual(copy.id, original.id)
+  assert.equal(store.getState().tutorialSeatingPlans.length, 2)
+  assert.deepEqual(store.getState().tutorialSeatingPlans.find(row => row.id === original.id), original)
+  const contentUpdatedAt = copy.contentUpdatedAt
+  await store.getState().updateTutorialSeatingPlan(copy.id, { isActive: true })
+  assert.equal(store.getState().tutorialSeatingPlans.filter(row => row.isActive).length, 1)
+  assert.equal(store.getState().tutorialSeatingPlans.find(row => row.isActive).id, copy.id)
+  assert.equal(store.getState().tutorialSeatingPlans.find(row => row.id === copy.id).contentUpdatedAt, contentUpdatedAt)
+  const byId = rows => [...rows].sort((a, b) => a.id.localeCompare(b.id))
+  assert.deepEqual(byId((await db.loadDataset()).tutorialSeatingPlans), byId(store.getState().tutorialSeatingPlans))
+})

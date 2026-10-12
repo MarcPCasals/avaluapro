@@ -5108,6 +5108,10 @@ export const useAvaluaproStore = create((set, get) => ({
           return {
             ...plan,
             ...patch,
+            contentUpdatedAt:
+              patch.layout !== undefined || patch.seats !== undefined
+                ? now
+                : plan.contentUpdatedAt || plan.createdAt,
             observation:
               patch.observation === undefined ? plan.observation : String(patch.observation || '').trim(),
             title: patch.title === undefined ? plan.title : String(patch.title || '').trim() || plan.title,

@@ -4460,6 +4460,9 @@ export function TutoringView() {
   const [draggingSeatingStudentId, setDraggingSeatingStudentId] = useState('')
   const [selectedSeatingPlanId, setSelectedSeatingPlanId] = useState('')
   const [loadedSeatingPlanId, setLoadedSeatingPlanId] = useState('')
+  const [seatingSaveMode, setSeatingSaveMode] = useState('new')
+  const [seatingSaveBusy, setSeatingSaveBusy] = useState(false)
+  const [seatingSaveMessage, setSeatingSaveMessage] = useState('')
   const [comparisonSeatingPlanId, setComparisonSeatingPlanId] = useState('')
   const [selectedSeatingStudentId, setSelectedSeatingStudentId] = useState('')
   const [seatingMoveStudentId, setSeatingMoveStudentId] = useState('')
@@ -4783,16 +4786,6 @@ export function TutoringView() {
         .filter((plan) => plan.classId === activeClassId)
         .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
     [activeClassId, tutorialSeatingPlans],
-  )
-  const latestSavedTutorialSeatingPlan = useMemo(
-    () =>
-      classTutorialSeatingPlans.reduce((latestPlan, plan) => {
-        if (!latestPlan) return plan
-        const latestSavedAt = String(latestPlan.createdAt || latestPlan.updatedAt || '')
-        const planSavedAt = String(plan.createdAt || plan.updatedAt || '')
-        return planSavedAt > latestSavedAt ? plan : latestPlan
-      }, null),
-    [classTutorialSeatingPlans],
   )
   const savedSociogramPositionsByStudentId = useMemo(
     () =>
@@ -6667,42 +6660,60 @@ export function TutoringView() {
     setDraggingSeatingStudentId('')
   }
 
-  const handleSaveTutorialSeatingPlan = async () => {
-    const fallbackName = `Disposició ${formatShortDate(getTodayDateInput())}`
-    const savedPlan = await saveTutorialSeatingPlan({
-      classId: activeClassId,
-      isActive: seatingSaveAsActive,
-      layout: {
-        ...generatedSeatingPlan.layout,
-        iterationObjective: seatingIterationObjective,
-        seatingRestrictions,
-        lockedStudentIds: seatingLockedStudentIds,
-      },
-      observation: seatingPlanObservation,
-      qualitySnapshot: {
-        conflictCount: generatedSeatingPlanAnalysis.conflicts.length,
-        label: generatedSeatingPlanAnalysis.quality.label,
-        score: generatedSeatingPlanAnalysis.score,
-      },
-      seats: generatedSeatingPlan.placements.map((placement) => ({
-        halfGroup: placement.halfGroup,
-        isConflict: placement.isConflict,
-        isLocked: placement.isLocked,
-        isStar: placement.isStar,
-        studentId: placement.studentId,
-        x: placement.seat.x,
+  const handleSaveTutorialSeatingPlan = async (mode = seatingSaveMode) => {
+    if (selectedSeatingPlan || seatingSaveBusy) return
+    setSeatingSaveBusy(true)
+    setSeatingSaveMessage('')
+    try {
+      const fallbackName = `Disposició ${formatShortDate(getTodayDateInput())}`
+      const planContent = {
+        classId: activeClassId,
+        isActive: seatingSaveAsActive,
+        layout: {
+          ...generatedSeatingPlan.layout,
+          iterationObjective: seatingIterationObjective,
+          seatingRestrictions,
+          lockedStudentIds: seatingLockedStudentIds,
+        },
+        observation: seatingPlanObservation,
+        qualitySnapshot: {
+          conflictCount: generatedSeatingPlanAnalysis.conflicts.length,
+          label: generatedSeatingPlanAnalysis.quality.label,
+          score: generatedSeatingPlanAnalysis.score,
+        },
+        seats: generatedSeatingPlan.placements.map((placement) => ({
+          halfGroup: placement.halfGroup,
+          isConflict: placement.isConflict,
+          isLocked: placement.isLocked,
+          isStar: placement.isStar,
+          studentId: placement.studentId,
+          x: placement.seat.x,
           y: placement.seat.y,
-      })),
-      title: seatingPlanName.trim() || fallbackName,
-    })
-    setSeatingPlanName('')
-    setSeatingPlanObservation('')
-    setSeatingSaveAsActive(false)
-    setLoadedSeatingPlanId(savedPlan?.id || '')
-    setSelectedSeatingPlanId('')
+        })),
+        title: seatingPlanName.trim() || fallbackName,
+      }
+      let savedPlanId
+      if (mode === 'update' && loadedSeatingPlan) {
+        await updateTutorialSeatingPlan(loadedSeatingPlan.id, planContent)
+        savedPlanId = loadedSeatingPlan.id
+      } else {
+        const savedPlan = await saveTutorialSeatingPlan(planContent)
+        savedPlanId = savedPlan?.id
+      }
+      if (!savedPlanId) throw new Error('No s’ha pogut guardar la disposició.')
+      setSeatingPlanName(planContent.title)
+      setLoadedSeatingPlanId(savedPlanId)
+      setSeatingSaveMode('update')
+      setSelectedSeatingPlanId('')
+      setSeatingSaveMessage(mode === 'update' && loadedSeatingPlan ? 'Canvis guardats a la versió existent.' : 'Nova versió guardada.')
+    } catch (error) {
+      setSeatingSaveMessage(error.message || 'No s’ha pogut guardar la disposició. Torna-ho a provar.')
+    } finally {
+      setSeatingSaveBusy(false)
+    }
   }
 
-  const handleLoadTutorialSeatingPlan = (plan) => {
+  const handleLoadTutorialSeatingPlan = (plan, mode = 'update') => {
     if (!plan) return
     const cleanLayout = normalizeSeatingLayout(plan.layout)
     const savedRestrictions = normalizeSavedSeatingRestrictions(plan.layout?.seatingRestrictions)
@@ -6719,7 +6730,12 @@ export function TutoringView() {
     })
     setSeatingManualSeatByStudentId(seatAssignments)
     setSeatingManualEmptySeatIds([])
-    setSeatingLockedStudentIds([...(plan.layout?.lockedStudentIds || [])])
+    setSeatingLockedStudentIds([
+      ...new Set([
+        ...(plan.layout?.lockedStudentIds || []),
+        ...(plan.seats || []).filter((seat) => seat.isLocked).map((seat) => seat.studentId),
+      ]),
+    ])
     setSeatingIterationObjective(plan.layout?.iterationObjective || 'balanced')
     setSeatingRestrictions(savedRestrictions)
     setSeatingUnseatedStudentIds(
@@ -6730,9 +6746,11 @@ export function TutoringView() {
     )
     setSeatingProblemSeats({})
     setSeatingAppliedProblemSeats({})
-    setSeatingPlanName(`${plan.title || 'Disposició'} · nova versió`)
+    setSeatingPlanName(mode === 'new' ? `${plan.title || 'Disposició'} · nova versió` : plan.title || 'Disposició')
+    setSeatingSaveMode(mode)
+    setSeatingSaveMessage('')
     setSeatingPlanObservation(plan.observation || '')
-    setSeatingSaveAsActive(Boolean(plan.isActive))
+    setSeatingSaveAsActive(mode === 'update' && Boolean(plan.isActive))
     setLoadedSeatingPlanId(plan.id)
     setSelectedSeatingPlanId('')
     setSelectedSeatingStudentId('')
@@ -6742,25 +6760,23 @@ export function TutoringView() {
   }
 
   const handleOpenTutorialSeatingTool = () => {
-    setSelectedSeatingPlanId(latestSavedTutorialSeatingPlan?.id || '')
-    setLoadedSeatingPlanId('')
+    if (classTutorialSeatingPlan) handleLoadTutorialSeatingPlan(classTutorialSeatingPlan)
+    else {
+      setSelectedSeatingPlanId('')
+      setLoadedSeatingPlanId('')
+      setSeatingSaveMode('new')
+      setSeatingPlanName('')
+      setSeatingPlanObservation('')
+      setSeatingSaveAsActive(false)
+      setSeatingSaveMessage('')
+    }
     setComparisonSeatingPlanId('')
     setActiveRelationshipTool('seating')
   }
 
-  const handleDuplicateTutorialSeatingPlan = async (plan) => {
-    if (!plan) return
-    const duplicatedPlan = await saveTutorialSeatingPlan({
-      classId: plan.classId,
-      contentUpdatedAt: plan.contentUpdatedAt || plan.createdAt,
-      isActive: false,
-      layout: plan.layout,
-      observation: plan.observation,
-      qualitySnapshot: plan.qualitySnapshot || null,
-      seats: plan.seats || [],
-      title: `${plan.title || 'Disposició'} · còpia`,
-    })
-    setLoadedSeatingPlanId(duplicatedPlan?.id || '')
+  const handleDuplicateTutorialSeatingPlan = (plan) => {
+    handleLoadTutorialSeatingPlan(plan, 'new')
+    setSeatingWorkspacePanel('save')
   }
 
   const handleSetActiveTutorialSeatingPlan = async (plan) => {
@@ -10884,7 +10900,10 @@ export function TutoringView() {
                   <SlidersHorizontal aria-hidden="true" size={17} />
                   Configurar
                 </button>
-                <button className="save" onClick={() => setSeatingWorkspacePanel('save')} type="button">
+                <button className="save" onClick={() => {
+                  if (selectedSeatingPlan) handleLoadTutorialSeatingPlan(selectedSeatingPlan)
+                  setSeatingWorkspacePanel('save')
+                }} type="button">
                   <Save aria-hidden="true" size={17} />
                   Guardar
                 </button>
@@ -10902,6 +10921,24 @@ export function TutoringView() {
                 </button>
               </div>
             </header>
+
+            <div className="tutorial-seating-version-context">
+              <div>
+                <strong>{selectedSeatingPlan ? `Consultant: ${selectedSeatingPlan.title}` : loadedSeatingPlan ? `${seatingSaveMode === 'update' ? 'Modificant' : 'Nova versió a partir de'}: ${loadedSeatingPlan.title}` : 'Nova disposició'}</strong>
+                <span>{selectedSeatingPlan ? 'Tria si vols modificar aquesta versió o crear-ne una de nova.' : seatingSaveMode === 'update' && loadedSeatingPlan ? 'En guardar, s’actualitzarà aquesta mateixa versió.' : 'En guardar, es crearà una versió nova.'}</span>
+              </div>
+              {selectedSeatingPlan && <button onClick={() => handleLoadTutorialSeatingPlan(selectedSeatingPlan)} type="button">Modificar versió</button>}
+              {(selectedSeatingPlan || loadedSeatingPlan) && <button onClick={() => {
+                if (selectedSeatingPlan) handleDuplicateTutorialSeatingPlan(selectedSeatingPlan)
+                else {
+                  setSeatingSaveMode('new')
+                  setSeatingPlanName((name) => `${name || loadedSeatingPlan.title} · nova versió`)
+                  setSeatingSaveAsActive(false)
+                  setSeatingSaveMessage('')
+                  setSeatingWorkspacePanel('save')
+                }
+              }} disabled={seatingSaveBusy || (!selectedSeatingPlan && seatingSaveMode === 'new')} type="button">Crear nova versió</button>}
+            </div>
 
             <nav aria-label="Eines de disposició d’aula" className="tutorial-seating-side-toolbar">
               <button
@@ -11277,10 +11314,12 @@ export function TutoringView() {
                       />
                       Marcar com a disposició activa
                     </label>
-                    <button className="primary" onClick={handleSaveTutorialSeatingPlan} type="button">
+                    <button className="primary" disabled={seatingSaveBusy || Boolean(selectedSeatingPlan)} onClick={() => handleSaveTutorialSeatingPlan()} type="button">
                       <Save aria-hidden="true" size={16} />
-                      Guardar versió
+                      {seatingSaveBusy ? 'Guardant…' : seatingSaveMode === 'update' && loadedSeatingPlan ? 'Guardar canvis' : 'Guardar nova versió'}
                     </button>
+                    {selectedSeatingPlan && <p>Prem «Modificar versió» o «Crear nova versió» per començar.</p>}
+                    {seatingSaveMessage && <p role="status">{seatingSaveMessage}</p>}
                   </div>
                 )}
 
@@ -11325,10 +11364,13 @@ export function TutoringView() {
                         <article key={`compact_${plan.id}`}>
                           <div>
                             <strong>{plan.title || 'Disposició guardada'}</strong>
-                            <small>{plan.qualitySnapshot?.score ?? '—'}/100</small>
+                            <small>{plan.isActive ? 'Activa · ' : ''}{plan.qualitySnapshot?.score ?? '—'}/100</small>
                           </div>
                           <button onClick={() => handleLoadTutorialSeatingPlan(plan)} type="button">
-                            Carregar
+                            Modificar versió
+                          </button>
+                          <button onClick={() => handleDuplicateTutorialSeatingPlan(plan)} type="button">
+                            Crear nova versió
                           </button>
                         </article>
                       ))
@@ -11396,8 +11438,7 @@ export function TutoringView() {
               {loadedSeatingPlan && (
                 <p>
                   <History aria-hidden="true" size={15} />
-                  Editant una còpia carregada de <strong>{loadedSeatingPlan.title}</strong>. En guardar es crearà una
-                  versió nova.
+                  {seatingSaveMode === 'update' ? 'Modificant la versió' : 'Creant una nova versió a partir de'} <strong>{loadedSeatingPlan.title}</strong>.
                 </p>
               )}
             </div>
@@ -11780,7 +11821,7 @@ export function TutoringView() {
                         <button
                           aria-label={`Carregar ${plan.title || 'disposició guardada'} per editar`}
                           onClick={() => handleLoadTutorialSeatingPlan(plan)}
-                          title="Carregar per editar"
+                          title="Modificar versió existent"
                           type="button"
                         >
                           <History aria-hidden="true" size={15} />
@@ -11788,7 +11829,7 @@ export function TutoringView() {
                         <button
                           aria-label={`Duplicar ${plan.title || 'disposició guardada'}`}
                           onClick={() => handleDuplicateTutorialSeatingPlan(plan)}
-                          title="Duplicar"
+                          title="Crear nova versió"
                           type="button"
                         >
                           <Clipboard aria-hidden="true" size={15} />
@@ -12351,7 +12392,7 @@ export function TutoringView() {
                     </div>
                   ) : (
                     <p className="tutorial-seating-readonly-note">
-                      Estàs consultant una disposició guardada. Torna a la proposta actual per editar-la.
+                      Estàs consultant una disposició guardada. Prem «Modificar versió» per editar-la.
                     </p>
                   )}
                 </aside>
