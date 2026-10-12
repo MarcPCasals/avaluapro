@@ -287,7 +287,7 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
   const attentionDiagnosisId = ATTENTION_DIAGNOSIS_IDS.find((diagnosisId) => diagnoses.includes(diagnosisId)) || ''
   const progressReason = resolveProgressReason(student?.progressReason)
   const classUtIds = new Set(state.uts.filter((ut) => ut.classId === student?.classId).map((ut) => ut.id))
-  const classCompetencies = state.competencies.filter((competency) => classUtIds.has(competency.utId))
+  const classCompetencies = state.competencies.filter((competency) => classUtIds.has(competency.utId) && competency.kind !== 'transversal')
   const subjectModifiedCompetencies = subjectCompetencies.map((competency, index) => {
     const code = getCompetencyCode(competency.name, `C${index + 1}`)
     const matchingCompetencies = classCompetencies.filter((classCompetency) => {

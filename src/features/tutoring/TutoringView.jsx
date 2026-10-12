@@ -1048,7 +1048,7 @@ function getLinkedEvaluationCompetencyGradeSource({ competency, evaluationContex
   const utOrderById = new Map(classUts.map((ut, index) => [ut.id, index]))
   const utsById = new Map(classUts.map((ut) => [ut.id, ut]))
   const matchingCompetencies = evaluationContext.competencies
-    .filter((item) => utOrderById.has(item.utId) && isSameCompetencyName(item.name, competency.name))
+    .filter((item) => item.kind !== 'transversal' && utOrderById.has(item.utId) && isSameCompetencyName(item.name, competency.name))
     .sort((a, b) => (utOrderById.get(b.utId) || 0) - (utOrderById.get(a.utId) || 0))
 
   for (const item of matchingCompetencies) {

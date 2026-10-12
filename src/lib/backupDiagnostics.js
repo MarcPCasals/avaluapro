@@ -49,7 +49,7 @@ export function summarizeBackup(backup) {
   )
   const cfnUnexpectedCompetencies = (collections.competencies || []).filter(
     (competency) =>
-      cfnClassIds.has(competency.classId) &&
+      cfnClassIds.has(competency.classId) && competency.kind !== 'transversal' &&
       !['C1: Modelització', 'C2: Indagació', 'C3: Argumentació'].includes(competency.name),
   )
 

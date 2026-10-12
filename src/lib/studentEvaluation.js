@@ -13,7 +13,7 @@ export function getClassUts(state, classId) {
 
 export function getUtCompetencies(state, utId) {
   return state.competencies
-    .filter((competency) => competency.utId === utId && !competency.inactive)
+    .filter((competency) => competency.utId === utId && competency.kind !== 'transversal' && !competency.inactive)
     .sort((a, b) => a.order - b.order)
     .map((competency) => ({
       ...competency,

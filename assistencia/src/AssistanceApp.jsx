@@ -1,3 +1,4 @@
+import { TransversalEvaluationDemo } from './TransversalEvaluationDemo.jsx'
 import { createHalfGroupProposal } from '../../src/features/tutoring/halfGroupProposalUtils.js'
 import { StudentGroupGenderControls } from '../../src/features/students/StudentGroupGenderControls.jsx'
 import { SociogramInsights } from '../../src/features/tutoring/SociogramInsights.jsx'
@@ -672,7 +673,7 @@ function AssistanceApp() {
           }}
           rows={overviewRows}
           showTutoringColumns={activeClass.isTutoringGroup}
-        />}</> : activeSurface === 'evaluation' ? <EvaluationTable
+        />}</> : activeSurface === 'evaluation' ? <>{new URLSearchParams(window.location.search).has('transversal-demo') && <TransversalEvaluationDemo students={evaluationStudents} />}<EvaluationTable
           activeClassId={activeClassId}
           competencies={dataset.evaluationCompetencies}
           marks={dataset.evaluationMarks}
@@ -689,7 +690,7 @@ function AssistanceApp() {
           }}
           renderAbsenceControl={renderSyntheticAbsenceControl}
           students={evaluationStudents}
-        /> : activeSurface === 'tracking' ? <><details><summary>Data d’una tasca · sessions fictícies</summary>
+        /></> : activeSurface === 'tracking' ? <><details><summary>Data d’una tasca · sessions fictícies</summary>
           <TaskDateField date={taskDemoDate} label="Demostració" sessionKey={taskDemoKey} sessions={syntheticTaskSessions}
             onChangeDate={(value) => { setTaskDemoDate(value); setTaskDemoKey('') }}
             onSelectSession={(session) => { setTaskDemoKey(session ? getTaskSessionKey(session) : ''); if (session) setTaskDemoDate(session.date) }} />

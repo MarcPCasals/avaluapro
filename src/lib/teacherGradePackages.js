@@ -151,7 +151,7 @@ export function getLatestEvaluationCompetencyGrade({ classId, competencyName, st
   const utOrderById = new Map(classUts.map((ut, index) => [ut.id, index]))
   const utsById = new Map(classUts.map((ut) => [ut.id, ut]))
   const matchingCompetencies = state.competencies
-    .filter((competency) => utOrderById.has(competency.utId) && isSameCompetencyName(competency.name, competencyName))
+    .filter((competency) => competency.kind !== 'transversal' && utOrderById.has(competency.utId) && isSameCompetencyName(competency.name, competencyName))
     .sort((a, b) => (utOrderById.get(b.utId) || 0) - (utOrderById.get(a.utId) || 0))
 
   for (const competency of matchingCompetencies) {

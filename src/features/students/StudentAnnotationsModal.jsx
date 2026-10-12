@@ -68,7 +68,7 @@ function buildAnnotationCanonicalCompetencies(competencies, classUts) {
 
   classUts.forEach((ut) => {
     competencies
-      .filter((competency) => competency.utId === ut.id && !competency.inactive)
+      .filter((competency) => competency.utId === ut.id && competency.kind !== 'transversal' && !competency.inactive)
       .forEach((competency) => {
         if (!byName.has(competency.name)) {
           byName.set(competency.name, {
@@ -87,7 +87,7 @@ function buildAnnotationEvolution({ classUts, competencies, criteria, marks, stu
   const canonicalCompetencies = buildAnnotationCanonicalCompetencies(competencies, classUts)
   const utScores = classUts.map((ut) => {
     const grades = competencies
-      .filter((competency) => competency.utId === ut.id && !competency.inactive)
+      .filter((competency) => competency.utId === ut.id && competency.kind !== 'transversal' && !competency.inactive)
       .map((competency) => ({
         ...competency,
         criteria: criteria
@@ -112,7 +112,7 @@ function buildAnnotationEvolution({ classUts, competencies, criteria, marks, stu
   const radarRows = canonicalCompetencies.map((canonicalCompetency, index) => {
     const grades = classUts.map((ut) => {
       const competency = competencies.find(
-        (item) => item.utId === ut.id && !item.inactive && item.name === canonicalCompetency.name,
+        (item) => item.utId === ut.id && item.kind !== 'transversal' && !item.inactive && item.name === canonicalCompetency.name,
       )
       if (!competency) return ''
       const competencyWithCriteria = {
@@ -397,7 +397,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   const activeCompetencies = useMemo(
     () =>
       competencies
-        .filter((competency) => competency.utId === activeUtId && !competency.inactive)
+        .filter((competency) => competency.utId === activeUtId && competency.kind !== 'transversal' && !competency.inactive)
         .sort((a, b) => a.order - b.order)
         .map((competency) => ({
           ...competency,

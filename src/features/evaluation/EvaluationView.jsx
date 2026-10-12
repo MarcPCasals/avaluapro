@@ -1,3 +1,7 @@
+import { Modal } from '../../components/Modal'
+import { transversalStructure } from '../../data/subjects'
+import { getTransversalNames, selectEvaluationCompetencies } from '../../lib/transversalEvaluation'
+import { TransversalSelector } from './TransversalSelector'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, MapPinned, Users } from 'lucide-react'
 import { getSubjectStructure } from '../../data/subjects'
@@ -18,6 +22,7 @@ import { SeatingChartsModal } from './SeatingChartsModal'
 
 function useEvaluationModel() {
   const { activeClassId, activeUtId } = useAvaluaproStore((state) => state.ui)
+  const scope = useAvaluaproStore((state) => state.ui.evaluationScope)
   const allStudents = useAvaluaproStore((state) => state.students)
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
@@ -34,18 +39,12 @@ function useEvaluationModel() {
           student.classId === activeClassId && !isStudentExemptFromSubject(student, activeClass?.subject),
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
-    const competencies = allCompetencies
-      .filter((competency) => competency.utId === activeUtId && !competency.inactive)
-      .sort((a, b) => a.order - b.order)
-      .map((competency) => {
-        const criteria = allCriteria
-          .filter((criterion) => criterion.competencyId === competency.id)
-          .sort((a, b) => a.order - b.order)
-        return { ...competency, criteria }
-      })
+    const competencies = selectEvaluationCompetencies(
+      { competencies: allCompetencies, criteria: allCriteria }, activeClass, activeUtId, scope,
+    )
 
     return { students, competencies, marks, agendaNotes }
-  }, [activeClass?.subject, activeClassId, activeUtId, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
+  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
 }
 
 function getCriterionMark(marks, studentId, criterionId) {
@@ -112,12 +111,41 @@ export function EvaluationView() {
   const [profileStudentId, setProfileStudentId] = useState(null)
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
   const [halfGroupFilter, setHalfGroupFilter] = useState('all')
-  const subjectStructure = getSubjectStructure(activeClass?.subject)
+  const scope = useAvaluaproStore((state) => state.ui.evaluationScope)
+  const isTransversal = scope === 'transversal'
+  const setClassTransversalCompetencies = useAvaluaproStore((state) => state.setClassTransversalCompetencies)
+  const [transversalBusy, setTransversalBusy] = useState(false)
+  const [transversalError, setTransversalError] = useState('')
+  const selectedTransversalNames = getTransversalNames(activeClass)
+  const selectionKey = JSON.stringify(selectedTransversalNames)
+  useEffect(() => {
+    if (!isTransversal || !activeClassId || selectionKey === '[]') return
+    setClassTransversalCompetencies(activeClassId, JSON.parse(selectionKey)).catch(error => {
+      setTransversalError(error.message || 'No s’han pogut preparar les competències transversals.')
+    })
+  }, [isTransversal, activeClassId, activeUtId, selectionKey, setClassTransversalCompetencies])
+  const handleTransversalToggle = async (name, active) => {
+    setTransversalBusy(true)
+    setTransversalError('')
+    try {
+      await setClassTransversalCompetencies(activeClassId, active
+        ? [...selectedTransversalNames, name] : selectedTransversalNames.filter(item => item !== name))
+    } catch (error) {
+      setTransversalError(error.message || 'No s’ha pogut guardar la selecció.')
+    } finally {
+      setTransversalBusy(false)
+    }
+  }
+  const subjectStructure = isTransversal ? transversalStructure : getSubjectStructure(activeClass?.subject)
   const activeCompetencyCount = competencies.length
   const totalSubjectCompetencies = subjectStructure?.length || activeCompetencyCount
   const competencySummaryIsComplete =
     totalSubjectCompetencies > 0 && activeCompetencyCount === totalSubjectCompetencies
-  const emptyStateCopy = getEmptyStateCopy(activeClass, subjectStructure)
+  const emptyStateCopy = isTransversal ? {
+    title: 'Encara no has activat competències transversals.',
+    body: 'Tria les competències transversals que avalues en aquesta classe.',
+    action: 'Activar transversals',
+  } : getEmptyStateCopy(activeClass, subjectStructure)
   const halfGroups = Array.from(new Set(students.map((student) => student.halfGroup).filter(Boolean))).sort()
   const filteredStudents = students.filter(
     (student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter,
@@ -172,7 +200,7 @@ export function EvaluationView() {
           </style>
         </head>
         <body>
-          <h2>${escapeCell(activeClass.name)} · ${escapeCell(activeUt.name)}</h2>
+          <h2>${escapeCell(activeClass.name)} · ${escapeCell(activeUt.name)}${isTransversal ? ' · Transversals' : ''}</h2>
           <table>
             <thead><tr>${headerCells}</tr></thead>
             <tbody>${bodyRows}</tbody>
@@ -180,7 +208,7 @@ export function EvaluationView() {
         </body>
       </html>`
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
-    downloadBlob(blob, `avaluapro-${activeClass.name}-${activeUt.name}-${getTodaySlug()}.xls`)
+    downloadBlob(blob, `avaluapro-${activeClass.name}-${activeUt.name}${isTransversal ? '-transversals' : ''}-${getTodaySlug()}.xls`)
   }
 
   useEffect(() => {
@@ -206,7 +234,7 @@ export function EvaluationView() {
             <strong>
               {activeCompetencyCount}/{totalSubjectCompetencies}
             </strong>
-            competències actives
+            {isTransversal ? 'transversals actives' : 'competències actives'}
           </button>
         )}
         {halfGroups.length > 0 && (
@@ -245,9 +273,18 @@ export function EvaluationView() {
         <ManageStudentsModal classId={activeClassId} onClose={() => setShowStudentsModal(false)} />
       )}
       {showRemindersModal && <RemindersModal onClose={() => setShowRemindersModal(false)} />}
-      {showStructureModal && (
+      {transversalError && <p role="alert">{transversalError}</p>}
+      {isTransversal && <p className="transversal-view-label">Competències transversals · {activeUt?.name}</p>}
+      {showStructureModal && (isTransversal ? (
+        <Modal onClose={() => setShowStructureModal(false)} size="lg" title="Competències transversals">
+          <TransversalSelector className={activeClass?.name} selectedNames={selectedTransversalNames}
+            onToggle={handleTransversalToggle} busy={transversalBusy} />
+          {transversalBusy && <p role="status">Guardant la selecció…</p>}
+          {transversalError && <p role="alert">{transversalError}</p>}
+        </Modal>
+      ) : (
         <EditStructureModal activeUtId={activeUtId} onClose={() => setShowStructureModal(false)} />
-      )}
+      ))}
       {showImportModal && (
         <ImportExcelModal
           criteria={flatCriteria}

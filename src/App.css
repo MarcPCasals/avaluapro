@@ -31518,3 +31518,7 @@ button.profile-followup-card:focus-visible {
 }
 .tutorial-seating-version-context button:disabled { opacity: .5; cursor: default; }
 .tutorial-seating-versions-compact article { grid-template-columns: minmax(0, 1fr); }
+
+.transversal-scope-trigger.active { color: #6d28d9; border-color: #c4b5fd; background: #f5f3ff; }
+.transversal-view-label { margin: 0 0 12px; color: #6d28d9; font-weight: 800; }
+@media (max-width: 1100px) { .current-ut-tabs { flex-wrap: wrap; } }

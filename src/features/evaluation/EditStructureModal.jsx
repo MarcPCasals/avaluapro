@@ -39,7 +39,7 @@ export function EditStructureModal({ activeUtId, onClose }) {
   const utCompetencies = useMemo(
     () =>
       state.competencies
-        .filter((competency) => competency.utId === activeUtId)
+        .filter((competency) => competency.utId === activeUtId && competency.kind !== 'transversal')
         .sort((a, b) => a.order - b.order)
         .map((competency) => ({
           ...competency,

@@ -21,7 +21,7 @@ const languageStructure = [
   },
 ]
 
-const transversalStructure = [
+export const transversalStructure = [
   {
     name: 'TRANS C1: Emprendre projectes per millorar l’entorn',
     color: 'orange',

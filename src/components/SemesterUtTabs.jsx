@@ -1,3 +1,4 @@
+import { EvaluationScopeButton } from '../features/evaluation/EvaluationScopeButton'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, CalendarClock, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react'
 import { loadPlanningAcademicYears, loadPlanningTemporalUnits } from '../data/cloud/planningFirestore'
@@ -18,6 +19,9 @@ function formatUntil(dateKey) {
 
 export function SemesterUtTabs() {
   const { activeClassId, activeSemesterId, activeUtId } = useAvaluaproStore((state) => state.ui)
+  const activeMode = useAvaluaproStore((state) => state.ui.activeMode)
+  const evaluationScope = useAvaluaproStore((state) => state.ui.evaluationScope)
+  const setEvaluationScope = useAvaluaproStore((state) => state.setEvaluationScope)
   const user = useAvaluaproStore((state) => state.cloud.user)
   const allSemesters = useAvaluaproStore((state) => state.semesters)
   const allUts = useAvaluaproStore((state) => state.uts)
@@ -109,6 +113,7 @@ export function SemesterUtTabs() {
       <button className="other-uts-trigger" onClick={() => setShowOtherUts(true)} type="button">
         Altres UTs <ChevronDown size={16} />
       </button>
+      {activeMode === 'evaluation' && <EvaluationScopeButton scope={evaluationScope} onChange={setEvaluationScope} />}
       {!isShowingCurrent && currentMatch?.ut && (
         <button className="current-ut-return" onClick={() => setActiveUt(currentMatch.ut.id)} type="button">
           Tornar a {currentMatch.ut.name}

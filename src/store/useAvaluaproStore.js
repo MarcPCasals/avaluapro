@@ -1,3 +1,4 @@
+import { buildTransversalStructure } from '../lib/transversalEvaluation'
 import { editHistory, historyValuesEqual } from '../lib/editHistory'
 import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
 import { create } from 'zustand'
@@ -3064,6 +3065,17 @@ export const useAvaluaproStore = create((set, get) => ({
     })
     writePreferences({ ...readPreferences(), ...ui })
     await persistCollections(set, get, COLLECTIONS)
+  },
+
+  setEvaluationScope: (scope) => {
+    set((state) => ({ ui: { ...state.ui, evaluationScope: scope === 'transversal' ? 'transversal' : 'specific' } }))
+  },
+
+  setClassTransversalCompetencies: async (classId, names) => {
+    const patch = buildTransversalStructure(get(), classId, names, createId)
+    if (!patch) return
+    setWithEditHistory(set, get, () => patch)
+    await persistCollections(set, get, ['classes', 'competencies', 'criteria'], { throwOnError: true })
   },
 
   updateMark: async (studentId, criterionId, value) => {
@@ -6268,7 +6280,7 @@ const reversibleActions = [
   'upsertTutorialRelation', 'importTutorialRelations', 'deleteTutorialRelation',
   'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
   'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
-  'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive',
+  'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive', 'setClassTransversalCompetencies',
   'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
   'updateTaskRecord', 'toggleStudentAbsence', 'updateTaskRecordMeta', 'addBehaviorEvent',
   'addAgendaNote', 'updateAgendaNote', 'deleteAgendaNote', 'saveClassroomRecovery', 'cancelClassroomRecovery', 'completeClassroomRecovery',
