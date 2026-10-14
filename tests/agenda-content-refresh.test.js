@@ -134,6 +134,13 @@ test('la lectura local-first conserva contingut pendent i no altera les sessions
   assert.equal(refreshAgendaBundleContent(before, data).items[1].sourceActivity.description, 'Descripció local pendent')
   assert.deepEqual(await loadPlanningScope(uid, 'session:s1:detail'), sessionsBefore)
   assert.deepEqual(await loadPlanningOutbox(uid), queueBefore)
+  const { loadCompleteAgendaContentRefresh } = await import('../src/features/agenda/agendaContentRefresh.js')
+  await loadCompleteAgendaContentRefresh({ classId: 'class', visibleBundles: [before],
+    applicationRecords: [{ planningUnit: unit, application: { id: 'app', classId: 'class' } }], repository,
+    loadReferences: async () => [{ session: before.session, items: before.items }],
+    loadStructure: async () => ({ planningUnit: { ...unit, ownerUid: uid }, phases: [], activities: [{ ...newSource, ownerUid: uid, updatedAt: '2026-10-13T10:00:00Z' }] }), loadOverrides: async () => [] })
+  assert.deepEqual(await loadPlanningScope(uid, 'session:s1:detail'), sessionsBefore)
+  assert.deepEqual(await loadPlanningOutbox(uid), queueBefore)
 })
 
 
@@ -149,4 +156,99 @@ test('els materials comuns actualitzats es recuperen en tornar a obrir la sessi�
   const oldUnit = bundle().planningUnit
   assert.deepEqual(refreshPlanningUnitMaterials(oldUnit, [unit]), { ...oldUnit, transversalMaterials: unit.transversalMaterials })
   assert.strictEqual(refreshPlanningUnitMaterials(oldUnit, []), oldUnit)
+})
+
+test('l’actualització completa arriba a setmanes no carregades i a altres UP de la mateixa matèria', async () => {
+  const { loadCompleteAgendaContentRefresh, selectAgendaContentApplications } = await import('../src/features/agenda/agendaContentRefresh.js')
+  const visible = bundle()
+  const distant = bundle('future', { planningUnit: { ...unit, id: 'up-future' }, application: { id: 'future-app', classId: 'class', subject: 'Ciències' } })
+  distant.items[1] = { ...distant.items[1], sourceActivityId: 'future-a', sourcePlanningUnitId: 'up-future' }
+  const records = [
+    { planningUnit: unit, application: { id: 'app', classId: 'class', subject: 'Ciències' } },
+    { planningUnit: distant.planningUnit, application: distant.application },
+    { planningUnit: unit, application: { id: 'math-app', classId: 'class', subject: 'Matemàtiques' } },
+    { planningUnit: unit, application: { id: 'other-group', classId: 'other-class', subject: 'Ciències' } },
+  ]
+  const selected = selectAgendaContentApplications(records, { classId: 'class', subject: ' ciencies ' })
+  assert.deepEqual(selected.map((r) => r.application.id), ['app', 'future-app'])
+  const calls = []
+  const snapshot = structuredClone(visible)
+  const { refresh: data, summary } = await loadCompleteAgendaContentRefresh({ applicationRecords: selected,
+    classId: 'class', visibleBundles: [visible], repository: { loadScope: async (key, loader) => {
+      calls.push(key)
+      if (!loader) return { source: 'local', entities: [] }
+      return { source: 'remote', entities: (await loader()).map((v) => v.entity || v) }
+    } }, loadReferences: async ({ applicationId }) => {
+      calls.push(`refs:${applicationId}`)
+      return applicationId === 'future-app' ? [distant] : [{ ...visible, items: visible.items.map((i) => ({ id: i.id, sourceActivityId: i.sourceActivityId })) }]
+    }, loadStructure: async (id) => ({ planningUnit: { ...unit, id }, phases: [], activities: [{ ...newSource, id: id === 'up' ? 'a' : 'future-a', planningUnitId: id }] }), loadOverrides: async () => [] })
+  assert.deepEqual(summary, { activityCount: 2, missingCount: 0, sessionCount: 2 })
+  assert.equal(refreshAgendaBundleContent(distant, data).items[1].sourceActivity.description, 'Nova descripció')
+  assert.deepEqual(withoutContent(refreshAgendaBundleContent(distant, data)), withoutContent(distant))
+  assert.deepEqual(visible, snapshot, 'la descoberta no muta la cronologia carregada')
+  assert.ok(!calls.some((key) => /math-app|other-group/.test(key)))
+})
+
+test('amb el tram visible buit també es refresquen les activitats d’altres setmanes', async () => {
+  const { loadCompleteAgendaContentRefresh } = await import('../src/features/agenda/agendaContentRefresh.js')
+  const remote = bundle('distant')
+  const { refresh: data, summary } = await loadCompleteAgendaContentRefresh({ classId: 'class', visibleBundles: [],
+    applicationRecords: [{ planningUnit: unit, application: { id: 'app', classId: 'class' } }],
+    repository: { loadScope: async (_key, loader) => loader ? { source: 'remote', entities: (await loader()).map((v) => v.entity || v) } : { source: 'local', entities: [] } },
+    loadReferences: async () => [remote], loadStructure: async () => ({ planningUnit: unit, phases: [], activities: [newSource] }), loadOverrides: async () => [] })
+  assert.equal(summary.activityCount, 1)
+  assert.ok(data.sessionIds.has('distant'))
+})
+
+test('les sessions només locals, incloses les d’altres setmanes, es conserven dins l’abast', async () => {
+  const { loadCompleteAgendaContentRefresh } = await import('../src/features/agenda/agendaContentRefresh.js')
+  const local = bundle('local-only')
+  const { refresh: data } = await loadCompleteAgendaContentRefresh({ classId: 'class', visibleBundles: [],
+    applicationRecords: [{ planningUnit: unit, application: { id: 'app', classId: 'class' } }],
+    repository: { loadScope: async (key, loader) => {
+      if (loader) return { source: 'remote', entities: (await loader()).map((v) => v.entity || v) }
+      return { source: 'local', entities: key.endsWith(':sessions') ? [local.session] : local.items.map((i) => ({ ...i, entityType: 'sessionItem' })) }
+    } }, loadReferences: async () => [], loadStructure: async () => ({ planningUnit: unit, phases: [], activities: [newSource] }), loadOverrides: async () => [] })
+  assert.ok(data.sessionIds.has('local-only'))
+  assert.deepEqual(withoutContent(refreshAgendaBundleContent(local, data)), withoutContent(local))
+})
+
+test('llegeix més de 500 sessions amb paginació i un màxim de sis lectures d’elements simultànies', async () => {
+  const { readAllPlanningContentReferences } = await import('../src/data/cloud/planningContentReferences.js')
+  const sessions = Array.from({ length: 751 }, (_, index) => ({ id: `s-${index}`, classId: 'class' }))
+  const cursors = []
+  let concurrent = 0
+  let peak = 0
+  const references = await readAllPlanningContentReferences({
+    loadSessionPage: async (cursor, pageSize) => {
+      cursors.push(cursor)
+      const offset = cursor || 0
+      return { sessions: sessions.slice(offset, offset + pageSize), cursor: offset + pageSize }
+    }, loadItems: async (id) => {
+      concurrent += 1
+      peak = Math.max(peak, concurrent)
+      await Promise.resolve()
+      concurrent -= 1
+      return [{ id: `${id}-item`, sourceActivityId: 'a', sourcePlanningUnitId: 'up' }]
+    },
+  })
+  assert.deepEqual(cursors, [null, 250, 500, 750])
+  assert.equal(references.length, 751)
+  assert.equal(references.at(-1).session.id, 's-750')
+  assert.equal(peak, 6)
+})
+
+test('els vincles originals pendents de la còpia local prevalen sobre referències remotes antigues', async () => {
+  const { loadCompleteAgendaContentRefresh } = await import('../src/features/agenda/agendaContentRefresh.js')
+  const local = bundle('pending')
+  const loadedUnits = []
+  const { refresh: data } = await loadCompleteAgendaContentRefresh({ classId: 'class', visibleBundles: [],
+    applicationRecords: [{ planningUnit: unit, application: { id: 'app', classId: 'class' } }],
+    repository: { loadScope: async (key, loader) => loader
+      ? { source: 'remote', entities: (await loader()).map((v) => v.entity || v) }
+      : { source: 'local', entities: key.endsWith(':detail') ? local.items.map((i) => ({ ...i, entityType: 'sessionItem' })) : [] } },
+    loadReferences: async () => [{ session: local.session, items: [{ ...local.items[1], sourceActivityId: 'obsolete', sourcePlanningUnitId: 'wrong-up' }] }],
+    loadStructure: async (id) => { loadedUnits.push(id); return { planningUnit: unit, phases: [], activities: [newSource] } }, loadOverrides: async () => [] })
+  assert.deepEqual(loadedUnits, ['up'])
+  assert.equal(refreshAgendaBundleContent(local, data).items[1].sourceActivity.description, 'Nova descripció')
 })

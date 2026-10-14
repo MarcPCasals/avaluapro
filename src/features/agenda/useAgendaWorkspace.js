@@ -1,4 +1,4 @@
-import { loadAgendaContentRefresh, refreshAgendaBundleContent, refreshPlanningUnitMaterials, summarizeAgendaContentRefresh } from './agendaContentRefresh.js'
+import { loadCompleteAgendaContentRefresh, refreshAgendaBundleContent, refreshPlanningUnitMaterials, selectAgendaContentApplications } from './agendaContentRefresh.js'
 import { EDIT_HISTORY_REFRESH_EVENT, editHistory } from '../../lib/editHistory'
 import { saveCalendarEventWithAutomaticReflow } from './agendaCancellation.js'
 import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
@@ -8,6 +8,7 @@ import {
   loadPlanningAcademicYears,
   loadOwnedPlanningUnits,
   loadPlanningActivityOverrides,
+  loadPlanningApplicationContentReferences,
   loadPlanningApplications,
   loadPlanningCalendarEvents,
   loadPlanningPrivateNotes,
@@ -570,7 +571,7 @@ export function useAgendaWorkspace(user, classes = []) {
    * sota cada UP, per això primer es resolen aquestes relacions i després es
    * carreguen les sessions i els seus elements concrets.
    */
-  const loadAccessiblePlanningApplications = useCallback(async ({ classId = '', temporalUnitId = '' } = {}) => {
+  const loadAccessiblePlanningApplications = useCallback(async ({ classId = '', temporalUnitId = '', forceRemote = false } = {}) => {
     if (!repository) return []
     const visibleUnits = allPlanningUnits.filter((unit) => (
       unit.status !== 'archived'
@@ -583,7 +584,7 @@ export function useAgendaWorkspace(user, classes = []) {
         const result = await repository.loadScope(
           `planningUnit:${unit.id}:applications:manager:${user.uid}`,
           () => loadPlanningApplications(unit.id, undefined, 100, user.uid),
-          { completeSnapshot: true, refreshToken: refreshRevision },
+          { completeSnapshot: true, forceRemote, refreshToken: refreshRevision },
         )
         if (result.error) throw result.error
         return result.entities
@@ -597,7 +598,7 @@ export function useAgendaWorkspace(user, classes = []) {
       const results = await Promise.all(allowedClassIds.map((allowedClassId) => repository.loadScope(
         `planningUnit:${unit.id}:applications${allowedClassId ? `:${allowedClassId}` : ''}`,
         () => loadPlanningApplications(unit.id, allowedClassId || undefined, 100),
-        { completeSnapshot: true, refreshToken: refreshRevision },
+        { completeSnapshot: true, forceRemote, refreshToken: refreshRevision },
       )))
       const failed = results.find((result) => result.error)
       if (failed) throw failed.error
@@ -772,21 +773,24 @@ export function useAgendaWorkspace(user, classes = []) {
     }
   }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, slotsByTimetableId, user?.uid])
 
-  const refreshTimelineContent = useCallback(async ({ classId, sessionIds }) => {
+  const refreshTimelineContent = useCallback(async ({ classId, subject = '' }) => {
     if (!repository || !classId) throw new Error('Selecciona un grup abans d’actualitzar el contingut.')
-    const selectedIds = new Set(sessionIds)
-    const selectedBundles = sessionBundles.filter((bundle) =>
-      bundle.session.classId === classId && selectedIds.has(bundle.session.id))
-    if (!selectedBundles.length) throw new Error('No hi ha sessions de Programació per actualitzar en aquest tram.')
-    const refresh = await loadAgendaContentRefresh({
-      bundles: selectedBundles, repository,
+    if (globalThis.navigator?.onLine === false) throw new Error('Cal connexió per actualitzar les descripcions i els materials de la Programació.')
+    const records = await loadAccessiblePlanningApplications({ classId, forceRemote: true })
+    const applicationRecords = selectAgendaContentApplications(records, {
+      classId, subject, classItem: classes.find((item) => item.id === classId) || sharedClasses.find((item) => item.id === classId),
+      subjects: getClassPlanningSubjects(slots, classId),
+    })
+    const { refresh, summary } = await loadCompleteAgendaContentRefresh({
+      applicationRecords, classId, visibleBundles: sessionBundles, repository,
+      loadReferences: loadPlanningApplicationContentReferences,
       loadStructure: loadPlanningUnitStructure,
       loadOverrides: loadPlanningActivityOverrides,
     })
-    // Apply to current state, never the snapshot captured before the remote reads.
+    // Only replace content in currently loaded bundles; never replace session snapshots.
     setSessionBundles((current) => current.map((bundle) => refreshAgendaBundleContent(bundle, refresh)))
-    return summarizeAgendaContentRefresh(selectedBundles, refresh)
-  }, [repository, sessionBundles])
+    return summary
+  }, [classes, loadAccessiblePlanningApplications, repository, sessionBundles, sharedClasses, slots])
 
   /**
    * Completa una única sessió quan el docent l'obre des del calendari o la

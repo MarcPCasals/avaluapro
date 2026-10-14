@@ -1,9 +1,11 @@
+import { readAllPlanningContentReferences } from './planningContentReferences.js'
 import {
   arrayRemove,
   arrayUnion,
   collection,
   deleteDoc,
   deleteField,
+  documentId,
   doc,
   FieldPath,
   getDocFromServer,
@@ -12,6 +14,7 @@ import {
   orderBy,
   query,
   setDoc,
+  startAfter,
   updateDoc,
   where,
   writeBatch,
@@ -371,6 +374,30 @@ export async function loadPlanningSessions({
     ...constraints,
   ))
   return mapSnapshot(snapshot)
+}
+
+/** Reads source references across every week, without saving or reflowing sessions. */
+export async function loadPlanningApplicationContentReferences({ planningUnitId, applicationId, classId }) {
+  const reference = collection(planningApplicationRef(planningUnitId, applicationId), 'sessions')
+  return readAllPlanningContentReferences({
+    loadSessionPage: async (cursor, pageSize) => {
+      const constraints = [where('classId', '==', classId), orderBy(documentId()), limit(pageSize)]
+      if (cursor) constraints.push(startAfter(cursor))
+      const snapshot = await readPlanningQuery('contentRefresh.sessions', query(reference, ...constraints))
+      return { sessions: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, classId: snapshotDoc.data().classId })),
+        cursor: snapshot.docs.at(-1) || null }
+    },
+    loadItems: async (sessionId) => {
+      const snapshot = await readPlanningQuery('contentRefresh.items', collection(
+        planningSessionRef(planningUnitId, applicationId, sessionId), 'items',
+      ))
+      return snapshot.docs.map((snapshotDoc) => {
+        const item = snapshotDoc.data()
+        return { id: snapshotDoc.id, sourceActivityId: item.sourceActivityId || null,
+          sourcePlanningUnitId: item.sourcePlanningUnitId || null }
+      })
+    },
+  })
 }
 
 export async function loadPlanningSessionDetail(planningUnitId, applicationId, sessionId, options = {}) {

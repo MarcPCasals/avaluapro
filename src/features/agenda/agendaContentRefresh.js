@@ -1,8 +1,57 @@
-// This action reads only source content. It never loads, saves or schedules sessions.
+import { planningSubjectsMatch, resolvePlanningSubject } from '../../domain/planning/subjects.js'
+
+// This action reads references and source content. It never saves or schedules sessions.
 const CONTENT_FIELDS = ['description', 'teacherMaterials', 'studentMaterials']
 
 function sourceUnitId(bundle, item) {
   return item.sourcePlanningUnitId || item.sourceActivity?.planningUnitId || bundle.planningUnit.id
+}
+
+export function selectAgendaContentApplications(records, { classId, subject = '', classItem, subjects = [] }) {
+  return records.filter((record) => record.application.classId === classId
+    && (!subject || planningSubjectsMatch(resolvePlanningSubject({ ...record, classItem, subjects }), subject)))
+}
+
+/** Discover all sessions without replacing their local timing or expanding the visible range. */
+export async function loadCompleteAgendaContentRefresh({
+  applicationRecords, classId, visibleBundles = [], repository, loadReferences, loadStructure, loadOverrides,
+}) {
+  applicationRecords = applicationRecords.filter((record) => record.application.classId === classId)
+  const bundles = []
+  for (let offset = 0; offset < applicationRecords.length; offset += 4) {
+    const groups = await Promise.all(applicationRecords.slice(offset, offset + 4).map(async (record) => {
+      const [remote, localSessions] = await Promise.all([
+        loadReferences({ planningUnitId: record.planningUnit.id, applicationId: record.application.id, classId }),
+        repository.loadScope(`application:${record.application.id}:sessions`),
+      ])
+      const byId = new Map(remote.filter((bundle) => bundle.session.classId === classId)
+        .map((bundle) => [bundle.session.id, { ...record, ...bundle }]))
+      for (const session of localSessions.entities.filter((session) => session.classId === classId)) {
+        if (!byId.has(session.id)) byId.set(session.id, { ...record, session, items: [] })
+      }
+      // Local-only sessions and recovered source-unit links remain part of the refresh.
+      for (const bundle of visibleBundles) {
+        if (bundle.session.classId === classId && bundle.application?.id === record.application.id
+          && bundle.planningUnit?.id === record.planningUnit.id) byId.set(bundle.session.id, { ...bundle })
+      }
+      const references = [...byId.values()]
+      for (let index = 0; index < references.length; index += 6) {
+        await Promise.all(references.slice(index, index + 6).map(async (bundle) => {
+          const cached = await repository.loadScope(`session:${bundle.session.id}:detail`)
+          const items = new Map(bundle.items.map((item) => [item.id, item]))
+          for (const item of cached.entities.filter((entity) => entity.entityType === 'sessionItem')) items.set(item.id, item)
+          const visible = visibleBundles.find((current) => current.session.id === bundle.session.id
+            && current.application?.id === record.application.id && current.planningUnit?.id === record.planningUnit.id)
+          for (const item of visible?.items || []) items.set(item.id, item)
+          bundle.items = [...items.values()]
+        }))
+      }
+      return references
+    }))
+    bundles.push(...groups.flat())
+  }
+  const refresh = await loadAgendaContentRefresh({ bundles, repository, loadStructure, loadOverrides })
+  return { refresh, summary: { ...summarizeAgendaContentRefresh(bundles, refresh), sessionCount: bundles.length } }
 }
 
 export async function loadAgendaContentRefresh({ bundles, repository, loadStructure, loadOverrides }) {
