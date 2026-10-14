@@ -208,3 +208,38 @@ test('una còpia antiga anul·lada no deixa una segona còpia quan l’activitat
   assert.ok(preview.removedItems.some((i) => i.id === 'item-old'))
   assert.ok(preview.removedItems.some((i) => i.id === 'item-second'))
 })
+
+for (const halfGroups of [false, true]) {
+  test(`substituir una sessió respecta l’ordre desat d’Àtoms 40 i Elements 15 encara que les dades arribin invertides${halfGroups ? ' en mitjos grups' : ''}`, () => {
+    const first = bundle('first', '2026-10-19', 'atoms')
+    first.items[0] = createSessionItem({ ...first.items[0], order: 0, plannedMinutes: 40, segmentIndex: 2, segmentCount: 2 }, options)
+    const elements = createSessionItem({ ...first.items[0], id: 'first-elements', sourceActivityId: 'elements', title: 'Elements',
+      order: 1, plannedMinutes: 15, segmentIndex: 1, segmentCount: 3 }, options)
+    first.items.unshift(elements)
+    const second = bundle('second', '2026-10-21', 'elements')
+    const third = bundle('third', '2026-11-02', 'elements')
+    third.items[0].plannedMinutes = 45
+    const report = bundle('report', '2026-11-04', 'report')
+    const past = bundle('past', '2026-10-16', 'atoms', { status: 'held' })
+    past.items[0].plannedMinutes = 15
+    const targets = halfGroups ? ['A','B'].map((subgroupId, index) => ({ ...first,
+      session: { ...first.session, id: `first-${subgroupId}`, subgroupId,
+        startsAt: `2026-10-19T${10 + index}:00:00`, parallelProgrammingKey: 'fictional-pair' },
+      items: first.items.map(item => ({ ...item, id: `${item.id}-${subgroupId}`, sessionId: `first-${subgroupId}` })),
+    })) : [first]
+    const data = input({ targetSessionId: targets[0].session.id, title: 'Informe fictici',
+      replacementActivity: plannedActivity('report'),
+      existingSessionBundles: [past,...targets,second,third,report], candidates: [],
+    })
+    const original = structuredClone(data)
+    const preview = buildAgendaSessionReplacement(data)
+    const following = preview.sessions.find(b=>b.session.id==='second')
+    assert.deepEqual(following.items.map(i=>[i.sourceActivityId,i.plannedMinutes]),[['atoms',40],['elements',15]])
+    assert.equal(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='atoms').reduce((n,i)=>n+i.plannedMinutes,0),40)
+    assert.equal(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='elements').reduce((n,i)=>n+i.plannedMinutes,0),115)
+    assert.equal(preview.sessions.flatMap(b=>b.items).filter(i=>i.sourceActivityId==='report').length,targets.length)
+    assert(!preview.removedItems.some(i=>i.sessionId==='past'))
+    assert.deepEqual(preview.unscheduled,[])
+    assert.deepEqual(data,original)
+  })
+}

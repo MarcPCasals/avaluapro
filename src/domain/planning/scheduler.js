@@ -1473,8 +1473,9 @@ export function buildAgendaSessionReplacement({
       application, candidates: candidates.filter((candidate) => candidate.startsAt > lastStartsAt), options,
       existingSessionBundles: adjustedBundles.map((bundle) => targetIds.has(bundle.session.id)
         ? { ...bundle, items: [] } : bundle),
+      // Les dades poden arribar en un ordre diferent del que s'ha desat a la sessió.
       additionalActivities: (adjustedBundles.find((bundle) => bundle.session.id === targetSessionId)?.items || [])
-        .filter((item) => !isBabeliumItem(item) && !isFixedAgendaItem(item)),
+        .filter((item) => !isBabeliumItem(item) && !isFixedAgendaItem(item)).sort(compareOrder),
       startAfterTarget: true, targetSessionId: targets.find((bundle) => bundle.session.startsAt === lastStartsAt).session.id,
     })
     reflow = {
