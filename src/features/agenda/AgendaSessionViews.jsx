@@ -661,6 +661,7 @@ export function AgendaTimelineView({
   sessionPrivateNotes = {},
   onOpenTimetableClassroom,
   onSchedule,
+  onRefreshContent,
   selectedClassId,
   slots = [],
   timetable,
@@ -676,6 +677,7 @@ export function AgendaTimelineView({
     const timer = globalThis.setInterval(() => setNow(Date.now()), 60_000)
     return () => globalThis.clearInterval(timer)
   }, [])
+  const [contentRefresh, setContentRefresh] = useState({ busy: false, classId: '', subject: '', notice: '', error: '' })
   const [subjectFilter, setSubjectFilter] = useState({ classId: '', subject: '' })
   const activeSubject = subjectFilter.classId === selectedClassId ? subjectFilter.subject : ''
   const groupBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
@@ -720,20 +722,35 @@ export function AgendaTimelineView({
   const upcomingGroups = logicalGroups
     .map((group) => ({ ...group, bundles: group.bundles.filter((bundle) => !sessionHasPassed(bundle, now, today)) }))
     .filter((group) => group.bundles.length > 0)
+  const refreshContent = async () => {
+    if (contentRefresh.busy) return
+    setContentRefresh({ busy: true, classId: selectedClassId, subject: activeSubject, notice: '', error: '' })
+    try {
+      const summary = await onRefreshContent({ classId: selectedClassId, sessionIds: classBundles.map((bundle) => bundle.session.id) })
+      const notice = `Descripcions i materials actualitzats de ${summary.activityCount} ${summary.activityCount === 1 ? 'activitat' : 'activitats'}. S’han conservat l’ordre i la temporització.`
+        + (summary.missingCount ? ` ${summary.missingCount} ${summary.missingCount === 1 ? 'activitat sense original; es conserva' : 'activitats sense original; es conserven'} a la cronologia.` : '')
+      setContentRefresh({ busy: false, classId: selectedClassId, subject: activeSubject, notice, error: '' })
+    } catch (error) {
+      setContentRefresh({ busy: false, classId: selectedClassId, subject: activeSubject, notice: '', error: error.message || 'No s’ha pogut actualitzar el contingut.' })
+    }
+  }
+  const refreshMatchesSelection = contentRefresh.classId === selectedClassId && contentRefresh.subject === activeSubject
   const selectedClass = classes.find((item) => item.id === selectedClassId)
   return (
     <section className="agenda-timeline-view">
       <header className="agenda-view-toolbar">
         <div><span className="agenda-view-kicker">Cronologia del grup seleccionat</span><div className="agenda-timeline-selected-class"><h2>{selectedClass?.name || 'Cap grup seleccionat'}</h2>{selectedClass && <ContextualHelp title="Cronologia del grup">Primer es mostren les sessions pendents; les sessions anteriors es conserven plegades dins l’històric.</ContextualHelp>}{loading && <Loader2 className="spin" size={16} />}</div></div>
-        <div className="agenda-timeline-toolbar-actions">{!activeSubject && <TemporalUnitCountdown progress={temporalUnitProgress} temporalUnit={activeTemporalUnit} type="sessions" />}{onSchedule && <button className="primary-action compact" onClick={() => onSchedule(activeSubject)} type="button"><Plus size={16} />{visibleUnscheduledActivities.length > 0 ? `Calendaritzar ${visibleUnscheduledActivities.length} activitats pendents` : 'Calendaritzar UP'}</button>}</div>
+        <div className="agenda-timeline-toolbar-actions">{onRefreshContent && <button className="secondary-action compact" disabled={loading || contentRefresh.busy || !selectedClassId || !classBundles.some((bundle) => bundle.planningUnit?.id)} aria-busy={contentRefresh.busy} onClick={refreshContent} title="Actualitza només descripcions i materials del grup i la matèria seleccionats en aquest tram. Conserva l’ordre i la temporització." type="button">{contentRefresh.busy ? <Loader2 aria-hidden="true" className="spin" size={16} /> : <RotateCcw aria-hidden="true" size={16} />}{contentRefresh.busy ? 'Actualitzant descripcions i materials…' : 'Actualitzar descripcions i materials'}</button>}{!activeSubject && <TemporalUnitCountdown progress={temporalUnitProgress} temporalUnit={activeTemporalUnit} type="sessions" />}{onSchedule && <button className="primary-action compact" disabled={contentRefresh.busy} onClick={() => onSchedule(activeSubject)} type="button"><Plus size={16} />{visibleUnscheduledActivities.length > 0 ? `Calendaritzar ${visibleUnscheduledActivities.length} activitats pendents` : 'Calendaritzar UP'}</button>}</div>
       </header>
-      {selectedClassId && subjects.length > 0 && <label className="agenda-timeline-subject">Calendarització<select value={activeSubject} onChange={(event) => setSubjectFilter({ classId: selectedClassId, subject: event.target.value })}><option value="">Totes les matèries</option>{subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}</select></label>}
+      {refreshMatchesSelection && (contentRefresh.busy || contentRefresh.notice) && <p className="agenda-session-edit-notice" role="status">{contentRefresh.busy ? 'Actualitzant descripcions i materials… Es conservaran l’ordre i la temporització.' : contentRefresh.notice}</p>}
+      {refreshMatchesSelection && contentRefresh.error && <p className="agenda-inline-error" role="alert">{contentRefresh.error}</p>}
+      {selectedClassId && subjects.length > 0 && <label className="agenda-timeline-subject">Calendarització<select disabled={contentRefresh.busy} value={activeSubject} onChange={(event) => setSubjectFilter({ classId: selectedClassId, subject: event.target.value })}><option value="">Totes les matèries</option>{subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}</select></label>}
       {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : <div className="agenda-timeline-sections">
-        {classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <>
+        {classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading || contentRefresh.busy} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading || contentRefresh.busy} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <>
           {upcomingGroups.length > 0 ? <TimelineRows onOpenNotes={onOpenNotes} notesLoadingId={notesLoadingId} onOpenTimetableClassroom={onOpenTimetableClassroom} classes={classes} slots={slots} calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}
-          {hasLater && <div className="agenda-timeline-pager future"><button disabled={loading} onClick={onLoadLater} type="button">Veure 8 setmanes següents<ArrowRight size={14} /></button></div>}
+          {hasLater && <div className="agenda-timeline-pager future"><button disabled={loading || contentRefresh.busy} onClick={onLoadLater} type="button">Veure 8 setmanes següents<ArrowRight size={14} /></button></div>}
           {archivedGroups.length > 0 && <details className="agenda-timeline-archive"><summary><span><History size={16} />Sessions anteriors</span><small>{archivedGroups.length} {archivedGroups.length === 1 ? 'sessió arxivada' : 'sessions arxivades'}</small><ChevronDown size={16} /></summary><TimelineRows onOpenNotes={onOpenNotes} notesLoadingId={notesLoadingId} onOpenTimetableClassroom={onOpenTimetableClassroom} classes={classes} slots={slots} calendarEvents={calendarEvents} groups={archivedGroups} onOpenSession={onOpenSession} /></details>}
-          {hasEarlier && <div className="agenda-timeline-pager past"><button disabled={loading} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />Veure 8 setmanes anteriors</button></div>}
+          {hasEarlier && <div className="agenda-timeline-pager past"><button disabled={loading || contentRefresh.busy} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />Veure 8 setmanes anteriors</button></div>}
         </>}
         <TimelineUnscheduledActivities activities={visibleUnscheduledActivities} hasApplications={unscheduledHasApplications} loading={unscheduledLoading} />
       </div>}

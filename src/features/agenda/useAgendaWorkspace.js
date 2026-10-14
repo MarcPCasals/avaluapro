@@ -1,3 +1,4 @@
+import { loadAgendaContentRefresh, refreshAgendaBundleContent, refreshPlanningUnitMaterials, summarizeAgendaContentRefresh } from './agendaContentRefresh.js'
 import { EDIT_HISTORY_REFRESH_EVENT, editHistory } from '../../lib/editHistory'
 import { saveCalendarEventWithAutomaticReflow } from './agendaCancellation.js'
 import { getNoClassCalendarEvent } from '../../lib/agendaCalendar.js'
@@ -747,6 +748,7 @@ export function useAgendaWorkspace(user, classes = []) {
         ) || new Map()
         return withBabelium({
           ...record,
+          planningUnit: refreshPlanningUnitMaterials(record.planningUnit, structureResults.flatMap((result) => result.entities)),
           detailsLoaded: true,
           items: entities
             .filter((entity) => entity.entityType === 'sessionItem')
@@ -769,6 +771,22 @@ export function useAgendaWorkspace(user, classes = []) {
       if (requestId === sessionRangeRequest.current) setSessionsLoading(false)
     }
   }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, slotsByTimetableId, user?.uid])
+
+  const refreshTimelineContent = useCallback(async ({ classId, sessionIds }) => {
+    if (!repository || !classId) throw new Error('Selecciona un grup abans d’actualitzar el contingut.')
+    const selectedIds = new Set(sessionIds)
+    const selectedBundles = sessionBundles.filter((bundle) =>
+      bundle.session.classId === classId && selectedIds.has(bundle.session.id))
+    if (!selectedBundles.length) throw new Error('No hi ha sessions de Programació per actualitzar en aquest tram.')
+    const refresh = await loadAgendaContentRefresh({
+      bundles: selectedBundles, repository,
+      loadStructure: loadPlanningUnitStructure,
+      loadOverrides: loadPlanningActivityOverrides,
+    })
+    // Apply to current state, never the snapshot captured before the remote reads.
+    setSessionBundles((current) => current.map((bundle) => refreshAgendaBundleContent(bundle, refresh)))
+    return summarizeAgendaContentRefresh(selectedBundles, refresh)
+  }, [repository, sessionBundles])
 
   /**
    * Completa una única sessió quan el docent l'obre des del calendari o la
@@ -849,6 +867,7 @@ export function useAgendaWorkspace(user, classes = []) {
       ).map((activity) => [activity.id, activity]))
       const detailedBundle = withBabelium({
         ...bundle,
+        planningUnit: refreshPlanningUnitMaterials(bundle.planningUnit, structureResults.flatMap((result) => result.entities)),
         detailsLoaded: true,
         items: rawItems.map((item) => ({
           ...item,
@@ -2362,6 +2381,7 @@ export function useAgendaWorkspace(user, classes = []) {
     loadTodaySessions,
     ownedPlanningUnits: planningUnits,
     refreshFromCloud,
+    refreshTimelineContent,
     resolveConflicts,
 
 
