@@ -1,3 +1,4 @@
+import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
 import { useState } from 'react'
 import { getSubjectStructure } from '../../src/data/subjects'
 import { buildEvaluationActionsPatch, getEvaluationActionCatalog } from '../../src/lib/evaluationActions'
@@ -7,18 +8,19 @@ import { EvaluationTable } from '../../src/features/evaluation/EvaluationTable'
 const subjects = ['Ciències Físiques i de la Natura', 'Català']
 function initialState() {
   const classes = subjects.map((subject, index) => ({ id: `action-class-${index}`, subject }))
-  const uts = classes.flatMap(item => [1, 2].map(n => ({ id: `${item.id}-ut-${n}`, classId: item.id, name: `UT${n}` })))
+  const uts = classes.flatMap(item => [1, 2].map(n => ({ id: `${item.id}-ut-${n}`, classId: item.id, name: `UT${n}`, order: n })))
   const competencies = uts.flatMap(ut => getSubjectStructure(classes.find(item => item.id === ut.classId).subject).map((comp, index) => ({
     ...comp, id: `${ut.id}-c${index}`, classId: ut.classId, utId: ut.id,
   })))
   const criteria = competencies.flatMap(comp => comp.criteria.map((name, index) => ({ id: `${comp.id}-ca${index}`, competencyId: comp.id, name })))
-  return { classes, uts, competencies, criteria, marks: [] }
+  return { classes, uts, semesters: [], competencies, criteria, marks: [] }
 }
 
 export function EvaluationActionsDemo({ students }) {
   const [state, setState] = useState(initialState)
   const [classId, setClassId] = useState('action-class-0')
   const [utNumber, setUtNumber] = useState(1)
+  const [selectedStudent, setSelectedStudent] = useState('')
   const [open, setOpen] = useState(false)
   const utId = `${classId}-ut-${utNumber}`
   const classItem = state.classes.find(item => item.id === classId)
@@ -26,6 +28,7 @@ export function EvaluationActionsDemo({ students }) {
     criteria: state.criteria.filter(criterion => criterion.competencyId === comp.id),
   }))
   const catalog = getEvaluationActionCatalog(classItem)
+  const progressState = { ...state, students: students.slice(0, 4).map(student => ({ ...student, classId })) }
   return <section>
     <div className="toolbar">
       <label>Matèria <select value={classId} onChange={event => setClassId(event.target.value)}>{state.classes.map(item => <option key={item.id} value={item.id}>{item.subject}</option>)}</select></label>
@@ -41,5 +44,9 @@ export function EvaluationActionsDemo({ students }) {
       onUpdateMark={(studentId, criterionId, value) => setState(current => ({ ...current,
         marks: [...current.marks.filter(mark => mark.studentId !== studentId || mark.criterionId !== criterionId), { studentId, criterionId, value }],
       }))} />
+    <label>Vista de les estadístiques<select value={selectedStudent} onChange={event => setSelectedStudent(event.target.value)}>
+      <option value="">Classe</option>{progressState.students.map(student => <option key={student.id} value={student.id}>{student.name}</option>)}
+    </select></label>
+    <ActionProgressStats key={`${classId}:${selectedStudent}`} state={progressState} classId={classId} studentId={selectedStudent || undefined} />
   </section>
 }

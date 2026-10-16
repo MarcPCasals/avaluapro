@@ -1,0 +1,35 @@
+.action-progress-stats { padding: 20px; margin: 20px 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; min-width: 0; }
+.action-progress-stats header p, .action-progress-method { color: #475569; line-height: 1.6; }
+.action-progress-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.action-progress-filters label { display: grid; gap: 6px; flex: 1 1 160px; min-width: 0; font-size: .875rem; font-weight: 700; }
+.action-progress-filters input, .action-progress-filters select { width: 100%; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; background: #fff; color: #0f172a; }
+.action-progress-summary { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.action-progress-summary > span { padding: 12px; background: #f5f3ff; border-radius: 10px; }
+.action-progress-summary strong { display: block; font-size: 1.25rem; color: #6d28d9; }
+.action-progress-scroll { overflow-x: auto; max-width: 100%; }
+.action-progress-table { border-collapse: collapse; width: 100%; font-size: .875rem; }
+.action-progress-table caption { text-align: left; padding: 8px 0; color: #475569; }
+.action-progress-table th, .action-progress-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: middle; min-width: 110px; }
+.action-progress-table thead th { background: #f8fafc; }
+.action-progress-table th[scope=row] { text-align: left; min-width: 220px; max-width: 340px; font-weight: 500; }
+.action-progress-table th[scope=row] > strong { color: #6d28d9; display: block; }
+.action-progress-table th[scope=row] > span { display: block; line-height: 1.5; }
+.action-progress-table small { display: block; color: #475569; font-size: .75rem; margin-top: 6px; }
+.action-progress-empty { color: #64748b; font-size: .8rem; }
+.action-progress-cell { display: grid; gap: 6px; border: 1px solid #ddd6fe; background: #faf5ff; border-radius: 9px; padding: 8px; width: 100%; cursor: pointer; }
+.action-progress-cell > strong { font-size: 1rem; }
+.action-progress-cell > strong small { display: inline; font-weight: 400; margin-left: 2px; }
+.action-distribution { display: flex; gap: 1px; height: 8px; width: 100%; border-radius: 4px; overflow: hidden; }
+.action-distribution > span { min-width: 2px; }
+.action-distribution-A { background: #16a34a; }
+.action-distribution-B { background: #2563eb; }
+.action-distribution-C { background: #d97706; }
+.action-distribution-D { background: #dc2626; }
+.action-distribution-NA { background: #111827; }
+.action-progress-trend { font-weight: 700; }
+.action-progress-trend.up { color: #15803d; }
+.action-progress-trend.down { color: #b91c1c; }
+.action-progress-method { font-size: .8rem; margin-top: 16px; }
+.action-progress-student-list { list-style: none; padding: 0; }
+.action-progress-student-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+@media (max-width: 640px) { .action-progress-stats { padding: 12px; } }
