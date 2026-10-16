@@ -61,7 +61,8 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
   assert.match(html, /class="action-criterion-result" role="status"><strong class="grade grade-C">C/)
   assert.match(html, /3\/3 accions qualificades/)
   assert.doesNotMatch(html, /Nota provisional/)
-  assert.match(html, /Desar notes de les accions/)
+  assert.match(html, /Les notes es desen automàticament en canviar cada acció/)
+  assert.doesNotMatch(html, /Desar notes de les accions/)
 })
 
 
