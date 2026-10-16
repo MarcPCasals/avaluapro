@@ -1,9 +1,11 @@
+import { getEvaluationActionCatalog } from '../../lib/evaluationActions'
+import { EvaluationActionsModal } from './EvaluationActionsModal'
 import { Modal } from '../../components/Modal'
 import { transversalStructure } from '../../data/subjects'
 import { getTransversalNames, selectEvaluationCompetencies } from '../../lib/transversalEvaluation'
 import { TransversalSelector } from './TransversalSelector'
 import { useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, MapPinned, Users } from 'lucide-react'
+import { Download, FileSpreadsheet, ListChecks, MapPinned, Users } from 'lucide-react'
 import { getSubjectStructure } from '../../data/subjects'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade } from '../../lib/grades'
@@ -102,6 +104,8 @@ export function EvaluationView() {
   const seatingCharts = useAvaluaproStore((state) => state.seatingCharts)
   const upsertSeatingChart = useAvaluaproStore((state) => state.upsertSeatingChart)
   const deleteSeatingChart = useAvaluaproStore((state) => state.deleteSeatingChart)
+  const saveEvaluationActions = useAvaluaproStore((state) => state.saveEvaluationActions)
+  const [showActionsModal, setShowActionsModal] = useState(false)
   const [showStudentsModal, setShowStudentsModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -137,6 +141,7 @@ export function EvaluationView() {
     }
   }
   const subjectStructure = isTransversal ? transversalStructure : getSubjectStructure(activeClass?.subject)
+  const actionCatalog = getEvaluationActionCatalog(activeClass, scope)
   const activeCompetencyCount = competencies.length
   const totalSubjectCompetencies = subjectStructure?.length || activeCompetencyCount
   const competencySummaryIsComplete =
@@ -237,6 +242,10 @@ export function EvaluationView() {
             {isTransversal ? 'transversals actives' : 'competències actives'}
           </button>
         )}
+        <button className="tool-button" onClick={() => setShowActionsModal(true)} type="button" disabled={!activeUtId}>
+          <ListChecks size={18} />
+          Accions de la UT
+        </button>
         {halfGroups.length > 0 && (
           <select
             className="half-group-select"
@@ -269,6 +278,12 @@ export function EvaluationView() {
           Gestió d’Alumnes
         </button>
       </div>
+      {showActionsModal && (
+        <EvaluationActionsModal key={`${activeClassId}:${activeUtId}:${scope}`}
+          competencies={competencies} catalog={actionCatalog} utName={activeUt?.name}
+          onClose={() => setShowActionsModal(false)}
+          onSave={({ catalog, selections }) => saveEvaluationActions({ classId: activeClassId, utId: activeUtId, scope, catalog, selections })} />
+      )}
       {showStudentsModal && (
         <ManageStudentsModal classId={activeClassId} onClose={() => setShowStudentsModal(false)} />
       )}
@@ -343,7 +358,11 @@ export function EvaluationView() {
         </section>
       ) : (
       <EvaluationTable
+        key={`${activeClassId}:${activeUtId}:${scope}`}
         activeClassId={activeClassId}
+        actionCatalog={actionCatalog}
+        utName={activeUt?.name}
+        onConfigureActions={() => setShowActionsModal(true)}
         agendaNotes={agendaNotes}
         competencies={competencies}
         marks={marks}

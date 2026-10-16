@@ -1,6 +1,9 @@
+import { useState } from 'react'
+import { CriterionGradeModal } from './CriterionGradeModal'
+import { getSelectedCriterionActions } from '../../lib/evaluationActions'
 import { Bell, BookOpen, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
-import { calculateGrade, GRADE_OPTIONS, gradeClassName, gradeTextClassName } from '../../lib/grades.js'
+import { calculateGrade, gradeClassName, gradeTextClassName } from '../../lib/grades.js'
 
 function getCriterionMark(marks, studentId, criterionId) {
   return marks.find((mark) => mark.studentId === studentId && mark.criterionId === criterionId)?.value || ''
@@ -30,6 +33,9 @@ function getStudentRowClass(dominantDiagnosis) {
 
 export function EvaluationTable({
   activeClassId,
+  actionCatalog = {},
+  utName,
+  onConfigureActions,
   agendaNotes = [],
   competencies = [],
   marks = [],
@@ -42,6 +48,7 @@ export function EvaluationTable({
   renderAbsenceControl = () => null,
   students = [],
 }) {
+  const [grading, setGrading] = useState(null)
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
   const studentOrder = new Map(students.map((student, index) => [student.id, index]))
   const criterionOrder = new Map(flatCriteria.map((criterion, index) => [criterion.id, index]))
@@ -67,6 +74,13 @@ export function EvaluationTable({
   }
 
   return (
+    <>
+    {grading && <CriterionGradeModal
+      {...grading} value={getCriterionMark(marks, grading.student.id, grading.criterion.id)}
+      actions={getSelectedCriterionActions(actionCatalog, grading.competency, grading.criterion)}
+      utName={utName} onClose={() => setGrading(null)}
+      onConfigure={onConfigureActions ? () => { setGrading(null); onConfigureActions() } : undefined}
+      onSave={value => onUpdateMark(grading.student.id, grading.criterion.id, value)} />}
     <div className="grid-scroll" data-tour="evaluation-table">
       <table className="evaluation-table">
         <thead>
@@ -158,23 +172,23 @@ export function EvaluationTable({
                     const value = getCriterionMark(marks, student.id, criterion.id)
                     return (
                       <td className="mark-cell criterion-mark-cell" key={`${student.id}_${criterion.id}`}>
-                        <select
-                          aria-label={`${student.name} · ${criterion.name}`}
+                        <button
+                          aria-label={`${student.name} · ${competency.name} · ${criterion.name}`}
                           className={gradeTextClassName(value)}
                           data-evaluation-select={`${student.id}_${criterion.id}`}
-                          onChange={(event) => onUpdateMark(student.id, criterion.id, event.target.value)}
+                          type="button"
+                          aria-haspopup="dialog"
+                          onClick={() => setGrading({ student, competency, criterion })}
                           onKeyDown={(event) => {
                             if (event.key !== 'Tab' || event.shiftKey) return
                             event.preventDefault()
                             focusNextEvaluationSelect(student.id, criterion.id)
                           }}
                           tabIndex={getEvaluationTabIndex(student.id, criterion.id)}
-                          value={value}
+                          title="Veure les accions de la UT i posar la nota"
                         >
-                          {GRADE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option || '-'}</option>
-                          ))}
-                        </select>
+                          {value || '-'}
+                        </button>
                       </td>
                     )
                   }),
@@ -207,5 +221,6 @@ export function EvaluationTable({
         </tbody>
       </table>
     </div>
+    </>
   )
 }

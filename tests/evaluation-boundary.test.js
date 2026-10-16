@@ -42,5 +42,5 @@ test('la graella compartida no coneix cap botiga o persistència', () => {
   assert.doesNotMatch(tableSource, /useAvaluaproStore|\/store\//i)
   assert.doesNotMatch(tableSource, /firebase|firestore/i)
   assert.doesNotMatch(tableSource, /indexedDB|\bidb\b/i)
-  assert.match(tableSource, /onUpdateMark\(student\.id, criterion\.id, event\.target\.value\)/)
+  assert.match(tableSource, /onUpdateMark\(grading\.student\.id, grading\.criterion\.id, value\)/)
 })

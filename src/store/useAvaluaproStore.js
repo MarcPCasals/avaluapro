@@ -1,3 +1,4 @@
+import { buildEvaluationActionsPatch } from '../lib/evaluationActions'
 import { buildTransversalStructure } from '../lib/transversalEvaluation'
 import { editHistory, historyValuesEqual } from '../lib/editHistory'
 import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
@@ -5296,6 +5297,11 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['criteria'])
   },
 
+  saveEvaluationActions: async (configuration) => {
+    setWithEditHistory(set, get, (state) => buildEvaluationActionsPatch(state, configuration))
+    await persistCollections(set, get, ['classes', 'criteria'], { throwOnError: true })
+  },
+
   updateCriterion: async (criterionId, patch) => {
     setWithEditHistory(set, get, (state) => ({
       criteria: state.criteria.map((criterion) =>
@@ -6281,7 +6287,7 @@ const reversibleActions = [
   'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
   'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
   'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive', 'setClassTransversalCompetencies',
-  'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
+  'saveEvaluationActions', 'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
   'updateTaskRecord', 'toggleStudentAbsence', 'updateTaskRecordMeta', 'addBehaviorEvent',
   'addAgendaNote', 'updateAgendaNote', 'deleteAgendaNote', 'saveClassroomRecovery', 'cancelClassroomRecovery', 'completeClassroomRecovery',
   'addStudents', 'addStudentsFromText', 'saveClassHalfGroupProposal', 'deleteClassHalfGroupProposal', 'applyClassHalfGroups',
