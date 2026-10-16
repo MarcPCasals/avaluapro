@@ -1,3 +1,5 @@
+import { useDialogSave } from '../../lib/useDialogSave'
+import './ActionDialogs.css'
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { getCriterionActionKey, parseActionLines } from '../../lib/evaluationActions'
@@ -13,7 +15,7 @@ function ActionImporter({ onImport }) {
       onImport(actions)
       setText('')
       setError('')
-      setNotice(`${actions.length} accions carregades. Selecciona les que avaluaràs.`)
+      setNotice(`${actions.length} accions afegides al catàleg de l’assignatura. En desar, estaran disponibles a totes les UT.`)
     } catch (cause) { setError(cause.message) }
   }
   return <details className="action-importer">
@@ -38,25 +40,48 @@ function ActionImporter({ onImport }) {
   </details>
 }
 
-export function EvaluationActionsModal({ competencies, catalog: initialCatalog, utName, onSave, onClose }) {
+function ActionCopyControls({ destinations, busy, onCopy }) {
+  const [selectedClasses, setSelectedClasses] = useState([])
+  const targets = destinations.filter(item => selectedClasses.includes(item.id))
+  return <details className="action-copy-panel">
+    <summary>Copiar accions a altres classes</summary>
+    <p>Tria les classes on vols afegir tot el catàleg de l’assignatura. Les accions estaran disponibles a totes les seves UT, també a les que creïs més endavant. A cada UT escolliràs quines avalues.</p>
+    <p>Es desaran els canvis d’aquesta finestra. Les seleccions i les notes de les classes de destí es conserven.</p>
+    <fieldset className="evaluation-actions-fields" disabled={busy}>
+      {destinations.length === 0 && <p>Encara no hi ha altres classes on copiar les accions.</p>}
+      <div className="action-copy-destinations">{destinations.map(item => <div className="action-copy-destination" key={item.id}>
+        <label className="action-copy-option"><input type="checkbox" checked={selectedClasses.includes(item.id)} onChange={event => {
+          const checked = event.target.checked
+          setSelectedClasses(current => checked ? [...current, item.id] : current.filter(id => id !== item.id))
+        }} /><span><strong>{item.name}</strong>{item.subject && <small>{item.subject}</small>}</span></label>
+      </div>)}</div>
+      <button className="secondary-action" type="button" disabled={!targets.length} onClick={() => onCopy({
+        targets: targets.map(item => ({ classId: item.id })),
+      })}>{busy ? 'Copiant…' : `Copiar a ${targets.length} ${targets.length === 1 ? 'classe' : 'classes'}`}</button>
+    </fieldset>
+  </details>
+}
+
+export function EvaluationActionsModal({ competencies, catalog: initialCatalog, utName, onSave, onClose, copyDestinations = [], onCopy }) {
+  const { busy, error, notice, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les accions.')
+  const activeCompetencies = competencies.filter(competency => !competency.inactive)
   const [catalog, setCatalog] = useState(initialCatalog)
-  const [selections, setSelections] = useState(() => Object.fromEntries(competencies.flatMap(comp =>
+  const [selections, setSelections] = useState(() => Object.fromEntries(activeCompetencies.flatMap(comp =>
     comp.criteria.map(criterion => [criterion.id, criterion.selectedActionIds || []]),
   )))
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
   const select = (criterionId, ids) => setSelections(current => ({ ...current, [criterionId]: ids }))
-  const save = async () => {
-    setBusy(true)
-    setError('')
-    try { await onSave({ catalog, selections }); onClose() }
-    catch (cause) { setError(cause.message || 'No s’han pogut desar les accions.'); setBusy(false) }
-  }
-  return <Modal title={`Accions que s’avaluen · ${utName || 'UT'}`} size="lg" onClose={() => !busy && onClose()}>
-    <p>Marca només les accions que avaluaràs en aquesta UT. El catàleg es pot reutilitzar a les altres UT del grup; cada UT conserva la seva selecció.</p>
-    {competencies.length === 0 && <p>Activa primer les competències d’aquesta UT.</p>}
+  const save = () => runSave(() => onSave({ catalog, selections }))
+  const copy = options => runSave(() => onCopy({ catalog, selections, ...options }), {
+    closeOnSuccess: false,
+    successMessage: report => `Catàleg copiat a ${report.classes} ${report.classes === 1 ? 'classe' : 'classes'}. Les accions ja estan disponibles a totes les seves UT. Les seleccions i les notes existents es conserven.`,
+  })
+  return <Modal title={`Accions que s’avaluen · ${utName || 'UT'}`} size="lg" panelClassName="evaluation-actions-dialog" onClose={close}>
+    <p>Les accions pertanyen al catàleg de l’assignatura i estan disponibles a totes les UT. Aquí només es mostren les competències actives; selecciona les accions que avaluaràs en aquesta UT.</p>
+    {onCopy && <ActionCopyControls destinations={copyDestinations} busy={busy} onCopy={copy} />}
+    {notice && <p className="action-copy-notice" role="status">{notice}</p>}
+    {activeCompetencies.length === 0 && <p>Activa primer les competències d’aquesta UT.</p>}
     <fieldset className="evaluation-actions-fields" disabled={busy}>
-      {competencies.map(competency => <section className="action-competency" key={competency.id}>
+      {activeCompetencies.map(competency => <section className="action-competency" key={competency.id}>
         <h3>{competency.name}</h3>
         {competency.criteria.map(criterion => {
           const key = getCriterionActionKey(competency, criterion)
@@ -81,9 +106,10 @@ export function EvaluationActionsModal({ competencies, catalog: initialCatalog, 
       </section>)}
     </fieldset>
     {error && <p role="alert">{error}</p>}
+    {busy && <p role="status">Desant els canvis… Pots tancar la finestra.</p>}
     <div className="evaluation-actions-footer">
-      <button className="secondary-action" type="button" disabled={busy} onClick={onClose}>Cancel·lar</button>
-      <button className="primary-action" type="button" disabled={busy || !competencies.length} onClick={save}>{busy ? 'Desant…' : 'Desar selecció'}</button>
+      <button className="secondary-action" type="button" onClick={close}>Tancar</button>
+      <button className="primary-action" type="button" disabled={busy || !activeCompetencies.length} onClick={save}>{busy ? 'Desant…' : 'Desar selecció'}</button>
     </div>
   </Modal>
 }

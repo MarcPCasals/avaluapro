@@ -1,4 +1,4 @@
-import { getEvaluationActionCatalog } from '../../lib/evaluationActions'
+import { getEvaluationActionCatalog, getEvaluationActionCopyDestinations } from '../../lib/evaluationActions'
 import { EvaluationActionsModal } from './EvaluationActionsModal'
 import { Modal } from '../../components/Modal'
 import { transversalStructure } from '../../data/subjects'
@@ -11,7 +11,6 @@ import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade } from '../../lib/grades'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -29,6 +28,7 @@ function useEvaluationModel() {
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
+  const allUts = useAvaluaproStore((state) => state.uts)
   const allCompetencies = useAvaluaproStore((state) => state.competencies)
   const allCriteria = useAvaluaproStore((state) => state.criteria)
   const marks = useAvaluaproStore((state) => state.marks)
@@ -42,11 +42,11 @@ function useEvaluationModel() {
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
     const competencies = selectEvaluationCompetencies(
-      { competencies: allCompetencies, criteria: allCriteria }, activeClass, activeUtId, scope,
+      { competencies: allCompetencies, criteria: allCriteria, uts: allUts }, activeClass, activeUtId, scope,
     )
 
     return { students, competencies, marks, agendaNotes }
-  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
+  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allUts, allCompetencies, allCriteria, marks, agendaNotes])
 }
 
 function getCriterionMark(marks, studentId, criterionId) {
@@ -106,6 +106,9 @@ export function EvaluationView() {
   const upsertSeatingChart = useAvaluaproStore((state) => state.upsertSeatingChart)
   const deleteSeatingChart = useAvaluaproStore((state) => state.deleteSeatingChart)
   const saveEvaluationActions = useAvaluaproStore((state) => state.saveEvaluationActions)
+  const copyEvaluationActions = useAvaluaproStore((state) => state.copyEvaluationActions)
+  const allClasses = useAvaluaproStore((state) => state.classes)
+  const copyDestinations = useMemo(() => getEvaluationActionCopyDestinations({ classes: allClasses }, activeClassId), [allClasses, activeClassId])
   const [showActionsModal, setShowActionsModal] = useState(false)
   const [showStudentsModal, setShowStudentsModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
@@ -280,8 +283,10 @@ export function EvaluationView() {
         </button>
       </div>
       {showActionsModal && (
-        <EvaluationActionsModal key={`${activeClassId}:${activeUtId}:${scope}`}
+        <EvaluationActionsModal key={`actions:${activeClassId}:${activeUtId}:${scope}`}
           competencies={competencies} catalog={actionCatalog} utName={activeUt?.name}
+          copyDestinations={copyDestinations}
+          onCopy={configuration => copyEvaluationActions({ ...configuration, classId: activeClassId, utId: activeUtId, scope })}
           onClose={() => setShowActionsModal(false)}
           onSave={({ catalog, selections }) => saveEvaluationActions({ classId: activeClassId, utId: activeUtId, scope, catalog, selections })} />
       )}
@@ -359,7 +364,7 @@ export function EvaluationView() {
         </section>
       ) : (
       <EvaluationTable
-        key={`${activeClassId}:${activeUtId}:${scope}`}
+        key={`table:${activeClassId}:${activeUtId}:${scope}`}
         activeClassId={activeClassId}
         actionCatalog={actionCatalog}
         utName={activeUt?.name}
@@ -374,9 +379,6 @@ export function EvaluationView() {
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
         onUpdateActionGrades={updateActionGrades}
-        renderAbsenceControl={(student) => (
-          <AbsenceToggle classId={activeClassId} studentId={student.id} />
-        )}
         students={filteredStudents}
       />
       )}

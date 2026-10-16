@@ -1,14 +1,15 @@
+import { selectEvaluationCompetencies } from '../../src/lib/transversalEvaluation'
 import { buildActionGradeMark, recalculateActionCriteria } from '../../src/lib/actionGrades'
 import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
 import { useState } from 'react'
 import { getSubjectStructure } from '../../src/data/subjects'
-import { buildEvaluationActionsPatch, getEvaluationActionCatalog } from '../../src/lib/evaluationActions'
+import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch, getEvaluationActionCatalog, getEvaluationActionCopyDestinations } from '../../src/lib/evaluationActions'
 import { EvaluationActionsModal } from '../../src/features/evaluation/EvaluationActionsModal'
 import { EvaluationTable } from '../../src/features/evaluation/EvaluationTable'
 
-const subjects = ['Ciències Físiques i de la Natura', 'Català']
+const subjects = ['Ciències Físiques i de la Natura', 'Català', 'Ciències Físiques i de la Natura']
 function initialState() {
-  const classes = subjects.map((subject, index) => ({ id: `action-class-${index}`, subject }))
+  const classes = subjects.map((subject, index) => ({ id: `action-class-${index}`, name: `Classe fictícia ${index + 1}`, subject }))
   const uts = classes.flatMap(item => [1, 2].map(n => ({ id: `${item.id}-ut-${n}`, classId: item.id, name: `UT${n}`, order: n })))
   const competencies = uts.flatMap(ut => getSubjectStructure(classes.find(item => item.id === ut.classId).subject).map((comp, index) => ({
     ...comp, id: `${ut.id}-c${index}`, classId: ut.classId, utId: ut.id,
@@ -25,23 +26,35 @@ export function EvaluationActionsDemo({ students }) {
   const [open, setOpen] = useState(false)
   const utId = `${classId}-ut-${utNumber}`
   const classItem = state.classes.find(item => item.id === classId)
-  const competencies = state.competencies.filter(comp => comp.utId === utId).map(comp => ({ ...comp,
-    criteria: state.criteria.filter(criterion => criterion.competencyId === comp.id),
-  }))
+  const competencies = selectEvaluationCompetencies(state, classItem, utId, 'specific')
   const catalog = getEvaluationActionCatalog(classItem)
   const progressState = { ...state, students: students.slice(0, 4).map(student => ({ ...student, classId })) }
   return <section>
     <div className="toolbar">
-      <label>Matèria <select value={classId} onChange={event => setClassId(event.target.value)}>{state.classes.map(item => <option key={item.id} value={item.id}>{item.subject}</option>)}</select></label>
+      <label>Matèria <select value={classId} onChange={event => setClassId(event.target.value)}>{state.classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.subject}</option>)}</select></label>
       <label>UT <select value={utNumber} onChange={event => setUtNumber(Number(event.target.value))}><option value={1}>UT1</option><option value={2}>UT2</option></select></label>
       <button type="button" className="tool-button" onClick={() => setOpen(true)}>Accions de la UT</button>
     </div>
-    {open && <EvaluationActionsModal key={utId} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
+    <fieldset className="evaluation-actions-fields"><legend>Competències actives de la UT fictícia</legend>
+      {state.competencies.filter(comp => comp.utId === utId).map(comp => <label key={comp.id} style={{ display: 'block', margin: '8px 0' }}>
+        <input type="checkbox" checked={!comp.inactive} onChange={event => {
+          const active = event.target.checked
+          setState(current => ({ ...current, competencies: current.competencies.map(item => item.id === comp.id ? { ...item, inactive: !active } : item) }))
+        }} /> {comp.name}
+      </label>)}
+    </fieldset>
+    {open && <EvaluationActionsModal key={`actions:${utId}`} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
+      copyDestinations={getEvaluationActionCopyDestinations(state, classId)}
+      onCopy={configuration => {
+        const { patch, report } = buildCopyEvaluationActionsPatch(state, { ...configuration, classId, utId })
+        setState(current => ({ ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }))
+        return report
+      }}
       onClose={() => setOpen(false)} onSave={configuration => setState(current => {
         const patch = buildEvaluationActionsPatch(current, { classId, utId, ...configuration })
         return { ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }
       })} />}
-    <EvaluationTable key={utId} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
+    <EvaluationTable key={`table:${utId}`} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
       onUpdateActionGrades={(studentId, criterionId, grades) => setState(current => {
         const existing = current.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
         const mark = buildActionGradeMark({ existing, criterion: current.criteria.find(item => item.id === criterionId), studentId, grades,

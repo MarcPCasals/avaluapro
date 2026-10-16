@@ -120,3 +120,44 @@ export function buildEvaluationActionsPatch(state, { classId, utId, scope = 'spe
     }),
   }
 }
+
+export function getEvaluationActionCopyDestinations(state, classId) {
+  return state.classes.filter(item => item.id !== classId)
+    .map(item => ({ id: item.id, name: item.name, subject: item.subject }))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ca', { numeric: true }))
+}
+
+// A subject catalog belongs to the class, so existing and future UTs reuse it.
+// Copying the catalog must never select actions or alter marks in a destination UT.
+export function buildCopyEvaluationActionsPatch(state, configuration) {
+  const { classId, utId, scope = 'specific', catalog, selections, targets } = configuration
+  if (!Array.isArray(targets) || !targets.length) throw new Error('Selecciona almenys una classe de destí.')
+  const sourcePatch = buildEvaluationActionsPatch(state, { classId, utId, scope, catalog, selections })
+  let classes = sourcePatch.classes
+  const criteria = sourcePatch.criteria
+  const seen = new Set()
+  const report = { classes: 0 }
+  for (const target of targets) {
+    if (target.classId === classId || seen.has(target.classId)) throw new Error('Cada classe de destí ha de ser diferent de la classe d’origen i no es pot repetir.')
+    seen.add(target.classId)
+    const destination = state.classes.find(item => item.id === target.classId)
+    if (!destination) throw new Error('No s’ha trobat una classe de destí.')
+    const merged = { ...getEvaluationActionCatalog(destination, scope) }
+    for (const [key, incoming] of Object.entries(catalog)) {
+      const actions = new Map((merged[key] || []).map(action => [action.id, action]))
+      for (const action of incoming) {
+        const existing = actions.get(action.id)
+        if (existing && existing.description !== action.description) {
+          throw new Error(`${destination.name || 'La classe de destí'}: el codi ${action.id} ja té una descripció diferent. Canvia el codi abans de copiar.`)
+        }
+        actions.set(action.id, { ...action })
+      }
+      merged[key] = [...actions.values()]
+    }
+    classes = classes.map(item => item.id === destination.id ? {
+      ...item, evaluationActionCatalogs: { ...item.evaluationActionCatalogs, [getActionCatalogScope(item.subject, scope)]: merged },
+    } : item)
+    report.classes++
+  }
+  return { patch: { classes, criteria }, report }
+}

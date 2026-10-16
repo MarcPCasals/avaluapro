@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { selectEvaluationCompetencies } from '../src/lib/transversalEvaluation.js'
 import {
-  CFN_ACTION_CATALOG, buildEvaluationActionsPatch, getCriterionActionKey,
+  CFN_ACTION_CATALOG, buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch, getActionCatalogScope, getCriterionActionKey, getEvaluationActionCopyDestinations,
   getEvaluationActionCatalog, getSelectedCriterionActions, parseActionLines,
 } from '../src/lib/evaluationActions.js'
 
@@ -81,4 +82,110 @@ test('les transversals reutilitzades de PI admeten selecció sense contaminar el
   assert.deepEqual(patch.criteria[0].selectedActionIds, ['T1'])
   assert.deepEqual(getEvaluationActionCatalog(patch.classes[0], 'transversal'), catalog)
   assert.equal(getEvaluationActionCatalog(patch.classes[0])['C1/CA1'][0].id, 'C1R1')
+})
+
+test('la selecció d’avaluació respecta les competències desactivades a la UT encara que la fila sigui antiga', () => {
+  const state = fixture()
+  state.uts[0].disabledCompetencyNames = [c1.name]
+  assert.deepEqual(selectEvaluationCompetencies(state, state.classes[0], 'ut1', 'specific'), [])
+  assert.equal(selectEvaluationCompetencies(state, state.classes[0], 'ut2', 'specific').length, 1)
+  const patch = buildEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog: CFN_ACTION_CATALOG, selections: { [ca1.id]: ['C1R1'] } })
+  assert.equal(patch.criteria[0].selectedActionIds, undefined)
+})
+
+function copyFixture() {
+  const state = fixture()
+  state.classes.push({ id: 'parallel', name: 'Classe paral·lela', subject }, { id: 'empty', name: 'Sense UT', subject })
+  state.uts.push({ id: 'parallel-ut1', classId: 'parallel', name: 'UT1', order: 1 }, { id: 'parallel-ut2', classId: 'parallel', name: 'UT2', order: 2 }, { id: 'language-ut', classId: 'language', name: 'UT1' })
+  state.uts[0].order = 1
+  state.competencies.push({ ...c1, id: 'parallel-comp', classId: 'parallel', utId: 'parallel-ut1' }, { ...c1, id: 'parallel-comp2', classId: 'parallel', utId: 'parallel-ut2' })
+  state.criteria.push({ ...ca1, id: 'parallel-ca', competencyId: 'parallel-comp' }, { ...ca1, id: 'parallel-ca2', competencyId: 'parallel-comp2' })
+  return state
+}
+
+test('copiar el catàleg a diverses classes no demana cap UT ni copia les seleccions', () => {
+  const state = copyFixture()
+  const catalog = { ...CFN_ACTION_CATALOG, 'C1/CA1': [...CFN_ACTION_CATALOG['C1/CA1'], { id: 'MANUAL1', description: 'Acció carregada manualment' }] }
+  const { patch, report } = buildCopyEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog,
+    selections: { [ca1.id]: ['MANUAL1'] }, targets: [{ classId: 'parallel' }, { classId: 'language' }, { classId: 'empty' }] })
+  assert.deepEqual(report, { classes: 3 })
+  assert.deepEqual(patch.criteria[0].selectedActionIds, ['MANUAL1'])
+  for (const id of ['parallel', 'language', 'empty']) {
+    const copied = getEvaluationActionCatalog(patch.classes.find(item => item.id === id))
+    assert.equal(copied['C1/CA1'].at(-1).id, 'MANUAL1')
+  }
+  for (const id of ['parallel-ca', 'parallel-ca2']) {
+    assert.equal(patch.criteria.find(item => item.id === id), state.criteria.find(item => item.id === id))
+  }
+  assert.equal(Object.hasOwn(patch, 'marks'), false)
+  assert.equal(state.classes[0].evaluationActionCatalogs, undefined)
+})
+
+test('el catàleg carregat és comú a totes les UT actuals i futures i no s’esborra en desactivar competències', () => {
+  const state = copyFixture()
+  const catalog = { 'C1/CA1': [{ id: 'MANUAL1', description: 'Acció carregada manualment' }] }
+  const { patch } = buildCopyEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog,
+    selections: {}, targets: [{ classId: 'parallel' }] })
+  const next = { ...state, ...patch }
+  next.uts.push({ id: 'future-ut', classId: 'parallel', name: 'UT3' })
+  next.competencies.push({ ...c1, id: 'future-comp', classId: 'parallel', utId: 'future-ut' })
+  next.criteria.push({ ...ca1, id: 'future-ca', competencyId: 'future-comp' })
+  const target = next.classes.find(item => item.id === 'parallel')
+  for (const utId of ['parallel-ut1', 'parallel-ut2', 'future-ut']) {
+    const comp = selectEvaluationCompetencies(next, target, utId, 'specific')[0]
+    assert.equal(getEvaluationActionCatalog(target)[getCriterionActionKey(comp, comp.criteria[0])].at(-1).id, 'MANUAL1')
+  }
+  next.uts.find(item => item.id === 'parallel-ut1').disabledCompetencyNames = [c1.name]
+  assert.deepEqual(selectEvaluationCompetencies(next, target, 'parallel-ut1', 'specific'), [])
+  assert.equal(getEvaluationActionCatalog(target)['C1/CA1'].at(-1).id, 'MANUAL1')
+  next.uts.find(item => item.id === 'parallel-ut1').disabledCompetencyNames = []
+  assert.equal(selectEvaluationCompetencies(next, target, 'parallel-ut1', 'specific').length, 1)
+  assert.equal(getEvaluationActionCatalog(target)['C1/CA1'].at(-1).id, 'MANUAL1')
+})
+
+test('es conserven les seleccions, les notes i les accions pròpies de totes les UT de destí', () => {
+  const state = copyFixture()
+  state.criteria.find(item => item.id === 'parallel-ca').selectedActionIds = ['C1R2']
+  state.marks.push({ id: 'target-mark', studentId: 'other-student', criterionId: 'parallel-ca2', value: 'A' })
+  state.classes.find(item => item.id === 'parallel').evaluationActionCatalogs = { [getActionCatalogScope(subject)]: {
+    'C1/CA1': [...CFN_ACTION_CATALOG['C1/CA1'], { id: 'LOCAL', description: 'Acció pròpia' }],
+  } }
+  const { patch } = buildCopyEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog: CFN_ACTION_CATALOG,
+    selections: { [ca1.id]: ['C1R1'] }, targets: [{ classId: 'parallel' }] })
+  assert.equal(patch.criteria.find(item => item.id === 'parallel-ca'), state.criteria.find(item => item.id === 'parallel-ca'))
+  assert.equal(patch.criteria.find(item => item.id === 'parallel-ca2'), state.criteria.find(item => item.id === 'parallel-ca2'))
+  assert.equal(getEvaluationActionCatalog(patch.classes.find(item => item.id === 'parallel'))['C1/CA1'].at(-1).id, 'LOCAL')
+  assert.equal(Object.hasOwn(patch, 'marks'), false)
+})
+
+test('els catàlegs específics i transversals continuen separats després de copiar', () => {
+  const state = copyFixture()
+  const catalog = { custom: [{ id: 'T1', description: 'Acció transversal' }] }
+  const { patch } = buildCopyEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', scope: 'transversal', catalog,
+    selections: {}, targets: [{ classId: 'empty' }] })
+  const target = patch.classes.find(item => item.id === 'empty')
+  assert.deepEqual(getEvaluationActionCatalog(target, 'transversal'), catalog)
+  assert.equal(getEvaluationActionCatalog(target)['C1/CA1'][0].id, 'C1R1')
+  assert.deepEqual(patch.criteria, state.criteria)
+})
+
+test('es rebutgen destins i codis ambigus sense aplicar canvis parcials', () => {
+  const state = copyFixture()
+  const config = { classId: 'science', utId: 'ut1', catalog: CFN_ACTION_CATALOG, selections: { [ca1.id]: ['C1R1'] }, targets: [{ classId: 'parallel' }] }
+  for (const targets of [[], [{ classId: 'missing' }], [{ classId: 'science' }], [...config.targets, ...config.targets]]) {
+    assert.throws(() => buildCopyEvaluationActionsPatch(state, { ...config, targets }))
+  }
+  state.classes.find(item => item.id === 'language').evaluationActionCatalogs = { [getActionCatalogScope('Català')]: { 'C1/CA1': [{ id: 'C1R1', description: 'Significat diferent' }] } }
+  const snapshot = JSON.stringify(state)
+  assert.throws(() => buildCopyEvaluationActionsPatch(state, { ...config, targets: [...config.targets, { classId: 'language' }] }), /descripció diferent/)
+  assert.equal(JSON.stringify(state), snapshot)
+})
+
+test('els destins inclouen totes les altres classes encara que no tinguin cap UT', () => {
+  const state = copyFixture()
+  const options = getEvaluationActionCopyDestinations(state, 'science')
+  assert.equal(options.length, 3)
+  assert.ok(options.some(item => item.id === 'empty'))
+  assert.equal(options.some(item => item.id === 'science'), false)
+  assert.equal(options.some(item => Object.hasOwn(item, 'uts')), false)
 })

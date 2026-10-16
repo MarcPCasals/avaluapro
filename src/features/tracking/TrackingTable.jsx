@@ -155,7 +155,6 @@ export function TrackingTable({
   onOpenTaskNote = () => {},
   onOpenTaskReminder = () => {},
   onSetTaskStatus = () => {},
-  renderAbsenceControl = () => null,
   rows = [],
   tableWrapRef = null,
   taskRecords = [],
@@ -245,7 +244,6 @@ export function TrackingTable({
                       >
                         <MessageCircle size={17} />
                       </button>
-                      {renderAbsenceControl(student)}
                       <button className="tracking-student-name" onClick={() => onOpenProfile(student.id)} type="button">
                         <strong>{student.name}</strong>
                         <span className="student-list-meta">

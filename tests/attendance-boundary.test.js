@@ -19,13 +19,12 @@ test('el control real d’absència delega la part visual al component compartit
   assert.match(source, /getStudentAbsenceHours/)
 })
 
-test('assistència connecta el mateix control a registres només en memòria', async () => {
+test('assistència conserva el registre d’absències només en memòria', async () => {
   const source = await readProjectFile('assistencia/src/AssistanceApp.jsx')
 
-  assert.match(source, /<AbsenceControl/)
   assert.match(source, /assistanceAdapter\.toggleAbsence/)
   assert.match(source, /dataset\.absenceRecords/)
-  assert.match(source, /renderAbsenceControl=\{renderSyntheticAbsenceControl\}/)
+  assert.doesNotMatch(source, /renderAbsenceControl/)
 })
 
 test('el control visual no coneix botigues ni persistència', async () => {

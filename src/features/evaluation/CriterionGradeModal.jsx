@@ -1,26 +1,17 @@
+import { useDialogSave } from '../../lib/useDialogSave'
+import './ActionDialogs.css'
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { GRADE_OPTIONS, gradeClassName } from '../../lib/grades'
 import { getActionGradeSummary } from '../../lib/actionGrades'
 
 export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onClose, onConfigure }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const { busy, error, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les notes.')
   const [grades, setGrades] = useState(() => Object.fromEntries(actions.map(action => [action.id, mark?.actionGrades?.[action.id] || ''])))
   const summary = getActionGradeSummary(criterion, { actionGrades: grades })
-  const save = async grade => {
-    setBusy(true)
-    setError('')
-    try { await onSave(grade); onClose() }
-    catch (cause) { setError(cause.message || 'No s’ha pogut desar la nota.'); setBusy(false) }
-  }
-  const saveActions = async () => {
-    setBusy(true)
-    setError('')
-    try { await onSaveActions(grades); onClose() }
-    catch (cause) { setError(cause.message || 'No s’han pogut desar les notes de les accions.'); setBusy(false) }
-  }
-  return <Modal title={`${criterion.name} · ${utName || 'UT'}`} onClose={() => !busy && onClose()}>
+  const save = grade => runSave(() => onSave(grade))
+  const saveActions = () => runSave(() => onSaveActions(grades))
+  return <Modal title={`${criterion.name} · ${utName || 'UT'}`} panelClassName="evaluation-actions-dialog" onClose={close}>
     <p><strong>{student.name}</strong><br />{competency.name}</p>
     <section className="criterion-actions-preview">
       <h3>Accions que s’avaluen en aquesta UT</h3>
@@ -48,5 +39,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
         className={gradeClassName(grade)} onClick={() => save(grade)}>{grade || 'Esborrar'}</button>)}
     </div>}
     {error && <p role="alert">{error}</p>}
+    {busy && <p role="status">Desant els canvis… Pots tancar la finestra.</p>}
+    <div className="evaluation-actions-footer"><button className="secondary-action" type="button" onClick={close}>Tancar</button></div>
   </Modal>
 }
