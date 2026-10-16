@@ -14490,7 +14490,7 @@ button.tutorial-record-pill {
 
 .dashboard-scope-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: 8px;
   margin-bottom: 18px;
   border: 1px solid #e5e7eb;
@@ -31522,3 +31522,40 @@ button.profile-followup-card:focus-visible {
 .transversal-scope-trigger.active { color: #6d28d9; border-color: #c4b5fd; background: #f5f3ff; }
 .transversal-view-label { margin: 0 0 12px; color: #6d28d9; font-weight: 800; }
 @media (max-width: 1100px) { .current-ut-tabs { flex-wrap: wrap; } }
+
+/* Criterion actions and the grade consultation dialog. */
+.mark-cell button[data-evaluation-select] {
+  width: 100%; min-height: 44px; border: 0; background: transparent;
+  font: inherit; font-weight: 950; cursor: pointer; border-radius: 7px;
+}
+.mark-cell button[data-evaluation-select]:focus-visible {
+  outline: 2px solid #2563eb; outline-offset: -2px;
+}
+.evaluation-actions-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.action-competency { margin: 24px 0; }
+.action-criterion { padding: 16px; margin: 12px 0; border: 1px solid #ddd6fe; border-radius: 12px; }
+.action-criterion h4 { margin: 0; }
+.action-criterion .section-title-row { flex-wrap: wrap; gap: 8px; }
+.evaluation-action-options { display: grid; gap: 10px; margin: 16px 0; }
+.evaluation-action-options label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.5; }
+.evaluation-action-options input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; accent-color: #7c3aed; }
+.action-importer { border-top: 1px solid #e5e7eb; margin-top: 16px; padding-top: 12px; }
+.action-importer summary { cursor: pointer; color: #6d28d9; font-weight: 700; }
+.action-importer .field-label { margin-top: 12px; }
+.action-importer textarea { width: 100%; min-height: 100px; resize: vertical; }
+.action-importer input[type=file] { max-width: 100%; }
+.evaluation-actions-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.criterion-actions-preview { background: #f5f3ff; border-radius: 12px; padding: 16px; margin: 18px 0; }
+.criterion-actions-preview h3 { margin-top: 0; }
+.criterion-actions-preview ul { padding-left: 22px; }
+.criterion-actions-preview li { margin: 8px 0; line-height: 1.5; }
+.criterion-grade-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.criterion-grade-options button { cursor: pointer; min-height: 44px; padding: 8px 14px; }
+.criterion-grade-options button[aria-pressed=true] { outline: 2px solid #7c3aed; outline-offset: 3px; }
+
+.action-grade-fields { display: grid; gap: 12px; }
+.action-grade-fields label { display: grid; grid-template-columns: minmax(0, 1fr) 110px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #ddd6fe; line-height: 1.5; }
+.action-grade-fields select { min-height: 44px; width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; color: #0f172a; }
+.action-criterion-result { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 14px 0; }
+.action-grade-provisional { display: block; font-size: 10px; font-weight: 600; color: #475569; }
+.action-legacy-notice { color: #475569; font-size: .875rem; }

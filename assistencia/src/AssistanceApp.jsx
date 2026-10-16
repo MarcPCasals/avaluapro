@@ -1,3 +1,4 @@
+import { EvaluationActionsDemo } from './EvaluationActionsDemo.jsx'
 import { TransversalEvaluationDemo } from './TransversalEvaluationDemo.jsx'
 import { createHalfGroupProposal } from '../../src/features/tutoring/halfGroupProposalUtils.js'
 import { StudentGroupGenderControls } from '../../src/features/students/StudentGroupGenderControls.jsx'
@@ -673,7 +674,7 @@ function AssistanceApp() {
           }}
           rows={overviewRows}
           showTutoringColumns={activeClass.isTutoringGroup}
-        />}</> : activeSurface === 'evaluation' ? <>{new URLSearchParams(window.location.search).has('transversal-demo') && <TransversalEvaluationDemo students={evaluationStudents} />}<EvaluationTable
+        />}</> : activeSurface === 'evaluation' && new URLSearchParams(window.location.search).has('actions-demo') ? <EvaluationActionsDemo students={evaluationStudents} /> : activeSurface === 'evaluation' ? <>{new URLSearchParams(window.location.search).has('transversal-demo') && <TransversalEvaluationDemo students={evaluationStudents} />}<EvaluationTable
           activeClassId={activeClassId}
           competencies={dataset.evaluationCompetencies}
           marks={dataset.evaluationMarks}

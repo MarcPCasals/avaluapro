@@ -1,3 +1,4 @@
+import { ActionProgressStats } from './ActionProgressStats'
 import { normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import { getClassUts, getUtCompetencies, getStudentUtGrade, getStudentCompetencyGrade, getLatestStudentLook, getGradeFromAverage } from '../../lib/studentEvaluation'
 import { useEffect, useState } from 'react'
@@ -62,6 +63,11 @@ const dashboardScopes = [
     id: 'evaluation',
     label: 'Avaluació',
     description: 'Notes i evolució.',
+  },
+  {
+    id: 'actions',
+    label: 'Accions',
+    description: 'Evolució de cada acció al llarg del curs.',
   },
   {
     id: 'ut',
@@ -1424,6 +1430,8 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
             </tbody>
           </table>
         </section>
+
+        <ActionProgressStats key={`${student.classId}:${student.id}`} state={state} classId={student.classId} studentId={student.id} />
 
         <div className="student-evolution-charts">
           <section className="student-evolution-card">
@@ -3109,6 +3117,10 @@ export function AnalyticsView() {
           </button>
       </div>
         </>
+      )}
+
+      {dashboardScope === 'actions' && (
+        <ActionProgressStats key={activeClassId} state={state} classId={activeClassId} />
       )}
 
       {dashboardScope === 'evaluation' && (

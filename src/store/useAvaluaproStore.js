@@ -1,3 +1,5 @@
+import { buildActionGradeMark, isActionGradedMark, recalculateActionCriteria } from '../lib/actionGrades'
+import { buildEvaluationActionsPatch } from '../lib/evaluationActions'
 import { buildTransversalStructure } from '../lib/transversalEvaluation'
 import { editHistory, historyValuesEqual } from '../lib/editHistory'
 import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
@@ -474,7 +476,9 @@ function normalizeDataset(dataset) {
     const key = `${mark.studentId}_${criterionId}`
     if (seenCriterionMarks.has(key)) return
     seenCriterionMarks.add(key)
-    marks.push({ id: mark.id, studentId: mark.studentId, criterionId, value: mark.value })
+    marks.push({ id: mark.id, studentId: mark.studentId, criterionId, value: mark.value,
+      ...(mark.actionGrades != null || isActionGradedMark(mark) ? { gradingMode: mark.gradingMode || 'actions', actionGrades: mark.actionGrades || {} } : {}),
+    })
   })
 
   const taskRecords = normalizedDataset.taskRecords.map((record) => {
@@ -488,7 +492,7 @@ function normalizeDataset(dataset) {
     }
   })
 
-  return { ...normalizedDataset, marks, taskRecords }
+  return { ...normalizedDataset, marks: recalculateActionCriteria(marks, normalizedDataset.criteria), taskRecords }
 }
 
 function setUiWithPreferences(set, patch) {
@@ -3078,14 +3082,29 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['classes', 'competencies', 'criteria'], { throwOnError: true })
   },
 
+  updateActionGrades: async (studentId, criterionId, grades) => {
+    const state = get()
+    const criterion = state.criteria.find(item => item.id === criterionId)
+    if (!criterion || !state.students.some(item => item.id === studentId)) throw new Error('No s’ha trobat l’alumne o el criteri.')
+    const existing = state.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
+    const mark = buildActionGradeMark({ existing, criterion, studentId, grades, createId })
+    setWithEditHistory(set, get, current => ({ marks: existing
+      ? current.marks.map(item => item.id === existing.id ? mark : item)
+      : [...current.marks, mark] }))
+    await persistCollections(set, get, ['marks'], { throwOnError: true })
+  },
+
   updateMark: async (studentId, criterionId, value) => {
+    if (get().criteria.find(item => item.id === criterionId)?.selectedActionIds?.length) {
+      throw new Error('Aquest criteri es calcula amb la nota mínima de les accions. Qualifica les accions individualment.')
+    }
     setWithEditHistory(set, get, (state) => {
       const existing = state.marks.find(
         (mark) => mark.studentId === studentId && mark.criterionId === criterionId,
       )
-      const marks = value
+      const marks = value || existing?.actionGrades
         ? existing
-          ? state.marks.map((mark) => (mark.id === existing.id ? { ...mark, value } : mark))
+          ? state.marks.map((mark) => (mark.id === existing.id ? { ...mark, value, ...(mark.actionGrades ? { gradingMode: 'criterion' } : {}) } : mark))
           : [...state.marks, { id: createId('mark'), studentId, criterionId, value }]
         : state.marks.filter((mark) => mark.id !== existing?.id)
       return { marks }
@@ -3095,6 +3114,10 @@ export const useAvaluaproStore = create((set, get) => ({
 
   updateMarksBulk: async (updates) => {
     if (updates.length === 0) return
+    const automaticIds = new Set(get().criteria.filter(item => item.selectedActionIds?.length).map(item => item.id))
+    if (updates.some(update => automaticIds.has(update.criterionId))) {
+      throw new Error('No es poden importar notes de criteri que es calculen a partir de les accions.')
+    }
 
     setWithEditHistory(set, get, (state) => {
       const updateMap = new Map(updates.map((update) => [`${update.studentId}_${update.criterionId}`, update.value]))
@@ -5296,6 +5319,15 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['criteria'])
   },
 
+  saveEvaluationActions: async (configuration) => {
+    const previousMarks = get().marks
+    setWithEditHistory(set, get, (state) => {
+      const patch = buildEvaluationActionsPatch(state, configuration)
+      return { ...patch, marks: recalculateActionCriteria(state.marks, patch.criteria) }
+    })
+    await persistCollections(set, get, ['classes', 'criteria', ...(previousMarks !== get().marks ? ['marks'] : [])], { throwOnError: true })
+  },
+
   updateCriterion: async (criterionId, patch) => {
     setWithEditHistory(set, get, (state) => ({
       criteria: state.criteria.map((criterion) =>
@@ -6274,14 +6306,14 @@ export const useAvaluaproStore = create((set, get) => ({
 // eliminacions definitives i restauracions de compte tenen un altre contracte.
 const reversibleActions = [
   'reorderClass', 'reorderClassToIndex', 'addUt', 'updateUt', 'deleteUt',
-  'addClass', 'updateClass', 'updateMark', 'updateMarksBulk',
+  'addClass', 'updateClass', 'updateMark', 'updateMarksBulk', 'updateActionGrades',
   'toggleCompetencyModification', 'setCompetencyModification', 'updateTutorialMark', 'importTutorialMarks',
   'addTutorialRecord', 'updateTutorialRecord', 'deleteTutorialRecord',
   'upsertTutorialRelation', 'importTutorialRelations', 'deleteTutorialRelation',
   'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
   'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
   'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive', 'setClassTransversalCompetencies',
-  'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
+  'saveEvaluationActions', 'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
   'updateTaskRecord', 'toggleStudentAbsence', 'updateTaskRecordMeta', 'addBehaviorEvent',
   'addAgendaNote', 'updateAgendaNote', 'deleteAgendaNote', 'saveClassroomRecovery', 'cancelClassroomRecovery', 'completeClassroomRecovery',
   'addStudents', 'addStudentsFromText', 'saveClassHalfGroupProposal', 'deleteClassHalfGroupProposal', 'applyClassHalfGroups',

@@ -80,8 +80,8 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
     ignoredRows: 0,
   }))
 
-  const importedValues = useMemo(() => countMatrixValues(matrix), [matrix])
-  const invalidValues = useMemo(() => countMatrixInvalids(matrix), [matrix])
+  const importedValues = useMemo(() => countMatrixValues(matrix.map(row => row.filter((_, index) => !criteria[index].selectedActionIds?.length))), [matrix, criteria])
+  const invalidValues = useMemo(() => countMatrixInvalids(matrix.map(row => row.filter((_, index) => !criteria[index].selectedActionIds?.length))), [matrix, criteria])
   const updates = useMemo(
     () =>
       students.flatMap((student, rowIndex) =>
@@ -89,11 +89,12 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
           .map((criterion, columnIndex) => ({
             studentId: student.id,
             criterionId: criterion.id,
+            automatic: Boolean(criterion.selectedActionIds?.length),
             value: matrix[rowIndex]?.[columnIndex]?.value || '',
             touched: matrix[rowIndex]?.[columnIndex]?.touched,
             invalid: matrix[rowIndex]?.[columnIndex]?.invalid,
           }))
-          .filter((update) => update.touched && !update.invalid),
+          .filter((update) => update.touched && !update.invalid && !update.automatic),
       ),
     [criteria, matrix, students],
   )
@@ -148,6 +149,7 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
           </div>
         </section>
 
+        {criteria.some(criterion => criterion.selectedActionIds?.length) && <p>Els criteris amb accions es calculen automàticament i no s’importen. Qualifica cada acció des de la graella d’avaluació.</p>}
         <div className="excel-import-status">
           <span className="ok">
             <CheckCircle2 size={16} />
@@ -191,8 +193,9 @@ export function ImportExcelModal({ criteria, onClose, onSave, students }) {
                           className={cell.invalid ? 'invalid' : gradeTextClassName(cell.value)}
                           onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)}
                           onPaste={(event) => handleCellPaste(event, rowIndex, columnIndex)}
-                          placeholder="-"
-                          value={cell.raw || cell.value}
+                          readOnly={Boolean(criterion.selectedActionIds?.length)}
+                          placeholder={criterion.selectedActionIds?.length ? 'Per accions' : '-'}
+                          value={criterion.selectedActionIds?.length ? '' : cell.raw || cell.value}
                         />
                       </td>
                     )
