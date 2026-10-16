@@ -1,5 +1,4 @@
 import { getActionGrade } from './actionGrades.js'
-import { getSubjectStructure, transversalStructure } from '../data/subjects.js'
 import { getCriterionActionKey, getEvaluationActionCatalog } from './evaluationActions.js'
 import { getNumericFromGrade } from './grades.js'
 import { getClassUts } from './studentEvaluation.js'
@@ -37,8 +36,6 @@ export function buildActionProgress(state, classId, { studentId, scope = 'specif
     const key = getCriterionActionKey(competency, criterion)
     if (!metadata.has(key)) metadata.set(key, { key, competencyName: competency.name, criterionName: criterion.name })
   }
-  const templates = scope === 'transversal' ? transversalStructure : getSubjectStructure(classItem.subject) || []
-  templates.forEach(comp => comp.criteria.forEach(name => register(comp, { name })))
   uts.forEach(ut => utCompetencies.get(ut.id).forEach(comp => comp.criteria.forEach(criterion => register(comp, criterion))))
   const marks = new Map(state.marks.map(mark => [`${mark.studentId}\u0000${mark.criterionId}`, mark]))
   const rows = [...metadata.values()].flatMap(meta => (catalog[meta.key] || []).map(action => {

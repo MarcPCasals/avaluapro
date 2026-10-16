@@ -37,8 +37,9 @@ export function buildTransversalStructure(state, classId, names, createId) {
 
 export function selectEvaluationCompetencies(state, classItem, utId, scope) {
   const names = getTransversalNames(classItem)
-  return state.competencies.filter(item => item.utId === utId &&
-    (scope === 'transversal' ? names.includes(item.name) : item.kind !== 'transversal' && !item.inactive))
+  const disabledNames = new Set(state.uts?.find(ut => ut.id === utId)?.disabledCompetencyNames || [])
+  return state.competencies.filter(item => item.utId === utId && !item.inactive &&
+    (scope === 'transversal' ? names.includes(item.name) : item.kind !== 'transversal' && !disabledNames.has(item.name)))
     .sort((a, b) => a.order - b.order)
     .map(item => ({ ...item, criteria: state.criteria.filter(criterion => criterion.competencyId === item.id)
       .sort((a, b) => a.order - b.order) }))

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 
-let server, Stats, GradeModal
+let server, Stats, GradeModal, ActionsModal
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()],
     optimizeDeps: { noDiscovery: true, include: [] },
@@ -13,6 +13,7 @@ test.before(async () => {
   })
   Stats = (await server.ssrLoadModule('/src/features/analytics/ActionProgressStats.jsx')).ActionProgressStats
   GradeModal = (await server.ssrLoadModule('/src/features/evaluation/CriterionGradeModal.jsx')).CriterionGradeModal
+  ActionsModal = (await server.ssrLoadModule('/src/features/evaluation/EvaluationActionsModal.jsx')).EvaluationActionsModal
 })
 test.after(async () => { await server?.close() })
 
@@ -61,4 +62,24 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
   assert.match(html, /3\/3 accions qualificades/)
   assert.doesNotMatch(html, /Nota provisional/)
   assert.match(html, /Desar notes de les accions/)
+})
+
+
+test('la finestra d’accions només mostra les competències actives i sempre ofereix Tancar', () => {
+  const state = fixture()
+  const active = { ...state.competencies[0], criteria: state.criteria }
+  const inactive = { id: 'inactive-comp', name: 'C2: Indagació', inactive: true, criteria: [] }
+  const html = renderToStaticMarkup(createElement(ActionsModal, {
+    competencies: [active, inactive], catalog: {}, utName: 'UT1', onClose() {}, onSave() {},
+  }))
+  assert.match(html, /C1: Modelització/)
+  assert.doesNotMatch(html, /C2: Indagació/)
+  assert.match(html, /aria-label="Tancar"/)
+  assert.match(html, /class="secondary-action" type="button">Tancar<\/button>/)
+})
+
+test('les estadístiques no mostren les competències inactives del catàleg general', () => {
+  const html = renderToStaticMarkup(createElement(Stats, { state: fixture(), classId: 'synthetic-class' }))
+  assert.match(html, /C1R1/)
+  assert.doesNotMatch(html, /C2P1|C3S1|C2: Indagació|C3: Argumentació/)
 })

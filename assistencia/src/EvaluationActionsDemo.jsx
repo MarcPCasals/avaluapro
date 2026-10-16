@@ -1,3 +1,4 @@
+import { selectEvaluationCompetencies } from '../../src/lib/transversalEvaluation'
 import { buildActionGradeMark, recalculateActionCriteria } from '../../src/lib/actionGrades'
 import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
 import { useState } from 'react'
@@ -25,9 +26,7 @@ export function EvaluationActionsDemo({ students }) {
   const [open, setOpen] = useState(false)
   const utId = `${classId}-ut-${utNumber}`
   const classItem = state.classes.find(item => item.id === classId)
-  const competencies = state.competencies.filter(comp => comp.utId === utId).map(comp => ({ ...comp,
-    criteria: state.criteria.filter(criterion => criterion.competencyId === comp.id),
-  }))
+  const competencies = selectEvaluationCompetencies(state, classItem, utId, 'specific')
   const catalog = getEvaluationActionCatalog(classItem)
   const progressState = { ...state, students: students.slice(0, 4).map(student => ({ ...student, classId })) }
   return <section>
@@ -36,6 +35,14 @@ export function EvaluationActionsDemo({ students }) {
       <label>UT <select value={utNumber} onChange={event => setUtNumber(Number(event.target.value))}><option value={1}>UT1</option><option value={2}>UT2</option></select></label>
       <button type="button" className="tool-button" onClick={() => setOpen(true)}>Accions de la UT</button>
     </div>
+    <fieldset className="evaluation-actions-fields"><legend>Competències actives de la UT fictícia</legend>
+      {state.competencies.filter(comp => comp.utId === utId).map(comp => <label key={comp.id} style={{ display: 'block', margin: '8px 0' }}>
+        <input type="checkbox" checked={!comp.inactive} onChange={event => {
+          const active = event.target.checked
+          setState(current => ({ ...current, competencies: current.competencies.map(item => item.id === comp.id ? { ...item, inactive: !active } : item) }))
+        }} /> {comp.name}
+      </label>)}
+    </fieldset>
     {open && <EvaluationActionsModal key={utId} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
       onClose={() => setOpen(false)} onSave={configuration => setState(current => {
         const patch = buildEvaluationActionsPatch(current, { classId, utId, ...configuration })

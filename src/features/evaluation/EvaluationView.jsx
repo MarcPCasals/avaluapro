@@ -29,6 +29,7 @@ function useEvaluationModel() {
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
+  const allUts = useAvaluaproStore((state) => state.uts)
   const allCompetencies = useAvaluaproStore((state) => state.competencies)
   const allCriteria = useAvaluaproStore((state) => state.criteria)
   const marks = useAvaluaproStore((state) => state.marks)
@@ -42,11 +43,11 @@ function useEvaluationModel() {
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'ca', { numeric: true }))
     const competencies = selectEvaluationCompetencies(
-      { competencies: allCompetencies, criteria: allCriteria }, activeClass, activeUtId, scope,
+      { competencies: allCompetencies, criteria: allCriteria, uts: allUts }, activeClass, activeUtId, scope,
     )
 
     return { students, competencies, marks, agendaNotes }
-  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allCompetencies, allCriteria, marks, agendaNotes])
+  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allUts, allCompetencies, allCriteria, marks, agendaNotes])
 }
 
 function getCriterionMark(marks, studentId, criterionId) {

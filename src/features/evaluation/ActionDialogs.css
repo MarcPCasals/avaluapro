@@ -1,0 +1,21 @@
+.evaluation-actions-dialog > .modal-header {
+  flex: 0 0 auto;
+  gap: 12px;
+}
+.evaluation-actions-dialog .modal-close {
+  flex: 0 0 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.evaluation-actions-dialog > .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+.evaluation-actions-dialog .evaluation-actions-footer {
+  position: sticky;
+  bottom: -18px;
+  padding: 12px 0;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+  z-index: 1;
+}
