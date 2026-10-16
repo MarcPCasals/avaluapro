@@ -43,12 +43,12 @@ export function EvaluationActionsDemo({ students }) {
         }} /> {comp.name}
       </label>)}
     </fieldset>
-    {open && <EvaluationActionsModal key={utId} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
+    {open && <EvaluationActionsModal key={`actions:${utId}`} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
       onClose={() => setOpen(false)} onSave={configuration => setState(current => {
         const patch = buildEvaluationActionsPatch(current, { classId, utId, ...configuration })
         return { ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }
       })} />}
-    <EvaluationTable key={utId} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
+    <EvaluationTable key={`table:${utId}`} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
       onUpdateActionGrades={(studentId, criterionId, grades) => setState(current => {
         const existing = current.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
         const mark = buildActionGradeMark({ existing, criterion: current.criteria.find(item => item.id === criterionId), studentId, grades,
