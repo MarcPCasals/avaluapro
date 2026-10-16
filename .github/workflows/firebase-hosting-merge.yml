@@ -32,7 +32,7 @@ jobs:
 
       - name: Check assessment and action statistics
         run: >-
-          node --test tests/dialog-save.test.js tests/action-grades.test.js
+          node --test tests/dialog-save.test.js tests/action-grades.test.js tests/action-grade-autosave.test.js
           tests/action-progress.test.js tests/action-progress-render.test.js
           tests/evaluation-actions.test.js tests/evaluation-boundary.test.js
           tests/analytics-boundary.test.js tests/edit-history-store.test.js
