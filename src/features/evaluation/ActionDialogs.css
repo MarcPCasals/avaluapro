@@ -33,6 +33,4 @@
 .action-copy-option input { flex: 0 0 18px; width: 18px; height: 18px; margin: 2px 0 0; }
 .action-copy-option span { display: grid; gap: 3px; }
 .action-copy-option small { color: #64748b; }
-.action-copy-destination .field-label { display: grid; gap: 6px; margin-top: 10px; }
-.action-copy-destination select { padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
 .action-copy-notice { padding: 12px; border-radius: 8px; background: #ecfdf5; color: #166534; }

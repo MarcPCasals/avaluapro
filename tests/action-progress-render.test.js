@@ -83,3 +83,15 @@ test('les estadístiques no mostren les competències inactives del catàleg gen
   assert.match(html, /C1R1/)
   assert.doesNotMatch(html, /C2P1|C3S1|C2: Indagació|C3: Argumentació/)
 })
+
+test('la còpia ofereix el catàleg per a totes les UT i només demana classes de destí', () => {
+  const state = fixture()
+  const html = renderToStaticMarkup(createElement(ActionsModal, {
+    competencies: [{ ...state.competencies[0], criteria: state.criteria }], catalog: {}, utName: 'UT1', onClose() {}, onSave() {}, onCopy() {},
+    copyDestinations: [{ id: 'other-class', name: 'Classe sense UT', subject: 'Ciències' }],
+  }))
+  assert.match(html, /Les accions pertanyen al catàleg de l’assignatura i estan disponibles a totes les UT/)
+  assert.match(html, /també a les que creïs més endavant/)
+  assert.match(html, /Classe sense UT/)
+  assert.doesNotMatch(html, /UT de destí|Copiar també les accions seleccionades|<select/)
+})

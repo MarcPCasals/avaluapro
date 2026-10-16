@@ -15,7 +15,7 @@ function ActionImporter({ onImport }) {
       onImport(actions)
       setText('')
       setError('')
-      setNotice(`${actions.length} accions carregades. Selecciona les que avaluaràs.`)
+      setNotice(`${actions.length} accions afegides al catàleg de l’assignatura. En desar, estaran disponibles a totes les UT.`)
     } catch (cause) { setError(cause.message) }
   }
   return <details className="action-importer">
@@ -42,35 +42,21 @@ function ActionImporter({ onImport }) {
 
 function ActionCopyControls({ destinations, busy, onCopy }) {
   const [selectedClasses, setSelectedClasses] = useState([])
-  const [copySelections, setCopySelections] = useState(true)
-  const [targetUts, setTargetUts] = useState(() => Object.fromEntries(destinations.map(item => [item.id, item.suggestedUtId])))
   const targets = destinations.filter(item => selectedClasses.includes(item.id))
-  const invalid = copySelections && targets.some(item => !item.uts.some(ut => ut.id === targetUts[item.id]))
   return <details className="action-copy-panel">
     <summary>Copiar accions a altres classes</summary>
-    <p>Tria les classes de destí. Es desarà també la configuració d’aquesta UT. Les notes no es copien i es conserven les seleccions i les notes que ja tinguin les classes de destí.</p>
+    <p>Tria les classes on vols afegir tot el catàleg de l’assignatura. Les accions estaran disponibles a totes les seves UT, també a les que creïs més endavant. A cada UT escolliràs quines avalues.</p>
+    <p>Es desaran els canvis d’aquesta finestra. Les seleccions i les notes de les classes de destí es conserven.</p>
     <fieldset className="evaluation-actions-fields" disabled={busy}>
-      <label className="action-copy-option"><input type="checkbox" checked={copySelections} onChange={event => setCopySelections(event.target.checked)} />Copiar també les accions seleccionades a una UT</label>
-      <p>{copySelections ? 'La selecció es copia als criteris actius que coincideixen i encara no tenen selecció ni notes.' : 'Es copiarà només el catàleg, disponible per seleccionar accions a qualsevol UT de la classe.'}</p>
       {destinations.length === 0 && <p>Encara no hi ha altres classes on copiar les accions.</p>}
       <div className="action-copy-destinations">{destinations.map(item => <div className="action-copy-destination" key={item.id}>
         <label className="action-copy-option"><input type="checkbox" checked={selectedClasses.includes(item.id)} onChange={event => {
           const checked = event.target.checked
           setSelectedClasses(current => checked ? [...current, item.id] : current.filter(id => id !== item.id))
         }} /><span><strong>{item.name}</strong>{item.subject && <small>{item.subject}</small>}</span></label>
-        {copySelections && selectedClasses.includes(item.id) && <label className="field-label">UT de destí de {item.name}
-          <select value={targetUts[item.id] || ''} onChange={event => {
-            const value = event.target.value
-            setTargetUts(current => ({ ...current, [item.id]: value }))
-          }}>
-            {!item.uts.length && <option value="">Sense UT disponible</option>}
-            {item.uts.map(ut => <option key={ut.id} value={ut.id}>{ut.name}</option>)}
-          </select>
-        </label>}
       </div>)}</div>
-      {invalid && <p>Les classes sense UT poden rebre el catàleg: desmarca l’opció de copiar la selecció.</p>}
-      <button className="secondary-action" type="button" disabled={!targets.length || invalid} onClick={() => onCopy({
-        copySelections, targets: targets.map(item => ({ classId: item.id, utId: targetUts[item.id] })),
+      <button className="secondary-action" type="button" disabled={!targets.length} onClick={() => onCopy({
+        targets: targets.map(item => ({ classId: item.id })),
       })}>{busy ? 'Copiant…' : `Copiar a ${targets.length} ${targets.length === 1 ? 'classe' : 'classes'}`}</button>
     </fieldset>
   </details>
@@ -87,10 +73,10 @@ export function EvaluationActionsModal({ competencies, catalog: initialCatalog, 
   const save = () => runSave(() => onSave({ catalog, selections }))
   const copy = options => runSave(() => onCopy({ catalog, selections, ...options }), {
     closeOnSuccess: false,
-    successMessage: report => `Accions copiades a ${report.classes} ${report.classes === 1 ? 'classe' : 'classes'}. ${report.copiedCriteria} seleccions copiades; ${report.preservedCriteria} criteris amb selecció o notes conservats.${report.unmatchedCriteria ? ` ${report.unmatchedCriteria} criteris d’origen no coincideixen amb criteris actius de destí; el catàleg sí que s’ha copiat.` : ''}`,
+    successMessage: report => `Catàleg copiat a ${report.classes} ${report.classes === 1 ? 'classe' : 'classes'}. Les accions ja estan disponibles a totes les seves UT. Les seleccions i les notes existents es conserven.`,
   })
   return <Modal title={`Accions que s’avaluen · ${utName || 'UT'}`} size="lg" panelClassName="evaluation-actions-dialog" onClose={close}>
-    <p>Marca només les accions que avaluaràs en aquesta UT. El catàleg es pot reutilitzar a les altres UT del grup; cada UT conserva la seva selecció.</p>
+    <p>Les accions pertanyen al catàleg de l’assignatura i estan disponibles a totes les UT. Aquí només es mostren les competències actives; selecciona les accions que avaluaràs en aquesta UT.</p>
     {onCopy && <ActionCopyControls destinations={copyDestinations} busy={busy} onCopy={copy} />}
     {notice && <p className="action-copy-notice" role="status">{notice}</p>}
     {activeCompetencies.length === 0 && <p>Activa primer les competències d’aquesta UT.</p>}
