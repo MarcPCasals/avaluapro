@@ -1,5 +1,5 @@
 import { buildActionGradeMark, isActionGradedMark, recalculateActionCriteria } from '../lib/actionGrades'
-import { buildEvaluationActionsPatch } from '../lib/evaluationActions'
+import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch } from '../lib/evaluationActions'
 import { buildTransversalStructure } from '../lib/transversalEvaluation'
 import { editHistory, historyValuesEqual } from '../lib/editHistory'
 import { createHalfGroupProposal } from '../features/tutoring/halfGroupProposalUtils.js'
@@ -5328,6 +5328,14 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['classes', 'criteria', ...(previousMarks !== get().marks ? ['marks'] : [])], { throwOnError: true })
   },
 
+  copyEvaluationActions: async (configuration) => {
+    const previousMarks = get().marks
+    const { patch, report } = buildCopyEvaluationActionsPatch(get(), configuration)
+    setWithEditHistory(set, get, (state) => ({ ...patch, marks: recalculateActionCriteria(state.marks, patch.criteria) }))
+    await persistCollections(set, get, ['classes', 'criteria', ...(previousMarks !== get().marks ? ['marks'] : [])], { throwOnError: true })
+    return report
+  },
+
   updateCriterion: async (criterionId, patch) => {
     setWithEditHistory(set, get, (state) => ({
       criteria: state.criteria.map((criterion) =>
@@ -6313,7 +6321,7 @@ const reversibleActions = [
   'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
   'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
   'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive', 'setClassTransversalCompetencies',
-  'saveEvaluationActions', 'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
+  'saveEvaluationActions', 'copyEvaluationActions', 'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',
   'updateTaskRecord', 'toggleStudentAbsence', 'updateTaskRecordMeta', 'addBehaviorEvent',
   'addAgendaNote', 'updateAgendaNote', 'deleteAgendaNote', 'saveClassroomRecovery', 'cancelClassroomRecovery', 'completeClassroomRecovery',
   'addStudents', 'addStudentsFromText', 'saveClassHalfGroupProposal', 'deleteClassHalfGroupProposal', 'applyClassHalfGroups',

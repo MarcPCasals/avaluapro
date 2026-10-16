@@ -19,3 +19,20 @@
   background: #fff;
   z-index: 1;
 }
+.action-copy-panel {
+  padding: 14px;
+  margin: 16px 0;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  background: #faf5ff;
+}
+.action-copy-panel summary { color: #6d28d9; font-weight: 750; cursor: pointer; }
+.action-copy-destinations { display: grid; gap: 10px; margin: 14px 0; }
+.action-copy-destination { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+.action-copy-option { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.action-copy-option input { flex: 0 0 18px; width: 18px; height: 18px; margin: 2px 0 0; }
+.action-copy-option span { display: grid; gap: 3px; }
+.action-copy-option small { color: #64748b; }
+.action-copy-destination .field-label { display: grid; gap: 6px; margin-top: 10px; }
+.action-copy-destination select { padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+.action-copy-notice { padding: 12px; border-radius: 8px; background: #ecfdf5; color: #166534; }

@@ -9,13 +9,16 @@ export function createDialogSaveLifecycle({ onClose, onState, errorMessage }) {
     closed = true
     handleClose()
   }
-  const save = async action => {
+  const save = async (action, { closeOnSuccess = true, successMessage } = {}) => {
     if (closed || pending) return
     pending = true
     onState({ busy: true, error: '' })
     try {
-      await action()
-      if (!closed) close()
+      const result = await action()
+      if (!closed) {
+        if (closeOnSuccess) close()
+        else onState({ busy: false, error: '', notice: successMessage?.(result) || '' })
+      }
     } catch (cause) {
       if (!closed) onState({ busy: false, error: cause?.message || errorMessage })
     } finally { pending = false }

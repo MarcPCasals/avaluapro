@@ -56,3 +56,23 @@ test('un doble clic no duplica el desat i desmuntar evita qualsevol tancament ta
   await saving
   assert.equal(state.closed, 0)
 })
+
+test('copiar pot mostrar el resultat i continuar amb la finestra oberta', async () => {
+  const state = fixture()
+  await state.lifecycle.save(async () => ({ classes: 2 }), { closeOnSuccess: false, successMessage: report => `Copiat a ${report.classes} classes` })
+  assert.equal(state.closed, 0)
+  assert.deepEqual(state.states.at(-1), { busy: false, error: '', notice: 'Copiat a 2 classes' })
+  state.lifecycle.close()
+  assert.equal(state.closed, 1)
+})
+
+test('tancar mentre es copia impedeix mostrar un resultat tardà', async () => {
+  const state = fixture()
+  let complete
+  const saving = state.lifecycle.save(() => new Promise(resolve => { complete = resolve }), { closeOnSuccess: false, successMessage: () => 'Copiat' })
+  state.lifecycle.close()
+  complete()
+  await saving
+  assert.equal(state.states.length, 1)
+  assert.equal(state.closed, 1)
+})

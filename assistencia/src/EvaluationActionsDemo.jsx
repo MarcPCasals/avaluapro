@@ -3,13 +3,13 @@ import { buildActionGradeMark, recalculateActionCriteria } from '../../src/lib/a
 import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
 import { useState } from 'react'
 import { getSubjectStructure } from '../../src/data/subjects'
-import { buildEvaluationActionsPatch, getEvaluationActionCatalog } from '../../src/lib/evaluationActions'
+import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch, getEvaluationActionCatalog, getEvaluationActionCopyDestinations } from '../../src/lib/evaluationActions'
 import { EvaluationActionsModal } from '../../src/features/evaluation/EvaluationActionsModal'
 import { EvaluationTable } from '../../src/features/evaluation/EvaluationTable'
 
-const subjects = ['Ciències Físiques i de la Natura', 'Català']
+const subjects = ['Ciències Físiques i de la Natura', 'Català', 'Ciències Físiques i de la Natura']
 function initialState() {
-  const classes = subjects.map((subject, index) => ({ id: `action-class-${index}`, subject }))
+  const classes = subjects.map((subject, index) => ({ id: `action-class-${index}`, name: `Classe fictícia ${index + 1}`, subject }))
   const uts = classes.flatMap(item => [1, 2].map(n => ({ id: `${item.id}-ut-${n}`, classId: item.id, name: `UT${n}`, order: n })))
   const competencies = uts.flatMap(ut => getSubjectStructure(classes.find(item => item.id === ut.classId).subject).map((comp, index) => ({
     ...comp, id: `${ut.id}-c${index}`, classId: ut.classId, utId: ut.id,
@@ -31,7 +31,7 @@ export function EvaluationActionsDemo({ students }) {
   const progressState = { ...state, students: students.slice(0, 4).map(student => ({ ...student, classId })) }
   return <section>
     <div className="toolbar">
-      <label>Matèria <select value={classId} onChange={event => setClassId(event.target.value)}>{state.classes.map(item => <option key={item.id} value={item.id}>{item.subject}</option>)}</select></label>
+      <label>Matèria <select value={classId} onChange={event => setClassId(event.target.value)}>{state.classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.subject}</option>)}</select></label>
       <label>UT <select value={utNumber} onChange={event => setUtNumber(Number(event.target.value))}><option value={1}>UT1</option><option value={2}>UT2</option></select></label>
       <button type="button" className="tool-button" onClick={() => setOpen(true)}>Accions de la UT</button>
     </div>
@@ -44,6 +44,12 @@ export function EvaluationActionsDemo({ students }) {
       </label>)}
     </fieldset>
     {open && <EvaluationActionsModal key={`actions:${utId}`} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
+      copyDestinations={getEvaluationActionCopyDestinations(state, classId, utId)}
+      onCopy={configuration => {
+        const { patch, report } = buildCopyEvaluationActionsPatch(state, { ...configuration, classId, utId })
+        setState(current => ({ ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }))
+        return report
+      }}
       onClose={() => setOpen(false)} onSave={configuration => setState(current => {
         const patch = buildEvaluationActionsPatch(current, { classId, utId, ...configuration })
         return { ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }
