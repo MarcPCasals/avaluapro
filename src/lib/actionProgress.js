@@ -1,3 +1,4 @@
+import { getActionGrade } from './actionGrades.js'
 import { getSubjectStructure, transversalStructure } from '../data/subjects.js'
 import { getCriterionActionKey, getEvaluationActionCatalog } from './evaluationActions.js'
 import { getNumericFromGrade } from './grades.js'
@@ -39,15 +40,14 @@ export function buildActionProgress(state, classId, { studentId, scope = 'specif
   const templates = scope === 'transversal' ? transversalStructure : getSubjectStructure(classItem.subject) || []
   templates.forEach(comp => comp.criteria.forEach(name => register(comp, { name })))
   uts.forEach(ut => utCompetencies.get(ut.id).forEach(comp => comp.criteria.forEach(criterion => register(comp, criterion))))
-  const marks = new Map(state.marks.filter(mark => levels.includes(mark.value))
-    .map(mark => [`${mark.studentId}\u0000${mark.criterionId}`, mark.value]))
+  const marks = new Map(state.marks.map(mark => [`${mark.studentId}\u0000${mark.criterionId}`, mark]))
   const rows = [...metadata.values()].flatMap(meta => (catalog[meta.key] || []).map(action => {
     const cells = uts.map(ut => {
       const criterion = utCompetencies.get(ut.id).flatMap(comp => comp.criteria.map(item => ({ comp, item })))
         .find(({ comp, item }) => getCriterionActionKey(comp, item) === meta.key)?.item
       const selected = Boolean(criterion?.selectedActionIds?.includes(action.id))
       const grades = selected ? students.flatMap(student => {
-        const grade = marks.get(`${student.id}\u0000${criterion.id}`)
+        const grade = getActionGrade(marks.get(`${student.id}\u0000${criterion.id}`), action.id)
         return grade ? [{ studentId: student.id, name: student.name, grade }] : []
       }) : []
       const distribution = Object.fromEntries(levels.map(level => [level, grades.filter(item => item.grade === level).length]))

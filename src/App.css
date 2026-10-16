@@ -31552,3 +31552,10 @@ button.profile-followup-card:focus-visible {
 .criterion-grade-options { display: flex; flex-wrap: wrap; gap: 10px; }
 .criterion-grade-options button { cursor: pointer; min-height: 44px; padding: 8px 14px; }
 .criterion-grade-options button[aria-pressed=true] { outline: 2px solid #7c3aed; outline-offset: 3px; }
+
+.action-grade-fields { display: grid; gap: 12px; }
+.action-grade-fields label { display: grid; grid-template-columns: minmax(0, 1fr) 110px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #ddd6fe; line-height: 1.5; }
+.action-grade-fields select { min-height: 44px; width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; color: #0f172a; }
+.action-criterion-result { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 14px 0; }
+.action-grade-provisional { display: block; font-size: 10px; font-weight: 600; color: #475569; }
+.action-legacy-notice { color: #475569; font-size: .875rem; }

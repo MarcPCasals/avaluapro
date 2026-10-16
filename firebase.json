@@ -21,6 +21,7 @@
     }
   },
   "hosting": {
+    "site": "avaluapro",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "predeploy": ["npm run build:firebase"],

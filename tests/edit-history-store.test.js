@@ -132,3 +132,38 @@ test('crear una versió conserva l’anterior i només canvia l’activa si es d
   const byId = rows => [...rows].sort((a, b) => a.id.localeCompare(b.id))
   assert.deepEqual(byId((await db.loadDataset()).tutorialSeatingPlans), byId(store.getState().tutorialSeatingPlans))
 })
+
+test('les notes pròpies de les accions persisteixen, es desfan i calculen el mínim després de restaurar', async () => {
+  const { EMPTY_DATASET } = await server.ssrLoadModule('/src/data/seedData.js')
+  const { CFN_ACTION_CATALOG } = await server.ssrLoadModule('/src/lib/evaluationActions.js')
+  store.setState({ ...EMPTY_DATASET,
+    classes: [{ id: 'action-class', name: 'Classe fictícia', subject: 'Ciències Físiques i de la Natura', utModelReady: true }],
+    students: [{ id: 'action-student', classId: 'action-class', name: 'Alumne fictici' }],
+    semesters: [{ id: 'action-sem', classId: 'action-class', name: 'S1', order: 1 }],
+    uts: [{ id: 'action-ut', classId: 'action-class', semesterId: 'action-sem', name: 'UT1', order: 1 }],
+    competencies: [{ id: 'action-comp', classId: 'action-class', utId: 'action-ut', name: 'C1: Modelització', order: 1 }],
+    criteria: [{ id: 'action-ca', competencyId: 'action-comp', name: 'CA1: Rigor', selectedActionIds: ['C1R1', 'C1R2', 'C1R3'] }],
+    cloud: { ...store.getState().cloud, user: null },
+  })
+  preferences.set('avaluapro:edit-history-budget:v1', '[]')
+  history.clear()
+  await store.getState().updateActionGrades('action-student', 'action-ca', { C1R1: 'A', C1R2: 'A', C1R3: 'C' })
+  assert.equal(store.getState().marks[0].value, 'C')
+  assert.equal((await db.loadDataset()).marks[0].actionGrades.C1R1, 'A')
+  await history.undo()
+  assert.equal(store.getState().marks.length, 0)
+  await history.redo()
+  assert.equal(store.getState().marks[0].value, 'C')
+  await assert.rejects(store.getState().updateMark('action-student', 'action-ca', 'A'), /nota mínima/)
+  await assert.rejects(store.getState().updateMarksBulk([{ studentId: 'action-student', criterionId: 'action-ca', value: 'A' }]), /a partir de les accions/)
+  await store.getState().saveEvaluationActions({ classId: 'action-class', utId: 'action-ut', catalog: CFN_ACTION_CATALOG, selections: { 'action-ca': ['C1R1', 'C1R2'] } })
+  assert.equal(store.getState().marks[0].value, 'A')
+  assert.equal((await db.loadDataset()).marks[0].actionGrades.C1R3, 'C')
+  await history.undo()
+  assert.equal(store.getState().marks[0].value, 'C')
+  const syntheticBackup = await db.loadDataset()
+  syntheticBackup.marks[0].value = 'A'
+  await store.getState().restoreBackup({ collections: syntheticBackup })
+  assert.equal(store.getState().marks[0].value, 'C')
+  assert.deepEqual(store.getState().marks[0].actionGrades, { C1R1: 'A', C1R2: 'A', C1R3: 'C' })
+})

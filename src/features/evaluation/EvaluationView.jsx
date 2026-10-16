@@ -98,6 +98,7 @@ export function EvaluationView() {
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
   const activeUt = useAvaluaproStore((state) => state.uts.find((ut) => ut.id === state.ui.activeUtId))
+  const updateActionGrades = useAvaluaproStore((state) => state.updateActionGrades)
   const updateMark = useAvaluaproStore((state) => state.updateMark)
   const updateMarksBulk = useAvaluaproStore((state) => state.updateMarksBulk)
   const toggleCompetencyModification = useAvaluaproStore((state) => state.toggleCompetencyModification)
@@ -372,6 +373,7 @@ export function EvaluationView() {
         onOpenRubric={setRubricCriterionId}
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
+        onUpdateActionGrades={updateActionGrades}
         renderAbsenceControl={(student) => (
           <AbsenceToggle classId={activeClassId} studentId={student.id} />
         )}

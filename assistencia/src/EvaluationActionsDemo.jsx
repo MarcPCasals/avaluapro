@@ -1,3 +1,4 @@
+import { buildActionGradeMark, recalculateActionCriteria } from '../../src/lib/actionGrades'
 import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
 import { useState } from 'react'
 import { getSubjectStructure } from '../../src/data/subjects'
@@ -36,10 +37,17 @@ export function EvaluationActionsDemo({ students }) {
       <button type="button" className="tool-button" onClick={() => setOpen(true)}>Accions de la UT</button>
     </div>
     {open && <EvaluationActionsModal key={utId} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
-      onClose={() => setOpen(false)} onSave={configuration => setState(current => ({ ...current,
-        ...buildEvaluationActionsPatch(current, { classId, utId, ...configuration }),
-      }))} />}
+      onClose={() => setOpen(false)} onSave={configuration => setState(current => {
+        const patch = buildEvaluationActionsPatch(current, { classId, utId, ...configuration })
+        return { ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }
+      })} />}
     <EvaluationTable key={utId} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
+      onUpdateActionGrades={(studentId, criterionId, grades) => setState(current => {
+        const existing = current.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
+        const mark = buildActionGradeMark({ existing, criterion: current.criteria.find(item => item.id === criterionId), studentId, grades,
+          createId: () => `synthetic-mark-${studentId}-${criterionId}` })
+        return { ...current, marks: existing ? current.marks.map(item => item.id === existing.id ? mark : item) : [...current.marks, mark] }
+      })}
       marks={state.marks} actionCatalog={catalog} utName={`UT${utNumber}`} onConfigureActions={() => setOpen(true)}
       onUpdateMark={(studentId, criterionId, value) => setState(current => ({ ...current,
         marks: [...current.marks.filter(mark => mark.studentId !== studentId || mark.criterionId !== criterionId), { studentId, criterionId, value }],
