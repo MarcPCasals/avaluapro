@@ -67,10 +67,10 @@ test('copiar accions persisteix totes les classes com una operació reversible i
   const original = store.getState().marks
   await db.saveCollections(store.getState(), ['classes', 'uts', 'competencies', 'criteria', 'marks'])
   const result = await store.getState().copyEvaluationActions({ classId: 'source', utId: 'source-ut', catalog: CFN_ACTION_CATALOG,
-    selections: { 'source-ca': ['C1R1', 'C1R3'] }, targets: [{ classId: 'target', utId: 'target-ut' }, { classId: 'graded', utId: 'graded-ut' }] })
-  assert.deepEqual(result, { classes: 2, copiedCriteria: 1, preservedCriteria: 1, unmatchedCriteria: 0 })
+    selections: { 'source-ca': ['C1R1', 'C1R3'] }, targets: [{ classId: 'target' }, { classId: 'graded' }] })
+  assert.deepEqual(result, { classes: 2 })
   const saved = await db.loadDataset()
-  assert.deepEqual(saved.criteria.find(item => item.id === 'target-ca').selectedActionIds, ['C1R1', 'C1R3'])
+  assert.equal(saved.criteria.find(item => item.id === 'target-ca').selectedActionIds, undefined)
   assert.equal(saved.criteria.find(item => item.id === 'graded-ca').selectedActionIds, undefined)
   assert.deepEqual(saved.marks, original)
   assert.equal(Object.keys(getEvaluationActionCatalog(saved.classes.find(item => item.id === 'target'))).length, 6)
@@ -79,7 +79,8 @@ test('copiar accions persisteix totes les classes com una operació reversible i
   assert.equal(store.getState().classes.find(item => item.id === 'target').evaluationActionCatalogs, undefined)
   assert.deepEqual(store.getState().marks, original)
   assert.equal(await history.redo(), true)
-  assert.deepEqual((await db.loadDataset()).criteria.find(item => item.id === 'target-ca').selectedActionIds, ['C1R1', 'C1R3'])
+  assert.equal((await db.loadDataset()).criteria.find(item => item.id === 'target-ca').selectedActionIds, undefined)
+  assert.equal(Object.keys(getEvaluationActionCatalog((await db.loadDataset()).classes.find(item => item.id === 'target'))).length, 6)
   store.setState({ classes: [], uts: [], competencies: [], criteria: [], marks: [] })
   history.clear()
 })

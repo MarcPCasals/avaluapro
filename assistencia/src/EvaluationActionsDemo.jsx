@@ -44,7 +44,7 @@ export function EvaluationActionsDemo({ students }) {
       </label>)}
     </fieldset>
     {open && <EvaluationActionsModal key={`actions:${utId}`} competencies={competencies} catalog={catalog} utName={`UT${utNumber}`}
-      copyDestinations={getEvaluationActionCopyDestinations(state, classId, utId)}
+      copyDestinations={getEvaluationActionCopyDestinations(state, classId)}
       onCopy={configuration => {
         const { patch, report } = buildCopyEvaluationActionsPatch(state, { ...configuration, classId, utId })
         setState(current => ({ ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }))

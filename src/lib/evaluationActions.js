@@ -121,39 +121,27 @@ export function buildEvaluationActionsPatch(state, { classId, utId, scope = 'spe
   }
 }
 
-export function getEvaluationActionCopyDestinations(state, classId, utId) {
-  const sourceUt = state.uts.find(ut => ut.id === utId && ut.classId === classId)
-  return state.classes.filter(item => item.id !== classId).map(item => {
-    const uts = state.uts.filter(ut => ut.classId === item.id).sort((a, b) => (a.order || 0) - (b.order || 0))
-    const suggested = uts.find(ut => sourceUt?.order != null && ut.order === sourceUt.order)
-      || uts.find(ut => ut.name === sourceUt?.name) || uts[0]
-    return { id: item.id, name: item.name, subject: item.subject, uts, suggestedUtId: suggested?.id || '' }
-  }).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ca', { numeric: true }))
+export function getEvaluationActionCopyDestinations(state, classId) {
+  return state.classes.filter(item => item.id !== classId)
+    .map(item => ({ id: item.id, name: item.name, subject: item.subject }))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ca', { numeric: true }))
 }
 
-// Copy configuration, never student marks. Existing destination selections stay
-// intact, so copying cannot change a criterion's grade or reactivate old marks.
+// A subject catalog belongs to the class, so existing and future UTs reuse it.
+// Copying the catalog must never select actions or alter marks in a destination UT.
 export function buildCopyEvaluationActionsPatch(state, configuration) {
-  const { classId, utId, scope = 'specific', catalog, selections, targets, copySelections = true } = configuration
+  const { classId, utId, scope = 'specific', catalog, selections, targets } = configuration
   if (!Array.isArray(targets) || !targets.length) throw new Error('Selecciona almenys una classe de destí.')
   const sourcePatch = buildEvaluationActionsPatch(state, { classId, utId, scope, catalog, selections })
-  const source = state.classes.find(item => item.id === classId)
-  const sourceSelections = new Map(selectEvaluationCompetencies(state, source, utId, scope)
-    .filter(comp => comp.classId === classId).flatMap(comp => comp.criteria.map(criterion => [
-      getCriterionActionKey(comp, criterion), sourcePatch.criteria.find(item => item.id === criterion.id).selectedActionIds || [],
-    ])))
   let classes = sourcePatch.classes
-  let criteria = sourcePatch.criteria
+  const criteria = sourcePatch.criteria
   const seen = new Set()
-  const report = { classes: 0, copiedCriteria: 0, preservedCriteria: 0, unmatchedCriteria: 0 }
+  const report = { classes: 0 }
   for (const target of targets) {
     if (target.classId === classId || seen.has(target.classId)) throw new Error('Cada classe de destí ha de ser diferent de la classe d’origen i no es pot repetir.')
     seen.add(target.classId)
     const destination = state.classes.find(item => item.id === target.classId)
     if (!destination) throw new Error('No s’ha trobat una classe de destí.')
-    if (copySelections && !state.uts.some(ut => ut.id === target.utId && ut.classId === target.classId)) {
-      throw new Error(`Tria una UT vàlida per a ${destination.name || 'la classe de destí'}.`)
-    }
     const merged = { ...getEvaluationActionCatalog(destination, scope) }
     for (const [key, incoming] of Object.entries(catalog)) {
       const actions = new Map((merged[key] || []).map(action => [action.id, action]))
@@ -169,23 +157,6 @@ export function buildCopyEvaluationActionsPatch(state, configuration) {
     classes = classes.map(item => item.id === destination.id ? {
       ...item, evaluationActionCatalogs: { ...item.evaluationActionCatalogs, [getActionCatalogScope(item.subject, scope)]: merged },
     } : item)
-    if (copySelections) {
-      const mappedKeys = new Set()
-      const updates = new Map()
-      for (const comp of selectEvaluationCompetencies(state, destination, target.utId, scope).filter(comp => comp.classId === destination.id)) {
-        for (const criterion of comp.criteria) {
-          const key = getCriterionActionKey(comp, criterion)
-          if (!sourceSelections.has(key)) continue
-          mappedKeys.add(key)
-          const hasMarks = state.marks.some(mark => mark.criterionId === criterion.id && (mark.value || Object.values(mark.actionGrades || {}).some(Boolean)))
-          if ((criterion.selectedActionIds || []).length || hasMarks) { report.preservedCriteria++; continue }
-          const ids = sourceSelections.get(key)
-          if (ids.length) { updates.set(criterion.id, [...ids]); report.copiedCriteria++ }
-        }
-      }
-      report.unmatchedCriteria += [...sourceSelections].filter(([key, ids]) => ids.length && !mappedKeys.has(key)).length
-      criteria = criteria.map(criterion => updates.has(criterion.id) ? { ...criterion, selectedActionIds: updates.get(criterion.id) } : criterion)
-    }
     report.classes++
   }
   return { patch: { classes, criteria }, report }
