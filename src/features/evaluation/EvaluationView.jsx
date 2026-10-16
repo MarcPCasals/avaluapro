@@ -281,7 +281,7 @@ export function EvaluationView() {
         </button>
       </div>
       {showActionsModal && (
-        <EvaluationActionsModal key={`${activeClassId}:${activeUtId}:${scope}`}
+        <EvaluationActionsModal key={`actions:${activeClassId}:${activeUtId}:${scope}`}
           competencies={competencies} catalog={actionCatalog} utName={activeUt?.name}
           onClose={() => setShowActionsModal(false)}
           onSave={({ catalog, selections }) => saveEvaluationActions({ classId: activeClassId, utId: activeUtId, scope, catalog, selections })} />
@@ -360,7 +360,7 @@ export function EvaluationView() {
         </section>
       ) : (
       <EvaluationTable
-        key={`${activeClassId}:${activeUtId}:${scope}`}
+        key={`table:${activeClassId}:${activeUtId}:${scope}`}
         activeClassId={activeClassId}
         actionCatalog={actionCatalog}
         utName={activeUt?.name}
