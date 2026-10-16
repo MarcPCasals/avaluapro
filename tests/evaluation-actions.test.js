@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { selectEvaluationCompetencies } from '../src/lib/transversalEvaluation.js'
 import {
   CFN_ACTION_CATALOG, buildEvaluationActionsPatch, getCriterionActionKey,
   getEvaluationActionCatalog, getSelectedCriterionActions, parseActionLines,
@@ -81,4 +82,13 @@ test('les transversals reutilitzades de PI admeten selecció sense contaminar el
   assert.deepEqual(patch.criteria[0].selectedActionIds, ['T1'])
   assert.deepEqual(getEvaluationActionCatalog(patch.classes[0], 'transversal'), catalog)
   assert.equal(getEvaluationActionCatalog(patch.classes[0])['C1/CA1'][0].id, 'C1R1')
+})
+
+test('la selecció d’avaluació respecta les competències desactivades a la UT encara que la fila sigui antiga', () => {
+  const state = fixture()
+  state.uts[0].disabledCompetencyNames = [c1.name]
+  assert.deepEqual(selectEvaluationCompetencies(state, state.classes[0], 'ut1', 'specific'), [])
+  assert.equal(selectEvaluationCompetencies(state, state.classes[0], 'ut2', 'specific').length, 1)
+  const patch = buildEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog: CFN_ACTION_CATALOG, selections: { [ca1.id]: ['C1R1'] } })
+  assert.equal(patch.criteria[0].selectedActionIds, undefined)
 })

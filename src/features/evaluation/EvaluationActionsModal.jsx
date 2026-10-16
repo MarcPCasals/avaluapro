@@ -1,3 +1,5 @@
+import { useDialogSave } from '../../lib/useDialogSave'
+import './ActionDialogs.css'
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { getCriterionActionKey, parseActionLines } from '../../lib/evaluationActions'
@@ -39,24 +41,19 @@ function ActionImporter({ onImport }) {
 }
 
 export function EvaluationActionsModal({ competencies, catalog: initialCatalog, utName, onSave, onClose }) {
+  const { busy, error, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les accions.')
+  const activeCompetencies = competencies.filter(competency => !competency.inactive)
   const [catalog, setCatalog] = useState(initialCatalog)
-  const [selections, setSelections] = useState(() => Object.fromEntries(competencies.flatMap(comp =>
+  const [selections, setSelections] = useState(() => Object.fromEntries(activeCompetencies.flatMap(comp =>
     comp.criteria.map(criterion => [criterion.id, criterion.selectedActionIds || []]),
   )))
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
   const select = (criterionId, ids) => setSelections(current => ({ ...current, [criterionId]: ids }))
-  const save = async () => {
-    setBusy(true)
-    setError('')
-    try { await onSave({ catalog, selections }); onClose() }
-    catch (cause) { setError(cause.message || 'No s’han pogut desar les accions.'); setBusy(false) }
-  }
-  return <Modal title={`Accions que s’avaluen · ${utName || 'UT'}`} size="lg" onClose={() => !busy && onClose()}>
+  const save = () => runSave(() => onSave({ catalog, selections }))
+  return <Modal title={`Accions que s’avaluen · ${utName || 'UT'}`} size="lg" panelClassName="evaluation-actions-dialog" onClose={close}>
     <p>Marca només les accions que avaluaràs en aquesta UT. El catàleg es pot reutilitzar a les altres UT del grup; cada UT conserva la seva selecció.</p>
-    {competencies.length === 0 && <p>Activa primer les competències d’aquesta UT.</p>}
+    {activeCompetencies.length === 0 && <p>Activa primer les competències d’aquesta UT.</p>}
     <fieldset className="evaluation-actions-fields" disabled={busy}>
-      {competencies.map(competency => <section className="action-competency" key={competency.id}>
+      {activeCompetencies.map(competency => <section className="action-competency" key={competency.id}>
         <h3>{competency.name}</h3>
         {competency.criteria.map(criterion => {
           const key = getCriterionActionKey(competency, criterion)
@@ -81,9 +78,10 @@ export function EvaluationActionsModal({ competencies, catalog: initialCatalog, 
       </section>)}
     </fieldset>
     {error && <p role="alert">{error}</p>}
+    {busy && <p role="status">Desant els canvis… Pots tancar la finestra.</p>}
     <div className="evaluation-actions-footer">
-      <button className="secondary-action" type="button" disabled={busy} onClick={onClose}>Cancel·lar</button>
-      <button className="primary-action" type="button" disabled={busy || !competencies.length} onClick={save}>{busy ? 'Desant…' : 'Desar selecció'}</button>
+      <button className="secondary-action" type="button" onClick={close}>Tancar</button>
+      <button className="primary-action" type="button" disabled={busy || !activeCompetencies.length} onClick={save}>{busy ? 'Desant…' : 'Desar selecció'}</button>
     </div>
   </Modal>
 }

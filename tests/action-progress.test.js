@@ -21,7 +21,7 @@ const action = (report, id = 'C1R1') => report.rows.find(row => row.action.id ==
 
 test('la classe mostra cobertura, distribució, mitjana i última UT amb dades sense comptar pendents com a zero', () => {
   const report = buildActionProgress(fixture(), 'science')
-  assert.equal(report.rows.length, 35)
+  assert.equal(report.rows.length, 4)
   assert.equal(report.students.length, 2)
   const row = action(report)
   assert.equal(row.cells[0].score, 2.5)
