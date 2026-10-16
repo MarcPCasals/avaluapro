@@ -53,6 +53,37 @@ test('les accions de la UT persisteixen amb el catàleg i es desfan com una sola
   history.clear()
 })
 
+test('copiar accions persisteix totes les classes com una operació reversible i conserva les notes de destí', async () => {
+  const { CFN_ACTION_CATALOG, getEvaluationActionCatalog } = await server.ssrLoadModule('/src/lib/evaluationActions.js')
+  const subject = 'Ciències Físiques i de la Natura'
+  store.setState({
+    classes: ['source', 'target', 'graded'].map(id => ({ id, name: id, subject })),
+    uts: ['source', 'target', 'graded'].map(id => ({ id: `${id}-ut`, classId: id, name: 'UT1', order: 1 })),
+    competencies: ['source', 'target', 'graded'].map(id => ({ id: `${id}-comp`, classId: id, utId: `${id}-ut`, name: 'C1: Modelització' })),
+    criteria: ['source', 'target', 'graded'].map(id => ({ id: `${id}-ca`, competencyId: `${id}-comp`, name: 'CA1: Rigor' })),
+    marks: [{ id: 'target-grade', studentId: 'synthetic-student', criterionId: 'graded-ca', value: 'B' }],
+  })
+  history.clear()
+  const original = store.getState().marks
+  await db.saveCollections(store.getState(), ['classes', 'uts', 'competencies', 'criteria', 'marks'])
+  const result = await store.getState().copyEvaluationActions({ classId: 'source', utId: 'source-ut', catalog: CFN_ACTION_CATALOG,
+    selections: { 'source-ca': ['C1R1', 'C1R3'] }, targets: [{ classId: 'target', utId: 'target-ut' }, { classId: 'graded', utId: 'graded-ut' }] })
+  assert.deepEqual(result, { classes: 2, copiedCriteria: 1, preservedCriteria: 1, unmatchedCriteria: 0 })
+  const saved = await db.loadDataset()
+  assert.deepEqual(saved.criteria.find(item => item.id === 'target-ca').selectedActionIds, ['C1R1', 'C1R3'])
+  assert.equal(saved.criteria.find(item => item.id === 'graded-ca').selectedActionIds, undefined)
+  assert.deepEqual(saved.marks, original)
+  assert.equal(Object.keys(getEvaluationActionCatalog(saved.classes.find(item => item.id === 'target'))).length, 6)
+  assert.equal(await history.undo(), true)
+  assert.equal(store.getState().criteria.find(item => item.id === 'target-ca').selectedActionIds, undefined)
+  assert.equal(store.getState().classes.find(item => item.id === 'target').evaluationActionCatalogs, undefined)
+  assert.deepEqual(store.getState().marks, original)
+  assert.equal(await history.redo(), true)
+  assert.deepEqual((await db.loadDataset()).criteria.find(item => item.id === 'target-ca').selectedActionIds, ['C1R1', 'C1R3'])
+  store.setState({ classes: [], uts: [], competencies: [], criteria: [], marks: [] })
+  history.clear()
+})
+
 test('una qualificació es desfà i refà al magatzem real i a IndexedDB fictici', async () => {
   store.setState({ marks: [] }); history.clear()
   await store.getState().updateMark('synthetic-student', 'synthetic-criterion', 'B')

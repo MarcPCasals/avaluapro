@@ -1,4 +1,4 @@
-import { getEvaluationActionCatalog } from '../../lib/evaluationActions'
+import { getEvaluationActionCatalog, getEvaluationActionCopyDestinations } from '../../lib/evaluationActions'
 import { EvaluationActionsModal } from './EvaluationActionsModal'
 import { Modal } from '../../components/Modal'
 import { transversalStructure } from '../../data/subjects'
@@ -107,6 +107,10 @@ export function EvaluationView() {
   const upsertSeatingChart = useAvaluaproStore((state) => state.upsertSeatingChart)
   const deleteSeatingChart = useAvaluaproStore((state) => state.deleteSeatingChart)
   const saveEvaluationActions = useAvaluaproStore((state) => state.saveEvaluationActions)
+  const copyEvaluationActions = useAvaluaproStore((state) => state.copyEvaluationActions)
+  const allClasses = useAvaluaproStore((state) => state.classes)
+  const allUts = useAvaluaproStore((state) => state.uts)
+  const copyDestinations = useMemo(() => getEvaluationActionCopyDestinations({ classes: allClasses, uts: allUts }, activeClassId, activeUtId), [allClasses, allUts, activeClassId, activeUtId])
   const [showActionsModal, setShowActionsModal] = useState(false)
   const [showStudentsModal, setShowStudentsModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
@@ -283,6 +287,8 @@ export function EvaluationView() {
       {showActionsModal && (
         <EvaluationActionsModal key={`actions:${activeClassId}:${activeUtId}:${scope}`}
           competencies={competencies} catalog={actionCatalog} utName={activeUt?.name}
+          copyDestinations={copyDestinations}
+          onCopy={configuration => copyEvaluationActions({ ...configuration, classId: activeClassId, utId: activeUtId, scope })}
           onClose={() => setShowActionsModal(false)}
           onSave={({ catalog, selections }) => saveEvaluationActions({ classId: activeClassId, utId: activeUtId, scope, catalog, selections })} />
       )}
