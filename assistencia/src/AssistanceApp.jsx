@@ -13,7 +13,6 @@ import { DatabaseZap, LockKeyhole, RotateCcw, Search, ShieldCheck, WifiOff } fro
 import { createMemoryDataAdapter } from '../../src/data/adapters/createMemoryDataAdapter.js'
 import { useDataAdapter } from '../../src/data/adapters/useDataAdapter.js'
 import { CrossAnalysisTable } from '../../src/features/analytics/CrossAnalysisTable.jsx'
-import { AbsenceControl } from '../../src/features/attendance/AbsenceControl.jsx'
 import { EvaluationTable } from '../../src/features/evaluation/EvaluationTable.jsx'
 import { SafeAssistanceExportPanel } from '../../src/features/data/SafeAssistanceExportPanel.jsx'
 import { StudentOverviewSharingDialog } from '../../src/features/students/StudentOverviewSharingDialog.jsx'
@@ -27,7 +26,6 @@ import { CooperativeGroupGrid } from '../../src/features/tutoring/CooperativeGro
 import { TutorialProfileList } from '../../src/features/tutoring/TutorialProfileList.jsx'
 import { getStudentTrackingStats } from '../../src/lib/analytics.js'
 import {
-  findAbsenceInSlot,
   formatAbsenceDateTime,
   getAbsenceTimeParts,
   getStudentAbsenceHours,
@@ -334,26 +332,6 @@ function AssistanceApp() {
     students: dataset.students,
     tasks: dataset.trackingTasks,
   }), [dataset.classes, dataset.evaluationCompetencies, dataset.students, dataset.trackingTasks])
-
-  function renderSyntheticAbsenceControl(student) {
-    const activeRecord = findAbsenceInSlot(
-      dataset.absenceRecords,
-      student.id,
-      activeClassId,
-      currentAbsenceSlot.slotKey,
-    )
-    const totalHours = getStudentAbsenceHours(dataset.absenceRecords, student.id, activeClassId)
-    return (
-      <AbsenceControl
-        activeRecord={activeRecord}
-        onToggle={() => {
-          assistanceAdapter.toggleAbsence(student.id, activeClassId, currentAbsenceSlot)
-          simulateAction('Absència fictícia modificada només a la memòria temporal.')
-        }}
-        totalHours={totalHours}
-      />
-    )
-  }
 
   function cycleEvaluation(student) {
     const currentIndex = LEVEL_SEQUENCE.indexOf(student.evaluation)
@@ -689,7 +667,6 @@ function AssistanceApp() {
             assistanceAdapter.setEvaluationMark(studentId, criterionId, value)
             simulateAction('Nota fictícia desada només a la memòria temporal.')
           }}
-          renderAbsenceControl={renderSyntheticAbsenceControl}
           students={evaluationStudents}
         /></> : activeSurface === 'tracking' ? <><details><summary>Data d’una tasca · sessions fictícies</summary>
           <TaskDateField date={taskDemoDate} label="Demostració" sessionKey={taskDemoKey} sessions={syntheticTaskSessions}
@@ -717,7 +694,6 @@ function AssistanceApp() {
             assistanceAdapter.setTaskStatus(student.id, taskId, status)
             simulateAction('Estat de seguiment desat només a la memòria temporal.')
           }}
-          renderAbsenceControl={renderSyntheticAbsenceControl}
           rows={trackingRows}
           taskRecords={dataset.trackingRecords}
           tasks={trackingTasks}

@@ -11,7 +11,6 @@ import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade } from '../../lib/grades'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -380,9 +379,6 @@ export function EvaluationView() {
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
         onUpdateActionGrades={updateActionGrades}
-        renderAbsenceControl={(student) => (
-          <AbsenceToggle classId={activeClassId} studentId={student.id} />
-        )}
         students={filteredStudents}
       />
       )}

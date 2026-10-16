@@ -47,7 +47,6 @@ export function EvaluationTable({
   onToggleCompetencyModification = () => {},
   onUpdateMark = () => {},
   onUpdateActionGrades,
-  renderAbsenceControl = () => null,
   students = [],
 }) {
   const [grading, setGrading] = useState(null)
@@ -155,7 +154,6 @@ export function EvaluationTable({
                   >
                     <MessageCircle size={17} />
                   </button>
-                  {renderAbsenceControl(student)}
                   <button
                     className="student-name student-profile-trigger"
                     data-tour={index === 0 ? 'student-name-open' : undefined}

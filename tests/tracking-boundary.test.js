@@ -26,7 +26,7 @@ test('la vista real conserva les accions sensibles fora del component', () => {
   assert.match(viewSource, /onAddBehavior=\{\(student, type\) => setBehaviorDraft\(\{ student, type \}\)\}/)
   assert.match(viewSource, /onOpenAgendaDetail=\{setAgendaDetailStudentId\}/)
   assert.match(viewSource, /onOpenRedPoints=\{setRedDetailStudentId\}/)
-  assert.match(viewSource, /<AbsenceToggle classId=\{activeClassId\} studentId=\{student\.id\} \/>/)
+  assert.doesNotMatch(viewSource + tableSource, /AbsenceToggle|renderAbsenceControl/)
 })
 
 test('assistència connecta la mateixa graella a estats sintètics', () => {

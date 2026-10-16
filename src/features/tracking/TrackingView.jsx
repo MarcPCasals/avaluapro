@@ -13,7 +13,6 @@ import {
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -1263,9 +1262,6 @@ export function TrackingView() {
         onOpenTaskNote={(task) => setTaskNoteDraft({ task })}
         onOpenTaskReminder={(task) => setReminderDraft({ task })}
         onSetTaskStatus={handleTaskStatus}
-        renderAbsenceControl={(student) => (
-          <AbsenceToggle classId={activeClassId} studentId={student.id} />
-        )}
         rows={trackingRows}
         tableWrapRef={tableWrapRef}
         taskRecords={taskRecords}
