@@ -1,0 +1,60 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-hosting-live
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check assessment and action statistics
+        run: >-
+          node --test tests/dialog-save.test.js tests/action-grades.test.js
+          tests/action-progress.test.js tests/action-progress-render.test.js
+          tests/evaluation-actions.test.js tests/evaluation-boundary.test.js
+          tests/analytics-boundary.test.js tests/edit-history-store.test.js
+          tests/transversal-evaluation.test.js
+
+      - name: Build for Firebase Hosting
+        run: npm run build:firebase
+
+      - name: Check Firebase deployment authorization
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AVALUAPRO }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing FIREBASE_SERVICE_ACCOUNT_AVALUAPRO. Complete the one-time authorization in docs/firebase-hosting-github.md, then re-run this workflow."
+            exit 1
+          fi
+
+      # The action deploys only Hosting. firebase.json also builds before deploy.
+      - name: Deploy to avaluapro.web.app
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AVALUAPRO }}
+          projectId: avaluapro
+          channelId: live
+          firebaseToolsVersion: '15.22.0'
