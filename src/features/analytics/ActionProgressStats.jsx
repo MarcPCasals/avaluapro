@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Modal } from '../../components/Modal'
-import { buildActionProgress } from '../../lib/actionProgress'
+import { buildActionProgress, getCriterionProgressSummary } from '../../lib/actionProgress'
 import { gradeClassName } from '../../lib/grades'
 import './ActionProgressStats.css'
 
@@ -53,8 +53,10 @@ export function ActionProgressStats({ state, classId, studentId }) {
           <h4>{name}</h4>
           {[...new Set(visibleRows.filter(row => row.competencyName === name).map(row => row.key))].map(criterionKey => {
             const criterionRows = visibleRows.filter(row => row.competencyName === name && row.key === criterionKey)
+            const summary = getCriterionProgressSummary(rows.filter(row => row.key === criterionKey))
+            const gradeLabel = summary.grade ? `${individual ? 'Nota' : 'Mitjana'}: ${summary.grade} · ${summary.ut.name}${summary.provisional ? ' · Provisional' : ''}` : 'Sense nota'
             return <details className="action-progress-criterion" key={`${scope}:${criterionKey}`}>
-              <summary><strong>{criterionRows[0].criterionName}</strong><span>{criterionRows.length} accions · {criterionRows.filter(row => row.latest).length} amb dades</span></summary>
+              <summary data-grade={summary.grade || undefined}><strong>{criterionRows[0].criterionName}</strong><span className="action-progress-criterion-grade">{gradeLabel}</span><span>{criterionRows.length} accions · {criterionRows.filter(row => row.latest).length} amb dades</span></summary>
           <div className="action-progress-scroll"><table className="action-progress-table">
             <caption>{name} · {criterionRows[0].criterionName} · {individual ? 'Nota de cada acció per UT' : 'Mitjana i distribució per acció i UT'}</caption>
             <thead><tr><th scope="col">Acció</th>{uts.map(ut => <th scope="col" key={ut.id}>{ut.name}</th>)}<th scope="col">Última amb nota</th><th scope="col">Evolució</th></tr></thead>
