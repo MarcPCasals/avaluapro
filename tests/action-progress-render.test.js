@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 
-let server, Stats, GradeModal, ActionsModal
+let server, Stats, GradeModal, ActionsModal, CrossTable
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()],
     optimizeDeps: { noDiscovery: true, include: [] },
@@ -14,6 +14,7 @@ test.before(async () => {
   Stats = (await server.ssrLoadModule('/src/features/analytics/ActionProgressStats.jsx')).ActionProgressStats
   GradeModal = (await server.ssrLoadModule('/src/features/evaluation/CriterionGradeModal.jsx')).CriterionGradeModal
   ActionsModal = (await server.ssrLoadModule('/src/features/evaluation/EvaluationActionsModal.jsx')).EvaluationActionsModal
+  CrossTable = (await server.ssrLoadModule('/src/features/analytics/CrossAnalysisTable.jsx')).CrossAnalysisTable
 })
 test.after(async () => { await server?.close() })
 
@@ -28,6 +29,18 @@ function fixture() {
     marks: [{ studentId: 'synthetic-student', criterionId: 'synthetic-ca', value: 'B', gradingMode: 'actions', actionGrades: { C1R1: 'B' } }],
   }
 }
+
+test('el percentatge de constància només és clicable quan hi ha activitats no completades i és inferior a 100', () => {
+  const rows = [67, 100, 0].map((consistency, index) => ({
+    student: { id: `synthetic-${index}`, name: `Alumne fictici ${index}` },
+    tracking: { consistency, hasTrackingData: index !== 2 }, decision: {},
+    incompleteActivities: [{ id: 'pending', title: 'Tasca fictícia', statusLabel: 'No feta' }],
+  }))
+  const html = renderToStaticMarkup(createElement(CrossTable, { rows }))
+  assert.match(html, /aria-label="67% de constància · Veure activitats no completades de Alumne fictici 0"/)
+  assert.doesNotMatch(html, /aria-label="100% de constància|activitats no completades de Alumne fictici [12]/)
+  assert.match(html, /<b class="consistency-badge ">100%<\/b>/)
+})
 
 test('la vista grupal distingeix notes, UT no seleccionades i la referència al criteri', () => {
   const html = renderToStaticMarkup(createElement(Stats, { state: fixture(), classId: 'synthetic-class' }))
