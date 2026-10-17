@@ -7,6 +7,14 @@
 .action-progress-summary > span { padding: 12px; background: #f5f3ff; border-radius: 10px; }
 .action-progress-summary strong { display: block; font-size: 1.25rem; color: #6d28d9; }
 .action-progress-scroll { overflow-x: auto; max-width: 100%; }
+.action-progress-criterion { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.action-progress-criterion > summary { padding: 14px 16px; cursor: pointer; background: #f8fafc; color: #0f172a; line-height: 1.5; }
+.action-progress-criterion > summary strong { margin-right: 14px; }
+.action-progress-criterion > summary span { display: inline-block; font-size: .8rem; color: #64748b; }
+.action-progress-criterion > summary:hover { background: #f1f5f9; }
+.action-progress-criterion > summary:focus-visible { outline: 2px solid #7c3aed; outline-offset: -3px; }
+.action-progress-criterion[open] > summary { border-bottom: 1px solid #e2e8f0; }
+.action-progress-criterion .action-progress-scroll { padding: 0 12px 12px; }
 .action-progress-table { border-collapse: collapse; width: 100%; font-size: .875rem; }
 .action-progress-table caption { text-align: left; padding: 8px 0; color: #475569; }
 .action-progress-table th, .action-progress-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: middle; min-width: 110px; }
