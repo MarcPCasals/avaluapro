@@ -23,6 +23,7 @@ import {
   buildTrackingInterventions,
   getStudentRedPointCount,
   getStudentTrackingStats,
+  getStudentIncompleteActivities,
 } from '../../lib/analytics'
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import {
@@ -2875,6 +2876,7 @@ export function AnalyticsView() {
       decision,
       evaluationGrade: profile.evaluation.grade,
       evidence: buildTrackingEvidence(profile, state, classTasks, activeBehaviorEvents),
+      incompleteActivities: getStudentIncompleteActivities(profile.student.id, state.taskRecords, classTasks),
       incidents: profile.incidents,
       lowConsistency: hasLowConsistency(profile),
       profile,

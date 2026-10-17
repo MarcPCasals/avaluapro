@@ -1,5 +1,8 @@
 import { CircleHelp, LineChart, ListFilter } from 'lucide-react'
+import { useState } from 'react'
+import { Modal } from '../../components/Modal'
 import { formatAbsenceHours } from '../../lib/attendance'
+import './CrossAnalysisTable.css'
 
 function getConsistencyLabel(tracking) {
   return tracking?.hasTrackingData ? `${tracking.consistency}%` : 'Sense dades'
@@ -18,8 +21,20 @@ export function CrossAnalysisTable({
   rows,
   sortMode,
 }) {
+  const [selectedStudentId, setSelectedStudentId] = useState(null)
+  const selectedRow = rows.find(row => row.student.id === selectedStudentId)
   return (
     <div className="profile-table-wrap full-width-analysis" data-tour="stats-cross">
+      {selectedRow && selectedRow.tracking.consistency < 100 && selectedRow.incompleteActivities?.length > 0 && (
+        <Modal onClose={() => setSelectedStudentId(null)} title={`Activitats no completades: ${selectedRow.student.name}`}>
+          <div className="tracking-evidence-modal">
+            {selectedRow.incompleteActivities.map(task => <article className="evidence-row" key={task.id}>
+              <strong>{task.title}</strong>
+              <span>{task.date || 'Sense data'} · {task.statusLabel}</span>
+            </article>)}
+          </div>
+        </Modal>
+      )}
       <div className="section-heading">
         <LineChart size={20} />
         <div>
@@ -97,9 +112,15 @@ export function CrossAnalysisTable({
                 <div className={`progress-line compact ${row.lowConsistency ? 'low' : ''}`}>
                   <span style={{ width: `${row.tracking.hasTrackingData ? row.tracking.consistency : 0}%` }} />
                 </div>
-                <b className={`consistency-badge ${row.tracking.hasTrackingData ? '' : 'empty'}`}>
+                {row.tracking.hasTrackingData && row.tracking.consistency < 100 && row.incompleteActivities?.length > 0 ? (
+                  <button className="consistency-badge clickable" type="button"
+                    aria-label={`${getConsistencyLabel(row.tracking)} de constància · Veure activitats no completades de ${row.student.name}`}
+                    onClick={() => setSelectedStudentId(row.student.id)}>
+                    {getConsistencyLabel(row.tracking)}
+                  </button>
+                ) : <b className={`consistency-badge ${row.tracking.hasTrackingData ? '' : 'empty'}`}>
                   {getConsistencyLabel(row.tracking)}
-                </b>
+                </b>}
               </td>
               <td>
                 <button

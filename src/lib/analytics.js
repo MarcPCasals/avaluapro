@@ -37,6 +37,16 @@ export function getStudentTrackingStats(studentId, taskRecords, tasks) {
   }
 }
 
+export function getStudentIncompleteActivities(studentId, taskRecords, tasks) {
+  const records = new Map(taskRecords.filter(record => record.studentId === studentId)
+    .map(record => [record.taskId, record]))
+  return tasks.flatMap(task => {
+    const status = records.get(task.id)?.status || ''
+    if (status === 'DONE' || status === 'EXEMPT') return []
+    return [{ ...task, status, statusLabel: status === 'MISSING' ? 'No feta' : status === 'LATE' ? 'Incompleta' : 'Sense registre' }]
+  })
+}
+
 export function hasMinimumTrackingActivities(tracking, minimum = 2) {
   return tracking.hasTrackingData && tracking.activityCount >= minimum
 }

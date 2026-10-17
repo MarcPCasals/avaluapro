@@ -24,7 +24,7 @@ import { SociometricSummaryPanel } from '../../src/features/tutoring/Sociometric
 import { SeatingPlanBoard } from '../../src/features/tutoring/SeatingPlanBoard.jsx'
 import { CooperativeGroupGrid } from '../../src/features/tutoring/CooperativeGroupGrid.jsx'
 import { TutorialProfileList } from '../../src/features/tutoring/TutorialProfileList.jsx'
-import { getStudentTrackingStats } from '../../src/lib/analytics.js'
+import { getStudentTrackingStats, getStudentIncompleteActivities } from '../../src/lib/analytics.js'
 import {
   formatAbsenceDateTime,
   getAbsenceTimeParts,
@@ -234,6 +234,7 @@ function AssistanceApp() {
         absenceRecords,
         decision,
         evaluationGrade: student.evaluation,
+        incompleteActivities: getStudentIncompleteActivities(student.id, dataset.trackingRecords, trackingTasks),
         incidents: student.incidents || 0,
         lowConsistency: tracking.hasTrackingData && tracking.consistency < 60,
         redPointCount: tracking.missing,
