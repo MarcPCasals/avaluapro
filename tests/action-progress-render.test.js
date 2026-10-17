@@ -96,3 +96,34 @@ test('la còpia ofereix el catàleg per a totes les UT i només demana classes d
   assert.match(html, /Classe sense UT/)
   assert.doesNotMatch(html, /UT de destí|Copiar també les accions seleccionades|<select/)
 })
+
+test('les accions grupals i individuals s’agrupen en desplegables per criteri plegats per defecte', () => {
+  const state = fixture()
+  state.criteria.push({ id: 'precision', competencyId: 'synthetic-comp', name: 'CA2: Precisió', selectedActionIds: [] })
+  state.competencies.push({ id: 'investigation', classId: 'synthetic-class', utId: 'synthetic-ut1', name: 'C2: Indagació' })
+  state.criteria.push({ id: 'pertinence', competencyId: 'investigation', name: 'CA1: Pertinència', selectedActionIds: [] })
+  for (const studentId of [undefined, 'synthetic-student']) {
+    const html = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class', studentId }))
+    const sections = [...html.matchAll(/<details class="action-progress-criterion"[^>]*>([\s\S]*?)<\/details>/g)]
+    assert.equal(sections.length, 3)
+    assert.doesNotMatch(html, /<details[^>]*\bopen(?:[\s=>])/)
+    const rigor = sections.find(section => section[1].includes('<strong>CA1: Rigor</strong>'))[1]
+    const precision = sections.find(section => section[1].includes('<strong>CA2: Precisió</strong>'))[1]
+    const pertinence = sections.find(section => section[1].includes('<strong>CA1: Pertinència</strong>'))[1]
+    assert.match(rigor, /4 accions · 1 amb dades/)
+    assert.match(rigor, /C1R1/)
+    assert.doesNotMatch(rigor, /C1P1|C2P1/)
+    assert.match(precision, /C1P1/)
+    assert.doesNotMatch(precision, /C1R1/)
+    assert.match(pertinence, /C2P1/)
+  }
+})
+
+test('el perfil de l’alumne no incorpora les accions i les estadístiques en conserven les dues vistes', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const profile = await readFile('src/features/students/StudentProfileModal.jsx', 'utf8')
+  const analytics = await readFile('src/features/analytics/AnalyticsView.jsx', 'utf8')
+  assert.doesNotMatch(profile, /ActionProgressStats/)
+  assert.match(analytics, /<ActionProgressStats[^>]*studentId=/)
+  assert.match(analytics, /<ActionProgressStats[^>]*classId=\{activeClassId\}/)
+})

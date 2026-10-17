@@ -51,11 +51,15 @@ export function ActionProgressStats({ state, classId, studentId }) {
       : !visibleRows.length ? <p>Cap acció coincideix amb els filtres.</p>
         : groups.map(name => <section className="action-progress-competency" key={name}>
           <h4>{name}</h4>
+          {[...new Set(visibleRows.filter(row => row.competencyName === name).map(row => row.key))].map(criterionKey => {
+            const criterionRows = visibleRows.filter(row => row.competencyName === name && row.key === criterionKey)
+            return <details className="action-progress-criterion" key={`${scope}:${criterionKey}`}>
+              <summary><strong>{criterionRows[0].criterionName}</strong><span>{criterionRows.length} accions · {criterionRows.filter(row => row.latest).length} amb dades</span></summary>
           <div className="action-progress-scroll"><table className="action-progress-table">
-            <caption>{name} · {individual ? 'Nota de cada acció per UT' : 'Mitjana i distribució per acció i UT'}</caption>
+            <caption>{name} · {criterionRows[0].criterionName} · {individual ? 'Nota de cada acció per UT' : 'Mitjana i distribució per acció i UT'}</caption>
             <thead><tr><th scope="col">Acció</th>{uts.map(ut => <th scope="col" key={ut.id}>{ut.name}</th>)}<th scope="col">Última amb nota</th><th scope="col">Evolució</th></tr></thead>
-            <tbody>{visibleRows.filter(row => row.competencyName === name).map(row => <tr key={row.id}>
-              <th scope="row">{!row.action.id.startsWith('text:') && <strong>{row.action.id}</strong>}<span>{row.action.description}</span><small>{row.criterionName}</small></th>
+            <tbody>{criterionRows.map(row => <tr key={row.id}>
+              <th scope="row">{!row.action.id.startsWith('text:') && <strong>{row.action.id}</strong>}<span>{row.action.description}</span></th>
               {row.cells.map(cell => <td key={cell.ut.id}>
                 {!cell.selected ? <span className="action-progress-empty">No seleccionada</span>
                   : !cell.evaluated ? <span className="action-progress-empty">Pendent de nota</span>
@@ -72,6 +76,8 @@ export function ActionProgressStats({ state, classId, studentId }) {
               </td>
             </tr>)}</tbody>
           </table></div>
+            </details>
+          })}
         </section>)}
     <p className="action-progress-method">A=4, B=3, C=2, D=1 i NA=1. Les UT sense selecció o sense nota no compten com a zero. L’evolució compara la primera i l’última UT amb nota{!individual && ', només amb els alumnes que tenen nota en totes dues'}.</p>
     {detail && <Modal title={`${detail.row.action.id.startsWith('text:') ? 'Acció' : detail.row.action.id} · ${detail.cell.ut.name}`} onClose={() => setDetail(null)}>

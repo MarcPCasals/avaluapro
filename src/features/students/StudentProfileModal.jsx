@@ -1,4 +1,3 @@
-import { ActionProgressStats } from '../analytics/ActionProgressStats'
 import { StudentGenderField } from './StudentGenderField'
 import { antecedentCompetencyKey, normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import {
@@ -1031,8 +1030,6 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             tone="tutoring"
           />
         )}
-
-        {!isExemptFromClassSubject && <ActionProgressStats key={`${student.classId}:${student.id}`} state={state} classId={student.classId} studentId={student.id} />}
 
         <section className="profile-section student-antecedents-section">
           <div className="profile-section-title">
