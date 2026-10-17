@@ -1,4 +1,4 @@
-import { getActionGrade } from './actionGrades.js'
+import { getActionGrade, getLowestActionGrade } from './actionGrades.js'
 import { getCriterionActionKey, getEvaluationActionCatalog } from './evaluationActions.js'
 import { getNumericFromGrade } from './grades.js'
 import { getClassUts } from './studentEvaluation.js'
@@ -7,6 +7,26 @@ import { isStudentExemptFromSubject } from './tutorialExemptions.js'
 
 const levels = ['A', 'B', 'C', 'D', 'NA']
 const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+
+export function getCriterionProgressSummary(rows) {
+  for (let index = (rows[0]?.cells.length || 0) - 1; index >= 0; index--) {
+    const cells = rows.map(row => row.cells[index]).filter(cell => cell.selected)
+    const students = new Map()
+    cells.forEach(cell => cell.grades.forEach(({ studentId, grade }) => {
+      if (!students.has(studentId)) students.set(studentId, [])
+      students.get(studentId).push(grade)
+    }))
+    if (!students.size) continue
+    const grades = [...students.values()].map(getLowestActionGrade)
+    const score = average(grades.map(getNumericFromGrade))
+    return {
+      grade: grades.every(grade => grade === 'NA') ? 'NA' : ['', 'D', 'C', 'B', 'A'][Math.round(score)],
+      score, ut: cells[0].ut,
+      provisional: [...students.values()].some(values => values.length < cells.length),
+    }
+  }
+  return { grade: '', score: null, ut: null, provisional: false }
+}
 
 function buildTrend(cells) {
   const observed = cells.filter(cell => cell.evaluated > 0)

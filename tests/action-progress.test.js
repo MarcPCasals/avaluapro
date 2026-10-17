@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildActionProgress } from '../src/lib/actionProgress.js'
+import { buildActionProgress, getCriterionProgressSummary } from '../src/lib/actionProgress.js'
 
 const actionMarks = marks => marks.map(mark => ({ ...mark, gradingMode: 'actions', actionGrades: { C1R1: mark.value } }))
 const subject = 'Ciències Físiques i de la Natura'
@@ -18,6 +18,30 @@ function fixture() {
   }
 }
 const action = (report, id = 'C1R1') => report.rows.find(row => row.action.id === id)
+
+test('el resum de criteri utilitza l’última UT amb notes i la mínima per alumne abans de fer la mitjana', () => {
+  const state = fixture()
+  state.criteria[1].selectedActionIds.push('C1R2', 'C1R3')
+  state.marks = [{ studentId: 's1', criterionId: 'ca-ut2', actionGrades: { C1R1: 'A', C1R2: 'A', C1R3: 'C' } },
+    { studentId: 's2', criterionId: 'ca-ut2', actionGrades: { C1R1: 'B', C1R2: 'B', C1R3: 'B' } }]
+  const group = getCriterionProgressSummary(buildActionProgress(state, 'science').rows)
+  assert.equal(group.score, 2.5)
+  assert.equal(group.grade, 'B')
+  assert.equal(group.ut.id, 'ut2')
+  assert.equal(group.provisional, false)
+  const individual = () => getCriterionProgressSummary(buildActionProgress(state, 'science', { studentId: 's1' }).rows)
+  assert.equal(individual().grade, 'C')
+  delete state.marks[0].actionGrades.C1R3
+  assert.equal(individual().grade, 'A')
+  assert.equal(individual().provisional, true)
+  for (const grade of ['A', 'B', 'C', 'D', 'NA']) {
+    state.marks[0].actionGrades = { C1R1: grade, C1R2: grade, C1R3: grade }
+    assert.equal(individual().grade, grade)
+  }
+  state.marks = []
+  assert.equal(individual().grade, '')
+  assert.equal(getCriterionProgressSummary([]).grade, '')
+})
 
 test('la classe mostra cobertura, distribució, mitjana i última UT amb dades sense comptar pendents com a zero', () => {
   const report = buildActionProgress(fixture(), 'science')

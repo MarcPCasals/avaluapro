@@ -12,6 +12,15 @@
 .action-progress-criterion > summary strong { margin-right: 14px; }
 .action-progress-criterion > summary span { display: inline-block; font-size: .8rem; color: #64748b; }
 .action-progress-criterion > summary:hover { background: #f1f5f9; }
+.action-progress-criterion > summary[data-grade] { background: var(--criterion-background); color: var(--criterion-color); }
+.action-progress-criterion > summary[data-grade]:hover { box-shadow: inset 0 0 0 2px currentColor; }
+.action-progress-criterion > summary[data-grade] span { color: inherit; }
+.action-progress-criterion > summary .action-progress-criterion-grade { margin-right: 14px; font-weight: 700; }
+.action-progress-criterion > summary[data-grade=A] { --criterion-background: #dcfce7; --criterion-color: #166534; }
+.action-progress-criterion > summary[data-grade=B] { --criterion-background: #dbeafe; --criterion-color: #1e40af; }
+.action-progress-criterion > summary[data-grade=C] { --criterion-background: #fef3c7; --criterion-color: #92400e; }
+.action-progress-criterion > summary[data-grade=D] { --criterion-background: #fee2e2; --criterion-color: #991b1b; }
+.action-progress-criterion > summary[data-grade=NA] { --criterion-background: #374151; --criterion-color: #fff; }
 .action-progress-criterion > summary:focus-visible { outline: 2px solid #7c3aed; outline-offset: -3px; }
 .action-progress-criterion[open] > summary { border-bottom: 1px solid #e2e8f0; }
 .action-progress-criterion .action-progress-scroll { padding: 0 12px 12px; }

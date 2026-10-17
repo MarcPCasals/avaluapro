@@ -49,6 +49,22 @@ test('la vista individual mostra la nota i no presenta una distribució grupal',
   assert.match(html, /Calen dues UT amb nota/)
 })
 
+test('la capçalera mostra la mínima de les accions, sense barrejar UT ni dependre dels filtres visuals', () => {
+  const state = fixture()
+  state.criteria[0].selectedActionIds = ['C1R1', 'C1R2', 'C1R3']
+  state.marks[0].actionGrades = { C1R1: 'A', C1R2: 'A', C1R3: 'C' }
+  for (const studentId of [undefined, 'synthetic-student']) {
+    const html = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class', studentId }))
+    assert.match(html, /<summary data-grade="C"><strong>CA1: Rigor<\/strong>/)
+    assert.match(html, /(?:Nota|Mitjana): C · UT1/)
+    assert.doesNotMatch(html, /C · UT2/)
+  }
+  state.marks = []
+  const html = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class' }))
+  assert.match(html, /<summary><strong>CA1: Rigor<\/strong>/)
+  assert.match(html, /Sense nota/)
+})
+
 test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A i C', () => {
   const actions = ['R1', 'R2', 'R3'].map(id => ({ id, description: `Acció ${id}` }))
   const html = renderToStaticMarkup(createElement(GradeModal, {
