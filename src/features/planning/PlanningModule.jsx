@@ -3,13 +3,13 @@ import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bell, BookOpenText, CalendarClock, CalendarRange, Check, ChevronDown,
-  Cloud, CloudOff, Copy, Eye, History, Lightbulb, Loader2,
+  Cloud, CloudOff, Copy, Eye, History, Lightbulb, ListChecks, Loader2,
   FileText, Link2, Pencil, Plus, RotateCcw, Save, Share2, Trash2, Users, X,
 } from 'lucide-react'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
-import { saveAgendaSchedulingRequest } from '../../lib/agendaSchedulingNavigation'
+import { saveAgendaSchedulingRequest, saveAgendaTimelineRequest } from '../../lib/agendaSchedulingNavigation'
 import {
   AcademicYearDialog, ActivityDialog, ActivityHistoryDialog, AnnualCopyDialog, PhaseDialog,
   PlanningConnectionDialog, PlanningUnitDialog, TemporalUnitDialog,
@@ -662,6 +662,15 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       classLabel: activeClass?.name || 'Tutoria',
     })
   }
+  const openAgendaTimeline = async () => {
+    try {
+      if (contextClassId !== storeActiveClassId) await setActiveClass(contextClassId)
+      saveAgendaTimelineRequest(globalThis.sessionStorage)
+      setActiveMode('agenda')
+    } catch (agendaError) {
+      workspace.setError(agendaError.message || 'No s’ha pogut obrir la cronologia.')
+    }
+  }
   const openAgendaReflow = async () => {
     try {
       await ensureActiveTutorialApplication()
@@ -871,9 +880,14 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       )}
 
       {workspace.activePlanningUnit && (
-        <button className="planning-agenda-floating" onClick={openAgendaReflow} title="Actualitzar les sessions futures de l’Agenda" type="button">
-          <CalendarClock size={18} /><span>Actualitzar Agenda</span>
-        </button>
+        <div className="planning-agenda-shortcuts" role="group" aria-label="Accessos a l’Agenda">
+          <button aria-label="Actualitzar agenda" className="planning-agenda-floating" onClick={openAgendaReflow} title="Actualitzar les sessions futures de l’Agenda" type="button">
+            <CalendarClock size={17} /><span>Actualitzar</span>
+          </button>
+          <button className="planning-agenda-floating planning-timeline-shortcut" onClick={openAgendaTimeline} title="Anar directament a la cronologia" type="button">
+            <ListChecks size={17} /><span>Cronologia</span>
+          </button>
+        </div>
       )}
 
       {dialog === 'year' && <AcademicYearDialog onClose={() => setDialog(null)} onSave={workspace.createYear} />}

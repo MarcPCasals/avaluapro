@@ -26,7 +26,7 @@ import { buildReminderSessionOptions, buildTimetableClassroomBundle, findNextTim
 import { splitTimetableSlots, timetableTimeToMinutes } from '../../lib/agendaTimetable'
 import { findCurrentTemporalUnit } from '../../lib/currentTemporalUnit'
 import { getPendingReminderSummary, getPersonalCalendarReminders } from '../../lib/reminders'
-import { consumeAgendaSchedulingRequest } from '../../lib/agendaSchedulingNavigation'
+import { consumeAgendaSchedulingRequest, consumeAgendaViewRequest } from '../../lib/agendaSchedulingNavigation'
 import { getTutoringCalendarReminders } from '../../lib/tutoringCoordination'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassroomMode } from '../classroom/ClassroomMode'
@@ -503,7 +503,7 @@ export default function AgendaModule() {
       ...tutoringCalendarReminders,
     ], workspace.today, 3)
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
-  const [view, setView] = useState('today')
+  const [view, setView] = useState(() => consumeAgendaViewRequest(globalThis.sessionStorage))
   const [weekStart, setWeekStart] = useState(() => getAgendaDefaultWeekStart(workspace.today))
   const [calendarMode, setCalendarMode] = useState('week')
   const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))

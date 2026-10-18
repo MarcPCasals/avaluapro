@@ -186,12 +186,18 @@
 .planning-basics-content { display: grid; }
 .planning-basics-content .planning-editor-section:last-child { border-bottom: 0; }
 
+.planning-agenda-shortcuts {
+  display: flex; gap: 6px; position: fixed; right: 24px; bottom: 22px; z-index: 45;
+  max-width: calc(100vw - 28px);
+}
 .planning-agenda-floating {
-  min-height: 44px; display: inline-flex; align-items: center; gap: 8px; position: fixed; right: 24px; bottom: 22px; z-index: 45;
-  border: 1px solid #ea580c; border-radius: 999px; padding: 0 17px; color: white; background: #f97316;
+  min-height: 44px; display: inline-flex; align-items: center; gap: 5px; position: static; width: auto; flex: 0 0 auto; white-space: nowrap;
+  border: 1px solid #ea580c; border-radius: 999px; padding: 0 11px; color: white; background: #f97316;
   box-shadow: 0 12px 30px rgb(124 45 18 / 24%); font-size: 12px; font-weight: 900;
 }
 .planning-agenda-floating:hover { background: #ea580c; transform: translateY(-1px); }
+.planning-timeline-shortcut { border-color: #2563eb; background: #2563eb; }
+.planning-timeline-shortcut:hover { background: #1d4ed8; }
 .planning-agenda-floating:focus-visible { outline: 3px solid #fed7aa; outline-offset: 3px; }
 
 .planning-editor-section { display: grid; gap: 13px; border-bottom: 1px solid #edf0f4; padding: 22px; }
@@ -750,7 +756,8 @@
 }
 
 @media (max-width: 720px) {
-  .planning-agenda-floating { right: 14px; bottom: 14px; min-height: 42px; padding: 0 14px; }
+  .planning-agenda-shortcuts { right: 14px; bottom: 14px; }
+  .planning-agenda-floating { min-height: 44px; padding: 0 10px; }
   .planning-dialog-backdrop { padding: 10px; }
   .planning-sharing-dialog, .planning-preview-dialog { max-height: calc(100vh - 20px); border-radius: 15px; }
   .planning-sharing-dialog { padding: 16px; }
