@@ -94,6 +94,19 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
   assert.doesNotMatch(html, /Desar notes de les accions/)
 })
 
+test('el diàleg explica l’entrada amb tecles i prepara el primer camp i el següent alumne', () => {
+  const html = renderToStaticMarkup(createElement(GradeModal, {
+    student: { name: 'Alumne fictici' }, competency: { name: 'C1' },
+    criterion: { name: 'Rigor', selectedActionIds: ['R1'] }, actions: [{ id: 'R1', description: 'Acció fictícia' }],
+    onClose() {}, onSaveActions() {}, onNextStudent() {}, nextStudentName: 'Alumne fictici 2',
+  }))
+  assert.match(html, /A, B, C, D o N \(NA\)/)
+  assert.match(html, /Enter: acció següent; a l’última, alumne següent/)
+  assert.match(html, /aria-describedby="action-grade-keyboard-help"/)
+  assert.match(html, /autofocus=""/)
+  assert.match(html, /Alumne següent: Alumne fictici 2/)
+})
+
 
 test('la finestra d’accions només mostra les competències actives i sempre ofereix Tancar', () => {
   const state = fixture()

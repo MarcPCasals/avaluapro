@@ -1,16 +1,18 @@
 import { useDialogSave } from '../../lib/useDialogSave'
 import './ActionDialogs.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { GRADE_OPTIONS, gradeClassName } from '../../lib/grades'
 import { getActionGradeSummary } from '../../lib/actionGrades'
 import { createActionGradeAutosave } from '../../lib/actionGradeAutosave'
 
-export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onClose, onConfigure }) {
+export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onClose, onConfigure, onNextStudent, nextStudentName }) {
   const { busy, error, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les notes.')
   const [grades, setGrades] = useState(() => Object.fromEntries(actions.map(action => [action.id, mark?.actionGrades?.[action.id] || ''])))
   const [autosaveState, setAutosaveState] = useState({ status: 'idle', error: '' })
   const [autosave] = useState(() => createActionGradeAutosave({ save: onSaveActions, onState: setAutosaveState }))
+  const fields = useRef([])
+  const advancing = useRef(false)
   useEffect(() => { autosave.setSave(onSaveActions) }, [autosave, onSaveActions])
   useEffect(() => {
     autosave.activate()
@@ -24,16 +26,47 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
   }
   const closeAfterSave = async () => { if (await autosave.flush()) close() }
   const configureAfterSave = async () => { if (await autosave.flush()) onConfigure() }
+  const nextStudentAfterSave = async () => {
+    if (advancing.current) return
+    advancing.current = true
+    try {
+      if (await autosave.flush()) {
+        if (onNextStudent) onNextStudent()
+        else close()
+      }
+    } finally { advancing.current = false }
+  }
+  const handleGradeKey = (event, actionId, index) => {
+    if (event.isComposing || event.nativeEvent?.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
+    const key = event.key.toUpperCase()
+    if (['A', 'B', 'C', 'D', 'N'].includes(key)) {
+      event.preventDefault()
+      changeGrade(actionId, key === 'N' ? 'NA' : key)
+    } else if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault()
+      changeGrade(actionId, '')
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      if (event.repeat || advancing.current) return
+      if (event.shiftKey) fields.current[index - 1]?.focus()
+      else if (index < actions.length - 1) fields.current[index + 1]?.focus()
+      else void nextStudentAfterSave()
+    }
+  }
   return <Modal title={`${criterion.name} · ${utName || 'UT'}`} panelClassName="evaluation-actions-dialog" onClose={closeAfterSave}>
     <p><strong>{student.name}</strong><br />{competency.name}</p>
     <section className="criterion-actions-preview">
       <h3>Accions que s’avaluen en aquesta UT</h3>
       {actions.length ? <>
         <p>Qualifica cada acció. La nota del criteri serà la més baixa: A &gt; B &gt; C &gt; D &gt; NA.</p>
+        <p id="action-grade-keyboard-help" className="action-grade-keyboard-help">Teclat: A, B, C, D o N (NA). Enter: acció següent; a l’última, {onNextStudent ? 'alumne següent' : 'acabar'}. Majúscules + Enter: acció anterior. Retrocés: esborrar. Desament automàtic.</p>
         {value && !mark?.actionGrades && <p className="action-legacy-notice">Nota anterior del criteri: <strong>{value}</strong>. Les accions no hereten aquesta nota; es conservarà fins que qualifiquis una acció.</p>}
-        <div className="action-grade-fields">{actions.map(action => <label key={action.id}>
+        <div className="action-grade-fields">{actions.map((action, index) => <label key={action.id}>
           <span>{!action.id.startsWith('text:') && <strong>{action.id}: </strong>}{action.description}</span>
           <select aria-label={`Nota de ${action.id.startsWith('text:') ? action.description : action.id}`} disabled={!onSaveActions}
+            autoFocus={index === 0} ref={element => { fields.current[index] = element }}
+            aria-describedby="action-grade-keyboard-help" className={gradeClassName(grades[action.id])}
+            onKeyDown={event => handleGradeKey(event, action.id, index)}
             value={grades[action.id] || ''} onChange={event => changeGrade(action.id, event.target.value)}>
             {GRADE_OPTIONS.map(grade => <option key={grade} value={grade}>{grade || 'Pendent'}</option>)}
           </select>
@@ -54,6 +87,8 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
     </div>}
     {error && <p role="alert">{error}</p>}
     {busy && <p role="status">Desant els canvis… Pots tancar la finestra.</p>}
-    <div className="evaluation-actions-footer"><button className="secondary-action" type="button" onClick={closeAfterSave}>Tancar</button></div>
+    <div className="evaluation-actions-footer"><button className="secondary-action" type="button" onClick={closeAfterSave}>Tancar</button>
+      {actions.length > 0 && onSaveActions && <button className="primary-action" type="button" onClick={nextStudentAfterSave}>{onNextStudent ? `Alumne següent: ${nextStudentName}` : 'Acabar'}</button>}
+    </div>
   </Modal>
 }
