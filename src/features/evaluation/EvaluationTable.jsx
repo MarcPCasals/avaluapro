@@ -53,6 +53,7 @@ export function EvaluationTable({
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
   const studentOrder = new Map(students.map((student, index) => [student.id, index]))
   const criterionOrder = new Map(flatCriteria.map((criterion, index) => [criterion.id, index]))
+  const nextGradingStudent = grading ? students[studentOrder.get(grading.student.id) + 1] : null
 
   const getEvaluationTabIndex = (studentId, criterionId) => {
     const studentIndex = studentOrder.get(studentId) ?? 0
@@ -77,10 +78,13 @@ export function EvaluationTable({
   return (
     <>
     {grading && <CriterionGradeModal
+      key={`${grading.student.id}:${grading.criterion.id}`}
       {...grading} value={getCriterionMark(marks, grading.student.id, grading.criterion.id)}
       mark={marks.find(mark => mark.studentId === grading.student.id && mark.criterionId === grading.criterion.id)}
       actions={getSelectedCriterionActions(actionCatalog, grading.competency, grading.criterion)}
       utName={utName} onClose={() => setGrading(null)}
+      nextStudentName={nextGradingStudent?.name}
+      onNextStudent={nextGradingStudent ? () => setGrading({ ...grading, student: nextGradingStudent }) : undefined}
       onConfigure={onConfigureActions ? () => { setGrading(null); onConfigureActions() } : undefined}
       onSave={value => onUpdateMark(grading.student.id, grading.criterion.id, value)}
       onSaveActions={onUpdateActionGrades ? grades => onUpdateActionGrades(grading.student.id, grading.criterion.id, grades) : undefined} />}
