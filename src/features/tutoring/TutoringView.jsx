@@ -1,3 +1,4 @@
+import { SeatingPlanSummary } from './SeatingPlanSummary.jsx'
 import { SeatingStructureOptions } from './SeatingStructureOptions.jsx'
 import { SeatingContextSelector } from './SeatingContextSelector.jsx'
 import { getSeatingContextKey, getSeatingRooms, getSeatingStudents, normalizeSeatingContext } from './seatingContext.js'
@@ -11081,6 +11082,8 @@ export function TutoringView() {
               }} disabled={seatingSaveBusy || (!selectedSeatingPlan && seatingSaveMode === 'new')} type="button">Crear nova versió</button>}
             </div>
 
+            <SeatingPlanSummary analysis={seatingPlanAnalysis} />
+
             <nav aria-label="Eines de disposició d’aula" className="tutorial-seating-side-toolbar">
               <button
                 className={seatingWorkspacePanel === 'structure' ? 'active' : ''}
@@ -11664,58 +11667,6 @@ export function TutoringView() {
               )}
             </section>
 
-            <section className={`tutorial-seating-quality-panel ${seatingPlanAnalysis.quality.tone}`}>
-              <div className="tutorial-seating-quality-score">
-                <span>Qualitat global</span>
-                <strong>
-                  {seatingPlanAnalysis.score}
-                  <small>/100</small>
-                </strong>
-                <em>{seatingPlanAnalysis.quality.label}</em>
-              </div>
-
-              <div className="tutorial-seating-quality-summary">
-                <div>
-                  <strong>Lectura de la proposta</strong>
-                  <p>{seatingPlanAnalysis.summary}</p>
-                </div>
-                {seatingPlanAnalysis.strengths.length > 0 && (
-                  <ul>
-                    {seatingPlanAnalysis.strengths.map((strength) => (
-                      <li key={strength}>
-                        <CheckCircle2 aria-hidden="true" size={15} />
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="tutorial-seating-quality-conflicts">
-                <header>
-                  <strong>Conflictes detectats</strong>
-                  <span>{seatingPlanAnalysis.conflicts.length}</span>
-                </header>
-                {seatingPlanAnalysis.conflicts.length > 0 ? (
-                  <div>
-                    {seatingPlanAnalysis.conflicts.slice(0, 3).map((conflict, index) => (
-                      <article className={conflict.severity} key={`${conflict.title}_${conflict.text}_${index}`}>
-                        <AlertTriangle aria-hidden="true" size={14} />
-                        <p>
-                          <strong>{conflict.title}</strong>
-                          <span>{conflict.text}</span>
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="empty">
-                    <CheckCircle2 aria-hidden="true" size={15} />
-                    Cap conflicte rellevant.
-                  </p>
-                )}
-              </div>
-            </section>
 
             {seatingQualityComparison && (
               <div
@@ -11791,36 +11742,6 @@ export function TutoringView() {
               </div>
             )}
 
-            <div className="tutorial-seating-insight-grid">
-              <article>
-                <strong>Incompatibilitats a prop</strong>
-                <span>{seatingPlanAnalysis.adjacentAvoidPairs.length}</span>
-                <p>Alumnes amb rebuig o tensió que han quedat massa a prop.</p>
-              </article>
-              <article>
-                <strong>Suports clars</strong>
-                <span>
-                  {Math.max(
-                    0,
-                    seatingPlanAnalysis.vulnerablePlacements.length - seatingPlanAnalysis.vulnerableWithoutSupport.length,
-                  )}
-                  /{seatingPlanAnalysis.vulnerablePlacements.length}
-                </span>
-                <p>Perfils vulnerables que sí que tenen algun suport proper.</p>
-              </article>
-              <article>
-                <strong>Prioritaris davant</strong>
-                <span>
-                  {seatingPlanAnalysis.priorityInFront.length}/{seatingPlanAnalysis.priorityPlacements.length}
-                </span>
-                <p>Alumnes delicats situats en zones de seguiment més fàcil.</p>
-              </article>
-              <article>
-                <strong>Parelles de treball</strong>
-                <span>{seatingPlanAnalysis.adjacentWorkPairs.length}</span>
-                <p>Vincles de treball útils que han quedat a prop dins l’aula.</p>
-              </article>
-            </div>
 
             {seatingPlanAnalysis.recommendations.length > 0 && (
               <div className="tutorial-seating-recommendations">
