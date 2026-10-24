@@ -30,12 +30,28 @@ export function getSeatingStudents(students, context) {
 }
 
 export function getSeatingRooms(plans, extraRooms = []) {
-  const rooms = new Map([['main', MAIN_SEATING_ROOM]])
-  for (const context of [...plans.map(plan => plan.layout?.seatingContext), ...extraRooms]) {
+  const rooms = new Map([['main', { ...MAIN_SEATING_ROOM, halfGroup: 'all', halfGroups: ['all'] }]])
+  // The active/latest saved layout determines a room's default, rather than the oldest version.
+  const sorted = [...plans].sort((a, b) => String(b.contentUpdatedAt || b.createdAt || b.updatedAt || '').localeCompare(String(a.contentUpdatedAt || a.createdAt || a.updatedAt || '')) ||
+    Number(Boolean(b.isActive)) - Number(Boolean(a.isActive)))
+  for (const context of [...sorted.map(plan => plan.layout?.seatingContext), ...extraRooms]) {
     const normalized = normalizeSeatingContext(context)
-    if (normalized.roomId !== 'main') rooms.set(normalized.roomId, normalized)
+    const existing = rooms.get(normalized.roomId)
+    if (!existing) rooms.set(normalized.roomId, { ...normalized, halfGroups: [normalized.halfGroup] })
+    else if (!existing.halfGroups.includes(normalized.halfGroup)) existing.halfGroups.push(normalized.halfGroup)
   }
   return [...rooms.values()]
+}
+
+export function getSeatingRoomContext(room) {
+  return normalizeSeatingContext(room)
+}
+
+export function getSeatingRoomGroupOptions(room, context) {
+  const configured = room?.halfGroups || [room?.halfGroup || 'all']
+  // Half-group classrooms may serve A and B; full-class use must be explicitly configured.
+  return room?.roomId === 'main' || configured.includes('all') || context?.halfGroup === 'all'
+    ? ['all', 'A', 'B'] : ['A', 'B']
 }
 
 export function getSessionSeatingPlans({ plans = [], classes = [], session = {} }) {

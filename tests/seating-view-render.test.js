@@ -51,3 +51,14 @@ test('el resum superior mostra les relacions, la qualitat i els conflictes de la
   assert.match(clear, /Cap conflicte rellevant/)
   assert.doesNotMatch(clear, /Conflicte fictici/)
 })
+
+test('una aula de mig grup mostra A/B i no ofereix tot el grup com a opció predeterminada', async () => {
+  const { getSeatingRooms, getSeatingRoomContext } = await import('../src/features/tutoring/seatingContext.js')
+  const rooms = getSeatingRooms([{ layout: { seatingContext: { roomId: 'lab', roomName: 'Laboratori', halfGroup: 'A' } } }])
+  const context = getSeatingRoomContext(rooms.find(room => room.roomId === 'lab'))
+  const html = renderToStaticMarkup(createElement(Selector, { context, rooms, students: [{ id: 'a', halfGroup: 'Grup A' }, { id: 'b', halfGroup: 'Grup B' }], onChange() {}, onAddRoom() {} }))
+  assert.match(html, /Laboratori · Mig grup A/)
+  assert.match(html, /value="A" selected=""/)
+  assert.doesNotMatch(html, /<option value="all"/)
+  assert.match(html, /1 alumnes/)
+})

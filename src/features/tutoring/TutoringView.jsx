@@ -6909,13 +6909,13 @@ export function TutoringView() {
     setSeatingRestrictions(getEmptySeatingRestrictions())
   }
 
-  const handleAddSeatingRoom = () => {
-    const roomName = window.prompt('Nom de la nova aula (per exemple, Laboratori):')?.trim()
+  const handleAddSeatingRoom = ({ roomName, halfGroup }) => {
+    roomName = String(roomName || '').trim()
     if (!roomName) return
     const existing = seatingRooms.find(room => room.roomName.toLocaleLowerCase('ca') === roomName.toLocaleLowerCase('ca'))
-    const room = existing || { roomId: `room_${crypto.randomUUID()}`, roomName }
+    const room = { ...(existing || { roomId: `room_${crypto.randomUUID()}`, roomName }), halfGroup }
     if (!existing) setSeatingExtraRooms(current => [...current, room])
-    handleChangeSeatingContext({ ...room, halfGroup: seatingContext.halfGroup })
+    handleChangeSeatingContext(room)
   }
 
   const handleDuplicateTutorialSeatingPlan = (plan) => {

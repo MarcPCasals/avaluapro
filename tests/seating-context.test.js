@@ -156,3 +156,27 @@ test('el diagnòstic detecta alumnes del mig grup absents d’un pla desat encar
   assert.equal(analysis.unplacedCount, 1)
   assert.equal(analysis.quality.label, 'Incompleta')
 })
+
+test('seleccionar una aula recupera el mig grup guardat en lloc d’heretar tot el grup de l’aula anterior', async () => {
+  const { getSeatingRoomContext, getSeatingRoomGroupOptions } = await import('../src/features/tutoring/seatingContext.js')
+  const saved = [
+    { ...plan(labA), createdAt: '2026-10-24T12:00:00Z' },
+    { ...plan({ ...labB, roomId: 'music', roomName: 'Música' }), createdAt: '2026-10-24T13:00:00Z' },
+  ]
+  const rooms = getSeatingRooms(saved)
+  const select = id => getSeatingRoomContext(rooms.find(room => room.roomId === id))
+  assert.equal(select('main').halfGroup, 'all')
+  assert.equal(select('lab').halfGroup, 'A')
+  assert.deepEqual(getSeatingStudents(students, select('lab')).map(s => s.id), ['a1', 'a2'])
+  assert.equal(select('music').halfGroup, 'B')
+  assert.deepEqual(getSeatingRoomGroupOptions(rooms.find(room => room.roomId === 'lab'), select('lab')), ['A', 'B'])
+})
+
+test('la configuració més recent d’una aula guanya les versions antigues encara que l’antiga sigui activa', async () => {
+  const { getSeatingRoomContext } = await import('../src/features/tutoring/seatingContext.js')
+  const rooms = getSeatingRooms([
+    { ...plan({ ...labA, halfGroup: 'all' }), isActive: true, createdAt: '2026-10-23T12:00:00Z' },
+    { ...plan(labA), isActive: false, createdAt: '2026-10-24T12:00:00Z' },
+  ])
+  assert.equal(getSeatingRoomContext(rooms.find(room => room.roomId === 'lab')).halfGroup, 'A')
+})
