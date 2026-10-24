@@ -132,3 +132,27 @@ test('una proposta amb menys llocs que alumnes conserva els pendents al diagnòs
   assert.equal(analysis.quality.label, 'Incompleta')
   assert.match(analysis.conflicts[0].title, /sense lloc/)
 })
+
+test('un mig grup complet no és incomplet per pendents de l’altre mig grup o una llista antiga', () => {
+  const roster = getSeatingStudents(students, labA)
+  const result = generate(labA)
+  result.unplacedProfiles = [...profilesByStudentId.values()]
+  const analysis = helpers.analyzeTutorialSeatingPlan({ plan: result, students: roster, relations: [], getSeatDistance: (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) })
+  assert.equal(analysis.expectedCount, 2)
+  assert.equal(analysis.placedCount, 2)
+  assert.equal(analysis.unplacedCount, 0)
+  assert.notEqual(analysis.quality.label, 'Incompleta')
+  assert.equal(analysis.score, 100)
+  assert.equal(analysis.conflicts.length, 0)
+})
+
+test('el diagnòstic detecta alumnes del mig grup absents d’un pla desat encara que la llista antiga de pendents sigui buida', () => {
+  const result = generate(labA)
+  result.placements = result.placements.slice(0, 1)
+  result.unplacedProfiles = []
+  const analysis = helpers.analyzeTutorialSeatingPlan({ plan: result, students: getSeatingStudents(students, labA), relations: [], getSeatDistance: () => 0 })
+  assert.equal(analysis.expectedCount, 2)
+  assert.equal(analysis.placedCount, 1)
+  assert.equal(analysis.unplacedCount, 1)
+  assert.equal(analysis.quality.label, 'Incompleta')
+})

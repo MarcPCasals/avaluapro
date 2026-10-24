@@ -44,9 +44,9 @@ test('files i taula docent es configuren amb desplegables que admeten dues files
 })
 
 test('el resum superior mostra les relacions, la qualitat i els conflictes de la proposta visible', () => {
-  const analysis = { score: 72, quality: { label: 'Correcte', tone: 'good' }, summary: 'Lectura sintètica', strengths: ['Suport adequat'], conflicts: [{ title: 'Incompatibilitat', text: 'Conflicte fictici', severity: 'high' }], adjacentAvoidPairs: [1], vulnerablePlacements: [1, 2], vulnerableWithoutSupport: [1], priorityInFront: [1], priorityPlacements: [1, 2], adjacentWorkPairs: [1, 2, 3] }
+  const analysis = { expectedCount: 2, placedCount: 2, score: 72, quality: { label: 'Correcte', tone: 'good' }, summary: 'Lectura sintètica', strengths: ['Suport adequat'], conflicts: [{ title: 'Incompatibilitat', text: 'Conflicte fictici', severity: 'high' }], adjacentAvoidPairs: [1], vulnerablePlacements: [1, 2], vulnerableWithoutSupport: [1], priorityInFront: [1], priorityPlacements: [1, 2], adjacentWorkPairs: [1, 2, 3] }
   const html = renderToStaticMarkup(createElement(Summary, { analysis }))
-  for (const text of ['Resum de relacions i conflictes', 'Qualitat global', 'Conflictes detectats', 'Conflicte fictici', 'Incompatibilitats a prop', 'Suports clars', 'Prioritaris davant', 'Parelles de treball']) assert.ok(html.includes(text), text)
+  for (const text of ['Resum de relacions i conflictes', '2/2 alumnes amb lloc', 'Qualitat global', 'Conflictes detectats', 'Conflicte fictici', 'Incompatibilitats a prop', 'Suports clars', 'Prioritaris davant', 'Parelles de treball']) assert.ok(html.includes(text), text)
   const clear = renderToStaticMarkup(createElement(Summary, { analysis: { ...analysis, conflicts: [] } }))
   assert.match(clear, /Cap conflicte rellevant/)
   assert.doesNotMatch(clear, /Conflicte fictici/)

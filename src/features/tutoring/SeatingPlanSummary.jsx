@@ -16,6 +16,7 @@ export function SeatingPlanSummary({ analysis }) {
               <div className="tutorial-seating-quality-summary">
                 <div>
                   <strong>Lectura de la proposta</strong>
+                  {Number.isInteger(analysis.expectedCount) && <p><strong>{analysis.placedCount}/{analysis.expectedCount} alumnes amb lloc</strong></p>}
                   <p>{analysis.summary}</p>
                 </div>
                 {analysis.strengths.length > 0 && (

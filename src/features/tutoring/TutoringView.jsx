@@ -5795,26 +5795,29 @@ export function TutoringView() {
       analyzeTutorialSeatingPlan({
         getSeatDistance,
         plan: visibleSeatingPlan,
+        students: seatingStudents,
         relations: effectiveTutorialRelations,
         restrictions: visibleSeatingRestrictions,
       }),
-    [effectiveTutorialRelations, visibleSeatingPlan, visibleSeatingRestrictions],
+    [effectiveTutorialRelations, visibleSeatingPlan, visibleSeatingRestrictions, seatingStudents],
   )
   const generatedSeatingPlanAnalysis = useMemo(
     () =>
       analyzeTutorialSeatingPlan({
         getSeatDistance,
         plan: generatedSeatingPlan,
+        students: seatingStudents,
         relations: effectiveTutorialRelations,
         restrictions: seatingRestrictions,
       }),
-    [effectiveTutorialRelations, generatedSeatingPlan, seatingRestrictions],
+    [effectiveTutorialRelations, generatedSeatingPlan, seatingRestrictions, seatingStudents],
   )
   const comparisonSeatingPlanAnalysis = useMemo(
     () =>
       comparisonSeatingPlan
         ? analyzeTutorialSeatingPlan({
             getSeatDistance,
+            students: seatingStudents,
             plan: materializeSavedSeatingPlan({
               plan: comparisonSeatingPlan,
               profilesByStudentId: cooperativeProfilesByStudentId,
@@ -5823,7 +5826,7 @@ export function TutoringView() {
             restrictions: comparisonSeatingPlan.layout?.seatingRestrictions || getEmptySeatingRestrictions(),
           })
         : null,
-    [comparisonSeatingPlan, cooperativeProfilesByStudentId, effectiveTutorialRelations],
+    [comparisonSeatingPlan, cooperativeProfilesByStudentId, effectiveTutorialRelations, seatingStudents],
   )
   const seatingCapacity = getSeatingCapacity(seatingLayout)
   const hasRelationChangesAfterSeatingSave = Boolean(
@@ -6212,6 +6215,7 @@ export function TutoringView() {
     const analysis = analyzeTutorialSeatingPlan({
       getSeatDistance,
       plan,
+      students: seatingStudents,
       relations: effectiveTutorialRelations,
       restrictions: seatingRestrictions,
     })
