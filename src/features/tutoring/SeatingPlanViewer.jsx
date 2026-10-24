@@ -16,7 +16,7 @@ export function SeatingPlanViewer({ plan, students = [] }) {
   return <section className="seating-plan-viewer" aria-label="Disposició d’aula activa">
     <p>{context.roomName} · {context.halfGroup === 'all' ? 'Tot el grup' : `Mig grup ${context.halfGroup}`} · {plan.title}</p>
     <div className="seating-viewer-front">Pissarra · Davant de l’aula</div>
-    <p style={{ textAlign: layout.teacherDeskSide === 'right' ? 'right' : 'left' }}>Taula docent</p>
+    <p style={{ textAlign: ['left', 'center', 'right'].includes(layout.teacherDeskSide) ? layout.teacherDeskSide : 'left' }}>Taula docent</p>
     <div className="seating-viewer-scroll"><div className="seating-viewer-grid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(85px, 1fr))` }}>
       {Array.from({ length: rows * columns }, (_, index) => {
         const x = index % columns, y = Math.floor(index / columns)

@@ -4,10 +4,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-let server, Selector, Viewer
+let server, Selector, Viewer, StructureOptions
 
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()], optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, hmr: false, ws: false } })
+  StructureOptions = (await server.ssrLoadModule('/src/features/tutoring/SeatingStructureOptions.jsx')).SeatingStructureOptions
   Selector = (await server.ssrLoadModule('/src/features/tutoring/SeatingContextSelector.jsx')).SeatingContextSelector
   Viewer = (await server.ssrLoadModule('/src/features/tutoring/SeatingPlanViewer.jsx')).SeatingPlanViewer
 })
@@ -31,4 +32,12 @@ test('si falta la disposició correcta es mostra un missatge per activar-la', ()
   const html = renderToStaticMarkup(createElement(Viewer, { plan: null }))
   assert.match(html, /No hi ha cap disposició activa/)
   assert.match(html, /Tutoria/)
+})
+
+test('files i taula docent es configuren amb desplegables que admeten dues files i centre', () => {
+  const html = renderToStaticMarkup(createElement(StructureOptions, { value: { rows: 2, teacherDeskSide: 'center' }, onChange() {} }))
+  assert.equal((html.match(/<select/g) || []).length, 2)
+  assert.match(html, /value="2" selected=""/)
+  assert.match(html, /value="center" selected=""/)
+  assert.doesNotMatch(html, /<button/)
 })

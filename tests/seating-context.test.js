@@ -98,3 +98,14 @@ test('Mode aula tria l’activa del mig grup de la sessió i del grup vinculat a
   assert.equal(getSessionSeatingPlans({ plans: twoRooms, classes, session: { classId: 'science', subgroupId: 'A' } })[0].id, 'main-a')
   assert.equal(getSessionSeatingPlans({ plans: twoRooms, classes, session: { classId: 'science', subgroupId: 'A', roomId: 'lab' } })[0].id, 'a')
 })
+
+test('el motor permet dues files i manté la taula docent al centre quan es normalitza un plànol desat', () => {
+  const result = generate(labA, { layout: { blocks: [3], rows: 2, teacherDeskSide: 'center', seatingContext: labA } })
+  assert.equal(result.rows, 2)
+  assert.equal(result.layout.rows, 2)
+  assert.equal(result.seats.length, 6)
+  assert.equal(result.layout.teacherDeskSide, 'center')
+  const reloaded = generate(labA, { layout: result.layout })
+  assert.equal(reloaded.rows, 2)
+  assert.equal(reloaded.layout.teacherDeskSide, 'center')
+})
