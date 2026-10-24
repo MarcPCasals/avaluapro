@@ -764,8 +764,10 @@ export function createCooperativeSociometricHelpers({
     )
   }
 
-  function analyzeTutorialSeatingPlan({ plan, relations, restrictions = {}, getSeatDistance }) {
-    const placements = plan?.placements || []
+  function analyzeTutorialSeatingPlan({ plan, relations, restrictions = {}, getSeatDistance, students }) {
+    const expectedIds = Array.isArray(students) ? new Set(students.map(student => student.id)) : null
+    const placements = (plan?.placements || []).filter(placement => !expectedIds || expectedIds.has(placement.studentId))
+    const placedIds = new Set(placements.map(placement => placement.studentId))
     const rows = plan?.rows || 5
     const adjacentAvoidPairs = []
     const adjacentWorkPairs = []
@@ -901,7 +903,12 @@ export function createCooperativeSociometricHelpers({
       recommendations.push('Procura deixar almenys una parella de treball fiable relativament a prop.')
     }
 
-    const unplacedCount = plan?.unplacedProfiles?.length || 0
+    // The selected roster is authoritative, including for saved layouts and stale pending lists.
+    const unplacedCount = expectedIds
+      ? [...expectedIds].filter(id => !placedIds.has(id)).length
+      : plan?.unplacedProfiles?.length || 0
+    const expectedCount = expectedIds ? expectedIds.size : placedIds.size + unplacedCount
+    const placedCount = placedIds.size
     const restrictionCount =
       (restrictions.neverNearPairs || []).length +
       (restrictions.preferNearPairs || []).length +
@@ -1013,6 +1020,8 @@ export function createCooperativeSociometricHelpers({
           : `La proposta necessita canvis: hi ha ${conflicts.length} conflicte${conflicts.length === 1 ? '' : 's'} amb impacte pedagògic.`
 
     return {
+      expectedCount,
+      placedCount,
       adjacentAvoidPairs,
       adjacentFriendshipPairs,
       adjacentLeaderPairs,
