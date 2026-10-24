@@ -36,7 +36,8 @@ jobs:
           tests/action-progress.test.js tests/action-progress-render.test.js
           tests/evaluation-actions.test.js tests/evaluation-boundary.test.js
           tests/analytics-boundary.test.js tests/edit-history-store.test.js
-          tests/transversal-evaluation.test.js
+          tests/transversal-evaluation.test.js tests/seating-context.test.js
+          tests/seating-version-workflow.test.js tests/seating-view-render.test.js
 
       - name: Build for Firebase Hosting
         run: npm run build:firebase
@@ -58,3 +59,4 @@ jobs:
           projectId: avaluapro
           channelId: live
           firebaseToolsVersion: '15.22.0'
+

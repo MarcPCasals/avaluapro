@@ -1,9 +1,12 @@
+import { Modal } from '../../components/Modal'
+import { SeatingPlanViewer } from '../tutoring/SeatingPlanViewer.jsx'
+import { getSeatingHalfGroup, getSeatingStudents, getSessionSeatingPlans, normalizeSeatingContext } from '../tutoring/seatingContext.js'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus,
   Pause, PencilLine, Play, Projector, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
-  Users, UserX, X,
+  Users, UserX, X, LayoutGrid,
 } from 'lucide-react'
 import {
   CLASSROOM_BEHAVIOR_CATEGORIES,
@@ -299,6 +302,8 @@ function ClassroomTimingProposalDialog({ actualMinutes, activity, onApply, onKee
 }
 
 export function ClassroomMode({
+  tutorialSeatingPlans = [],
+  seatingClasses = [],
   absenceRecords,
   agendaNotes = [],
   behaviorEvents,
@@ -322,7 +327,12 @@ export function ClassroomMode({
   taskRecords,
   tasks,
 }) {
+  const [showSeatingPlan, setShowSeatingPlan] = useState(false)
+  const [seatingRoomId, setSeatingRoomId] = useState('')
   const [currentBundle, setCurrentBundle] = useState(bundle)
+  const sessionSeatingPlans = getSessionSeatingPlans({ plans: tutorialSeatingPlans, classes: seatingClasses, session: currentBundle.session })
+  const sessionSeatingPlan = sessionSeatingPlans.find(plan => normalizeSeatingContext(plan.layout?.seatingContext).roomId === seatingRoomId) || sessionSeatingPlans[0] || null
+  const seatingRoster = getSeatingStudents(students.filter(student => student.classId === currentBundle.session.classId), { halfGroup: getSeatingHalfGroup(currentBundle.session.subgroupId) || 'all' })
   const completedItemIds = useMemo(
     () => new Set(currentBundle.results.filter((result) => ['completed', 'continued', 'skipped'].includes(result.status)).map((result) => result.sessionItemId)),
     [currentBundle.results],
@@ -729,6 +739,7 @@ export function ClassroomMode({
           <span>{classItem?.name || 'Grup'}{currentBundle.session.subgroupId ? ` · ${currentBundle.session.subgroupId}` : ''}</span>
           <strong>{currentBundle.planningUnit.code} · {currentBundle.planningUnit.title}</strong>
         </div>
+        <button className="secondary-action" type="button" onClick={() => setShowSeatingPlan(true)}><LayoutGrid size={18} />Disposició d’aula</button>
         <div className="classroom-session-meta"><span>{formatSessionDate(currentBundle.session.startsAt)}</span><strong>{String(currentBundle.session.startsAt).slice(11, 16)}</strong></div>
       </header>
 
@@ -836,6 +847,12 @@ export function ClassroomMode({
         <button className="classroom-close-button" disabled={Boolean(timerStartedAt && !timerStoppedAt)} onClick={() => setCloseReview(true)} type="button"><CheckCircle2 size={17} />Tancar la classe</button>
       </footer>
 
+      {showSeatingPlan && <Modal title={`Disposició d’aula · ${getSeatingHalfGroup(currentBundle.session.subgroupId) ? `Mig grup ${getSeatingHalfGroup(currentBundle.session.subgroupId)}` : 'Tot el grup'}`} size="lg" onClose={() => setShowSeatingPlan(false)}>
+        {sessionSeatingPlans.length > 1 && <label>Aula <select aria-label="Aula de la disposició" value={normalizeSeatingContext(sessionSeatingPlan?.layout?.seatingContext).roomId} onChange={event => setSeatingRoomId(event.target.value)}>
+          {sessionSeatingPlans.map(plan => { const context = normalizeSeatingContext(plan.layout?.seatingContext); return <option key={plan.id} value={context.roomId}>{context.roomName}</option> })}
+        </select></label>}
+        <SeatingPlanViewer plan={sessionSeatingPlan} students={seatingRoster} />
+      </Modal>}
       {closeReview && <ClassroomCloseReviewDialog attendanceConfirmed={Boolean(currentBundle.session.attendanceConfirmedAt)} attendanceIssueCount={attendanceIssueIds.size} attendanceIssueDetail={attendanceIssueDetail} busy={busy === 'close'} className={classItem?.name} onClose={() => setCloseReview(false)} onConfirm={closeSession} pendingTaskCount={pendingTaskRecords.length} reminderCount={reminderCount} sessionTime={String(currentBundle.session.startsAt).slice(11, 16)} setSummaryPrivateNote={setSummaryPrivateNote} setSummaryReflection={setSummaryReflection} showNotes={!currentBundle.standalone} summaryPrivateNote={summaryPrivateNote} summaryNoteRegistered={Boolean(currentBundle.privateNotes?.[0]?.recordInPlanning)} summaryReflection={summaryReflection} />}
       {reviewItem && <ActivityReviewDialog item={reviewItem} onClose={() => setReviewItem(null)} onSave={(changes) => saveReview(reviewItem, changes)} result={currentBundle.results.find((result) => result.sessionItemId === reviewItem.id)} />}
       {timingProposal && <ClassroomTimingProposalDialog actualMinutes={timingProposal.actualMinutes} activity={timingProposal.item.sourceActivity} onApply={applyRealTimingToPlanning} onKeep={keepProgrammedTiming} />}

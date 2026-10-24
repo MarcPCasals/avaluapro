@@ -1,3 +1,4 @@
+import { isSameSeatingContext } from '../features/tutoring/seatingContext.js'
 import { buildActionGradeMark, isActionGradedMark, recalculateActionCriteria } from '../lib/actionGrades'
 import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch } from '../lib/evaluationActions'
 import { buildTransversalStructure } from '../lib/transversalEvaluation'
@@ -5119,7 +5120,7 @@ export const useAvaluaproStore = create((set, get) => ({
         tutorialSeatingPlans: [
           nextPlan,
           ...(state.tutorialSeatingPlans || []).map((plan) =>
-            isActive && plan.classId === classId ? { ...plan, isActive: false, updatedAt: now } : plan,
+            isActive && plan.classId === classId && isSameSeatingContext(plan, nextPlan) ? { ...plan, isActive: false, updatedAt: now } : plan,
           ),
         ],
       }
@@ -5136,7 +5137,7 @@ export const useAvaluaproStore = create((set, get) => ({
       if (!target) return {}
       return {
         tutorialSeatingPlans: (state.tutorialSeatingPlans || []).map((plan) => {
-          if (patch.isActive && plan.classId === target.classId && plan.id !== planId) {
+          if (patch.isActive && plan.classId === target.classId && plan.id !== planId && isSameSeatingContext(plan, { ...target, ...patch })) {
             return { ...plan, isActive: false, updatedAt: now }
           }
           if (plan.id !== planId) return plan
@@ -5168,7 +5169,7 @@ export const useAvaluaproStore = create((set, get) => ({
       const remainingPlans = (current.tutorialSeatingPlans || []).filter((item) => item.id !== planId)
       if (!plan.isActive) return { tutorialSeatingPlans: remainingPlans }
       const fallbackActivePlan = remainingPlans
-        .filter((item) => item.classId === plan.classId)
+        .filter((item) => item.classId === plan.classId && isSameSeatingContext(item, plan))
         .sort((a, b) =>
           String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')),
         )[0]
@@ -6371,3 +6372,4 @@ useAvaluaproStore.subscribe((state, previous) => {
 for (const name of ['restoreBackup', 'restoreCloudBackup', 'pullFromCloud', 'deleteClass', 'deleteStudent', 'deleteOldTrackingData', 'resetToSeed', 'startOwnData']) {
   useAvaluaproStore.setState({ [name]: (...args) => { editHistory.clear(); return originals[name](...args) } })
 }
+

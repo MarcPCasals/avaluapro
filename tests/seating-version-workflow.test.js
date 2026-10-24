@@ -1,3 +1,4 @@
+import { getSeatingStudents, normalizeSeatingContext } from '../src/features/tutoring/seatingContext.js'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
@@ -15,7 +16,8 @@ function fixture() {
   const state = {}
   const scope = {
     normalizeSeatingLayout: layout => ({ ...layout }), normalizeSeatingBlocks: blocks => blocks || [],
-    getSavedSeatingAssignments, getUnseatedStudentIds, normalizeSavedSeatingRestrictions,
+    getSavedSeatingAssignments, getUnseatedStudentIds, normalizeSavedSeatingRestrictions, getSeatingStudents, normalizeSeatingContext,
+    seatingContext: normalizeSeatingContext(),
     getGridSeatId: (x, y) => `seat_${x}_${y}`, DEFAULT_SEATING_BLOCKS: [3],
     classStudents: [{ id: 'fictici-1' }, { id: 'fictici-2' }],
   }
@@ -108,16 +110,32 @@ test('una vista de consulta no desa la proposta oculta i els errors mantenen el 
 test('obrir l’eina carrega la disposició activa per modificar i duplicar prepara una còpia editable', () => {
   const { scope, state, load } = fixture()
   Object.assign(scope, {
-    classTutorialSeatingPlan: original,
+    contextTutorialSeatingPlan: original,
     handleLoadTutorialSeatingPlan: load,
     setComparisonSeatingPlanId: value => { state.comparison = value },
     setActiveRelationshipTool: value => { state.tool = value },
   })
-  handler('handleOpenTutorialSeatingTool', 'handleDuplicateTutorialSeatingPlan', scope)()
+  handler('handleOpenTutorialSeatingTool', 'handleChangeSeatingContext', scope)()
   assert.equal(state.setLoadedSeatingPlanId, original.id)
   assert.equal(state.setSeatingSaveMode, 'update')
   assert.equal(state.tool, 'seating')
   handler('handleDuplicateTutorialSeatingPlan', 'handleSetActiveTutorialSeatingPlan', scope)(original)
   assert.equal(state.setSeatingSaveMode, 'new')
   assert.equal(state.setSeatingWorkspacePanel, 'save')
+})
+
+test('carregar un mig grup recupera el context i només deixa pendents els seus membres', () => {
+  const { scope, state, load } = fixture()
+  scope.classStudents = [{ id: 'fictici-1', halfGroup: 'Grup A' }, { id: 'fictici-2', halfGroup: 'Grup B' }, { id: 'fictici-3', halfGroup: 'Grup A' }]
+  load({ ...original, layout: { ...original.layout, seatingContext: { roomId: 'lab', roomName: 'Laboratori', halfGroup: 'A' } } })
+  assert.equal(state.setSeatingContext.roomId, 'lab')
+  assert.equal(state.setSeatingContext.halfGroup, 'A')
+  assert.deepEqual(state.setSeatingUnseatedStudentIds, ['fictici-3'])
+})
+
+test('guardar una disposició de mig grup persisteix la seva aula sense substituir el context', async () => {
+  const seatingContext = { roomId: 'lab', roomName: 'Laboratori', halfGroup: 'B' }
+  const { save, calls } = saveFixture({ seatingContext })
+  await save()
+  assert.deepEqual(calls[0].patch.layout.seatingContext, seatingContext)
 })
