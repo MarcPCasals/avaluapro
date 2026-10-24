@@ -1,3 +1,5 @@
+import { SeatingContextSelector } from '../../src/features/tutoring/SeatingContextSelector.jsx'
+import { getSeatingStudents, getSeatingRooms, normalizeSeatingContext } from '../../src/features/tutoring/seatingContext.js'
 import { EvaluationActionsDemo } from './EvaluationActionsDemo.jsx'
 import { TransversalEvaluationDemo } from './TransversalEvaluationDemo.jsx'
 import { createHalfGroupProposal } from '../../src/features/tutoring/halfGroupProposalUtils.js'
@@ -145,6 +147,8 @@ function AssistanceApp() {
   const [selectedTutorialStudentId, setSelectedTutorialStudentId] = useState('')
   const [selectedSociometricStudentId, setSelectedSociometricStudentId] = useState('')
   const [selectedSeatingStudentId, setSelectedSeatingStudentId] = useState('')
+  const [seatingContext, setSeatingContext] = useState(() => normalizeSeatingContext())
+  const [seatingRooms, setSeatingRooms] = useState(() => getSeatingRooms([], [{ roomId: 'lab', roomName: 'Laboratori fictici' }]))
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [cooperativeVariant, setCooperativeVariant] = useState(0)
   const [selectedCooperativeGroupId, setSelectedCooperativeGroupId] = useState('')
@@ -277,7 +281,8 @@ function AssistanceApp() {
     (row) => row.student.id === selectedSociometricStudentId,
   )
   const seatingSeats = useMemo(() => {
-    const orderedRows = [...sociometricSummary.studentRows].sort((a, b) => {
+    const roster = new Set(getSeatingStudents(activeClassStudents, seatingContext).map(student => student.id))
+    const orderedRows = sociometricSummary.studentRows.filter(row => roster.has(row.student.id)).sort((a, b) => {
       const categoryOrder = { Rebutjat: 0, Aïllat: 1, Líder: 2, Acceptat: 3 }
       return categoryOrder[a.category] - categoryOrder[b.category] ||
         a.student.name.localeCompare(b.student.name, 'ca', { numeric: true })
@@ -291,7 +296,7 @@ function AssistanceApp() {
       row: Math.floor(index / 5) + 1,
       student: rotatedRows[index]?.student || null,
     }))
-  }, [seatingVariant, sociometricSummary.studentRows])
+  }, [activeClassStudents, seatingContext, seatingVariant, sociometricSummary.studentRows])
   const selectedSeatingSeat = seatingSeats.find((seat) => seat.student?.id === selectedSeatingStudentId)
   const cooperativeGroups = useMemo(() => {
     const categoryOrder = { Rebutjat: 0, Aïllat: 1, Líder: 2, Acceptat: 3 }
@@ -791,6 +796,15 @@ function AssistanceApp() {
                 Genera una alternativa fictícia
               </button>
             </header>
+            <SeatingContextSelector context={seatingContext} rooms={seatingRooms} students={activeClassStudents}
+              onChange={context => { setSeatingContext(context); setSelectedSeatingStudentId('') }}
+              onAddRoom={() => {
+                const roomName = window.prompt('Nom de la nova aula:')?.trim()
+                if (!roomName) return
+                const room = { roomId: crypto.randomUUID(), roomName }
+                setSeatingRooms(current => [...current, room])
+                setSeatingContext({ ...room, halfGroup: seatingContext.halfGroup })
+              }} />
             <SeatingPlanBoard
               columns={5}
               onSelectSeat={(seat) => {
@@ -936,3 +950,4 @@ function AssistanceApp() {
 }
 
 export default AssistanceApp
+

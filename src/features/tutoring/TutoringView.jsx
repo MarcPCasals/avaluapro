@@ -1,3 +1,5 @@
+import { SeatingContextSelector } from './SeatingContextSelector.jsx'
+import { getSeatingContextKey, getSeatingRooms, getSeatingStudents, normalizeSeatingContext } from './seatingContext.js'
 import { openGroupRosterExport } from './groupRosterExport.js'
 import { SociogramInsights } from './SociogramInsights'
 import { buildSocialSubgroups, getPositiveComponentMap } from './sociometricSubgroupUtils.js'
@@ -2402,6 +2404,7 @@ function normalizeSeatingLayout(layout) {
     ...(blocks.length > 0 ? { blocks } : {}),
     columns,
     halfGroupSeatIds: normalizeSeatingHalfGroupSeatIds(layout?.halfGroupSeatIds, validSeatIds),
+    seatingContext: normalizeSeatingContext(layout?.seatingContext),
     rows,
     teacherDeskSide: layout?.teacherDeskSide === 'right' ? 'right' : 'left',
   }
@@ -2569,6 +2572,7 @@ function buildTutorialSeatingPlan({
 
   const variantOffset = Number(variant || 0)
   const objectiveWeights = getSeatingObjectiveWeights(objective)
+  const rosterIds = new Set(students.map(student => student.id))
   const studentsToPlace = students
     .map((student) => profilesByStudentId.get(student.id))
     .filter(Boolean)
@@ -2591,7 +2595,7 @@ function buildTutorialSeatingPlan({
   const placedStudentIds = new Set()
 
   Object.entries(manualSeatByStudentId || {}).forEach(([studentId, seatId]) => {
-    if (forcedUnseated.has(studentId)) return
+    if (!rosterIds.has(studentId) || forcedUnseated.has(studentId)) return
     const student = profilesByStudentId.get(studentId)
     const seat = activeSeatMap.get(seatId)
     if (!student || !seat || blockedSeats.has(seat.id) || placed.some((placement) => placement.seat.id === seat.id)) return
@@ -4433,6 +4437,9 @@ export function TutoringView() {
   const [cooperativeCopyMessage, setCooperativeCopyMessage] = useState('')
   const [showCooperativeProjection, setShowCooperativeProjection] = useState(false)
   const [cooperativeWorkspacePanel, setCooperativeWorkspacePanel] = useState('')
+  const [seatingContext, setSeatingContext] = useState(() => normalizeSeatingContext())
+  const [seatingExtraRooms, setSeatingExtraRooms] = useState([])
+  const [seatingContextDrafts, setSeatingContextDrafts] = useState({})
   const [seatingLayout, setSeatingLayout] = useState(() =>
     normalizeSeatingLayout({ blocks: DEFAULT_SEATING_BLOCKS, rows: SEATING_GRID_ROWS }),
   )
@@ -4479,6 +4486,42 @@ export function TutoringView() {
   const [tutoringChangeSignalsSpaceId, setTutoringChangeSignalsSpaceId] = useState('')
   const [tutoringChangeSignalError, setTutoringChangeSignalError] = useState({ message: '', spaceId: '' })
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const [seatingClassId, setSeatingClassId] = useState(activeClassId)
+  if (seatingClassId !== activeClassId) {
+    setSeatingClassId(activeClassId)
+    setSeatingContext(normalizeSeatingContext())
+    setSeatingExtraRooms([])
+    setSeatingContextDrafts({})
+    const cleanLayout = normalizeSeatingLayout({ blocks: DEFAULT_SEATING_BLOCKS, rows: SEATING_GRID_ROWS })
+    setSeatingLayout(cleanLayout)
+    setSeatingStructureDraft({ blocks: cleanLayout.blocks || DEFAULT_SEATING_BLOCKS, rows: cleanLayout.rows, teacherDeskSide: cleanLayout.teacherDeskSide })
+    setSeatingManualSeatByStudentId({})
+    setSeatingManualEmptySeatIds([])
+    setSeatingLockedStudentIds([])
+    setSeatingVariant(0)
+    setSeatingIterationObjective('balanced')
+    setSeatingIterationZone('front')
+    setSeatingIterationMessage('')
+    setSeatingHalfGroupAssignmentMode('')
+    setSeatingProblemSeats({})
+    setSeatingAppliedProblemSeats({})
+    setSeatingUnseatedStudentIds([])
+    setSeatingPlanName('')
+    setSeatingPlanObservation('')
+    setSeatingSaveAsActive(false)
+    setDraggingSeatingStudentId('')
+    setSelectedSeatingPlanId('')
+    setLoadedSeatingPlanId('')
+    setSeatingSaveMode('new')
+    setSeatingSaveMessage('')
+    setComparisonSeatingPlanId('')
+    setSelectedSeatingStudentId('')
+    setSeatingMoveStudentId('')
+    setSeatingBlockSeatMode(false)
+    setSeatingRestrictionTargetId('')
+    setSeatingQualityBaseline(null)
+    setSeatingRestrictions(getEmptySeatingRestrictions())
+  }
   const classes = useAvaluaproStore((state) => state.classes)
   const cloud = useAvaluaproStore((state) => state.cloud)
   const students = useAvaluaproStore((state) => state.students)
@@ -4774,7 +4817,7 @@ export function TutoringView() {
   const classTutorialSeatingPlan = useMemo(
     () => {
       const sortedPlans = (tutorialSeatingPlans || [])
-        .filter((plan) => plan.classId === activeClassId)
+        .filter((plan) => plan.classId === activeClassId && getSeatingContextKey(plan.layout?.seatingContext) === getSeatingContextKey())
         .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
       return sortedPlans.find((plan) => plan.isActive) || sortedPlans[0] || null
     },
@@ -5694,6 +5737,11 @@ export function TutoringView() {
     selectedCooperativeGroupSet,
     visibleCooperativeGroups,
   ])
+  const seatingStudents = useMemo(() => getSeatingStudents(classStudents, seatingContext), [classStudents, seatingContext])
+  const seatingRooms = useMemo(() => getSeatingRooms(classTutorialSeatingPlans, seatingExtraRooms), [classTutorialSeatingPlans, seatingExtraRooms])
+  const contextTutorialSeatingPlans = useMemo(() => classTutorialSeatingPlans.filter(plan =>
+    getSeatingContextKey(plan.layout?.seatingContext) === getSeatingContextKey(seatingContext)), [classTutorialSeatingPlans, seatingContext])
+  const contextTutorialSeatingPlan = contextTutorialSeatingPlans.find(plan => plan.isActive) || contextTutorialSeatingPlans[0] || null
   const generatedSeatingPlan = useMemo(
     () =>
       buildTutorialSeatingPlan({
@@ -5707,12 +5755,12 @@ export function TutoringView() {
         profilesByStudentId: cooperativeProfilesByStudentId,
         relations: effectiveTutorialRelations,
         restrictions: seatingRestrictions,
-        students: classStudents,
+        students: seatingStudents,
         unseatedStudentIds: seatingUnseatedStudentIds,
         variant: seatingVariant,
       }),
     [
-      classStudents,
+      seatingStudents,
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
       seatingLayout,
@@ -5727,11 +5775,11 @@ export function TutoringView() {
     ],
   )
   const selectedSeatingPlan =
-    classTutorialSeatingPlans.find((plan) => plan.id === selectedSeatingPlanId) || null
+    contextTutorialSeatingPlans.find((plan) => plan.id === selectedSeatingPlanId) || null
   const loadedSeatingPlan =
-    classTutorialSeatingPlans.find((plan) => plan.id === loadedSeatingPlanId) || null
+    contextTutorialSeatingPlans.find((plan) => plan.id === loadedSeatingPlanId) || null
   const comparisonSeatingPlan =
-    classTutorialSeatingPlans.find((plan) => plan.id === comparisonSeatingPlanId) || null
+    contextTutorialSeatingPlans.find((plan) => plan.id === comparisonSeatingPlanId) || null
   const visibleSeatingRestrictions =
     selectedSeatingPlan?.layout?.seatingRestrictions || seatingRestrictions
   const visibleSeatingPlan = selectedSeatingPlan
@@ -6153,7 +6201,7 @@ export function TutoringView() {
       profilesByStudentId: cooperativeProfilesByStudentId,
       relations: effectiveTutorialRelations,
       restrictions: seatingRestrictions,
-      students: classStudents,
+      students: seatingStudents,
       unseatedStudentIds: [],
       variant,
     })
@@ -6671,6 +6719,7 @@ export function TutoringView() {
         isActive: seatingSaveAsActive,
         layout: {
           ...generatedSeatingPlan.layout,
+          seatingContext: normalizeSeatingContext(seatingContext),
           iterationObjective: seatingIterationObjective,
           seatingRestrictions,
           lockedStudentIds: seatingLockedStudentIds,
@@ -6715,6 +6764,8 @@ export function TutoringView() {
 
   const handleLoadTutorialSeatingPlan = (plan, mode = 'update') => {
     if (!plan) return
+    const planContext = normalizeSeatingContext(plan.layout?.seatingContext)
+    setSeatingContext(planContext)
     const cleanLayout = normalizeSeatingLayout(plan.layout)
     const savedRestrictions = normalizeSavedSeatingRestrictions(plan.layout?.seatingRestrictions)
     const seatAssignments = getSavedSeatingAssignments(plan, getGridSeatId)
@@ -6740,7 +6791,7 @@ export function TutoringView() {
     setSeatingRestrictions(savedRestrictions)
     setSeatingUnseatedStudentIds(
       getUnseatedStudentIds(
-        classStudents.map((student) => student.id),
+        getSeatingStudents(classStudents, planContext).map((student) => student.id),
         seatAssignments,
       ),
     )
@@ -6760,7 +6811,7 @@ export function TutoringView() {
   }
 
   const handleOpenTutorialSeatingTool = () => {
-    if (classTutorialSeatingPlan) handleLoadTutorialSeatingPlan(classTutorialSeatingPlan)
+    if (contextTutorialSeatingPlan) handleLoadTutorialSeatingPlan(contextTutorialSeatingPlan)
     else {
       setSelectedSeatingPlanId('')
       setLoadedSeatingPlanId('')
@@ -6772,6 +6823,91 @@ export function TutoringView() {
     }
     setComparisonSeatingPlanId('')
     setActiveRelationshipTool('seating')
+  }
+
+  const handleChangeSeatingContext = (nextContext) => {
+    const next = normalizeSeatingContext(nextContext)
+    if (getSeatingContextKey(next) === getSeatingContextKey(seatingContext)) return
+    const currentDraft = { seatingLayout, seatingStructureDraft, seatingManualSeatByStudentId, seatingManualEmptySeatIds, seatingLockedStudentIds, seatingVariant, seatingIterationObjective, seatingIterationZone, seatingIterationMessage, seatingHalfGroupAssignmentMode, seatingProblemSeats, seatingAppliedProblemSeats, seatingUnseatedStudentIds, seatingPlanName, seatingPlanObservation, seatingSaveAsActive, draggingSeatingStudentId, selectedSeatingPlanId, loadedSeatingPlanId, seatingSaveMode, seatingSaveMessage, comparisonSeatingPlanId, selectedSeatingStudentId, seatingMoveStudentId, seatingBlockSeatMode, seatingRestrictionTargetId, seatingQualityBaseline, seatingRestrictions }
+    setSeatingContextDrafts(current => ({ ...current, [getSeatingContextKey(seatingContext)]: currentDraft }))
+    setSeatingContext(next)
+    const draft = seatingContextDrafts[getSeatingContextKey(next)]
+    if (draft) {
+      setSeatingLayout(draft.seatingLayout)
+      setSeatingStructureDraft(draft.seatingStructureDraft)
+      setSeatingManualSeatByStudentId(draft.seatingManualSeatByStudentId)
+      setSeatingManualEmptySeatIds(draft.seatingManualEmptySeatIds)
+      setSeatingLockedStudentIds(draft.seatingLockedStudentIds)
+      setSeatingVariant(draft.seatingVariant)
+      setSeatingIterationObjective(draft.seatingIterationObjective)
+      setSeatingIterationZone(draft.seatingIterationZone)
+      setSeatingIterationMessage(draft.seatingIterationMessage)
+      setSeatingHalfGroupAssignmentMode(draft.seatingHalfGroupAssignmentMode)
+      setSeatingProblemSeats(draft.seatingProblemSeats)
+      setSeatingAppliedProblemSeats(draft.seatingAppliedProblemSeats)
+      setSeatingUnseatedStudentIds(draft.seatingUnseatedStudentIds)
+      setSeatingPlanName(draft.seatingPlanName)
+      setSeatingPlanObservation(draft.seatingPlanObservation)
+      setSeatingSaveAsActive(draft.seatingSaveAsActive)
+      setDraggingSeatingStudentId(draft.draggingSeatingStudentId)
+      setSelectedSeatingPlanId(draft.selectedSeatingPlanId)
+      setLoadedSeatingPlanId(draft.loadedSeatingPlanId)
+      setSeatingSaveMode(draft.seatingSaveMode)
+      setSeatingSaveMessage(draft.seatingSaveMessage)
+      setComparisonSeatingPlanId(draft.comparisonSeatingPlanId)
+      setSelectedSeatingStudentId(draft.selectedSeatingStudentId)
+      setSeatingMoveStudentId(draft.seatingMoveStudentId)
+      setSeatingBlockSeatMode(draft.seatingBlockSeatMode)
+      setSeatingRestrictionTargetId(draft.seatingRestrictionTargetId)
+      setSeatingQualityBaseline(draft.seatingQualityBaseline)
+      setSeatingRestrictions(draft.seatingRestrictions)
+      return
+    }
+    const saved = classTutorialSeatingPlans.filter(plan => getSeatingContextKey(plan.layout?.seatingContext) === getSeatingContextKey(next))
+    const plan = saved.find(item => item.isActive) || saved[0]
+    if (plan) {
+      handleLoadTutorialSeatingPlan(plan)
+      return
+    }
+    const template = classTutorialSeatingPlans.find(plan => normalizeSeatingContext(plan.layout?.seatingContext).roomId === next.roomId)
+    const cleanLayout = normalizeSeatingLayout({ ...(template?.layout || { blocks: DEFAULT_SEATING_BLOCKS, rows: SEATING_GRID_ROWS }), halfGroupSeatIds: {}, seatingContext: next })
+    setSeatingLayout(cleanLayout)
+    setSeatingStructureDraft({ blocks: cleanLayout.blocks || DEFAULT_SEATING_BLOCKS, rows: cleanLayout.rows, teacherDeskSide: cleanLayout.teacherDeskSide })
+    setSeatingManualSeatByStudentId({})
+    setSeatingManualEmptySeatIds([])
+    setSeatingLockedStudentIds([])
+    setSeatingVariant(0)
+    setSeatingIterationObjective('balanced')
+    setSeatingIterationZone('front')
+    setSeatingIterationMessage('')
+    setSeatingHalfGroupAssignmentMode('')
+    setSeatingProblemSeats({})
+    setSeatingAppliedProblemSeats({})
+    setSeatingUnseatedStudentIds([])
+    setSeatingPlanName('')
+    setSeatingPlanObservation('')
+    setSeatingSaveAsActive(false)
+    setDraggingSeatingStudentId('')
+    setSelectedSeatingPlanId('')
+    setLoadedSeatingPlanId('')
+    setSeatingSaveMode('new')
+    setSeatingSaveMessage('')
+    setComparisonSeatingPlanId('')
+    setSelectedSeatingStudentId('')
+    setSeatingMoveStudentId('')
+    setSeatingBlockSeatMode(false)
+    setSeatingRestrictionTargetId('')
+    setSeatingQualityBaseline(null)
+    setSeatingRestrictions(getEmptySeatingRestrictions())
+  }
+
+  const handleAddSeatingRoom = () => {
+    const roomName = window.prompt('Nom de la nova aula (per exemple, Laboratori):')?.trim()
+    if (!roomName) return
+    const existing = seatingRooms.find(room => room.roomName.toLocaleLowerCase('ca') === roomName.toLocaleLowerCase('ca'))
+    const room = existing || { roomId: `room_${crypto.randomUUID()}`, roomName }
+    if (!existing) setSeatingExtraRooms(current => [...current, room])
+    handleChangeSeatingContext({ ...room, halfGroup: seatingContext.halfGroup })
   }
 
   const handleDuplicateTutorialSeatingPlan = (plan) => {
@@ -10884,7 +11020,7 @@ export function TutoringView() {
                 </button>
               </div>
               <div className="tutorial-seating-header-actions">
-                <button onClick={() => downloadTutorialSeatingJpeg(visibleSeatingPlan, activeClass?.name)} type="button">
+                <button onClick={() => downloadTutorialSeatingJpeg(visibleSeatingPlan, `${activeClass?.name || ''} · ${seatingContext.roomName} · ${seatingContext.halfGroup === 'all' ? 'Tot el grup' : `Mig grup ${seatingContext.halfGroup}`}`)} type="button">
                   <FileDown aria-hidden="true" size={17} />
                   Descarregar JPG
                 </button>
@@ -10922,6 +11058,8 @@ export function TutoringView() {
               </div>
             </header>
 
+            <SeatingContextSelector context={seatingContext} rooms={seatingRooms} students={classStudents}
+              onChange={handleChangeSeatingContext} onAddRoom={handleAddSeatingRoom} disabled={seatingSaveBusy} />
             <div className="tutorial-seating-version-context">
               <div>
                 <strong>{selectedSeatingPlan ? `Consultant: ${selectedSeatingPlan.title}` : loadedSeatingPlan ? `${seatingSaveMode === 'update' ? 'Modificant' : 'Nova versió a partir de'}: ${loadedSeatingPlan.title}` : 'Nova disposició'}</strong>
@@ -10988,7 +11126,7 @@ export function TutoringView() {
               >
                 <History aria-hidden="true" size={22} />
                 <strong>Versions</strong>
-                <span>{classTutorialSeatingPlans.length} guardades</span>
+                <span>{contextTutorialSeatingPlans.length} guardades</span>
               </button>
             </nav>
 
@@ -11312,8 +11450,9 @@ export function TutoringView() {
                         onChange={(event) => setSeatingSaveAsActive(event.target.checked)}
                         type="checkbox"
                       />
-                      Marcar com a disposició activa
+                      Marcar com a disposició activa d’aquesta aula i aquest grup
                     </label>
+                    <p>El Mode aula mostrarà la disposició activa del grup o mig grup de la sessió.</p>
                     <button className="primary" disabled={seatingSaveBusy || Boolean(selectedSeatingPlan)} onClick={() => handleSaveTutorialSeatingPlan()} type="button">
                       <Save aria-hidden="true" size={16} />
                       {seatingSaveBusy ? 'Guardant…' : seatingSaveMode === 'update' && loadedSeatingPlan ? 'Guardar canvis' : 'Guardar nova versió'}
@@ -11334,7 +11473,7 @@ export function TutoringView() {
                       </div>
                       <div>
                         <dt>Capacitat</dt>
-                        <dd>{seatingCapacity}/{classStudents.length}</dd>
+                        <dd>{seatingCapacity}/{seatingStudents.length}</dd>
                       </div>
                       <div>
                         <dt>Fixats</dt>
@@ -11359,8 +11498,8 @@ export function TutoringView() {
 
                 {seatingWorkspacePanel === 'versions' && (
                   <div className="tutorial-seating-versions-compact">
-                    {classTutorialSeatingPlans.length > 0 ? (
-                      classTutorialSeatingPlans.map((plan) => (
+                    {contextTutorialSeatingPlans.length > 0 ? (
+                      contextTutorialSeatingPlans.map((plan) => (
                         <article key={`compact_${plan.id}`}>
                           <div>
                             <strong>{plan.title || 'Disposició guardada'}</strong>
@@ -11387,7 +11526,7 @@ export function TutoringView() {
                 <strong>Capacitat activa</strong>
                 <div>
                   <span>
-                    {seatingCapacity}/{classStudents.length} llocs
+                    {seatingCapacity}/{seatingStudents.length} llocs
                   </span>
                 </div>
               </article>
@@ -11750,7 +11889,7 @@ export function TutoringView() {
                   <History aria-hidden="true" size={18} />
                   <div>
                     <strong>Historial de disposicions</strong>
-                    <span>{classTutorialSeatingPlans.length} versió/ns guardada/es</span>
+                    <span>{contextTutorialSeatingPlans.length} versió/ns guardada/es</span>
                   </div>
                 </div>
                 {selectedSeatingPlan && (
@@ -11786,9 +11925,9 @@ export function TutoringView() {
                 </div>
               )}
 
-              {classTutorialSeatingPlans.length > 0 ? (
+              {contextTutorialSeatingPlans.length > 0 ? (
                 <div className="tutorial-seating-history-list">
-                  {classTutorialSeatingPlans.map((plan) => (
+                  {contextTutorialSeatingPlans.map((plan) => (
                     <article
                       className={`${plan.isActive ? 'active' : ''} ${
                         selectedSeatingPlanId === plan.id ? 'previewing' : ''
@@ -12228,7 +12367,7 @@ export function TutoringView() {
                           value={seatingRestrictionTargetId}
                         >
                           <option value="">Selecciona alumne</option>
-                          {classStudents
+                          {seatingStudents
                             .filter((student) => student.id !== selectedSeatingStudentId)
                             .map((student) => (
                               <option key={student.id} value={student.id}>

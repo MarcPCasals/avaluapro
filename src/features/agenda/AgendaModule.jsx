@@ -405,6 +405,7 @@ export default function AgendaModule() {
   const [initialSchedulingRequest] = useState(() => consumeAgendaSchedulingRequest(globalThis.sessionStorage))
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
+  const tutorialSeatingPlans = useAvaluaproStore((state) => state.tutorialSeatingPlans)
   const students = useAvaluaproStore((state) => state.students)
   const semesters = useAvaluaproStore((state) => state.semesters)
   const uts = useAvaluaproStore((state) => state.uts)
@@ -998,6 +999,8 @@ export default function AgendaModule() {
         behaviorEvents={behaviorEvents}
         bundle={activeBundle}
         classes={agendaClasses}
+        seatingClasses={classes}
+        tutorialSeatingPlans={tutorialSeatingPlans}
         key={`${activeBundle.session.id}:${classroomRevision}`}
         onCloseSession={closeClassroom}
         onCancelRecovery={(bundle, studentId, kind) => cancelClassroomRecovery({
@@ -1096,3 +1099,4 @@ export default function AgendaModule() {
     </section>
   )
 }
+
