@@ -930,7 +930,9 @@ export function createCooperativeSociometricHelpers({
     const hasCriticalConflict = dangerAvoidCount > 0 || neverNearConflicts.length > 0 || unplacedCount > 0
     const score = hasCriticalConflict ? Math.min(54, rawScore) : rawScore
     const quality =
-      score >= 85
+      unplacedCount > 0
+        ? { label: 'Incompleta', tone: 'danger' }
+        : score >= 85
         ? { label: 'Molt sòlida', tone: 'positive' }
         : score >= 70
           ? { label: 'Bona', tone: 'good' }
@@ -938,6 +940,11 @@ export function createCooperativeSociometricHelpers({
             ? { label: 'Acceptable amb revisions', tone: 'warning' }
             : { label: 'Riscosa', tone: 'danger' }
     const conflicts = [
+      ...(unplacedCount > 0 ? [{
+        severity: 'danger',
+        title: 'Alumnes sense lloc assignat',
+        text: `Falten ${unplacedCount} alumne/s per col·locar. Revisa el nombre de taules actives, els llocs bloquejats i els alumnes pendents de col·locar.`,
+      }] : []),
       ...adjacentAvoidPairs.map(({ pair, severity }) => ({
         severity,
         text: `${formatSeatingStudentName(pair[0].student.student.name)} i ${formatSeatingStudentName(pair[1].student.student.name)} tenen tensió o rebuig i són massa a prop.`,
@@ -975,7 +982,7 @@ export function createCooperativeSociometricHelpers({
       })),
     ]
     const strengths = []
-    if (adjacentAvoidPairs.length === 0 && neverNearConflicts.length === 0) {
+    if (placements.length > 1 && adjacentAvoidPairs.length === 0 && neverNearConflicts.length === 0) {
       strengths.push('No hi ha incompatibilitats crítiques a prop.')
     }
     if (vulnerablePlacements.length > 0 && vulnerableWithoutSupport.length === 0) {
@@ -993,8 +1000,13 @@ export function createCooperativeSociometricHelpers({
     if (unplacedCount === 0 && placements.length > 0) {
       strengths.push('Tots els alumnes tenen un lloc assignat.')
     }
+    if (unplacedCount > 0) {
+      recommendations.unshift(`Assigna un lloc als ${unplacedCount} alumne/s pendents. Si no hi caben, amplia les files o les taules actives de l’aula.`)
+    }
     const summary =
-      conflicts.length === 0
+      unplacedCount > 0
+        ? `La proposta és incompleta: ${unplacedCount} alumne/s encara no tenen lloc. Aquesta manca d’assignacions penalitza la qualitat; cal resoldre-la abans de donar la disposició per bona.`
+        : conflicts.length === 0
         ? 'La proposta respecta els criteris principals i no presenta conflictes pedagògics rellevants.'
         : score >= 70
           ? `La proposta és funcional, però convé revisar ${conflicts.length} punt${conflicts.length === 1 ? '' : 's'} abans de donar-la per bona.`

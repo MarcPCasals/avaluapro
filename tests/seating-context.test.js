@@ -109,3 +109,26 @@ test('el motor permet dues files i manté la taula docent al centre quan es norm
   assert.equal(reloaded.rows, 2)
   assert.equal(reloaded.layout.teacherDeskSide, 'center')
 })
+
+test('la manca de llocs en una proposta automàtica apareix com a incidència i explica la qualitat zero', () => {
+  const analyze = helpers.analyzeTutorialSeatingPlan
+  const result = analyze({ plan: { rows: 2, placements: [], unplacedProfiles: Array.from({ length: 9 }, (_, i) => ({ student: { id: `synthetic-${i}` } })) }, relations: [], getSeatDistance: () => 0 })
+  assert.equal(result.score, 0)
+  assert.equal(result.quality.label, 'Incompleta')
+  assert.equal(result.unplacedCount, 9)
+  assert.equal(result.conflicts[0].severity, 'danger')
+  assert.match(result.conflicts[0].text, /9 alumne/)
+  assert.match(result.summary, /incompleta/)
+  assert.doesNotMatch(result.summary, /no presenta conflictes/)
+  assert.match(result.recommendations[0], /amplia les files/)
+})
+
+test('una proposta amb menys llocs que alumnes conserva els pendents al diagnòstic', () => {
+  const result = generate({}, { layout: { blocks: [1], rows: 2 } })
+  assert.equal(result.placements.length, 2)
+  assert.equal(result.unplacedProfiles.length, 2)
+  const analysis = helpers.analyzeTutorialSeatingPlan({ plan: result, relations: [], getSeatDistance: (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) })
+  assert.equal(analysis.unplacedCount, 2)
+  assert.equal(analysis.quality.label, 'Incompleta')
+  assert.match(analysis.conflicts[0].title, /sense lloc/)
+})
