@@ -148,7 +148,7 @@ function AssistanceApp() {
   const [selectedSociometricStudentId, setSelectedSociometricStudentId] = useState('')
   const [selectedSeatingStudentId, setSelectedSeatingStudentId] = useState('')
   const [seatingContext, setSeatingContext] = useState(() => normalizeSeatingContext())
-  const [seatingRooms, setSeatingRooms] = useState(() => getSeatingRooms([], [{ roomId: 'lab', roomName: 'Laboratori fictici' }]))
+  const [seatingRooms, setSeatingRooms] = useState(() => getSeatingRooms([], [{ roomId: 'lab', roomName: 'Laboratori fictici', halfGroup: 'A' }]))
   const [seatingVariant, setSeatingVariant] = useState(0)
   const [cooperativeVariant, setCooperativeVariant] = useState(0)
   const [selectedCooperativeGroupId, setSelectedCooperativeGroupId] = useState('')
@@ -798,12 +798,11 @@ function AssistanceApp() {
             </header>
             <SeatingContextSelector context={seatingContext} rooms={seatingRooms} students={activeClassStudents}
               onChange={context => { setSeatingContext(context); setSelectedSeatingStudentId('') }}
-              onAddRoom={() => {
-                const roomName = window.prompt('Nom de la nova aula:')?.trim()
+              onAddRoom={({ roomName, halfGroup }) => {
                 if (!roomName) return
-                const room = { roomId: crypto.randomUUID(), roomName }
+                const room = { roomId: crypto.randomUUID(), roomName, halfGroup, halfGroups: [halfGroup] }
                 setSeatingRooms(current => [...current, room])
-                setSeatingContext({ ...room, halfGroup: seatingContext.halfGroup })
+                setSeatingContext(room)
               }} />
             <SeatingPlanBoard
               columns={5}
