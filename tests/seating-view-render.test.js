@@ -4,10 +4,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-let server, Selector, Viewer, StructureOptions
+let server, Selector, Viewer, StructureOptions, Summary
 
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()], optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, hmr: false, ws: false } })
+  Summary = (await server.ssrLoadModule('/src/features/tutoring/SeatingPlanSummary.jsx')).SeatingPlanSummary
   StructureOptions = (await server.ssrLoadModule('/src/features/tutoring/SeatingStructureOptions.jsx')).SeatingStructureOptions
   Selector = (await server.ssrLoadModule('/src/features/tutoring/SeatingContextSelector.jsx')).SeatingContextSelector
   Viewer = (await server.ssrLoadModule('/src/features/tutoring/SeatingPlanViewer.jsx')).SeatingPlanViewer
@@ -40,4 +41,13 @@ test('files i taula docent es configuren amb desplegables que admeten dues files
   assert.match(html, /value="2" selected=""/)
   assert.match(html, /value="center" selected=""/)
   assert.doesNotMatch(html, /<button/)
+})
+
+test('el resum superior mostra les relacions, la qualitat i els conflictes de la proposta visible', () => {
+  const analysis = { score: 72, quality: { label: 'Correcte', tone: 'good' }, summary: 'Lectura sintètica', strengths: ['Suport adequat'], conflicts: [{ title: 'Incompatibilitat', text: 'Conflicte fictici', severity: 'high' }], adjacentAvoidPairs: [1], vulnerablePlacements: [1, 2], vulnerableWithoutSupport: [1], priorityInFront: [1], priorityPlacements: [1, 2], adjacentWorkPairs: [1, 2, 3] }
+  const html = renderToStaticMarkup(createElement(Summary, { analysis }))
+  for (const text of ['Resum de relacions i conflictes', 'Qualitat global', 'Conflictes detectats', 'Conflicte fictici', 'Incompatibilitats a prop', 'Suports clars', 'Prioritaris davant', 'Parelles de treball']) assert.ok(html.includes(text), text)
+  const clear = renderToStaticMarkup(createElement(Summary, { analysis: { ...analysis, conflicts: [] } }))
+  assert.match(clear, /Cap conflicte rellevant/)
+  assert.doesNotMatch(clear, /Conflicte fictici/)
 })
