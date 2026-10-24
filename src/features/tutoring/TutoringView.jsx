@@ -1,3 +1,4 @@
+import { SeatingStructureOptions } from './SeatingStructureOptions.jsx'
 import { SeatingContextSelector } from './SeatingContextSelector.jsx'
 import { getSeatingContextKey, getSeatingRooms, getSeatingStudents, normalizeSeatingContext } from './seatingContext.js'
 import { openGroupRosterExport } from './groupRosterExport.js'
@@ -828,7 +829,9 @@ async function downloadTutorialSeatingJpeg(
   context.fillText('PISSARRA', width / 2, boardY + 18)
 
   const teacherDeskWidth = 132
-  const teacherDeskX = plan.layout.teacherDeskSide === 'right' ? width - margin - teacherDeskWidth : margin
+  const teacherDeskX = plan.layout.teacherDeskSide === 'center'
+    ? (width - teacherDeskWidth) / 2
+    : plan.layout.teacherDeskSide === 'right' ? width - margin - teacherDeskWidth : margin
   drawSeatingExportRoundedRect(context, teacherDeskX, boardY + 48, teacherDeskWidth, 42, 9)
   context.fillStyle = '#f1f5f9'
   context.fill()
@@ -2382,7 +2385,7 @@ function getStableStudentNumber(value, variant = 0) {
 
 function normalizeSeatingLayout(layout) {
   const blocks = normalizeSeatingBlocks(layout?.blocks)
-  const rows = Math.min(7, Math.max(3, Number.parseInt(layout?.rows, 10) || SEATING_GRID_ROWS))
+  const rows = Math.min(7, Math.max(2, Number.parseInt(layout?.rows, 10) || SEATING_GRID_ROWS))
   const columns =
     blocks.length > 0
       ? blocks.reduce((sum, size) => sum + size, 0)
@@ -2406,7 +2409,7 @@ function normalizeSeatingLayout(layout) {
     halfGroupSeatIds: normalizeSeatingHalfGroupSeatIds(layout?.halfGroupSeatIds, validSeatIds),
     seatingContext: normalizeSeatingContext(layout?.seatingContext),
     rows,
-    teacherDeskSide: layout?.teacherDeskSide === 'right' ? 'right' : 'left',
+    teacherDeskSide: ['left', 'center', 'right'].includes(layout?.teacherDeskSide) ? layout.teacherDeskSide : 'left',
   }
 }
 
@@ -11159,60 +11162,7 @@ export function TutoringView() {
                 {seatingWorkspacePanel === 'structure' && (
                   <div className="tutorial-seating-structure-editor">
                     <p>Defineix les files i quantes taules individuals hi ha a cada bloc.</p>
-                    <label>
-                      Files
-                      <span className="tutorial-seating-stepper">
-                        <button
-                          aria-label="Treure una fila"
-                          onClick={() =>
-                            setSeatingStructureDraft((current) => ({
-                              ...current,
-                              rows: Math.max(3, current.rows - 1),
-                            }))
-                          }
-                          type="button"
-                        >
-                          −
-                        </button>
-                        <strong>{seatingStructureDraft.rows}</strong>
-                        <button
-                          aria-label="Afegir una fila"
-                          onClick={() =>
-                            setSeatingStructureDraft((current) => ({
-                              ...current,
-                              rows: Math.min(7, current.rows + 1),
-                            }))
-                          }
-                          type="button"
-                        >
-                          +
-                        </button>
-                      </span>
-                    </label>
-                    <fieldset className="tutorial-seating-teacher-side">
-                      <legend>Taula docent</legend>
-                      <div>
-                        <button
-                          className={seatingStructureDraft.teacherDeskSide === 'left' ? 'active' : ''}
-                          onClick={() =>
-                            setSeatingStructureDraft((current) => ({ ...current, teacherDeskSide: 'left' }))
-                          }
-                          type="button"
-                        >
-                          Esquerra
-                        </button>
-                        <button
-                          className={seatingStructureDraft.teacherDeskSide === 'right' ? 'active' : ''}
-                          onClick={() =>
-                            setSeatingStructureDraft((current) => ({ ...current, teacherDeskSide: 'right' }))
-                          }
-                          type="button"
-                        >
-                          Dreta
-                        </button>
-                      </div>
-                      <small>La planta quedarà sempre al costat contrari.</small>
-                    </fieldset>
+                    <SeatingStructureOptions value={seatingStructureDraft} onChange={setSeatingStructureDraft} />
                     <fieldset>
                       <legend>Distribució per blocs</legend>
                       <div className="tutorial-seating-block-editors">
