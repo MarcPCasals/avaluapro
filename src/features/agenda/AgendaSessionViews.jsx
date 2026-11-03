@@ -679,13 +679,15 @@ export function AgendaTimelineView({
   }, [])
   const [contentRefresh, setContentRefresh] = useState({ busy: false, classId: '', subject: '', notice: '', error: '' })
   const [subjectFilter, setSubjectFilter] = useState({ classId: '', subject: '' })
-  const activeSubject = subjectFilter.classId === selectedClassId ? subjectFilter.subject : ''
   const groupBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
   const timetableSubjects = getClassPlanningSubjects(slots, selectedClassId)
   const subjectForBundle = (bundle) => resolvePlanningSubject({ application: bundle.application,
     planningUnit: bundle.planningUnit, classItem: classes.find((item) => item.id === selectedClassId), subjects: timetableSubjects })
-  const subjects = [...new Set([...timetableSubjects, ...groupBundles.map(subjectForBundle)].filter(Boolean))]
   const selectedClassSubject = classes.find((item) => item.id === selectedClassId)?.subject
+  const subjects = [...new Set([...timetableSubjects, ...groupBundles.map(subjectForBundle), selectedClassSubject].filter(Boolean))]
+  const defaultSubject = resolvePlanningSubject({ classItem: { subject: selectedClassSubject }, subjects })
+  // An explicit empty selection means “all”; only an untouched group uses its subject.
+  const activeSubject = subjectFilter.classId === selectedClassId ? subjectFilter.subject : defaultSubject
   const timetableAvailability = buildTimetableSessionCandidates({ calendarEvents, classId: selectedClassId,
     subject: activeSubject, from: range?.from || today, to: range?.to || addDays(today, 56),
     timetables: timetable ? [timetable] : [], slotsByTimetableId: timetable ? { [timetable.id]: slots } : {},
