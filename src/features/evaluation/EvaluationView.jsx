@@ -1,3 +1,4 @@
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { getEvaluationActionCatalog, getEvaluationActionCopyDestinations } from '../../lib/evaluationActions'
 import { EvaluationActionsModal } from './EvaluationActionsModal'
 import { Modal } from '../../components/Modal'
@@ -11,7 +12,6 @@ import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { calculateGrade } from '../../lib/grades'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -20,7 +20,7 @@ import { EditStructureModal } from './EditStructureModal'
 import { EvaluationTable } from './EvaluationTable'
 import { ImportExcelModal } from './ImportExcelModal'
 import { RubricModal } from './RubricModal'
-import { SeatingChartsModal } from './SeatingChartsModal'
+import { TutorialSeatingMirrorModal } from './TutorialSeatingMirrorModal'
 
 function useEvaluationModel() {
   const { activeClassId, activeUtId } = useAvaluaproStore((state) => state.ui)
@@ -103,9 +103,6 @@ export function EvaluationView() {
   const updateMark = useAvaluaproStore((state) => state.updateMark)
   const updateMarksBulk = useAvaluaproStore((state) => state.updateMarksBulk)
   const toggleCompetencyModification = useAvaluaproStore((state) => state.toggleCompetencyModification)
-  const seatingCharts = useAvaluaproStore((state) => state.seatingCharts)
-  const upsertSeatingChart = useAvaluaproStore((state) => state.upsertSeatingChart)
-  const deleteSeatingChart = useAvaluaproStore((state) => state.deleteSeatingChart)
   const saveEvaluationActions = useAvaluaproStore((state) => state.saveEvaluationActions)
   const copyEvaluationActions = useAvaluaproStore((state) => state.copyEvaluationActions)
   const allClasses = useAvaluaproStore((state) => state.classes)
@@ -114,6 +111,7 @@ export function EvaluationView() {
   const [showStudentsModal, setShowStudentsModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showExcelOptions, setShowExcelOptions] = useState(false)
   const [showRemindersModal, setShowRemindersModal] = useState(false)
   const [showSeatingModal, setShowSeatingModal] = useState(false)
   const [rubricCriterionId, setRubricCriterionId] = useState(null)
@@ -125,6 +123,17 @@ export function EvaluationView() {
   const setClassTransversalCompetencies = useAvaluaproStore((state) => state.setClassTransversalCompetencies)
   const [transversalBusy, setTransversalBusy] = useState(false)
   const [transversalError, setTransversalError] = useState('')
+  useSearchNavigation('evaluation', (target) => {
+    setHalfGroupFilter('all')
+    setProfileStudentId(null)
+    setAnnotationsStudentId(null)
+    if (target.previewOnly) return
+    if (target.action === 'students') setShowStudentsModal(true)
+    if (target.action === 'structure') setShowStructureModal(true)
+    if (target.action === 'actions') setShowActionsModal(true)
+    if (target.action === 'import') setShowImportModal(true)
+    if (target.studentId) setProfileStudentId(target.studentId)
+  })
   const selectedTransversalNames = getTransversalNames(activeClass)
   const selectionKey = JSON.stringify(selectedTransversalNames)
   useEffect(() => {
@@ -161,7 +170,6 @@ export function EvaluationView() {
     (student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter,
   )
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
-  const classSeatingCharts = seatingCharts.filter((chart) => chart.classId === activeClassId)
 
   const handleExportActiveUtExcel = () => {
     if (!activeClass || !activeUt || competencies.length === 0) {
@@ -244,13 +252,9 @@ export function EvaluationView() {
             <strong>
               {activeCompetencyCount}/{totalSubjectCompetencies}
             </strong>
-            {isTransversal ? 'transversals actives' : 'competències actives'}
+            Competències i accions actives
           </button>
         )}
-        <button className="tool-button" onClick={() => setShowActionsModal(true)} type="button" disabled={!activeUtId}>
-          <ListChecks size={18} />
-          Accions de la UT
-        </button>
         {halfGroups.length > 0 && (
           <select
             className="half-group-select"
@@ -270,19 +274,27 @@ export function EvaluationView() {
           <MapPinned size={18} />
           Llocs Fixos
         </button>
-        <button className="tool-button" data-tour="import-excel-button" onClick={() => setShowImportModal(true)} type="button">
+        <button className="tool-button" data-tour="import-excel-button" onClick={() => setShowExcelOptions(true)} type="button">
           <FileSpreadsheet size={18} />
-          Importar Excel
-        </button>
-        <button className="tool-button" onClick={handleExportActiveUtExcel} type="button">
-          <Download size={18} />
-          Exportar notes UT
+          Importar / exportar notes
         </button>
         <button className="tool-button dark" data-tour="manage-students-button" onClick={() => setShowStudentsModal(true)} type="button">
           <Users size={18} />
           Gestió d’Alumnes
         </button>
       </div>
+      {showExcelOptions && (
+        <Modal onClose={() => setShowExcelOptions(false)} size="sm" title="Importar / exportar notes">
+          <div className="evaluation-excel-options">
+            <button className="secondary-action" onClick={() => { setShowExcelOptions(false); setShowImportModal(true) }} type="button">
+              <FileSpreadsheet size={18} /> Importar notes d’Excel
+            </button>
+            <button className="secondary-action" onClick={() => { setShowExcelOptions(false); handleExportActiveUtExcel() }} type="button">
+              <Download size={18} /> Exportar notes de la UT
+            </button>
+          </div>
+        </Modal>
+      )}
       {showActionsModal && (
         <EvaluationActionsModal key={`actions:${activeClassId}:${activeUtId}:${scope}`}
           competencies={competencies} catalog={actionCatalog} utName={activeUt?.name}
@@ -298,14 +310,15 @@ export function EvaluationView() {
       {transversalError && <p role="alert">{transversalError}</p>}
       {isTransversal && <p className="transversal-view-label">Competències transversals · {activeUt?.name}</p>}
       {showStructureModal && (isTransversal ? (
-        <Modal onClose={() => setShowStructureModal(false)} size="lg" title="Competències transversals">
+        <Modal onClose={() => setShowStructureModal(false)} size="lg" title="Competències i accions actives · Transversals">
+          <button className="secondary-action compact" onClick={() => { setShowStructureModal(false); setShowActionsModal(true) }} disabled={!activeUtId} type="button"><ListChecks size={18} />Configurar accions de la UT</button>
           <TransversalSelector className={activeClass?.name} selectedNames={selectedTransversalNames}
             onToggle={handleTransversalToggle} busy={transversalBusy} />
           {transversalBusy && <p role="status">Guardant la selecció…</p>}
           {transversalError && <p role="alert">{transversalError}</p>}
         </Modal>
       ) : (
-        <EditStructureModal activeUtId={activeUtId} onClose={() => setShowStructureModal(false)} />
+        <EditStructureModal activeUtId={activeUtId} onClose={() => setShowStructureModal(false)} onOpenActions={() => { setShowStructureModal(false); setShowActionsModal(true) }} />
       ))}
       {showImportModal && (
         <ImportExcelModal
@@ -316,14 +329,11 @@ export function EvaluationView() {
         />
       )}
       {showSeatingModal && (
-        <SeatingChartsModal
-          charts={classSeatingCharts}
+        <TutorialSeatingMirrorModal
+          key={activeClassId}
           classId={activeClassId}
-          halfGroups={halfGroups}
-          students={students}
+          initialHalfGroup={halfGroupFilter}
           onClose={() => setShowSeatingModal(false)}
-          onDelete={deleteSeatingChart}
-          onSave={upsertSeatingChart}
         />
       )}
       {rubricCriterionId && (
@@ -380,9 +390,6 @@ export function EvaluationView() {
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
         onUpdateActionGrades={updateActionGrades}
-        renderAbsenceControl={(student) => (
-          <AbsenceToggle classId={activeClassId} studentId={student.id} />
-        )}
         students={filteredStudents}
       />
       )}

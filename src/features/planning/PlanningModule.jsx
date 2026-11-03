@@ -1,3 +1,5 @@
+import { getPlanningSearchStep } from '../search/planningSearchNavigation.js'
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { acknowledgePlanningUnitDraft, getPlanningUnitDraftValues, updatePlanningUnitDraft } from '../../domain/planning/unitDraft'
 import { PlanningResourceCoverage } from './PlanningResourceCoverage'
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
@@ -528,6 +530,30 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
   const [activityPhaseId, setActivityPhaseId] = useState('')
   const [phaseParentId, setPhaseParentId] = useState('')
   const [connectedDecision, setConnectedDecision] = useState(null)
+  useSearchNavigation('planning', (target) => {
+    if (target.previewOnly) return
+    if (!user?.uid) { workspace.setError('Inicia sessió per obrir la programació.'); return }
+    const requestedContext = target.tutoringSpaceId ? 'tutorial' : 'subject'
+    if (target.planningUnitId && planningContext !== requestedContext) {
+      if (target.tutoringSpaceId && resolvedTutorialContext.tutoringSpaceId !== target.tutoringSpaceId) {
+        workspace.setError('Aquesta programació pertany a una altra tutoria.')
+        return
+      }
+      setPlanningContext(requestedContext)
+      return false
+    }
+    const step = getPlanningSearchStep(workspace, target)
+    if (step.kind === 'wait') return false
+    if (step.kind === 'year') { workspace.setActiveAcademicYearId(step.id); return false }
+    if (step.kind === 'unit') { workspace.setActivePlanningUnitId(step.id); return false }
+    if (step.kind === 'error') workspace.setError(step.message)
+    if (step.kind === 'dialog') setDialog(step.dialog)
+    if (step.kind === 'activity') { setEditingActivity(step.activity); setDialog('activity') }
+    if (step.kind === 'connect') {
+      workspace.setError('Aquesta UP encara no està connectada al grup actual. Pots consultar-ne el contingut des de la cerca o connectar-la aquí.')
+      setDialog('connect')
+    }
+  }, `${planningContext}:${workspace.loading}:${workspace.activeAcademicYearId}:${workspace.academicYears.length}:${workspace.loadedUnitsYearId}:${workspace.loadedStructureId}:${workspace.activePlanningUnitId}:${workspace.activities.length}:${workspace.planningUnits.length}`)
   const collaboratorSyncRef = useRef('')
   const curriculumCatalog = useMemo(() => {
     const unique = (items) => Array.from(new Map(items

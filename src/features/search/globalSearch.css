@@ -1,0 +1,41 @@
+.global-search-trigger { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; min-height: 40px; width: clamp(125px, 12vw, 185px); padding: 8px 12px; border: 1px solid #475569; border-radius: 9px; background: #1e293b; color: #e2e8f0; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
+.global-search-trigger:hover { border-color: #94a3b8; background: #334155; }
+.global-search-trigger kbd { margin-left: auto; font-size: 10px; color: #94a3b8; }
+.global-search-trigger:focus-visible, .global-search-input-wrap:focus-within { outline: 2px solid #60a5fa; outline-offset: 3px; }
+.class-settings-trigger { position: sticky; right: 0; flex-shrink: 0; background: #1f2937; box-shadow: -5px 0 6px #1f2937; }
+.global-search-dialog { width: min(780px, 94vw); color: #1e293b; }
+.global-search-dialog .modal-body { padding: 18px; overflow: auto; }
+.global-search-input-wrap { display: flex; align-items: center; gap: 12px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; color: #64748b; }
+.global-search-input-wrap input { flex: 1; min-width: 0; border: 0; padding: 0; outline: none; background: transparent; color: #0f172a; font: inherit; font-size: 16px; }
+.global-search-context { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 14px 0 10px; font-size: 12px; color: #64748b; }
+.global-search-results { max-height: min(55vh, 560px); overflow: auto; display: grid; gap: 4px; }
+.global-search-result { display: flex; align-items: start; gap: 12px; width: 100%; border: 1px solid transparent; border-radius: 10px; padding: 12px; text-align: left; background: white; color: #475569; cursor: pointer; }
+.global-search-result.active { background: #eff6ff; border-color: #bfdbfe; }
+.global-search-result-icon { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; color: #2563eb; background: #dbeafe; }
+.global-search-result-icon.student { color: #0f766e; background: #ccfbf1; }
+.global-search-result-icon.content { color: #7c3aed; background: #ede9fe; }
+.global-search-result-copy { display: grid; gap: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.global-search-result-copy small { font-size: 10px; letter-spacing: .03em; color: #64748b; }
+.global-search-result-copy strong { font-size: 14px; color: #0f172a; }
+.global-search-result-copy > span { font-size: 12px; color: #64748b; }
+.global-search-result-copy .global-search-snippet { color: #475569; line-height: 1.45; }
+.global-search-footer, .global-search-notice { font-size: 11px; color: #64748b; margin: 12px 0 0; }
+.global-search-notice { margin: 0 0 10px; }
+.global-search-empty { padding: 24px 12px; text-align: center; color: #475569; }
+.global-search-empty p { font-size: 13px; }
+.global-search-detail { color: #1e293b; }
+.global-search-detail-path { font-size: 13px; color: #64748b; }
+.global-search-detail-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; max-height: 55vh; overflow: auto; margin: 16px 0 24px; }
+.search-destination-highlight { animation: search-destination-pulse 2.5s ease-out; }
+@keyframes search-destination-pulse { from { outline: 3px solid #60a5fa; outline-offset: 5px; } to { outline: 3px solid transparent; outline-offset: 5px; } }
+.class-settings-create { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 1200px) { .global-search-trigger { width: 112px; } .global-search-trigger kbd { display: none; } }
+@media (max-width: 600px) { .global-search-trigger { width: 102px; padding: 8px; } .global-search-dialog .modal-body { padding: 12px; } .global-search-result { padding: 10px 6px; gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .search-destination-highlight { animation: none; outline: 2px solid #60a5fa; } }
+
+@media (max-width: 700px) {
+  .top-bar { flex-wrap: wrap; width: 100vw; box-sizing: border-box; left: 0; }
+  .top-bar .class-tabs { flex: 1; min-width: 0; max-width: none; }
+  .top-bar .top-actions { flex: 1 0 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .top-bar .global-search-trigger { flex: 1; min-width: 110px; }
+}

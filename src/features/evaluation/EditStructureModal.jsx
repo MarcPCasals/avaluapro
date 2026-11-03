@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Copy, Plus, Power, Trash2 } from 'lucide-react'
+import { CheckCircle2, Copy, ListChecks, Plus, Power, Trash2 } from 'lucide-react'
 import { getSubjectOption, getSubjectStructure } from '../../data/subjects'
 import { Modal } from '../../components/Modal'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
@@ -14,7 +14,7 @@ const COMPETENCY_COLORS = [
   { id: 'gray', label: 'Gris' },
 ]
 
-export function EditStructureModal({ activeUtId, onClose }) {
+export function EditStructureModal({ activeUtId, onClose, onOpenActions }) {
   const state = useAvaluaproStore()
   const addCompetency = useAvaluaproStore((store) => store.addCompetency)
   const updateCompetency = useAvaluaproStore((store) => store.updateCompetency)
@@ -98,7 +98,9 @@ export function EditStructureModal({ activeUtId, onClose }) {
 
   if (subjectStructure) {
     return (
-      <Modal onClose={onClose} size="lg" title={`Competències per ${activeUt?.name || 'UT'}`}>
+      <Modal onClose={onClose} size="lg" title={`Competències i accions actives · ${activeUt?.name || 'UT'}`}>
+
+        {onOpenActions && <button className="secondary-action compact" onClick={onOpenActions} disabled={!activeUtId} type="button"><ListChecks size={18} />Configurar accions de la UT</button>}
         <div className="ut-competency-config">
           <section className="ut-config-intro">
             <div>
@@ -142,7 +144,9 @@ export function EditStructureModal({ activeUtId, onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} size="xl" title={`Competències de la UT · ${activeUt?.name || 'UT'}`}>
+    <Modal onClose={onClose} size="xl" title={`Competències i accions actives · ${activeUt?.name || 'UT'}`}>
+
+        {onOpenActions && <button className="secondary-action compact" onClick={onOpenActions} disabled={!activeUtId} type="button"><ListChecks size={18} />Configurar accions de la UT</button>}
       <div className="structure-editor">
         <section className="modal-section">
           <div className="section-title-row">

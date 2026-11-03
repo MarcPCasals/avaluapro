@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CriterionGradeModal } from './CriterionGradeModal'
 import { getSelectedCriterionActions } from '../../lib/evaluationActions'
 import { getActionGradeSummary, isActionGradedMark } from '../../lib/actionGrades'
@@ -47,12 +47,27 @@ export function EvaluationTable({
   onToggleCompetencyModification = () => {},
   onUpdateMark = () => {},
   onUpdateActionGrades,
-  renderAbsenceControl = () => null,
   students = [],
 }) {
   const [grading, setGrading] = useState(null)
+  const [studentQuery, setStudentQuery] = useState('')
+  const searchRef = useRef(null)
+  const normalizeName = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim()
+  const queryWords = normalizeName(studentQuery).split(/\s+/).filter(Boolean)
+  const visibleStudents = students.filter((student) => queryWords.every((word) => normalizeName(student.name).includes(word)))
+  useEffect(() => {
+    const focusSearch = (event) => {
+      if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.code !== 'KeyJ') return
+      if (document.querySelector('[role="dialog"], dialog[open]')) return
+      event.preventDefault()
+      searchRef.current?.focus()
+      searchRef.current?.select()
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
   const flatCriteria = competencies.flatMap((competency) => competency.criteria)
-  const studentOrder = new Map(students.map((student, index) => [student.id, index]))
+  const studentOrder = new Map(visibleStudents.map((student, index) => [student.id, index]))
   const criterionOrder = new Map(flatCriteria.map((criterion, index) => [criterion.id, index]))
 
   const getEvaluationTabIndex = (studentId, criterionId) => {
@@ -66,7 +81,7 @@ export function EvaluationTable({
     const criterionIndex = criterionOrder.get(criterionId) ?? 0
     const currentFlatIndex = studentIndex * flatCriteria.length + criterionIndex
     const nextFlatIndex = currentFlatIndex + 1
-    const nextStudent = students[Math.floor(nextFlatIndex / flatCriteria.length)]
+    const nextStudent = visibleStudents[Math.floor(nextFlatIndex / flatCriteria.length)]
     const nextCriterion = flatCriteria[nextFlatIndex % flatCriteria.length]
     if (!nextStudent || !nextCriterion) return
 
@@ -90,10 +105,29 @@ export function EvaluationTable({
         <thead>
           <tr>
             <th className="sticky-student header-student" rowSpan="2">
+              <div className="student-header-tools">
               <span>
                 <Users size={22} />
                 Alumnes
               </span>
+              <input
+                ref={searchRef}
+                className="student-name-search"
+                type="search"
+                aria-label="Cercar alumnes pel nom"
+                aria-keyshortcuts="Meta+J"
+                placeholder="Cerca… ⌘ J"
+                title="Cercar alumnes (⌘ + J)"
+                value={studentQuery}
+                onChange={(event) => setStudentQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setStudentQuery('')
+                  }
+                }}
+              />
               <button
                 className="note-signal"
                 onClick={onOpenReminders}
@@ -102,6 +136,7 @@ export function EvaluationTable({
               >
                 <Bell size={20} />
               </button>
+              </div>
             </th>
             {competencies.map((competency) => (
               <th
@@ -133,7 +168,12 @@ export function EvaluationTable({
           </tr>
         </thead>
         <tbody>
-          {students.map((student, index) => {
+          {visibleStudents.length === 0 && (
+            <tr><td colSpan={1 + flatCriteria.length + competencies.length} className="student-search-empty" role="status">
+              {studentQuery.trim() ? 'Cap alumne coincideix amb la cerca.' : 'No hi ha alumnes en aquest grup.'}
+            </td></tr>
+          )}
+          {visibleStudents.map((student, index) => {
             const dominantDiagnosis = getDominantDiagnosis(student.diagnoses)
             const studentNotes = agendaNotes.filter(
               (note) => note.studentId === student.id && note.classId === activeClassId,
@@ -145,7 +185,7 @@ export function EvaluationTable({
             return (
               <tr className={getStudentRowClass(dominantDiagnosis)} key={student.id}>
                 <td className="sticky-student student-cell">
-                  <span className="student-index">{index + 1}.</span>
+                  <span className="student-index">{students.indexOf(student) + 1}.</span>
                   <button
                     className={`student-note-button ${noteState}`}
                     data-tour={index === 0 ? 'student-comments' : undefined}
@@ -155,7 +195,6 @@ export function EvaluationTable({
                   >
                     <MessageCircle size={17} />
                   </button>
-                  {renderAbsenceControl(student)}
                   <button
                     className="student-name student-profile-trigger"
                     data-tour={index === 0 ? 'student-name-open' : undefined}

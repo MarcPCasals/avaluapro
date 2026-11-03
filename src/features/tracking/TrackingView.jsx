@@ -1,3 +1,4 @@
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
@@ -628,6 +629,20 @@ export function TrackingView() {
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const [redDetailStudentId, setRedDetailStudentId] = useState(null)
   const [studentSearch, setStudentSearch] = useState('')
+  useSearchNavigation('tracking', (target) => {
+    setHalfGroupFilter('all')
+    setInterventionFilter('all')
+    setProfileStudentId(null)
+    setAgendaDetailStudentId(null)
+    const student = students.find(item => item.id === target.studentId)
+    setStudentSearch(student?.name || '')
+    if (target.recordId) setShowPastTasks(true)
+    if (target.previewOnly) return
+    if (target.action === 'new-task') setShowTaskModal(true)
+    if (target.action === 'interventions') setShowInterventions(true)
+    if (student && target.action === 'agenda-notes') setAgendaDetailStudentId(student.id)
+    else if (student) setProfileStudentId(student.id)
+  })
   const [loadedClassSessions, setLoadedClassSessions] = useState({ classId: '', sessions: [] })
   const classSessionChoices = loadedClassSessions.classId === activeClassId ? loadedClassSessions.sessions : []
   const nextClassSession = classSessionChoices.find((session) => new Date(session.startsAt) > new Date()) || null

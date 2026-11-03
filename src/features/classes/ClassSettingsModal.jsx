@@ -8,6 +8,7 @@ import {
   LogOut,
   RefreshCw,
   Settings,
+  Plus,
   Share2,
   Trash2,
   UserMinus,
@@ -18,7 +19,7 @@ import { normalizeEducandEmail } from '../../lib/email'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { ClassFormFields } from './ClassFormFields'
 
-export function ClassSettingsModal({ classId, onClose }) {
+export function ClassSettingsModal({ classId, onClose, onAddClass }) {
   const classes = useAvaluaproStore((state) => state.classes)
   const cloud = useAvaluaproStore((state) => state.cloud)
   const leaveSharedTutoringSpace = useAvaluaproStore((state) => state.leaveSharedTutoringSpace)
@@ -49,7 +50,12 @@ export function ClassSettingsModal({ classId, onClose }) {
     }
   }, [cloud.user?.email, loadSharedTutoringSpaces])
 
-  if (!currentClass) return null
+  if (!currentClass) return (
+    <Modal onClose={onClose} title="Configuració de les classes">
+      <p>Encara no hi ha cap classe. Crea’n una per començar.</p>
+      <button className="primary-action" onClick={onAddClass} type="button"><Plus size={18} />Afegir classe</button>
+    </Modal>
+  )
 
   const sharedMembers = currentClass.sharedTutoringMemberEmails || []
   const currentSharedSpace = (cloud.sharedTutoringSpaces || []).find(
@@ -157,7 +163,11 @@ export function ClassSettingsModal({ classId, onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} size="lg" title="Configuració del grup">
+    <Modal onClose={onClose} size="lg" title="Configuració de les classes">
+      <div className="modal-section class-settings-create">
+        <strong>Grup actual: {currentClass.name}</strong>
+        <button className="primary-action" onClick={onAddClass} type="button"><Plus size={18} />Afegir classe</button>
+      </div>
       <div className="modal-section">
         <h3>
           <Settings size={18} />

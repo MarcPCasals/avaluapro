@@ -1,0 +1,11 @@
+.tutorial-record-form .doip-text-field { grid-column: 1 / -1; display: grid; gap: 8px; }
+.doip-text-label { color: #64748b; font-size: .8rem; font-weight: 800; text-transform: uppercase; }
+.doip-editor-shell { border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; background: white; }
+.doip-editor-shell:focus-within { outline: 2px solid #0866d9; outline-offset: 1px; }
+.doip-editor-toolbar { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.doip-editor-toolbar button { min-width: 32px; min-height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; cursor: pointer; }
+.doip-editor-toolbar button[aria-pressed="true"] { background: #ffedd5; color: #c2410c; border-color: #fb923c; }
+.doip-rich-editor { min-height: 140px; padding: 12px; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1rem; font-weight: 400; text-transform: none; color: #1f2937; }
+.doip-rich-editor strong, .doip-rich-editor b { font-weight: 700; }
+.doip-rich-editor:empty::before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; }
+.doip-rich-editor[aria-disabled="true"] { opacity: .6; }

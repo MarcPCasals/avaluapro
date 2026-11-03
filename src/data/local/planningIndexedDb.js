@@ -497,3 +497,8 @@ export async function restorePlanningHistoryRows(uid, changes, side) {
     await done
   } finally { db.close() }
 }
+
+/** Lectura local per a la cerca global, aïllada pel compte actiu. */
+export async function loadPlanningSearchEntities(uid) {
+  return (await rowsForUid(ENTITY_STORE, uid)).map(stripLocalMetadata).filter(Boolean)
+}

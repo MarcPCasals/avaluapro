@@ -1,3 +1,4 @@
+import { assignActiveSeatingPlan, getActiveSeatingPlans } from '../features/tutoring/activeSeatingPlans'
 import { buildActionGradeMark, isActionGradedMark, recalculateActionCriteria } from '../lib/actionGrades'
 import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch } from '../lib/evaluationActions'
 import { buildTransversalStructure } from '../lib/transversalEvaluation'
@@ -2545,6 +2546,7 @@ export const useAvaluaproStore = create((set, get) => ({
   },
 
   setActiveClass: async (classId) => {
+    set({ searchNavigation: null })
     const state = get()
     const activeClass = state.classes.find((classItem) => classItem.id === classId)
     const timeline = activeClass?.subject ? ensureFixedCourseForClass(state, classId) : null
@@ -2713,9 +2715,12 @@ export const useAvaluaproStore = create((set, get) => ({
     const ut = get().uts.find((item) => item.id === activeUtId)
     setUiWithPreferences(set, { activeSemesterId: ut?.semesterId || get().ui.activeSemesterId, activeUtId })
   },
-  setActiveMode: (activeMode) => setUiWithPreferences(set, { activeMode }),
+  searchNavigation: null,
+  requestSearchNavigation: (target) => set({ searchNavigation: { id: createId('search-navigation'), ownerUid: get().cloud.user?.uid || '', target } }),
+  clearSearchNavigation: (id) => set((state) => state.searchNavigation?.id === id ? { searchNavigation: null } : {}),
+  setActiveMode: (activeMode) => { set({ searchNavigation: null }); setUiWithPreferences(set, { activeMode }) },
   setActiveInsight: (activeInsight) => setUiWithPreferences(set, { activeInsight }),
-  setActiveTutoringPanel: (activeTutoringPanel) => setUiWithPreferences(set, { activeTutoringPanel }),
+  setActiveTutoringPanel: (activeTutoringPanel) => { set({ searchNavigation: null }); setUiWithPreferences(set, { activeTutoringPanel }) },
   setDefaultSubject: (defaultSubject) => setProfileWithPreferences(set, { defaultSubject }),
   setGuideOpen: (guideOpen) => {
     set((state) => ({ onboarding: { ...state.onboarding, guideOpen } }))
@@ -5100,6 +5105,7 @@ export const useAvaluaproStore = create((set, get) => ({
   }) => {
     if (!classId || !layout || !Array.isArray(seats)) return
 
+    isActive = Boolean(isActive || !getActiveSeatingPlans(get().tutorialSeatingPlans, classId).all)
     const now = new Date().toISOString()
     const nextPlan = {
       id: createId('tseat'),
@@ -5128,12 +5134,23 @@ export const useAvaluaproStore = create((set, get) => ({
     return nextPlan
   },
 
+  setActiveTutorialSeatingPlanSlot: async (classId, scope, planId) => {
+    const now = new Date().toISOString()
+    setWithEditHistory(set, get, state => ({
+      tutorialSeatingPlans: assignActiveSeatingPlan(state.tutorialSeatingPlans || [], classId, scope, planId, now),
+    }))
+    await persistCollections(set, get, ['tutorialSeatingPlans'])
+  },
+
   updateTutorialSeatingPlan: async (planId, patch) => {
     if (!planId || !patch) return
     const now = new Date().toISOString()
     setWithEditHistory(set, get, (state) => {
       const target = (state.tutorialSeatingPlans || []).find((plan) => plan.id === planId)
       if (!target) return {}
+      if (patch.isActive === false && getActiveSeatingPlans(state.tutorialSeatingPlans, target.classId).all?.id === planId) {
+        patch = { ...patch, isActive: true }
+      }
       return {
         tutorialSeatingPlans: (state.tutorialSeatingPlans || []).map((plan) => {
           if (patch.isActive && plan.classId === target.classId && plan.id !== planId) {
@@ -5163,6 +5180,9 @@ export const useAvaluaproStore = create((set, get) => ({
     const state = get()
     const plan = (state.tutorialSeatingPlans || []).find((item) => item.id === planId)
     if (!plan) return
+    if ((state.tutorialSeatingPlans || []).filter(item => item.classId === plan.classId).length === 1) {
+      throw new Error('Cal conservar una disposició per al grup sencer. Desa una altra versió abans d’eliminar aquesta.')
+    }
     await tombstoneSharedRowIfNeeded(state, 'tutorialSeatingPlans', plan)
     setWithEditHistory(set, get, (current) => {
       const remainingPlans = (current.tutorialSeatingPlans || []).filter((item) => item.id !== planId)

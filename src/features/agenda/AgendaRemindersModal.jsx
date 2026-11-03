@@ -9,7 +9,7 @@ import { useAgendaWorkspace } from './useAgendaWorkspace'
  * l'Agenda. Així els dos accessos a Recordatoris ofereixen les mateixes
  * pròximes classes, incloses les que encara no tenen cap UP vinculada.
  */
-export function AgendaRemindersModal({ onClose }) {
+export function AgendaRemindersModal({ onClose, focusedReminderIds = [] }) {
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
   const workspace = useAgendaWorkspace(user, classes)
@@ -36,6 +36,7 @@ export function AgendaRemindersModal({ onClose }) {
 
   return (
     <RemindersModal
+      focusedReminderIds={focusedReminderIds}
       onClose={onClose}
       sessionOptions={sessionOptions}
       sessionOptionsLoading={workspace.loading || workspace.sessionsLoading}

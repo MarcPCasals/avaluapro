@@ -28,7 +28,8 @@ test('la vista real conserva totes les accions de la graella', () => {
   assert.match(viewSource, /onOpenRubric=\{setRubricCriterionId\}/)
   assert.match(viewSource, /onToggleCompetencyModification=\{toggleCompetencyModification\}/)
   assert.match(viewSource, /onUpdateMark=\{updateMark\}/)
-  assert.match(viewSource, /<AbsenceToggle classId=\{activeClassId\} studentId=\{student\.id\} \/>/)
+  assert.doesNotMatch(viewSource, /AbsenceToggle|renderAbsenceControl/)
+  assert.doesNotMatch(tableSource, /renderAbsenceControl/)
 })
 
 test('la mateixa graella rep l’adaptador sintètic a assistència', () => {

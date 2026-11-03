@@ -1,3 +1,4 @@
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { ActionProgressStats } from './ActionProgressStats'
 import { normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import { getClassUts, getUtCompetencies, getStudentUtGrade, getStudentCompetencyGrade, getLatestStudentLook, getGradeFromAverage } from '../../lib/studentEvaluation'
@@ -2795,6 +2796,8 @@ export function AnalyticsView() {
         ? 'tracking'
         : 'executive',
   )
+
+  useSearchNavigation('analytics', () => { setDashboardScope('executive'); setSelectedInsight(null) })
 
   useEffect(() => {
     window.__avaluaproSetDashboardScope = (scope) => {

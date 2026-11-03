@@ -28,11 +28,10 @@ const coreModes = [
 ]
 
 const insights = [
-  { id: 'dashboard', label: 'Estadístiques Globals', icon: BarChart3, help: 'Creua rendiment, constància, absències i comportament per detectar prioritats docents i patrons del grup.' },
+  { id: 'dashboard', label: 'Estadístiques', icon: BarChart3, help: 'Creua rendiment, constància, absències i comportament per detectar prioritats docents i patrons del grup.' },
 ]
 
 const tutoringHelp = 'Reuneix l’avaluació tutorial, el seguiment, les relacions del grup, els informes, la coordinació amb el cotutor i la planificació de les classes de tutoria.'
-const urgentHelp = 'Mostra els alumnes que acumulen senyals rellevants de rendiment, constància o comportament perquè puguis prioritzar-ne la revisió.'
 
 function getUrgentProfiles(state) {
   const { activeClassId, activeUtId } = state.ui
@@ -146,7 +145,7 @@ export function MainNavigation({ optionalModulesEnabled = true }) {
       <div className="mode-tabs">
         {modes.map((mode) => {
           const Icon = mode.icon
-          return (
+          const tab = (
             <ContextualTab
               className={`mode-tab ${mode.optional ? `optional ${mode.id}` : ''} ${activeMode === mode.id ? 'active' : ''}`}
               help={mode.help}
@@ -159,6 +158,23 @@ export function MainNavigation({ optionalModulesEnabled = true }) {
               {mode.label}
             </ContextualTab>
           )
+          return mode.id === 'students' ? (
+            <div className="student-navigation-group" key={mode.id}>
+              {tab}
+              {urgentProfiles.length > 0 && (
+                <button
+                  aria-label={`Urgent: ${urgentProfiles.length} alumnes per revisar`}
+                  className="urgent-tab has-items urgent-icon-button"
+                  data-tour="urgent-button"
+                  onClick={() => setShowUrgent(true)}
+                  title={`Urgent: ${urgentProfiles.length} alumnes per revisar`}
+                  type="button"
+                >
+                  <AlertTriangle aria-hidden="true" size={20} />
+                </button>
+              )}
+            </div>
+          ) : tab
         })}
       </div>
       <div className="insight-tabs">
@@ -198,18 +214,6 @@ export function MainNavigation({ optionalModulesEnabled = true }) {
             {tutoringUnreadCount > 0 && <span className="tutoring-mode-badge">{tutoringUnreadCount}</span>}
           </ContextualTab>
         )}
-        <ContextualTab
-          className={`urgent-tab ${urgentProfiles.length > 0 ? 'has-items' : ''}`}
-          data-tour="urgent-button"
-          help={urgentHelp}
-          helpTitle="Urgent"
-          onClick={() => setShowUrgent(true)}
-          type="button"
-        >
-          <AlertTriangle size={18} />
-          Urgent
-          <span>{urgentProfiles.length}</span>
-        </ContextualTab>
       </div>
       {showUrgent && <UrgentModal profiles={urgentProfiles} onClose={() => setShowUrgent(false)} />}
     </div>

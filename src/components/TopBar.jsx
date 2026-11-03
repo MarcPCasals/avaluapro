@@ -1,3 +1,4 @@
+import { GlobalSearch } from '../features/search/GlobalSearch.jsx'
 import { EditHistoryControls } from './EditHistoryControls'
 import {
   AlertCircle,
@@ -13,7 +14,6 @@ import {
   LogOut,
   Loader2,
   MessageCircle,
-  Plus,
   Send,
   Settings,
   ShieldCheck,
@@ -153,6 +153,7 @@ export function TopBar() {
   const [showTeacherPackages, setShowTeacherPackages] = useState(false)
   const [showTutoringShare, setShowTutoringShare] = useState(false)
   const [showReminders, setShowReminders] = useState(false)
+  const [searchReminderIds, setSearchReminderIds] = useState([])
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showDataMenu, setShowDataMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -451,20 +452,21 @@ export function TopBar() {
             {item.name}
           </button>
         ))}
-        <button className="icon-button class-add" onClick={() => setShowNewClass(true)} title="Nova classe" type="button">
-          <Plus size={22} />
+        <button className="icon-button class-settings-trigger" data-tour="class-settings" onClick={() => setShowSettings(true)} title="Configuració de les classes" aria-label="Configuració de les classes" type="button">
+          <Settings size={22} />
         </button>
       </nav>
       <div className="top-actions">
-        <button
-          className="icon-button"
-          data-tour="class-settings"
-          onClick={() => setShowSettings(true)}
-          title="Configuració del grup"
-          type="button"
-        >
-          <Settings size={22} />
-        </button>
+        <GlobalSearch key={cloud.user?.uid || 'local'} onTopAction={(action, target) => {
+          if (action === 'settings') setShowSettings(true)
+          if (action === 'new-class') setShowNewClass(true)
+          if (action === 'profile') setShowProfile(true)
+          if (action === 'help') setShowHelp(true)
+          if (action === 'messages') setShowMessaging(true)
+          if (action === 'reminders') { setSearchReminderIds(target.focusedReminderIds || []); setShowReminders(true) }
+          if (action === 'data-safety') setShowDataSafety(true)
+          if (action === 'packages') setShowTeacherPackages(true)
+        }} />
         <button
           className="icon-button"
           data-tour="guide-button"
@@ -498,7 +500,7 @@ export function TopBar() {
             : 'Recordatoris'}
           className={`icon-button top-reminders-button ${pendingReminderCount > 0 ? 'has-reminders' : ''}`}
           data-tour="reminders-button"
-          onClick={() => setShowReminders(true)}
+          onClick={() => { setSearchReminderIds([]); setShowReminders(true) }}
           title={pendingReminderCount > 0
             ? `${pendingReminderCount} recordatori${pendingReminderCount === 1 ? '' : 's'} pendent${pendingReminderCount === 1 ? '' : 's'}`
             : 'Recordatoris'}
@@ -681,7 +683,7 @@ export function TopBar() {
         <EditHistoryControls />
       </div>
       {showSettings && (
-        <ClassSettingsModal classId={activeClassId} onClose={() => setShowSettings(false)} />
+        <ClassSettingsModal classId={activeClassId} onClose={() => setShowSettings(false)} onAddClass={() => { setShowSettings(false); setShowNewClass(true) }} />
       )}
       {showNewClass && <NewClassModal onClose={() => setShowNewClass(false)} />}
       {showDataSafety && (
@@ -725,7 +727,7 @@ export function TopBar() {
             <div className="module-loading" role="status"><Loader2 size={24} />Carregant l’horari…</div>
           </Modal>
         )}>
-          <AgendaRemindersModal onClose={() => setShowReminders(false)} />
+          <AgendaRemindersModal focusedReminderIds={searchReminderIds} onClose={() => setShowReminders(false)} />
         </Suspense>
       )}
       {showResetConfirm && (

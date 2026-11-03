@@ -2680,21 +2680,21 @@ button.tutorial-record-pill {
 
 .tutorial-tracking-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
 
 .tutorial-student-profile-tools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
 
 .tutorial-tracking-lower-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.9fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -3065,6 +3065,7 @@ button.tutorial-record-pill {
 }
 
 .tutorial-record-form-card {
+  grid-column: 1 / -1;
   min-height: unset;
 }
 
@@ -10015,7 +10016,7 @@ button.tutorial-record-pill {
   font-weight: 850;
 }
 
-.tutorial-sociogram-row-main > span,
+.tutorial-sociogram-count,
 .tutorial-relation-pill span,
 .tutorial-relation-entry span {
   border-radius: 999px;
@@ -10027,12 +10028,12 @@ button.tutorial-record-pill {
   white-space: nowrap;
 }
 
-.tutorial-sociogram-row-main > span.green {
+.tutorial-sociogram-count.green {
   color: #166534;
   background: #dcfce7;
 }
 
-.tutorial-sociogram-row-main > span.red {
+.tutorial-sociogram-count.red {
   color: #991b1b;
   background: #fee2e2;
 }
@@ -12224,6 +12225,7 @@ button.tutorial-record-pill {
   .tutorial-insight-grid,
   .tutorial-profile-insight-grid,
   .tutorial-student-profile-tools,
+  .tutorial-tracking-lower-grid,
   .tutorial-tracking-grid,
   .tutorial-print-options {
     grid-template-columns: 1fr;
@@ -31559,3 +31561,125 @@ button.profile-followup-card:focus-visible {
 .action-criterion-result { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 14px 0; }
 .action-grade-provisional { display: block; font-size: 10px; font-weight: 600; color: #475569; }
 .action-legacy-notice { color: #475569; font-size: .875rem; }
+
+.tutorial-sociogram-student {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tutorial-sociogram-count {
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.tutorial-sociogram-count[aria-expanded="true"] {
+  border-color: currentColor;
+}
+
+.tutorial-sociogram-count:focus-visible,
+.tutorial-sociogram-student:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.tutorial-quick-relation-detail {
+  border-top: 1px solid #cbd5e1;
+  padding-top: 10px;
+  min-width: 0;
+}
+
+.tutorial-quick-relation-detail .tutorial-relation-pills {
+  margin-top: 8px;
+}
+
+.tutorial-quick-relation-detail .tutorial-relation-pill span {
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  .tutorial-sociogram-row-main {
+    grid-template-columns: repeat(3, auto);
+    justify-content: start;
+  }
+  .tutorial-sociogram-student {
+    grid-column: 1 / -1;
+  }
+}
+
+.tutorial-doip-search {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tutorial-doip-search input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.tutorial-doip-group {
+  margin-top: 16px;
+}
+
+.tutorial-doip-group h3 {
+  margin: 0 0 8px;
+  color: #334155;
+  font-size: 14px;
+}
+
+/* Compact urgent access beside the student tab. */
+.main-navigation .urgent-icon-button {
+  flex: 0 0 40px;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.main-navigation .urgent-icon-button:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.student-navigation-group { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+.main-navigation .student-navigation-group .urgent-icon-button { flex-basis: 32px; width: 32px; min-height: 36px; }
+.evaluation-excel-options { display: grid; gap: 12px; }
+.tutorial-seating-mirror { display: grid; gap: 16px; }
+.tutorial-seating-mirror > p { margin: 0; color: #475569; }
+.tutorial-seating-mirror-controls { display: flex; flex-wrap: wrap; gap: 16px; }
+.tutorial-seating-mirror-controls label { display: grid; gap: 6px; font-weight: 700; }
+.tutorial-seating-mirror-controls select { padding: 8px; max-width: 100%; }
+.tutorial-seating-mirror-scroll { overflow: auto; max-height: 60vh; }
+.tutorial-seating-mirror-room { padding: 12px; }
+.tutorial-seating-mirror-board { text-align: center; padding: 10px; border-radius: 6px; color: white; background: #334155; }
+.tutorial-seating-mirror-teacher { padding: 14px 8px; font-weight: 700; }
+.tutorial-seating-mirror-grid { display: grid; gap: 8px; }
+.tutorial-seating-mirror-seat { display: grid; align-content: center; gap: 6px; min-height: 90px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; text-align: center; }
+.tutorial-seating-mirror-seat.occupied { background: #fff7ed; border-color: #fdba74; }
+.tutorial-seating-mirror-seat.unused { visibility: hidden; }
+.tutorial-seating-mirror-seat.block-start { margin-left: 12px; }
+.tutorial-seating-mirror-seat small, .tutorial-seating-mirror-seat span { font-size: 11px; color: #64748b; }
+
+.tutorial-active-seating { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 16px; grid-column: 1 / -1; }
+.tutorial-active-seating article { display: grid; gap: 8px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
+.tutorial-active-seating article.enabled { border-color: #fdba74; background: #fff7ed; }
+.tutorial-active-seating select { width: 100%; min-width: 0; padding: 8px; }
+.tutorial-active-seating article > span { overflow-wrap: anywhere; color: #475569; }
+.tutorial-active-seating button { padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; }
+@media (max-width: 700px) { .tutorial-active-seating { grid-template-columns: 1fr; } }
+
+/* Inline name filter in the evaluation student header. */
+.student-header-tools { display: flex; align-items: center; gap: 10px; }
+.header-student .student-header-tools > span { flex: 0 0 auto; gap: 8px; font-size: 18px; }
+.student-header-tools .student-name-search { width: 100%; min-width: 75px; flex: 1 1 100px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b; font: inherit; font-size: 13px; font-weight: 400; }
+.student-name-search:focus { outline: 2px solid #f97316; outline-offset: 2px; }
+.student-header-tools .note-signal { flex: 0 0 32px; width: 32px; height: 32px; padding: 6px; }
+.student-search-empty { padding: 24px; text-align: left; color: #64748b; }

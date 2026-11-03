@@ -1,3 +1,4 @@
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import {
   CheckCircle2,
   ClipboardList,
@@ -264,6 +265,18 @@ export function StudentOverviewView() {
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
   const [registryStudentId, setRegistryStudentId] = useState(null)
   const [otherRecordsStudentId, setOtherRecordsStudentId] = useState(null)
+  useSearchNavigation('students', (target) => {
+    setProfileStudentId(null)
+    setAnnotationsStudentId(null)
+    setRegistryStudentId(null)
+    setOtherRecordsStudentId(null)
+    setSearch('')
+    setOnlyAttention(false)
+    if (!target.studentId || target.previewOnly) return
+    if (target.action === 'annotations') setAnnotationsStudentId(target.studentId)
+    else if (target.action === 'registry') setRegistryStudentId(target.studentId)
+    else setProfileStudentId(target.studentId)
+  })
   const showTutoringColumns = Boolean(activeClass?.isTutoringGroup || activeClass?.subject === 'Tutoria')
 
   const profilesByStudentId = useMemo(

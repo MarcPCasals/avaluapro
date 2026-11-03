@@ -1,3 +1,4 @@
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { EDIT_HISTORY_REFRESH_EVENT } from '../../lib/editHistory'
 import { applyClassroomContinuationPreview } from '../../domain/planning/classroomContinuation'
 import { planningSubjectsMatch } from '../../domain/planning/subjects.js'
@@ -508,6 +509,24 @@ export default function AgendaModule() {
   const [calendarMode, setCalendarMode] = useState('week')
   const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))
   const [dialog, setDialog] = useState(() => initialSchedulingRequest.planningUnitId ? 'scheduling' : null)
+  useSearchNavigation('agenda', (target) => {
+    if (target.academicYearId && workspace.activeAcademicYearId !== target.academicYearId) {
+      if (workspace.loading) return false
+      if (workspace.academicYears.some(year => year.id === target.academicYearId)) {
+        workspace.setActiveAcademicYearId(target.academicYearId)
+        return false
+      }
+    }
+    setDialog(null)
+    if (target.view) setView(target.view)
+    if (target.date && /^\d{4}-\d{2}-\d{2}$/.test(target.date)) {
+      setView('week')
+      setCalendarMode('week')
+      setWeekStart(startOfWeek(target.date))
+      setMonthKey(firstDayOfMonth(target.date))
+    }
+    if (!target.previewOnly && target.action === 'scheduling') setDialog('scheduling')
+  }, `${workspace.loading}:${workspace.activeAcademicYearId}:${workspace.academicYears.length}`)
   const [focusedReminderIds, setFocusedReminderIds] = useState([])
   const [activeBundle, setActiveBundle] = useState(null)
   const [notesBundle, setNotesBundle] = useState(null)

@@ -1,3 +1,6 @@
+import './doipEditor.css'
+import { SEATING_SCOPES, getActiveSeatingPlans } from './activeSeatingPlans'
+import { useSearchNavigation } from '../search/useSearchNavigation'
 import { openGroupRosterExport } from './groupRosterExport.js'
 import { SociogramInsights } from './SociogramInsights'
 import { buildSocialSubgroups, getPositiveComponentMap } from './sociometricSubgroupUtils.js'
@@ -348,6 +351,84 @@ const VALID_IMPORT_GRADES = new Set(['A', 'B', 'C', 'D', 'NA'])
 const EMPTY_IMPORT_MARKS = new Set(['', '-', '—', '.'])
 const TUTORING_TEXT_LIMIT = 700
 const FAMILY_INTERVIEW_FIELD_LIMIT = 1400
+
+function DoipFormattedText({ text }) {
+  return <span style={{ whiteSpace: 'pre-wrap' }}>{String(text || '').split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={index}>{part.slice(2, -2)}</strong>
+      : part,
+  )}</span>
+}
+
+function DoipTextField({ label, value, onChange, disabled, required = false, placeholder }) {
+  const input = useRef(null)
+  const lastValue = useRef(null)
+  const [bold, setBold] = useState(false)
+
+  // Keep the persisted plain-text format; render formatting as real DOM nodes.
+  useEffect(() => {
+    if (!input.current || value === lastValue.current) return
+    const fragment = document.createDocumentFragment()
+    String(value || '').split(/(\*\*[^*]+\*\*)/g).forEach((part) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const strong = document.createElement('strong')
+        strong.textContent = part.slice(2, -2)
+        fragment.append(strong)
+      } else fragment.append(document.createTextNode(part))
+    })
+    input.current.replaceChildren(fragment)
+    lastValue.current = value
+  }, [value])
+
+  const readText = () => {
+    const visit = (node, inheritedBold = false) => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent
+      if (node.nodeName === 'BR') return '\n'
+      const isBold = inheritedBold || ['B', 'STRONG'].includes(node.nodeName)
+      const text = Array.from(node.childNodes).map((child) => visit(child, isBold)).join('')
+      const formatted = isBold && !inheritedBold && text.trim() ? `**${text}**` : text
+      return ['DIV', 'P'].includes(node.nodeName) && node !== input.current
+        ? `${node.previousSibling ? '\n' : ''}${formatted}` : formatted
+    }
+    const next = input.current.innerText.trim() ? visit(input.current) : ''
+    lastValue.current = next
+    onChange(next)
+    setBold(document.queryCommandState('bold'))
+  }
+  const toggleBold = () => {
+    if (disabled) return
+    input.current.focus()
+    document.execCommand('bold')
+    readText()
+  }
+  return <div className="doip-text-field full">
+    <span className="doip-text-label">{label}</span>
+    <div className="doip-editor-shell">
+      <div className="doip-editor-toolbar">
+        <button type="button" disabled={disabled} aria-pressed={bold}
+          onMouseDown={(event) => event.preventDefault()} onClick={toggleBold}
+          aria-label={`Negreta: ${label}`} title="Negreta (⌘B / Ctrl+B)"><strong>B</strong></button>
+      </div>
+      <div ref={input} role="textbox" aria-label={label} aria-multiline="true"
+        aria-required={required} aria-disabled={disabled} contentEditable={!disabled}
+        suppressContentEditableWarning className="doip-rich-editor" data-placeholder={placeholder}
+        onInput={readText} onKeyUp={() => setBold(document.queryCommandState('bold'))}
+        onMouseUp={() => setBold(document.queryCommandState('bold'))}
+        onPaste={(event) => {
+          event.preventDefault()
+          document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
+          readText()
+        }}
+        onDrop={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') {
+            event.preventDefault()
+            toggleBold()
+          }
+        }} />
+    </div>
+  </div>
+}
 
 function FamilyInterviewTemplate({ draft, onChange, onToggleTopic }) {
   return (
@@ -3825,7 +3906,7 @@ function TutorialReportDocument({
                 .map((record) => {
                   const typeMeta = getRecordTypeMeta(record.type)
                   return (
-                    <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
+                    <article className={`tutorial-record-entry ${typeMeta.tone}`} data-search-record={record.id} key={record.id}>
                       <div>
                         <strong>{typeMeta.label}</strong>
                         <span>{formatShortDate(record.date)}</span>
@@ -4266,7 +4347,7 @@ function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
                 const channel = FAMILY_CONTACT_CHANNELS.find((item) => item.id === record.contactChannel)?.label
                 const outcome = FAMILY_CONTACT_OUTCOMES.find((item) => item.id === record.contactOutcome)?.label
                 return (
-                  <article className={`tutorial-record-entry ${typeMeta.tone}`} key={record.id}>
+                  <article className={`tutorial-record-entry ${typeMeta.tone}`} data-search-record={record.id} key={record.id}>
                     <div>
                       <strong>{typeMeta.label}</strong>
                       <span>
@@ -4374,6 +4455,12 @@ export function TutoringView() {
   const [selectedExemptionStudentId, setSelectedExemptionStudentId] = useState('')
   const [selectedDoipStudentId, setSelectedDoipStudentId] = useState('')
   const [doipDraft, setDoipDraft] = useState('')
+  const [doipMeasures, setDoipMeasures] = useState('')
+  const [doipFilter, setDoipFilter] = useState('pending')
+  const [doipDate, setDoipDate] = useState(getTodayDateInput)
+  const [doipSaving, setDoipSaving] = useState(false)
+  const [doipError, setDoipError] = useState('')
+  const [doipSearch, setDoipSearch] = useState({ classId: '', value: '' })
   const [showExemptionConfig, setShowExemptionConfig] = useState(false)
   const [showModifiedCompetencyConfig, setShowModifiedCompetencyConfig] = useState(false)
   const [exemptionForm, setExemptionForm] = useState({ studentId: '', subjects: [] })
@@ -4403,6 +4490,7 @@ export function TutoringView() {
   const [relationSearch, setRelationSearch] = useState({ source: '', target: '' })
   const [relationSaveState, setRelationSaveState] = useState({ status: '', message: '' })
   const [selectedRelationStudentId, setSelectedRelationStudentId] = useState('')
+  const [quickRelationDetail, setQuickRelationDetail] = useState(null)
   const [activeRelationshipTool, setActiveRelationshipTool] = useState('')
   const [selectedSociometricStatKey, setSelectedSociometricStatKey] = useState('')
   const [sociometricSurveyMessage, setSociometricSurveyMessage] = useState('')
@@ -4520,6 +4608,9 @@ export function TutoringView() {
   const toggleTutorialStudentRole = useAvaluaproStore((state) => state.toggleTutorialStudentRole)
   const saveTutorialSeatingPlan = useAvaluaproStore((state) => state.saveTutorialSeatingPlan)
   const updateTutorialSeatingPlan = useAvaluaproStore((state) => state.updateTutorialSeatingPlan)
+  const setActiveSeatingSlot = useAvaluaproStore(state => state.setActiveTutorialSeatingPlanSlot)
+  const [activeSeatingSlotBusy, setActiveSeatingSlotBusy] = useState(false)
+  const [activeSeatingSlotError, setActiveSeatingSlotError] = useState('')
   const deleteTutorialSeatingPlan = useAvaluaproStore((state) => state.deleteTutorialSeatingPlan)
   const shareTutoringClass = useAvaluaproStore((state) => state.shareTutoringClass)
   const linkClassToSharedTutoringSpace = useAvaluaproStore((state) => state.linkClassToSharedTutoringSpace)
@@ -4780,6 +4871,7 @@ export function TutoringView() {
     },
     [activeClassId, tutorialSeatingPlans],
   )
+  const activeSeatingSlots = getActiveSeatingPlans(tutorialSeatingPlans, activeClassId)
   const classTutorialSeatingPlans = useMemo(
     () =>
       (tutorialSeatingPlans || [])
@@ -5193,6 +5285,16 @@ export function TutoringView() {
   const selectedTutorialRecordRow = tutorialRecordSummary.studentRows.find(
     (row) => row.student.id === selectedTutorialRecordStudentId,
   )
+  const doipSearchValue = doipSearch.classId === activeClassId ? doipSearch.value : ''
+  const normalizeDoipName = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim()
+  const doipSearchWords = normalizeDoipName(doipSearchValue).split(/\s+/).filter(Boolean)
+  const matchingDoipRows = tutorialRecordSummary.studentRows
+    .filter((row) => doipSearchWords.every((word) => normalizeDoipName(row.student.name).includes(word)))
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ca'))
+  const doipGroups = [
+    { id: 'pending', label: 'Pendents', rows: matchingDoipRows.filter((row) => row.doip === 0) },
+    { id: 'done', label: 'Fets', rows: matchingDoipRows.filter((row) => row.doip > 0) },
+  ]
   const selectedDoipStudent = classStudents.find((student) => student.id === selectedDoipStudentId)
   const selectedDoipRecords = selectedDoipStudent
     ? classTutorialRecords
@@ -6788,7 +6890,8 @@ export function TutoringView() {
     if (!plan) return
     const shouldDelete = window.confirm(`Vols eliminar la versió “${plan.title || 'Disposició guardada'}”?`)
     if (!shouldDelete) return
-    await deleteTutorialSeatingPlan(plan.id)
+    try { await deleteTutorialSeatingPlan(plan.id) }
+    catch (error) { setActiveSeatingSlotError(error.message); return }
     if (selectedSeatingPlanId === plan.id) setSelectedSeatingPlanId('')
     if (loadedSeatingPlanId === plan.id) setLoadedSeatingPlanId('')
     if (comparisonSeatingPlanId === plan.id) setComparisonSeatingPlanId('')
@@ -7116,6 +7219,37 @@ export function TutoringView() {
       setShareTutoringBusy('')
     }
   }
+
+  useSearchNavigation('tutoring', (target) => {
+    setSelectedDoipStudentId('')
+    setSelectedTutorialRecordStudentId('')
+    setSelectedTutorialProfileId('')
+    setSelectedModifiedStudentId('')
+    setSelectedExemptionStudentId('')
+    if (target.previewOnly) return
+    if (target.tool !== undefined) setActiveRelationshipTool(target.tool)
+    if (target.studentId) {
+      setSelectedRelationStudentId(target.studentId)
+      if (target.action === 'doip') {
+        setDoipDraft('')
+        setDoipMeasures('')
+        setDoipDate(getTodayDateInput())
+        setDoipError('')
+        setSelectedDoipStudentId(target.studentId)
+      }
+      if (target.action === 'registry') setSelectedTutorialRecordStudentId(target.studentId)
+      if (target.action === 'modified') setSelectedModifiedStudentId(target.studentId)
+      if (target.action === 'exemptions') setSelectedExemptionStudentId(target.studentId)
+      if (target.action === 'report') {
+        setProfileFilter('all')
+        setProfileSearch('')
+        setSelectedTutorialProfileId(target.studentId)
+      }
+    }
+    if (target.action === 'new-annotation') {
+      setRecordForm(current => ({ ...current, type: 'family-contact', studentId: target.studentId || '' }))
+    }
+  })
 
   return (
     <section className="tutoring-view" data-tour="tutoring-view">
@@ -7733,7 +7867,7 @@ export function TutoringView() {
           )}
 
           <div className="tutorial-tracking-grid">
-            <article className={`tutoring-card tutorial-record-form-card ${familyInterviewActive ? 'family-interview-active' : ''}`}>
+            <article data-tour="tutorial-new-annotation" className={`tutoring-card tutorial-record-form-card ${familyInterviewActive ? 'family-interview-active' : ''}`}>
               <div>
                 <Plus size={24} />
                 <h2>Nova anotació</h2>
@@ -7777,7 +7911,7 @@ export function TutoringView() {
                       ))}
                     </optgroup>
                     <optgroup label="Incidències i altres registres">
-                      {TUTORING_RECORD_TYPES.map((type) => (
+                      {TUTORING_RECORD_TYPES.filter((type) => type.id !== 'doip').map((type) => (
                         <option key={type.id} value={type.id}>{type.label}</option>
                       ))}
                     </optgroup>
@@ -7919,9 +8053,26 @@ export function TutoringView() {
                   Desar anotació
                 </button>
               </form>
+
+              <details className="tutorial-disciplinary-register">
+                <summary>Incidències i altres registres de seguiment</summary>
+                <div className="tutorial-record-summary">
+                  {TUTORING_RECORD_TYPES.filter((type) => type.id !== 'doip').map((type) => (
+                    <button
+                      className={`tutorial-record-pill ${type.tone} ${recordForm.type === type.id ? 'active' : ''}`}
+                      key={type.id}
+                      onClick={() => setRecordForm((current) => ({ ...current, type: type.id }))}
+                      type="button"
+                    >
+                      <strong>{countByType(classTutorialRecords, type.id)}</strong>
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </details>
             </article>
 
-            <article className="tutoring-card">
+            <article className="tutoring-card" data-tour="tutorial-registry">
               <div>
                 <UsersRound size={24} />
                 <h2>Registre per alumne</h2>
@@ -7953,49 +8104,61 @@ export function TutoringView() {
                 </div>
               )}
             </article>
-          </div>
 
-          <details className="tutorial-disciplinary-register">
-            <summary>Incidències i altres registres de seguiment</summary>
-            <div className="tutorial-record-summary">
-              {TUTORING_RECORD_TYPES.map((type) => (
-                <button
-                  className={`tutorial-record-pill ${type.tone} ${recordForm.type === type.id ? 'active' : ''}`}
-                  key={type.id}
-                  onClick={() => setRecordForm((current) => ({ ...current, type: type.id }))}
-                  type="button"
-                >
-                  <strong>{countByType(classTutorialRecords, type.id)}</strong>
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </details>
-
-          <section className="tutorial-student-profile-tools">
             <article className="tutoring-card tutorial-doip-card" data-tour="tutoring-doip-card">
               <div>
                 <ClipboardList size={24} />
-                <h2>DOIPs pendents</h2>
+                <h2>DOIPs</h2>
               </div>
-              <p>
-                Marca les respostes de l’equip educatiu quan demanis informació curta sobre un alumne. Així veus qui
-                encara no té cap DOIP registrat.
-              </p>
-              {tutorialRecordSummary.studentsWithoutDoip.length === 0 ? (
-                <div className="empty-state compact">Tots els alumnes visibles tenen almenys un DOIP registrat.</div>
-              ) : (
-                <div className="tutorial-doip-list">
-                  {tutorialRecordSummary.studentsWithoutDoip.slice(0, 12).map((row) => (
-                    <button key={row.student.id} onClick={() => setSelectedDoipStudentId(row.student.id)} type="button">
-                      <span>{row.student.name}</span>
-                      <small>Afegir resposta DOIP</small>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p>Consulta els DOIPs de cada alumne o afegeix-ne un amb la data, el contingut de l’equip educatiu i les mesures educatives acordades.</p>
+              <div className="tutorial-profile-filter-tabs" aria-label="Estat dels DOIPs">
+                {doipGroups.map((group) => <button key={group.id} type="button"
+                  className={doipFilter === group.id ? 'active' : ''}
+                  aria-pressed={doipFilter === group.id} onClick={() => setDoipFilter(group.id)}>
+                  {group.label} ({group.rows.length})
+                </button>)}
+              </div>
+              <label className="tutorial-doip-search">
+                Cercar alumne
+                <input type="search" placeholder="Escriu el nom o els cognoms…"
+                  value={doipSearchValue}
+                  onChange={(event) => setDoipSearch({ classId: activeClassId, value: event.target.value })}
+                  aria-controls="tutorial-doip-results" />
+              </label>
+              <div id="tutorial-doip-results">
+                <p role="status">{doipGroups.find((group) => group.id === doipFilter).rows.length} alumnes{doipSearchValue.trim() ? ' coincidents' : ''}</p>
+                {classStudents.length === 0 ? (
+                  <div className="empty-state compact">Afegeix alumnes a la tutoria per registrar DOIPs.</div>
+                ) : matchingDoipRows.length === 0 ? (
+                  <div className="empty-state compact">No s’ha trobat cap alumne amb aquest nom.</div>
+                ) : doipGroups.filter((group) => group.id === doipFilter).map((group) => (
+                  <section className="tutorial-doip-group" key={group.id} aria-labelledby={`doip-group-${group.id}`}>
+                    <h3 id={`doip-group-${group.id}`}>{group.label} ({group.rows.length})</h3>
+                    {group.rows.length === 0 ? (
+                      <p>{doipSearchValue.trim() ? 'Cap coincidència en aquest grup.' : 'Cap alumne en aquest grup.'}</p>
+                    ) : (
+                      <div className="tutorial-doip-list">
+                        {group.rows.map((row) => (
+                          <button key={row.student.id} onClick={() => {
+                            setDoipDraft('')
+                            setDoipMeasures('')
+                            setDoipDate(getTodayDateInput())
+                            setDoipError('')
+                            setSelectedDoipStudentId(row.student.id)
+                          }} type="button">
+                            <span>{row.student.name}</span>
+                            <small>{row.doip ? `${row.doip} ${row.doip === 1 ? 'DOIP' : 'DOIPs'} · Consultar / afegir` : 'Afegir DOIP'}</small>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
             </article>
+          </div>
 
+          <section className="tutorial-student-profile-tools">
             <article className="tutoring-card tutorial-modified-card" data-tour="tutoring-modified-card">
               <div>
                 <SlidersHorizontal size={24} />
@@ -8082,7 +8245,7 @@ export function TutoringView() {
           </section>
 
           <section className="tutorial-tracking-lower-grid">
-            <article className="tutoring-card compact">
+            <article className="tutoring-card compact" data-tour="tutorial-history">
               <div>
                 <CalendarDays size={22} />
                 <h2>Historial recent</h2>
@@ -10922,6 +11085,34 @@ export function TutoringView() {
               </div>
             </header>
 
+            <section className="tutorial-active-seating" aria-label="Disposicions actives">
+              {SEATING_SCOPES.map(scope => {
+                const activePlan = activeSeatingSlots[scope.id]
+                return <article key={scope.id} className={activePlan ? 'enabled' : ''}>
+                  <strong>{scope.label}</strong>
+                  <span>{activePlan ? activePlan.title : scope.id === 'all' ? 'Desa la primera disposició per activar-la' : 'Desactivada'}</span>
+                  <label>
+                    <span className="sr-only">Disposició activa · {scope.label}</span>
+                    <select disabled={activeSeatingSlotBusy || !classTutorialSeatingPlans.length} value={activePlan?.id || ''} onChange={async event => {
+                      const planId = event.target.value
+                      setActiveSeatingSlotBusy(true)
+                      setActiveSeatingSlotError('')
+                      try { await setActiveSeatingSlot(activeClassId, scope.id, planId) }
+                      catch (error) { setActiveSeatingSlotError(error.message) }
+                      finally { setActiveSeatingSlotBusy(false) }
+                    }}>
+                      {scope.id !== 'all' && <option value="">Desactivada</option>}
+                      {scope.id === 'all' && !activePlan && <option value="">Sense disposició desada</option>}
+                      {classTutorialSeatingPlans.map(plan => <option key={plan.id} value={plan.id}>{plan.title || 'Disposició guardada'}</option>)}
+                    </select>
+                  </label>
+                  {activePlan && <button type="button" onClick={() => setSelectedSeatingPlanId(activePlan.id)}>Veure disposició</button>}
+                  {scope.id === 'all' && <small>Sempre activa</small>}
+                </article>
+              })}
+              {activeSeatingSlotError && <p role="alert">{activeSeatingSlotError}</p>}
+            </section>
+
             <div className="tutorial-seating-version-context">
               <div>
                 <strong>{selectedSeatingPlan ? `Consultant: ${selectedSeatingPlan.title}` : loadedSeatingPlan ? `${seatingSaveMode === 'update' ? 'Modificant' : 'Nova versió a partir de'}: ${loadedSeatingPlan.title}` : 'Nova disposició'}</strong>
@@ -11312,7 +11503,7 @@ export function TutoringView() {
                         onChange={(event) => setSeatingSaveAsActive(event.target.checked)}
                         type="checkbox"
                       />
-                      Marcar com a disposició activa
+                      Activar per al grup sencer
                     </label>
                     <button className="primary" disabled={seatingSaveBusy || Boolean(selectedSeatingPlan)} onClick={() => handleSaveTutorialSeatingPlan()} type="button">
                       <Save aria-hidden="true" size={16} />
@@ -11431,7 +11622,7 @@ export function TutoringView() {
                   type="checkbox"
                 />
                 <span>
-                  <strong>Marcar com a disposició activa</strong>
+                  <strong>Activar per al grup sencer</strong>
                   <small>Serà la versió de referència actual de la classe.</small>
                 </span>
               </label>
@@ -11798,7 +11989,7 @@ export function TutoringView() {
                       <div className="tutorial-seating-history-copy">
                         <div>
                           <strong>{plan.title || 'Disposició guardada'}</strong>
-                          {plan.isActive && <span className="active-badge">Activa</span>}
+                          {SEATING_SCOPES.filter(scope => activeSeatingSlots[scope.id]?.id === plan.id).map(scope => <span key={scope.id} className="active-badge">{scope.label} · activa</span>)}
                         </div>
                         <small>
                           {formatShortDate((plan.createdAt || plan.updatedAt)?.slice(0, 10))} ·{' '}
@@ -11847,12 +12038,12 @@ export function TutoringView() {
                           aria-label={
                             plan.isActive
                               ? `${plan.title || 'Disposició guardada'} és activa`
-                              : `Marcar ${plan.title || 'disposició guardada'} com a activa`
+                              : `Marcar ${plan.title || 'disposició guardada'} com a activa per al grup sencer`
                           }
                           className={plan.isActive ? 'active-plan' : ''}
                           disabled={Boolean(plan.isActive)}
                           onClick={() => handleSetActiveTutorialSeatingPlan(plan)}
-                          title={plan.isActive ? 'Disposició activa' : 'Marcar com a activa'}
+                          title={plan.isActive ? 'Activa · grup sencer' : 'Activar per al grup sencer'}
                           type="button"
                         >
                           <CheckCircle2 aria-hidden="true" size={15} />
@@ -12401,7 +12592,7 @@ export function TutoringView() {
           </section>
 
           <div className="tutorial-relationships-grid">
-            <article className="tutoring-card tutorial-sociogram-card">
+            <article className="tutoring-card tutorial-sociogram-card" data-tour="tutorial-quick-map">
               <div>
                 <Network size={24} />
                 <h2>Mapa ràpid del grup</h2>
@@ -12413,24 +12604,76 @@ export function TutoringView() {
                   {tutorialRelationSummary.studentRows.map((row) => {
                     const isSelected = row.student.id === selectedRelationRow?.student.id
                     const roleRow = tutorialRoleRowsByStudent.get(row.student.id)
+                    const detailType = quickRelationDetail?.classId === activeClassId &&
+                      quickRelationDetail?.studentId === row.student.id ? quickRelationDetail.type : null
+                    const detailId = `quick-relations-${row.student.id}`
+                    const detailRelations = [...row.outgoing, ...row.incoming].filter((relation) =>
+                      detailType === 'all' || (detailType === 'positive'
+                        ? relation.type === 'positive' || relation.type === 'friendship'
+                        : relation.type === 'avoid'),
+                    )
                     return (
                       <article
                         className={`tutorial-sociogram-row ${isSelected ? 'active' : ''}`}
                         key={row.student.id}
                       >
-                        <button
-                          className="tutorial-sociogram-row-main"
-                          onClick={() => setSelectedRelationStudentId(row.student.id)}
-                          type="button"
-                        >
-                          <div>
+                        <div className="tutorial-sociogram-row-main">
+                          <button
+                            className="tutorial-sociogram-student"
+                            onClick={() => setSelectedRelationStudentId(row.student.id)}
+                            type="button"
+                          >
                             <strong>{row.student.name}</strong>
                             <small>{row.student.halfGroup || 'Sense mig grup'}</small>
-                          </div>
-                          <span className="green">{row.supportiveCount} positives</span>
-                          <span className="red">{row.avoidCount} evitar</span>
-                          <span>{row.total} total</span>
-                        </button>
+                          </button>
+                          {[
+                            { type: 'positive', tone: 'green', count: row.supportiveCount, label: 'positives' },
+                            { type: 'avoid', tone: 'red', count: row.avoidCount, label: 'evitar' },
+                            { type: 'all', tone: '', count: row.total, label: 'total' },
+                          ].map(({ type, tone, count, label }) => (
+                            <button
+                              aria-controls={detailType ? detailId : undefined}
+                              aria-expanded={detailType === type}
+                              aria-label={`Relacions ${label} de ${row.student.name}`}
+                              className={`tutorial-sociogram-count ${tone}`}
+                              key={type}
+                              onClick={() => {
+                                setSelectedRelationStudentId(row.student.id)
+                                setQuickRelationDetail(detailType === type ? null : {
+                                  classId: activeClassId, studentId: row.student.id, type,
+                                })
+                              }}
+                              type="button"
+                            >
+                              {count} {label}
+                            </button>
+                          ))}
+                        </div>
+                        {detailType && (
+                          <section className="tutorial-quick-relation-detail" id={detailId} aria-label={`Relacions de ${row.student.name}`}>
+                            <strong>{detailType === 'positive' ? 'Relacions positives' : detailType === 'avoid' ? 'Relacions a evitar' : 'Totes les relacions'}</strong>
+                            {detailType !== 'all' && <small>Recompte ponderat: les observacions docents compten doble.</small>}
+                            {detailRelations.length === 0 ? (
+                              <p>No hi ha relacions d’aquest tipus registrades.</p>
+                            ) : (
+                              <div className="tutorial-relation-pills">
+                                {detailRelations.map((relation) => {
+                                  const typeMeta = getRelationTypeMeta(relation.type)
+                                  const isOutgoing = relation.sourceStudentId === row.student.id
+                                  const otherStudent = classStudents.find((student) => student.id ===
+                                    (isOutgoing ? relation.targetStudentId : relation.sourceStudentId))
+                                  return (
+                                    <article className={`tutorial-relation-pill ${typeMeta.tone}`} key={relation.id}>
+                                      <strong>{isOutgoing ? 'Cap a' : 'Rep de'} {otherStudent?.name || 'Alumne no trobat'}</strong>
+                                      <span>{typeMeta.shortLabel} · intensitat {relation.strength || 2} · {relation.sourceLabel || 'Criteri docent'}</span>
+                                      {relation.note && <p>{relation.note}</p>}
+                                    </article>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </section>
+                        )}
                         <div className="tutorial-role-actions">
                           <button
                             className={roleRow?.star ? 'active star' : ''}
@@ -12708,18 +12951,18 @@ export function TutoringView() {
             setDoipDraft('')
           }}
           size="lg"
-          title={`Resposta DOIP: ${selectedDoipStudent.name}`}
+          title={`DOIPs: ${selectedDoipStudent.name}`}
         >
           <div className="tutorial-doip-detail-modal">
             {selectedDoipRecords.length === 0 ? (
-              <div className="empty-state compact">Encara no hi ha cap resposta DOIP registrada per aquest alumne.</div>
+              <div className="empty-state compact">Encara no hi ha cap DOIP registrat per aquest alumne.</div>
             ) : (
               <div className="tutorial-record-history compact">
                 {selectedDoipRecords.map((record) => (
-                  <article className="tutorial-record-entry blue" key={record.id}>
+                  <article className="tutorial-record-entry blue" data-search-record={record.id} key={record.id}>
                     <div>
                       <strong>{formatShortDate(record.date)}</strong>
-                      <p>{record.note || 'Sense resum afegit.'}</p>
+                      <p><DoipFormattedText text={record.note || 'Sense resum afegit.'} /></p>
                     </div>
                     <button
                       className="icon-button danger subtle"
@@ -12733,35 +12976,45 @@ export function TutoringView() {
                 ))}
               </div>
             )}
-            <label className="field-label">
-              Resum de respostes de l’equip educatiu
-              <textarea
-                maxLength={TUTORING_TEXT_LIMIT}
-                onChange={(event) => setDoipDraft(event.target.value)}
-                placeholder="Resumeix les respostes rebudes i els acords principals."
-                value={doipDraft}
-              />
-            </label>
-            <div className="modal-actions">
-              <button
-                className="secondary-action"
-                disabled={!doipDraft.trim()}
-                onClick={async () => {
-                  await addTutorialRecord({
-                    classId: activeClassId,
-                    date: getTodayDateInput(),
-                    note: doipDraft,
-                    studentId: selectedDoipStudent.id,
-                    type: 'doip',
-                  })
-                  setDoipDraft('')
-                }}
-                type="button"
-              >
-                Afegir resposta DOIP
+            <form className="tutorial-record-form" onSubmit={async (event) => {
+              event.preventDefault()
+              if (doipSaving || !doipDate || !doipDraft.trim()) return
+              setDoipSaving(true)
+              setDoipError('')
+              try {
+                await addTutorialRecord({
+                  classId: activeClassId,
+                  date: doipDate,
+                  note: [doipDraft.trim(), doipMeasures.trim() ? `**Mesures educatives**\n${doipMeasures.trim()}` : ''].filter(Boolean).join('\n\n'),
+                  studentId: selectedDoipStudent.id,
+                  type: 'doip',
+                })
+                setDoipDraft('')
+                setDoipMeasures('')
+                setDoipDate(getTodayDateInput())
+              } catch {
+                setDoipError('No s’ha pogut desar el DOIP. Torna-ho a provar.')
+              } finally {
+                setDoipSaving(false)
+              }
+            }}>
+              <label className="full">
+                Data del DOIP
+                <input type="date" required value={doipDate} disabled={doipSaving}
+                  onChange={(event) => setDoipDate(event.target.value)} />
+              </label>
+              <DoipTextField label="Contingut del DOIP" required value={doipDraft}
+                onChange={setDoipDraft} disabled={doipSaving}
+                placeholder="Escriu aquí el contingut del DOIP, les aportacions i els acords de l’equip educatiu." />
+              <DoipTextField label="Mesures educatives que aplicarem" value={doipMeasures}
+                onChange={setDoipMeasures} disabled={doipSaving}
+                placeholder="Concreta les mesures, qui les aplicarà i quan en fareu el seguiment." />
+              {doipError && <p role="alert">{doipError}</p>}
+              <button className="primary-action" type="submit"
+                disabled={doipSaving || !doipDate || !doipDraft.trim()}>
+                {doipSaving ? 'Desant…' : 'Afegir DOIP'}
               </button>
-              <small>Si més endavant demanes un altre DOIP, pots afegir una altra entrada aquí mateix.</small>
-            </div>
+            </form>
           </div>
         </Modal>
       )}

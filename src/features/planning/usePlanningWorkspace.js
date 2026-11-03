@@ -102,6 +102,8 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
   const [activityOverridesLoading, setActivityOverridesLoading] = useState(false)
   const [activeAcademicYearId, setActiveAcademicYearId] = useState('')
   const [activePlanningUnitId, setActivePlanningUnitId] = useState('')
+  const [loadedUnitsYearId, setLoadedUnitsYearId] = useState('')
+  const [loadedStructureId, setLoadedStructureId] = useState('')
   const [loading, setLoading] = useState(true)
   const [sharedLoading, setSharedLoading] = useState(true)
   const [error, setError] = useState('')
@@ -292,7 +294,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
         : nextUnits.find((item) => item.status !== 'archived')?.id || nextUnits[0]?.id || '')
       if (utResult.error || unitResult.error) setError('S’han carregat dades locals perquè Firebase no ha respost.')
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquest curs.'))
-      .finally(() => !cancelled && setLoading(false))
+      .finally(() => { if (!cancelled) { setLoadedUnitsYearId(activeAcademicYearId); setLoading(false) } })
     return () => { cancelled = true }
   }, [activeAcademicYearId, refreshRevision, repository, user?.uid])
 
@@ -418,6 +420,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       setActivities(sortByOrder(result.entities.filter((item) => item.entityType === 'planningActivity')))
       if (result.error) setError('La UP mostra la còpia local perquè Firebase no ha respost.')
     }).catch((loadError) => !cancelled && setError(loadError.message || 'No s’ha pogut obrir aquesta UP.'))
+      .finally(() => !cancelled && setLoadedStructureId(activePlanningUnitId))
     return () => { cancelled = true }
   }, [activePlanningUnitId, refreshRevision, repository, user?.uid])
 
@@ -1354,6 +1357,8 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
     activeAcademicYearId,
     activePlanningUnit,
     activePlanningUnitId,
+    loadedUnitsYearId,
+    loadedStructureId,
     activeApplication,
     activeRole,
     applications,

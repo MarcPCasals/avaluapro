@@ -8,6 +8,7 @@ import {
   loadPlanningConflicts,
   loadPlanningOutbox,
   loadPlanningScope,
+  loadPlanningSearchEntities,
   mergePlanningRemoteScope,
   PLANNING_LOCAL_DB_NAME,
   recordPlanningOperationFailure,
@@ -901,4 +902,17 @@ test('l’element hidratat desa només dades de domini a la còpia local i la cu
   assert.ok(hydrated.sourceActivity)
   await acknowledgePlanningOperation(pending[0], item.updatedAt)
   await clearPlanningLocalData(uid)
+})
+
+
+test('la cerca local aïlla els comptes i no inclou entitats eliminades', async () => {
+  const first = academicYear('search-teacher-1')
+  const second = academicYear('search-teacher-2')
+  await savePlanningEntityLocally('search-teacher-1', first)
+  await savePlanningEntityLocally('search-teacher-2', second)
+  assert.deepEqual((await loadPlanningSearchEntities('search-teacher-1')).map(row => row.ownerUid), ['search-teacher-1'])
+  assert.deepEqual(await loadPlanningSearchEntities(''), [])
+  await deletePlanningEntityLocally('search-teacher-1', first)
+  assert.deepEqual(await loadPlanningSearchEntities('search-teacher-1'), [])
+  assert.equal((await loadPlanningSearchEntities('search-teacher-2')).length, 1)
 })
