@@ -68,7 +68,8 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
           const note = savedNotes[action.id]
           const orientations = previousOrientations.filter(item => item.actionId === action.id)
           const classResult = previousClassResults[action.id]
-          const needsReinforcement = classResult && (classResult.distribution.D + classResult.distribution.NA) > classResult.evaluated / 2
+          const needsReinforcement = classResult && classResult.evaluated >= Math.max(2, Math.ceil(classResult.total * 2 / 3))
+            && (classResult.distribution.D + classResult.distribution.NA) > classResult.evaluated / 2
           const editing = noteDraft?.action.id === action.id
           return <div className="action-note-item" key={action.id}>
           <div className="action-note-row"><label>

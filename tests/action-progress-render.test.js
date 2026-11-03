@@ -113,6 +113,15 @@ test('el diàleg mostra comentari, orientacions i resultat anterior sense qualif
   assert.match(html, /3 de 4 amb nota/)
   assert.match(html, /Convé reforçar aquesta acció/)
   assert.match(html, /0\/1 accions qualificades/)
+  const sparse = renderToStaticMarkup(createElement(GradeModal, {
+    student: { name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
+    criterion: { name: 'CA1: Pertinència', selectedActionIds: ['C2P5'] },
+    actions: [{ id: 'C2P5', description: 'Expressar les dades amb pertinència.' }],
+    onClose() {}, onSaveActions() {},
+    previousClassResults: { C2P5: { utName: 'UT1', score: 1, evaluated: 1, total: 4, distribution: { A: 0, B: 0, C: 0, D: 1, NA: 0 } } },
+  }))
+  assert.match(sparse, /1 de 4 amb nota/)
+  assert.doesNotMatch(sparse, /Convé reforçar aquesta acció/)
 })
 
 test('el recull individual separa orientacions i justificacions amb la UT d’origen', () => {
