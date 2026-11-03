@@ -17,8 +17,6 @@
 .action-progress-table small { display: block; color: #475569; font-size: .75rem; margin-top: 6px; }
 .action-progress-empty { color: #64748b; font-size: .8rem; }
 .action-progress-cell { display: grid; gap: 6px; border: 1px solid #ddd6fe; background: #faf5ff; border-radius: 9px; padding: 8px; width: 100%; cursor: pointer; }
-.action-progress-cell > strong { font-size: 1rem; }
-.action-progress-cell > strong small { display: inline; font-weight: 400; margin-left: 2px; }
 .action-distribution { display: flex; gap: 1px; height: 8px; width: 100%; border-radius: 4px; overflow: hidden; }
 .action-distribution > span { min-width: 2px; }
 .action-distribution-A { background: #16a34a; }
@@ -31,5 +29,25 @@
 .action-progress-trend.down { color: #b91c1c; }
 .action-progress-method { font-size: .8rem; margin-top: 16px; }
 .action-progress-student-list { list-style: none; padding: 0; }
-.action-progress-student-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+.action-progress-student-list li { display: block; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
 @media (max-width: 640px) { .action-progress-stats { padding: 12px; } }
+.action-progress-summary > button { padding: 12px; background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 10px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.action-progress-summary > button:hover { background: #ede9fe; }
+.action-progress-competency { margin: 16px 0; border: 1px solid #e2e8f0; border-radius: 10px; }
+.action-progress-competency > summary, .action-progress-criterion > summary { padding: 12px; min-height: 44px; cursor: pointer; font-weight: 700; }
+.action-progress-competency > summary { background: #f5f3ff; border-radius: 10px; }
+.action-progress-criterion { margin: 8px 12px 12px; }
+.action-progress-criterion > summary { background: #f8fafc; border-radius: 8px; }
+.action-progress-criterion > summary small { font-weight: 400; color: #475569; }
+.action-progress-score { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.action-progress-score small { display: inline; margin: 0; }
+.action-progress-student-row, .action-progress-student-row > div { display: flex; align-items: center; gap: 12px; }
+.action-progress-student-row { justify-content: space-between; }
+.action-progress-student-row > div { flex-shrink: 0; }
+.action-progress-note { margin: 10px 0; padding: 12px; background: #f8fafc; border-left: 3px solid #8b5cf6; overflow-wrap: anywhere; }
+.action-progress-note p { white-space: pre-wrap; margin: 8px 0 0; }
+.action-progress-measures { margin: 20px 0; }
+.action-progress-measures h3 { margin-bottom: 6px; }
+.action-progress-measures > small { color: #475569; }
+.action-progress-stats summary:focus-visible, .action-progress-stats button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (max-width: 640px) { .action-progress-student-row { flex-wrap: wrap; } .action-progress-criterion { margin-inline: 6px; } }

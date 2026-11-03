@@ -139,3 +139,24 @@ test('l’acció recuperada salta les UT sense nota o sense selecció i respecta
   assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'transversal', 'C1/CA1'), {})
   assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C2/CA1'), {})
 })
+
+test('les anotacions conserven alumne, acció i UT sense dependre de la qualificació', () => {
+  const state = fixture()
+  state.marks[0].actionNotes = { C1R1: { text: 'Mesura fictícia.', orientation: true } }
+  state.marks[1].actionNotes = { C1R1: { text: 'Justificació fictícia.', orientation: false } }
+  state.criteria[2].selectedActionIds = []
+  state.marks.push({ studentId: 's1', criterionId: 'ca-ut3', actionNotes: {
+    C1R1: { text: 'Mesura sense qualificació.', orientation: true }, C1R2: { text: '   ', orientation: true },
+  } })
+  state.marks.push({ studentId: 'other-student', criterionId: 'ca-ut3', actionNotes: { C1R1: { text: 'No correspon al grup.', orientation: true } } })
+  const row = action(buildActionProgress(state, 'science'))
+  assert.equal(row.cells[0].notes.length, 2)
+  assert.equal(row.cells[0].notes[0].studentId, 's1')
+  assert.equal(row.cells[0].notes[1].orientation, false)
+  assert.equal(row.cells[2].notes.length, 1)
+  assert.equal(row.cells[2].notes[0].criterionId, 'ca-ut3')
+  assert.equal(row.cells[2].evaluated, 0)
+  assert.equal(row.cells.flatMap(cell => cell.notes).filter(note => note.orientation).length, 2)
+  assert.equal(action(buildActionProgress(state, 'science', { studentId: 's2' })).cells[2].notes.length, 0)
+  assert.equal(action(buildActionProgress(state, 'science'), 'C1R2').cells[2].notes.length, 0)
+})

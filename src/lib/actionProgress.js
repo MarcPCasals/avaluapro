@@ -43,13 +43,18 @@ export function buildActionProgress(state, classId, { studentId, scope = 'specif
       const criterion = utCompetencies.get(ut.id).flatMap(comp => comp.criteria.map(item => ({ comp, item })))
         .find(({ comp, item }) => getCriterionActionKey(comp, item) === meta.key)?.item
       const selected = Boolean(criterion?.selectedActionIds?.includes(action.id))
+      // Comments remain useful even before grading or after deselecting an action.
+      const notes = criterion ? students.flatMap(student => {
+        const note = marks.get(`${student.id}\u0000${criterion.id}`)?.actionNotes?.[action.id]
+        return note?.text?.trim() ? [{ ...note, studentId: student.id, name: student.name, criterionId: criterion.id }] : []
+      }) : []
       const grades = selected ? students.flatMap(student => {
         const grade = getActionGrade(marks.get(`${student.id}\u0000${criterion.id}`), action.id)
         return grade ? [{ studentId: student.id, name: student.name, grade }] : []
       }) : []
       const distribution = Object.fromEntries(levels.map(level => [level, grades.filter(item => item.grade === level).length]))
       return {
-        ut, selected, grades, distribution, evaluated: grades.length,
+        ut, selected, grades, notes, distribution, evaluated: grades.length,
         pending: selected ? students.length - grades.length : 0,
         score: average(grades.map(item => getNumericFromGrade(item.grade))),
         achievedPercent: grades.length ? Math.round(100 * (distribution.A + distribution.B) / grades.length) : null,

@@ -5,14 +5,17 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 
-let server, Stats, GradeModal, ActionsModal, StudentNotes
+let server, Stats, GradeModal, ActionsModal, StudentNotes, StudentList, Measures
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()],
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   })
   StudentNotes = (await server.ssrLoadModule('/src/features/students/StudentActionNotes.jsx')).StudentActionNotes
-  Stats = (await server.ssrLoadModule('/src/features/analytics/ActionProgressStats.jsx')).ActionProgressStats
+  const statsModule = await server.ssrLoadModule('/src/features/analytics/ActionProgressStats.jsx')
+  Stats = statsModule.ActionProgressStats
+  StudentList = statsModule.ActionProgressStudentList
+  Measures = statsModule.ActionProgressMeasures
   GradeModal = (await server.ssrLoadModule('/src/features/evaluation/CriterionGradeModal.jsx')).CriterionGradeModal
   ActionsModal = (await server.ssrLoadModule('/src/features/evaluation/EvaluationActionsModal.jsx')).EvaluationActionsModal
 })
@@ -136,4 +139,38 @@ test('el recull individual separa orientacions i justificacions amb la UT d’or
   assert.match(html, /Grup fictici · UT1/)
   assert.match(html, /Orientació fictícia/)
   assert.match(html, /Justificació fictícia/)
+})
+
+
+test('les estadístiques agrupen per competència i criteri i afegeixen lletra i recompte de mesures', () => {
+  const state = fixture()
+  state.marks[0].actionNotes = { C1R1: { text: 'Mesura fictícia.', orientation: true }, C1R2: { text: 'Comentari fictici.', orientation: false } }
+  const html = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class' }))
+  assert.match(html, /<details class="action-progress-competency" open=""><summary>C1: Modelització/)
+  assert.match(html, /<details class="action-progress-criterion" open=""><summary>CA1: Rigor/)
+  assert.match(html, /1 mesures educatives. Veure mesures per acció/)
+  assert.match(html, /class="grade grade-B">B<\/strong><span>3<small>\/4/)
+})
+
+test('el detall només ofereix Notes per als alumnes amb anotació, inclosos els pendents', () => {
+  const html = renderToStaticMarkup(createElement(StudentList, {
+    students: [{ id: 'a', name: 'Fictici A' }, { id: 'b', name: 'Fictici B' }, { id: 'c', name: 'Fictici C' }],
+    cell: { grades: [{ studentId: 'a', grade: 'B' }, { studentId: 'b', grade: 'A' }],
+      notes: [{ studentId: 'a', text: 'Comentari.' }, { studentId: 'c', text: 'Mesura.', orientation: true }] },
+  }))
+  assert.match(html, /aria-label="Notes de Fictici A"/)
+  assert.match(html, /aria-label="Notes de Fictici C"/)
+  assert.doesNotMatch(html, /aria-label="Notes de Fictici B"/)
+  assert.match(html, /Pendent de nota/)
+})
+
+test('el recull de mesures identifica acció, alumne i UT i presenta un estat buit', () => {
+  const html = renderToStaticMarkup(createElement(Measures, { groups: [{
+    row: { id: 'row', action: { id: 'C1R1', description: 'Acció fictícia' }, competencyName: 'C1', criterionName: 'CA1' },
+    notes: [{ studentId: 'a', criterionId: 'ca1', name: 'Fictici A', ut: { name: 'UT1' }, text: 'Mesura fictícia.' }],
+  }] }))
+  assert.match(html, /C1R1 · Acció fictícia/)
+  assert.match(html, /Fictici A · UT1/)
+  assert.match(html, /Mesura fictícia./)
+  assert.match(renderToStaticMarkup(createElement(Measures, { groups: [] })), /Encara no hi ha mesures educatives/)
 })
