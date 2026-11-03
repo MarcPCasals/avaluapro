@@ -5,12 +5,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 
-let server, Stats, GradeModal, ActionsModal
+let server, Stats, GradeModal, ActionsModal, StudentNotes
 test.before(async () => {
   server = await createServer({ configFile: false, envFile: false, plugins: [react()],
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   })
+  StudentNotes = (await server.ssrLoadModule('/src/features/students/StudentActionNotes.jsx')).StudentActionNotes
   Stats = (await server.ssrLoadModule('/src/features/analytics/ActionProgressStats.jsx')).ActionProgressStats
   GradeModal = (await server.ssrLoadModule('/src/features/evaluation/CriterionGradeModal.jsx')).CriterionGradeModal
   ActionsModal = (await server.ssrLoadModule('/src/features/evaluation/EvaluationActionsModal.jsx')).EvaluationActionsModal
@@ -61,7 +62,7 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
   assert.match(html, /class="action-criterion-result" role="status"><strong class="grade grade-C">C/)
   assert.match(html, /3\/3 accions qualificades/)
   assert.doesNotMatch(html, /Nota provisional/)
-  assert.match(html, /Desar notes de les accions/)
+  assert.match(html, /Desar qualificacions de les accions/)
 })
 
 
@@ -94,4 +95,36 @@ test('la còpia ofereix el catàleg per a totes les UT i només demana classes d
   assert.match(html, /també a les que creïs més endavant/)
   assert.match(html, /Classe sense UT/)
   assert.doesNotMatch(html, /UT de destí|Copiar també les accions seleccionades|<select/)
+})
+
+test('el diàleg mostra comentari, orientacions i resultat anterior sense qualificar la UT actual', () => {
+  const html = renderToStaticMarkup(createElement(GradeModal, {
+    student: { name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
+    criterion: { name: 'CA1: Pertinència', selectedActionIds: ['C2P5'] },
+    actions: [{ id: 'C2P5', description: 'Expressar les dades amb pertinència.' }],
+    mark: { value: '', actionNotes: { C2P5: { text: 'Justificació fictícia.', orientation: false } } },
+    onClose() {}, onSaveActions() {}, onSaveActionNote() {},
+    previousOrientations: [{ actionId: 'C2P5', criterionId: 'old', utName: 'UT1', text: 'Practicar les unitats.' }],
+    previousClassResults: { C2P5: { utName: 'UT1', score: 1, evaluated: 3, total: 4, distribution: { A: 0, B: 0, C: 0, D: 3, NA: 0 } } },
+  }))
+  assert.match(html, /has-note/)
+  assert.match(html, /Justificació fictícia/)
+  assert.match(html, /Practicar les unitats/)
+  assert.match(html, /3 de 4 amb nota/)
+  assert.match(html, /Convé reforçar aquesta acció/)
+  assert.match(html, /0\/1 accions qualificades/)
+})
+
+test('el recull individual separa orientacions i justificacions amb la UT d’origen', () => {
+  const base = { criterionId: 'ca', actionId: 'C2P5', description: 'Acció fictícia', utName: 'UT1', className: 'Grup fictici' }
+  const html = renderToStaticMarkup(createElement(StudentNotes, { notes: [
+    { ...base, text: 'Orientació fictícia.', orientation: true },
+    { ...base, criterionId: 'ca2', text: 'Justificació fictícia.', orientation: false },
+  ] }))
+  assert.match(html, /Notes i orientacions d’accions \(2\)/)
+  assert.match(html, /Orientacions i mesures educatives/)
+  assert.match(html, /Justificacions/)
+  assert.match(html, /Grup fictici · UT1/)
+  assert.match(html, /Orientació fictícia/)
+  assert.match(html, /Justificació fictícia/)
 })

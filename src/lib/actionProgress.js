@@ -64,3 +64,15 @@ export function buildActionProgress(state, classId, { studentId, scope = 'specif
   }))
   return { rows, uts, students, individual: Boolean(studentId) }
 }
+
+export function getPreviousClassActionResults(state, classId, utId, scope, criterionKey) {
+  if (!state) return {}
+  const ordered = getClassUts(state, classId)
+  const index = ordered.findIndex(ut => ut.id === utId)
+  if (index <= 0) return {}
+  const report = buildActionProgress({ ...state, uts: ordered.slice(0, index) }, classId, { scope })
+  return Object.fromEntries(report.rows.filter(row => row.key === criterionKey && row.latest).map(row => {
+    const { ut, score, evaluated, distribution } = row.latest
+    return [row.action.id, { utName: ut.name, score, evaluated, distribution, total: report.students.length }]
+  }))
+}

@@ -1,3 +1,5 @@
+import { buildActionNoteMark, listStudentActionNotes } from '../../src/lib/actionNotes'
+import { StudentActionNotes } from '../../src/features/students/StudentActionNotes'
 import { selectEvaluationCompetencies } from '../../src/lib/transversalEvaluation'
 import { buildActionGradeMark, recalculateActionCriteria } from '../../src/lib/actionGrades'
 import { ActionProgressStats } from '../../src/features/analytics/ActionProgressStats'
@@ -55,6 +57,14 @@ export function EvaluationActionsDemo({ students }) {
         return { ...current, ...patch, marks: recalculateActionCriteria(current.marks, patch.criteria) }
       })} />}
     <EvaluationTable key={`table:${utId}`} activeClassId={classId} competencies={competencies} students={students.slice(0, 4)}
+      utId={utId} actionNoteContext={progressState}
+      onUpdateActionNote={(studentId, criterionId, action, note) => setState(current => {
+        const existing = current.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
+        const mark = buildActionNoteMark({ existing, studentId, criterionId, action, ...note,
+          updatedAt: new Date().toISOString(), createId: () => `synthetic-mark-${studentId}-${criterionId}` })
+        if (!mark) return current
+        return { ...current, marks: existing ? current.marks.map(item => item.id === existing.id ? mark : item) : [...current.marks, mark] }
+      })}
       onUpdateActionGrades={(studentId, criterionId, grades) => setState(current => {
         const existing = current.marks.find(mark => mark.studentId === studentId && mark.criterionId === criterionId)
         const mark = buildActionGradeMark({ existing, criterion: current.criteria.find(item => item.id === criterionId), studentId, grades,
@@ -68,6 +78,7 @@ export function EvaluationActionsDemo({ students }) {
     <label>Vista de les estadístiques<select value={selectedStudent} onChange={event => setSelectedStudent(event.target.value)}>
       <option value="">Classe</option>{progressState.students.map(student => <option key={student.id} value={student.id}>{student.name}</option>)}
     </select></label>
+    {selectedStudent && <StudentActionNotes notes={listStudentActionNotes(progressState, selectedStudent)} />}
     <ActionProgressStats key={`${classId}:${selectedStudent}`} state={progressState} classId={classId} studentId={selectedStudent || undefined} />
   </section>
 }

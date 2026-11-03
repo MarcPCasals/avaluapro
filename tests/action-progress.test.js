@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildActionProgress } from '../src/lib/actionProgress.js'
+import { buildActionProgress, getPreviousClassActionResults } from '../src/lib/actionProgress.js'
 
 const actionMarks = marks => marks.map(mark => ({ ...mark, gradingMode: 'actions', actionGrades: { C1R1: mark.value } }))
 const subject = 'Ciències Físiques i de la Natura'
@@ -115,4 +115,27 @@ test('les notes antigues de criteri no es converteixen en notes per acció', () 
   assert.equal(row.cells[0].evaluated, 0)
   assert.equal(row.cells[0].pending, 2)
   assert.equal(row.latest, null)
+})
+
+test('l’últim resultat anterior ignora la UT actual, les futures i els alumnes pendents', () => {
+  const state = fixture()
+  const previous = getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C1/CA1').C1R1
+  assert.equal(previous.utName, 'UT2')
+  assert.equal(previous.score, 3)
+  assert.equal(previous.evaluated, 1)
+  assert.equal(previous.total, 2)
+  assert.deepEqual(previous.distribution, { A: 0, B: 1, C: 0, D: 0, NA: 0 })
+  state.marks.push(...actionMarks([{ studentId: 's2', criterionId: 'ca-ut3', value: 'A' }]))
+  assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C1/CA1').C1R1, previous)
+  assert.equal(getPreviousClassActionResults(state, 'science', 'ut2', 'specific', 'C1/CA1').C1R1.utName, 'UT1')
+  assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut1', 'specific', 'C1/CA1'), {})
+  assert.deepEqual(getPreviousClassActionResults(state, 'science', 'absent', 'specific', 'C1/CA1'), {})
+})
+
+test('l’acció recuperada salta les UT sense nota o sense selecció i respecta l’àmbit', () => {
+  const state = fixture()
+  state.criteria[1].selectedActionIds = []
+  assert.equal(getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C1/CA1').C1R1.utName, 'UT1')
+  assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'transversal', 'C1/CA1'), {})
+  assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C2/CA1'), {})
 })

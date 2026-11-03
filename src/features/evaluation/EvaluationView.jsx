@@ -29,6 +29,8 @@ function useEvaluationModel() {
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
+  const semesters = useAvaluaproStore((state) => state.semesters)
+  const classes = useAvaluaproStore((state) => state.classes)
   const allUts = useAvaluaproStore((state) => state.uts)
   const allCompetencies = useAvaluaproStore((state) => state.competencies)
   const allCriteria = useAvaluaproStore((state) => state.criteria)
@@ -46,8 +48,8 @@ function useEvaluationModel() {
       { competencies: allCompetencies, criteria: allCriteria, uts: allUts }, activeClass, activeUtId, scope,
     )
 
-    return { students, competencies, marks, agendaNotes }
-  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allUts, allCompetencies, allCriteria, marks, agendaNotes])
+    return { students, competencies, marks, agendaNotes, actionNoteContext: { students: allStudents, classes, marks, criteria: allCriteria, competencies: allCompetencies, uts: allUts, semesters } }
+  }, [activeClass, activeClassId, activeUtId, scope, allStudents, allUts, allCompetencies, allCriteria, marks, agendaNotes, classes, semesters])
 }
 
 function getCriterionMark(marks, studentId, criterionId) {
@@ -92,13 +94,14 @@ function getEmptyStateCopy(activeClass, subjectStructure) {
 }
 
 export function EvaluationView() {
-  const { students, competencies, marks, agendaNotes } = useEvaluationModel()
+  const { students, competencies, marks, agendaNotes, actionNoteContext } = useEvaluationModel()
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
   const activeUtId = useAvaluaproStore((state) => state.ui.activeUtId)
   const activeClass = useAvaluaproStore((state) =>
     state.classes.find((classItem) => classItem.id === state.ui.activeClassId),
   )
   const activeUt = useAvaluaproStore((state) => state.uts.find((ut) => ut.id === state.ui.activeUtId))
+  const updateActionNote = useAvaluaproStore((state) => state.updateActionNote)
   const updateActionGrades = useAvaluaproStore((state) => state.updateActionGrades)
   const updateMark = useAvaluaproStore((state) => state.updateMark)
   const updateMarksBulk = useAvaluaproStore((state) => state.updateMarksBulk)
@@ -389,6 +392,10 @@ export function EvaluationView() {
         onOpenRubric={setRubricCriterionId}
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
+        actionNoteContext={actionNoteContext}
+        utId={activeUtId}
+        evaluationScope={scope}
+        onUpdateActionNote={updateActionNote}
         onUpdateActionGrades={updateActionGrades}
         students={filteredStudents}
       />

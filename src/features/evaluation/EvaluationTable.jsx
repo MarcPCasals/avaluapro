@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { getPreviousClassActionResults } from '../../lib/actionProgress'
+import { getPreviousActionOrientations } from '../../lib/actionNotes'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CriterionGradeModal } from './CriterionGradeModal'
-import { getSelectedCriterionActions } from '../../lib/evaluationActions'
+import { getCriterionActionKey, getSelectedCriterionActions } from '../../lib/evaluationActions'
 import { getActionGradeSummary, isActionGradedMark } from '../../lib/actionGrades'
 import { Bell, BookOpen, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
@@ -47,9 +49,17 @@ export function EvaluationTable({
   onToggleCompetencyModification = () => {},
   onUpdateMark = () => {},
   onUpdateActionGrades,
+  onUpdateActionNote,
+  actionNoteContext,
+  utId,
+  evaluationScope = 'specific',
   students = [],
 }) {
   const [grading, setGrading] = useState(null)
+  const gradingCriterionKey = grading ? getCriterionActionKey(grading.competency, grading.criterion) : ''
+  const previousClassResults = useMemo(() => gradingCriterionKey
+    ? getPreviousClassActionResults(actionNoteContext, activeClassId, utId, evaluationScope, gradingCriterionKey)
+    : {}, [actionNoteContext, activeClassId, utId, evaluationScope, gradingCriterionKey])
   const [studentQuery, setStudentQuery] = useState('')
   const searchRef = useRef(null)
   const normalizeName = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim()
@@ -93,9 +103,13 @@ export function EvaluationTable({
   return (
     <>
     {grading && <CriterionGradeModal
+      key={`${grading.student.id}:${grading.criterion.id}`}
       {...grading} value={getCriterionMark(marks, grading.student.id, grading.criterion.id)}
       mark={marks.find(mark => mark.studentId === grading.student.id && mark.criterionId === grading.criterion.id)}
       actions={getSelectedCriterionActions(actionCatalog, grading.competency, grading.criterion)}
+      previousClassResults={previousClassResults}
+      previousOrientations={getPreviousActionOrientations(actionNoteContext, grading.student.id, grading.competency, grading.criterion, utId)}
+      onSaveActionNote={onUpdateActionNote ? (action, note) => onUpdateActionNote(grading.student.id, grading.criterion.id, action, note) : undefined}
       utName={utName} onClose={() => setGrading(null)}
       onConfigure={onConfigureActions ? () => { setGrading(null); onConfigureActions() } : undefined}
       onSave={value => onUpdateMark(grading.student.id, grading.criterion.id, value)}

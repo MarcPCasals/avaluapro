@@ -1,3 +1,5 @@
+import { listStudentActionNotes } from '../../lib/actionNotes'
+import { StudentActionNotes } from './StudentActionNotes'
 import {
   BarChart3,
   ChevronDown,
@@ -384,6 +386,8 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
         .sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
     [activeClassId, agendaNotes, studentId],
   )
+  const actionNotes = useMemo(() => listStudentActionNotes({ marks, criteria, competencies, uts, classes }, studentId),
+    [marks, criteria, competencies, uts, classes, studentId])
   const teamNotes = notes.filter((note) => note.type === 'team')
   const tutoringNotes = notes.filter((note) => note.type === 'tutoring')
   const trackingNotes = notes.filter((note) => note.type === 'tracking')
@@ -603,6 +607,8 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
             </button>
           </div>
         </section>
+
+        <StudentActionNotes notes={actionNotes} />
 
         <section className="annotation-tools-row">
           <div>

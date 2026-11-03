@@ -1,3 +1,4 @@
+import { buildActionNoteMark } from '../lib/actionNotes'
 import { assignActiveSeatingPlan, getActiveSeatingPlans } from '../features/tutoring/activeSeatingPlans'
 import { buildActionGradeMark, isActionGradedMark, recalculateActionCriteria } from '../lib/actionGrades'
 import { buildCopyEvaluationActionsPatch, buildEvaluationActionsPatch } from '../lib/evaluationActions'
@@ -478,6 +479,7 @@ function normalizeDataset(dataset) {
     if (seenCriterionMarks.has(key)) return
     seenCriterionMarks.add(key)
     marks.push({ id: mark.id, studentId: mark.studentId, criterionId, value: mark.value,
+      ...(mark.actionNotes ? { actionNotes: mark.actionNotes } : {}),
       ...(mark.actionGrades != null || isActionGradedMark(mark) ? { gradingMode: mark.gradingMode || 'actions', actionGrades: mark.actionGrades || {} } : {}),
     })
   })
@@ -3099,6 +3101,25 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['marks'], { throwOnError: true })
   },
 
+  updateActionNote: async (studentId, criterionId, action, note) => {
+    const state = get()
+    const criterion = state.criteria.find(item => item.id === criterionId)
+    const competency = state.competencies.find(item => item.id === criterion?.competencyId)
+    const ut = state.uts.find(item => item.id === competency?.utId)
+    if (!state.students.some(item => item.id === studentId && item.classId === ut?.classId)
+      || !criterion?.selectedActionIds?.includes(action.id)) {
+      throw new Error('No s’ha trobat l’alumne o l’acció seleccionada.')
+    }
+    const existing = state.marks.find(item => item.studentId === studentId && item.criterionId === criterionId)
+    const mark = buildActionNoteMark({ existing, studentId, criterionId, action, ...note,
+      updatedAt: new Date().toISOString(), createId })
+    if (!mark) return
+    setWithEditHistory(set, get, current => ({ marks: existing
+      ? current.marks.map(item => item.id === existing.id ? mark : item)
+      : [...current.marks, mark] }))
+    await persistCollections(set, get, ['marks'], { throwOnError: true })
+  },
+
   updateMark: async (studentId, criterionId, value) => {
     if (get().criteria.find(item => item.id === criterionId)?.selectedActionIds?.length) {
       throw new Error('Aquest criteri es calcula amb la nota mínima de les accions. Qualifica les accions individualment.')
@@ -3107,7 +3128,7 @@ export const useAvaluaproStore = create((set, get) => ({
       const existing = state.marks.find(
         (mark) => mark.studentId === studentId && mark.criterionId === criterionId,
       )
-      const marks = value || existing?.actionGrades
+      const marks = value || existing?.actionGrades || Object.keys(existing?.actionNotes || {}).length
         ? existing
           ? state.marks.map((mark) => (mark.id === existing.id ? { ...mark, value, ...(mark.actionGrades ? { gradingMode: 'criterion' } : {}) } : mark))
           : [...state.marks, { id: createId('mark'), studentId, criterionId, value }]
@@ -3127,17 +3148,22 @@ export const useAvaluaproStore = create((set, get) => ({
     setWithEditHistory(set, get, (state) => {
       const updateMap = new Map(updates.map((update) => [`${update.studentId}_${update.criterionId}`, update.value]))
       const touchedKeys = new Set(updateMap.keys())
+      const previousMarks = new Map(state.marks.map(mark => [`${mark.studentId}_${mark.criterionId}`, mark]))
       const marks = state.marks
         .filter((mark) => !touchedKeys.has(`${mark.studentId}_${mark.criterionId}`))
         .concat(
-          updates
-            .filter((update) => update.value)
-            .map((update) => ({
-              id: createId('mark'),
+          updates.flatMap(update => {
+            const previous = previousMarks.get(`${update.studentId}_${update.criterionId}`)
+            const actionNotes = previous?.actionNotes
+            if (!update.value && !Object.keys(actionNotes || {}).length) return []
+            return [{
+              id: previous?.id || createId('mark'),
               studentId: update.studentId,
               criterionId: update.criterionId,
               value: update.value,
-            })),
+              ...(actionNotes ? { actionNotes } : {}),
+            }]
+          }),
         )
 
       return { marks }
@@ -6334,7 +6360,7 @@ export const useAvaluaproStore = create((set, get) => ({
 // eliminacions definitives i restauracions de compte tenen un altre contracte.
 const reversibleActions = [
   'reorderClass', 'reorderClassToIndex', 'addUt', 'updateUt', 'deleteUt',
-  'addClass', 'updateClass', 'updateMark', 'updateMarksBulk', 'updateActionGrades',
+  'addClass', 'updateClass', 'updateMark', 'updateMarksBulk', 'updateActionGrades', 'updateActionNote',
   'toggleCompetencyModification', 'setCompetencyModification', 'updateTutorialMark', 'importTutorialMarks',
   'addTutorialRecord', 'updateTutorialRecord', 'deleteTutorialRecord',
   'upsertTutorialRelation', 'importTutorialRelations', 'deleteTutorialRelation',
