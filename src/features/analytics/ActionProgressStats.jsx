@@ -74,9 +74,13 @@ export function ActionProgressStats({ state, classId, studentId }) {
                             <span className="action-progress-score"><strong className={gradeClassName(getGradeFromAverage(cell.score))}>{getGradeFromAverage(cell.score)}</strong><span>{number(cell.score)}<small>/4</small></span></span><Distribution cell={cell} />
                             <small>{cell.evaluated}/{report.students.length} amb nota</small>
                           </button>}
+                    {cell.notes.length > 0 && <button className="action-progress-notes-button" type="button" onClick={() => setDetail({ row, cell })}
+                      aria-label={`${row.action.id.startsWith('text:') ? row.action.description : row.action.id} · ${cell.ut.name}: veure ${cell.notes.length} ${cell.notes.length === 1 ? 'anotació' : 'anotacions'}`}>
+                      Notes{!individual && ` (${cell.notes.length})`}
+                    </button>}
                   </td>)}
                   <td>{row.latest ? <>{individual ? <span className={gradeClassName(row.latest.grades[0].grade)}>{row.latest.grades[0].grade}</span>
-                    : <strong>{row.latest.achievedPercent}% A/B</strong>}<small>{row.latest.ut.name}{!individual && ` · n=${row.latest.evaluated}`}</small></> : <span className="action-progress-empty">Sense dades</span>}</td>
+                    : <strong>{row.latest.achievedPercent}% A/B</strong>}<small>{row.latest.ut.name}{!individual && ` · n=${row.latest.evaluated}`}</small>{individual && row.latest.notes.length > 0 && <button className="action-progress-notes-button" type="button" onClick={() => setDetail({ row, cell: row.latest })} aria-label={`${row.action.id.startsWith('text:') ? row.action.description : row.action.id} · ${row.latest.ut.name}: veure anotació`}>Notes</button>}</> : <span className="action-progress-empty">Sense dades</span>}</td>
                   <td><span className={`action-progress-trend ${row.trend.kind}`}>{trendLabels[row.trend.kind]}</span>
                     {row.trend.count > 0 && <small>{row.trend.firstUt.name} → {row.trend.lastUt.name}{!individual && ` · mateixos ${row.trend.count} alumnes`}</small>}
                   </td>
@@ -87,7 +91,7 @@ export function ActionProgressStats({ state, classId, studentId }) {
         </details>)}
     <p className="action-progress-method">A=4, B=3, C=2, D=1 i NA=1. La lletra de la mitjana és A a partir de 3,5; B a partir de 2,5; C a partir d’1,5; D per sota. Les UT sense selecció o sense nota no compten com a zero. L’evolució compara la primera i l’última UT amb nota{!individual && ', només amb els alumnes que tenen nota en totes dues'}.</p>
     {detail && <Modal title={`${detail.row.action.id.startsWith('text:') ? 'Acció' : detail.row.action.id} · ${detail.cell.ut.name}`} onClose={() => setDetail(null)}>
-      <p>{detail.row.action.description}</p><p>Criteri: {detail.row.criterionName}. {detail.cell.pending} alumnes pendents de nota.</p>
+      <p>{detail.row.action.description}</p><p>Criteri: {detail.row.criterionName}. {individual ? `${detail.cell.pending} pendent de nota` : `${detail.cell.pending} alumnes pendents de nota`}.</p>
       <ActionProgressStudentList cell={detail.cell} students={report.students} />
     </Modal>}
     {showMeasures && <Modal title={`Mesures educatives (${measureCount})`} onClose={() => setShowMeasures(false)} size="lg">

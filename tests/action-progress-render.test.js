@@ -174,3 +174,15 @@ test('el recull de mesures identifica acció, alumne i UT i presenta un estat bu
   assert.match(html, /Mesura fictícia./)
   assert.match(renderToStaticMarkup(createElement(Measures, { groups: [] })), /Encara no hi ha mesures educatives/)
 })
+
+test('una anotació es veu des de la nota individual i des del detall grupal', () => {
+  const state = fixture()
+  state.marks[0].actionNotes = { C1R1: { text: 'Mesura fictícia.', orientation: true } }
+  const individual = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class', studentId: 'synthetic-student' }))
+  const group = renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class' }))
+  assert.match(individual, /C1R1 · UT1: veure 1 anotació/)
+  assert.match(individual, /C1R1 · UT1: veure anotació/)
+  assert.match(group, /C1R1 · UT1: veure 1 anotació/)
+  delete state.marks[0].actionNotes
+  assert.doesNotMatch(renderToStaticMarkup(createElement(Stats, { state, classId: 'synthetic-class', studentId: 'synthetic-student' })), /veure anotació/)
+})
