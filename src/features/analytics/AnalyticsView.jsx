@@ -1432,8 +1432,6 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
           </table>
         </section>
 
-        <ActionProgressStats key={`${student.classId}:${student.id}`} state={state} classId={student.classId} studentId={student.id} />
-
         <div className="student-evolution-charts">
           <section className="student-evolution-card">
             <h3>Trajectòria temporal</h3>
@@ -1516,6 +1514,8 @@ function StudentEvolutionModal({ canonicalCompetencies, onClose, state, student,
             </div>
           </section>
         </div>
+
+        <ActionProgressStats key={`${student.classId}:${student.id}`} state={state} classId={student.classId} studentId={student.id} />
       </div>
     </Modal>
   )
