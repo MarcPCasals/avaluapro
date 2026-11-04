@@ -97,7 +97,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
       setNoteError(cause?.message || 'No s’ha pogut desar el comentari.')
     } finally { setNoteSaving(false) }
   }
-  return <Modal title={`${criterion.name} · ${utName || 'UT'}`} panelClassName="evaluation-actions-dialog" onClose={closeAfterSave}>
+  return <Modal title={`${criterion.name} · ${utName || 'UT'}`} panelClassName="evaluation-actions-dialog" closeButtonTabIndex={-1} onClose={closeAfterSave}>
     <p><strong>{student.name}</strong><br />{competency.name}</p>
     <section className="criterion-actions-preview">
       <h3>Accions que s’avaluen en aquesta UT</h3>
@@ -154,7 +154,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
           </div>
         })}</div>
       </> : <p>Encara no has seleccionat accions per a aquest criteri en aquesta UT.</p>}
-      {onConfigure && <button className="secondary-action compact" type="button" disabled={busy} onClick={configureAfterSave}>Escollir accions de la UT</button>}
+      {onConfigure && <button className="secondary-action compact" type="button" disabled={busy} onClick={configureAfterSave} tabIndex={-1}>Escollir accions de la UT</button>}
     </section>
     <h3>Nota del criteri</h3>
     {actions.length ? <>

@@ -59,7 +59,7 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
     student: { name: 'Alumne fictici' }, competency: { name: 'C1: Modelització' },
     criterion: { name: 'CA1: Rigor', selectedActionIds: actions.map(action => action.id) }, actions,
     mark: { value: 'C', actionGrades: { R1: 'A', R2: 'A', R3: 'C' } }, value: 'C',
-    onClose() {}, onSaveActions() {}, onNextStudent() {},
+    onClose() {}, onConfigure() {}, onSaveActions() {}, onNextStudent() {},
   }))
   assert.equal((html.match(/aria-label="Nota de R/g) || []).length, 3)
   assert.match(html, /class="action-criterion-result" role="status"><strong class="grade grade-C">C/)
@@ -67,6 +67,8 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
   assert.doesNotMatch(html, /Nota provisional/)
   assert.match(html, /Alumne següent/)
   assert.doesNotMatch(html, /Desar qualificacions de les accions/)
+  assert.match(html, /class="modal-close"[^>]*tabindex="-1"/)
+  assert.match(html, /tabindex="-1">Escollir accions de la UT/)
 })
 
 

@@ -11,7 +11,7 @@ const FOCUSABLE_SELECTOR = [
 
 function visibleFocusableElements(panel) {
   return [...panel.querySelectorAll(FOCUSABLE_SELECTOR)]
-    .filter((element) => element.getClientRects().length > 0)
+    .filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0)
 }
 
 /**

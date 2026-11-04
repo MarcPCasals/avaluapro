@@ -2,7 +2,7 @@ import { X } from 'lucide-react'
 import { useId } from 'react'
 import { useDialogAccessibility } from '../lib/useDialogAccessibility'
 
-export function Modal({ children, onClose, panelClassName = '', title, size = 'md' }) {
+export function Modal({ children, onClose, panelClassName = '', title, size = 'md', closeButtonTabIndex }) {
   const titleId = useId()
   const panelRef = useDialogAccessibility(onClose)
   return (
@@ -10,7 +10,7 @@ export function Modal({ children, onClose, panelClassName = '', title, size = 'm
       <section aria-labelledby={titleId} aria-modal="true" className={`modal-panel ${size} ${panelClassName}`.trim()} ref={panelRef} role="dialog" tabIndex="-1">
         <header className="modal-header">
           <h2 id={titleId}>{title}</h2>
-          <button aria-label="Tancar" className="modal-close" data-tour="modal-close" onClick={onClose} title="Tancar" type="button">
+          <button aria-label="Tancar" className="modal-close" data-tour="modal-close" onClick={onClose} tabIndex={closeButtonTabIndex} title="Tancar" type="button">
             <X size={22} />
           </button>
         </header>
