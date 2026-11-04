@@ -99,6 +99,7 @@ export function EvaluationTable({
       `[data-evaluation-select="${nextStudent.id}_${nextCriterion.id}"]`,
     )?.focus()
   }
+  const nextGradingStudent = grading && visibleStudents[(studentOrder.get(grading.student.id) ?? -1) + 1]
 
   return (
     <>
@@ -113,6 +114,7 @@ export function EvaluationTable({
       utName={utName} onClose={() => setGrading(null)}
       onConfigure={onConfigureActions ? () => { setGrading(null); onConfigureActions() } : undefined}
       onSave={value => onUpdateMark(grading.student.id, grading.criterion.id, value)}
+      onNextStudent={nextGradingStudent ? () => setGrading({ ...grading, student: nextGradingStudent }) : undefined}
       onSaveActions={onUpdateActionGrades ? grades => onUpdateActionGrades(grading.student.id, grading.criterion.id, grades) : undefined} />}
     <div className="grid-scroll" data-tour="evaluation-table">
       <table className="evaluation-table">

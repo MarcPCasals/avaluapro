@@ -59,13 +59,14 @@ test('el diàleg permet qualificar cada acció i presenta C com a mínim de A, A
     student: { name: 'Alumne fictici' }, competency: { name: 'C1: Modelització' },
     criterion: { name: 'CA1: Rigor', selectedActionIds: actions.map(action => action.id) }, actions,
     mark: { value: 'C', actionGrades: { R1: 'A', R2: 'A', R3: 'C' } }, value: 'C',
-    onClose() {}, onSaveActions() {},
+    onClose() {}, onSaveActions() {}, onNextStudent() {},
   }))
   assert.equal((html.match(/aria-label="Nota de R/g) || []).length, 3)
   assert.match(html, /class="action-criterion-result" role="status"><strong class="grade grade-C">C/)
   assert.match(html, /3\/3 accions qualificades/)
   assert.doesNotMatch(html, /Nota provisional/)
-  assert.match(html, /Desar qualificacions de les accions/)
+  assert.match(html, /Alumne següent/)
+  assert.doesNotMatch(html, /Desar qualificacions de les accions/)
 })
 
 
@@ -115,6 +116,7 @@ test('el diàleg mostra comentari, orientacions i resultat anterior sense qualif
   assert.match(html, /Practicar les unitats/)
   assert.match(html, /3 de 4 amb nota/)
   assert.match(html, /Convé reforçar aquesta acció/)
+  assert.match(html, /class="secondary-action compact action-note-trigger has-note"[^>]*tabindex="-1"/)
   assert.match(html, /0\/1 accions qualificades/)
   const sparse = renderToStaticMarkup(createElement(GradeModal, {
     student: { name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },

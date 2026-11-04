@@ -6,9 +6,14 @@ import { Modal } from '../../components/Modal'
 import { GRADE_OPTIONS, gradeClassName } from '../../lib/grades'
 import { getActionGradeSummary } from '../../lib/actionGrades'
 
-export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onClose, onConfigure, onSaveActionNote, previousOrientations = [], previousClassResults = {} }) {
+export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onNextStudent, onClose, onConfigure, onSaveActionNote, previousOrientations = [], previousClassResults = {} }) {
   const { busy, error, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les notes.')
   const [grades, setGrades] = useState(() => Object.fromEntries(actions.map(action => [action.id, mark?.actionGrades?.[action.id] || ''])))
+  const gradesRef = useRef(grades)
+  const dirtyRef = useRef(false)
+  const savingRef = useRef(null)
+  const [savingGrades, setSavingGrades] = useState(false)
+  const [gradeError, setGradeError] = useState('')
   const [noteDraft, setNoteDraft] = useState(null)
   const [noteError, setNoteError] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
@@ -19,14 +24,49 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
   useEffect(() => { if (editingActionId) noteInput.current?.focus() }, [editingActionId])
   const summary = getActionGradeSummary(criterion, { actionGrades: grades })
   const save = grade => runSave(() => onSave(grade))
-  const saveActions = () => { if (canLeave()) return runSave(() => onSaveActions(grades)) }
+  const flushGrades = () => {
+    if (savingRef.current) return savingRef.current
+    if (!dirtyRef.current || !onSaveActions) return Promise.resolve()
+    setSavingGrades(true)
+    const operation = (async () => {
+      while (dirtyRef.current) {
+        dirtyRef.current = false
+        try { await onSaveActions(gradesRef.current) }
+        catch (cause) {
+          dirtyRef.current = true
+          throw cause
+        }
+      }
+    })()
+    savingRef.current = operation
+    operation.finally(() => {
+      if (savingRef.current === operation) savingRef.current = null
+      setSavingGrades(false)
+    }).catch(() => {})
+    return operation
+  }
+  const changeGrade = (actionId, grade) => {
+    const next = { ...gradesRef.current, [actionId]: grade }
+    gradesRef.current = next
+    dirtyRef.current = true
+    setGrades(next)
+    setGradeError('')
+    flushGrades().catch(cause => setGradeError(cause?.message || 'No s’han pogut desar les qualificacions.'))
+  }
+  const afterGradesSaved = async callback => {
+    if (!canLeave()) return
+    try {
+      await flushGrades()
+      if (!dirtyRef.current) callback()
+    } catch (cause) { setGradeError(cause?.message || 'No s’han pogut desar les qualificacions.') }
+  }
   const canLeave = () => {
     if (!noteDraft && !noteSaving) return true
     setNoteError('Desa o cancel·la el comentari abans de continuar.')
     return false
   }
-  const closeAfterSave = () => { if (canLeave()) close() }
-  const configureAfterSave = () => { if (canLeave()) onConfigure() }
+  const closeAfterSave = () => afterGradesSaved(close)
+  const configureAfterSave = () => afterGradesSaved(onConfigure)
   const openNote = action => {
     if (!canLeave()) return
     const note = savedNotes[action.id]
@@ -75,13 +115,13 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
           <div className="action-note-row"><label>
           <span>{!action.id.startsWith('text:') && <strong>{action.id}: </strong>}{action.description}</span>
           <select aria-label={`Nota de ${action.id.startsWith('text:') ? action.description : action.id}`} className={gradeClassName(grades[action.id])} disabled={busy || Boolean(noteDraft)}
-            value={grades[action.id] || ''} onChange={event => setGrades(current => ({ ...current, [action.id]: event.target.value }))}>
+            value={grades[action.id] || ''} onChange={event => changeGrade(action.id, event.target.value)}>
             {GRADE_OPTIONS.map(grade => <option key={grade} value={grade}>{grade || 'Pendent'}</option>)}
           </select>
           </label>
           {onSaveActionNote && <button type="button" className={`secondary-action compact action-note-trigger${note ? ' has-note' : ''}`}
             ref={element => { noteButtons.current[action.id] = element }}
-            disabled={busy || noteSaving} onClick={() => openNote(action)} aria-expanded={editing}
+            disabled={busy || noteSaving || savingGrades} onClick={() => openNote(action)} aria-expanded={editing} tabIndex={-1}
             aria-label={`${note ? 'Editar comentari' : 'Afegir comentari'}: ${action.description}`}>
             <StickyNote size={16} aria-hidden="true" /> {note ? 'Amb comentari' : 'Notes'}
           </button>}
@@ -94,7 +134,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
             {needsReinforcement && <strong>Majoria de D o NA entre els avaluats · Convé reforçar aquesta acció</strong>}
           </div>}
           {orientations.length > 0 && <details open className="action-note-history">
-            <summary>Orientacions de les UT anteriors ({orientations.length})</summary>
+            <summary tabIndex={-1}>Orientacions de les UT anteriors ({orientations.length})</summary>
             {orientations.map(item => <p key={item.criterionId}><strong>{item.utName}:</strong> {item.text}</p>)}
           </details>}
           {editing && <form className="action-note-editor" onSubmit={saveNote}>
@@ -121,11 +161,13 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
       <div className="action-criterion-result" role="status"><strong className={gradeClassName(summary.value)}>{summary.value || 'Sense nota'}</strong>
         <span>{summary.evaluated}/{summary.total} accions qualificades{summary.provisional ? ' · Nota provisional' : ''}</span>
       </div>
-      <button className="primary-action" type="button" disabled={busy || noteSaving || !onSaveActions} onClick={saveActions}>{busy ? 'Desant…' : 'Desar qualificacions de les accions'}</button>
+      <button className="primary-action" type="button" disabled={busy || noteSaving || !onNextStudent} onClick={() => afterGradesSaved(onNextStudent)}>Alumne següent</button>
     </> : <div className="criterion-grade-options" role="group" aria-label="Nota del criteri">
       {GRADE_OPTIONS.map(grade => <button key={grade} type="button" disabled={busy} aria-pressed={value === grade}
         className={gradeClassName(grade)} onClick={() => save(grade)}>{grade || 'Esborrar'}</button>)}
     </div>}
+    {gradeError && <p role="alert">{gradeError} Torna-ho a provar amb «Tancar» o canviant una nota.</p>}
+    {savingGrades && <p role="status">Desant les qualificacions…</p>}
     {error && <p role="alert">{error}</p>}
     {busy && <p role="status">Desant els canvis… Pots tancar la finestra.</p>}
     <div className="evaluation-actions-footer"><button className="secondary-action" type="button" onClick={closeAfterSave}>Tancar</button>
