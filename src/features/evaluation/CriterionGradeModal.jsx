@@ -6,7 +6,7 @@ import { Modal } from '../../components/Modal'
 import { GRADE_OPTIONS, gradeClassName } from '../../lib/grades'
 import { getActionGradeSummary } from '../../lib/actionGrades'
 
-export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onNextStudent, onClose, onConfigure, onSaveActionNote, previousOrientations = [], previousClassResults = {} }) {
+export function CriterionGradeModal({ student, competency, criterion, actions, value, mark, utName, onSave, onSaveActions, onNext, nextLabel, onClose, onConfigure, onSaveActionNote, previousOrientations = [], previousClassResults = {} }) {
   const { busy, error, close, save: runSave } = useDialogSave(onClose, 'No s’han pogut desar les notes.')
   const [grades, setGrades] = useState(() => Object.fromEntries(actions.map(action => [action.id, mark?.actionGrades?.[action.id] || ''])))
   const gradesRef = useRef(grades)
@@ -161,7 +161,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
       <div className="action-criterion-result" role="status"><strong className={gradeClassName(summary.value)}>{summary.value || 'Sense nota'}</strong>
         <span>{summary.evaluated}/{summary.total} accions qualificades{summary.provisional ? ' · Nota provisional' : ''}</span>
       </div>
-      <button className="primary-action" type="button" disabled={busy || noteSaving || !onNextStudent} onClick={() => afterGradesSaved(onNextStudent)}>Alumne següent</button>
+      <button className="primary-action" type="button" disabled={busy || noteSaving || !onNext} onClick={() => afterGradesSaved(onNext)}>{nextLabel || 'Últim alumne'}</button>
     </> : <div className="criterion-grade-options" role="group" aria-label="Nota del criteri">
       {GRADE_OPTIONS.map(grade => <button key={grade} type="button" disabled={busy} aria-pressed={value === grade}
         className={gradeClassName(grade)} onClick={() => save(grade)}>{grade || 'Esborrar'}</button>)}

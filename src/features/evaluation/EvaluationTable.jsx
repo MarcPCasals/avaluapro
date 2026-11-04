@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CriterionGradeModal } from './CriterionGradeModal'
 import { getCriterionActionKey, getSelectedCriterionActions } from '../../lib/evaluationActions'
 import { getActionGradeSummary, isActionGradedMark } from '../../lib/actionGrades'
+import { getNextGradingTarget } from '../../lib/evaluationNavigation'
 import { Bell, BookOpen, MessageCircle, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
 import { calculateGrade, gradeClassName, gradeTextClassName } from '../../lib/grades.js'
@@ -99,7 +100,7 @@ export function EvaluationTable({
       `[data-evaluation-select="${nextStudent.id}_${nextCriterion.id}"]`,
     )?.focus()
   }
-  const nextGradingStudent = grading && visibleStudents[(studentOrder.get(grading.student.id) ?? -1) + 1]
+  const nextGradingTarget = grading && getNextGradingTarget(visibleStudents, competencies, grading.student.id, grading.criterion.id)
 
   return (
     <>
@@ -114,7 +115,8 @@ export function EvaluationTable({
       utName={utName} onClose={() => setGrading(null)}
       onConfigure={onConfigureActions ? () => { setGrading(null); onConfigureActions() } : undefined}
       onSave={value => onUpdateMark(grading.student.id, grading.criterion.id, value)}
-      onNextStudent={nextGradingStudent ? () => setGrading({ ...grading, student: nextGradingStudent }) : undefined}
+      nextLabel={nextGradingTarget?.label}
+      onNext={nextGradingTarget ? () => setGrading(nextGradingTarget) : undefined}
       onSaveActions={onUpdateActionGrades ? grades => onUpdateActionGrades(grading.student.id, grading.criterion.id, grades) : undefined} />}
     <div className="grid-scroll" data-tour="evaluation-table">
       <table className="evaluation-table">
