@@ -16134,6 +16134,12 @@ button.tutorial-record-pill {
   line-height: 1;
 }
 
+.ut-competency-score .ut-competency-numeric {
+  color: #334155;
+  font-size: 18px;
+  font-weight: 800;
+}
+
 .ut-competency-score span,
 .ut-competency-card small {
   color: #64748b;

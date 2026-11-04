@@ -61,9 +61,9 @@ const dashboardScopes = [
     description: 'Decisions clau.',
   },
   {
-    id: 'evaluation',
-    label: 'Avaluació',
-    description: 'Notes i evolució.',
+    id: 'ut',
+    label: 'UT activa',
+    description: 'Unitat actual.',
   },
   {
     id: 'actions',
@@ -71,9 +71,9 @@ const dashboardScopes = [
     description: 'Evolució de cada acció al llarg del curs.',
   },
   {
-    id: 'ut',
-    label: 'UT activa',
-    description: 'Unitat actual.',
+    id: 'evaluation',
+    label: 'Avaluació',
+    description: 'Notes i evolució.',
   },
   {
     id: 'tracking',
@@ -88,6 +88,7 @@ const dashboardScopes = [
 ]
 
 const gradeOrder = ['A', 'B', 'C', 'D']
+const formatGradeAverage = (value) => Number(value).toLocaleString('ca-ES', { maximumFractionDigits: 2 })
 const gradeLabels = {
   A: 'Alt assoliment',
   B: 'Assoliment correcte',
@@ -2220,6 +2221,7 @@ function UtCompetencyOverview({ competencies, onSelectGroup, setInfo }) {
             </header>
             <div className="ut-competency-score">
               <b className={gradeClassName(averageGrade)}>{averageGrade || '-'}</b>
+              {averageGrade && <span className="ut-competency-numeric">{formatGradeAverage(competency.average)}/4</span>}
               <span>mitjana</span>
               <em>{competency.total > 0 ? `${riskPercent}% amb D` : 'sense dades'}</em>
             </div>
@@ -2431,7 +2433,7 @@ function UtStatsView({
           help={chartHelp.utSummary}
           label="Mitjana de la UT"
           setInfo={setInfo}
-          value={getGradeFromAverage(averageScore) || '-'}
+          value={averageScore ? `${getGradeFromAverage(averageScore)} · ${formatGradeAverage(averageScore)}/4` : '-'}
           helper={`${evaluatedProfiles.length} alumnes amb evidències`}
         />
       </div>
