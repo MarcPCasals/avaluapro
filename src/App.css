@@ -10231,6 +10231,71 @@ button.tutorial-record-pill {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.tutorial-doip-detail-modal .tutorial-record-history.compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.doip-record-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.doip-record-original,
+.doip-record-comments {
+  min-width: 0;
+}
+
+.doip-record-comments {
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f5f3ff;
+}
+
+.doip-record-comments > strong {
+  color: #6d28d9;
+}
+
+.doip-comment-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doip-comment-list li {
+  border-left: 3px solid #a78bfa;
+  padding: 2px 0 3px 9px;
+}
+
+.doip-record-comments form {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.doip-record-comments textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.doip-record-comments form button {
+  justify-self: start;
+}
+
+.doip-record-comments form small[role="alert"] {
+  color: #b91c1c;
+}
+
+@media (max-width: 700px) {
+  .doip-record-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .tutorial-record-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

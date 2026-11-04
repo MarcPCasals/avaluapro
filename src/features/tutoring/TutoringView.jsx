@@ -4435,6 +4435,79 @@ function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
   )
 }
 
+function DoipRecordEntry({ record, onAddComment, onDelete }) {
+  const [commentDraft, setCommentDraft] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const comments = Array.isArray(record.doipComments) ? record.doipComments : []
+
+  const saveComment = async (event) => {
+    event.preventDefault()
+    const text = commentDraft.trim()
+    if (!text || isSaving) return
+    setIsSaving(true)
+    setSaveError('')
+    try {
+      const saved = await onAddComment(record.id, text)
+      if (saved) setCommentDraft('')
+      else setSaveError('No s’ha pogut desar el comentari.')
+    } catch {
+      setSaveError('No s’ha pogut desar el comentari. Torna-ho a provar.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <article className="tutorial-record-entry blue doip-record-entry" data-search-record={record.id}>
+      <div className="doip-record-content">
+        <div className="doip-record-original">
+          <strong>{formatShortDate(record.date)}</strong>
+          <p><DoipFormattedText text={record.note || 'Sense resum afegit.'} /></p>
+        </div>
+        <div className="doip-record-comments">
+          <strong>Comentaris posteriors</strong>
+          {comments.length > 0 ? (
+            <ol className="doip-comment-list">
+              {comments.map((comment) => (
+                <li key={comment.id}>
+                  <small>{formatShortDate(String(comment.createdAt || '').slice(0, 10))}</small>
+                  <p>{comment.text}</p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <small>Encara no hi ha cap comentari posterior.</small>
+          )}
+          <form onSubmit={saveComment}>
+            <label className="field-label" htmlFor={`doip-comment-${record.id}`}>Comentari nou</label>
+            <textarea
+              id={`doip-comment-${record.id}`}
+              maxLength={TUTORING_TEXT_LIMIT}
+              onChange={(event) => setCommentDraft(event.target.value)}
+              placeholder="Afegeix la informació nova de la reunió amb l’equip educatiu."
+              rows={3}
+              value={commentDraft}
+            />
+            {saveError && <small role="alert">{saveError}</small>}
+            <button className="secondary-action" disabled={!commentDraft.trim() || isSaving} type="submit">
+              {isSaving ? 'Desant…' : 'Afegir comentari'}
+            </button>
+          </form>
+        </div>
+      </div>
+      <button
+        className="icon-button danger subtle"
+        onClick={() => onDelete(record.id)}
+        title="Eliminar resposta DOIP"
+        type="button"
+      >
+        <Trash2 size={16} />
+      </button>
+    </article>
+  )
+}
+
 export function TutoringView() {
   const sociogramCanvasRef = useRef(null)
   const sociogramDragRef = useRef(null)
@@ -4592,6 +4665,7 @@ export function TutoringView() {
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const importTutorialMarks = useAvaluaproStore((state) => state.importTutorialMarks)
   const addTutorialRecord = useAvaluaproStore((state) => state.addTutorialRecord)
+  const addDoipComment = useAvaluaproStore((state) => state.addDoipComment)
   const updateTutorialRecord = useAvaluaproStore((state) => state.updateTutorialRecord)
   const deleteTutorialRecord = useAvaluaproStore((state) => state.deleteTutorialRecord)
   const upsertTutorialRelation = useAvaluaproStore((state) => state.upsertTutorialRelation)
@@ -12959,20 +13033,12 @@ export function TutoringView() {
             ) : (
               <div className="tutorial-record-history compact">
                 {selectedDoipRecords.map((record) => (
-                  <article className="tutorial-record-entry blue" data-search-record={record.id} key={record.id}>
-                    <div>
-                      <strong>{formatShortDate(record.date)}</strong>
-                      <p><DoipFormattedText text={record.note || 'Sense resum afegit.'} /></p>
-                    </div>
-                    <button
-                      className="icon-button danger subtle"
-                      onClick={() => deleteTutorialRecord(record.id)}
-                      title="Eliminar resposta DOIP"
-                      type="button"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </article>
+                  <DoipRecordEntry
+                    key={record.id}
+                    onAddComment={addDoipComment}
+                    onDelete={deleteTutorialRecord}
+                    record={record}
+                  />
                 ))}
               </div>
             )}

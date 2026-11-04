@@ -4490,6 +4490,25 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialRecords'])
   },
 
+  addDoipComment: async (recordId, text) => {
+    const cleanText = String(text || '').trim()
+    if (!recordId || !cleanText) return false
+    const record = get().tutorialRecords.find((item) => item.id === recordId)
+    if (!record || record.type !== 'doip') return false
+
+    const now = new Date().toISOString()
+    const comment = { id: createId('doip-comment'), text: cleanText, createdAt: now }
+    setWithEditHistory(set, get, (state) => ({
+      tutorialRecords: state.tutorialRecords.map((item) =>
+        item.id === recordId
+          ? { ...item, doipComments: [...(Array.isArray(item.doipComments) ? item.doipComments : []), comment], updatedAt: now }
+          : item,
+      ),
+    }))
+    await persistCollections(set, get, ['tutorialRecords'])
+    return true
+  },
+
   deleteTutorialRecord: async (recordId) => {
     if (!recordId) return
     const state = get()
