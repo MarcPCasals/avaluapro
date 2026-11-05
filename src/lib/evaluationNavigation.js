@@ -1,15 +1,14 @@
 export function getNextGradingTarget(students, competencies, studentId, criterionId) {
-  const targets = competencies.flatMap(competency =>
-    competency.criteria.map(criterion => ({ competency, criterion })))
-  const criterionIndex = targets.findIndex(target => target.criterion.id === criterionId)
+  const competency = competencies.find(item => item.criteria.some(criterion => criterion.id === criterionId))
+  const criterionIndex = competency?.criteria.findIndex(criterion => criterion.id === criterionId) ?? -1
   const studentIndex = students.findIndex(student => student.id === studentId)
   if (criterionIndex < 0 || studentIndex < 0) return null
 
-  const nextCriterion = targets[criterionIndex + 1]
-  if (nextCriterion) return { student: students[studentIndex], ...nextCriterion, label: 'Criteri següent' }
+  const nextCriterion = competency.criteria[criterionIndex + 1]
+  if (nextCriterion) return { student: students[studentIndex], competency, criterion: nextCriterion, label: 'Criteri següent' }
 
   const nextStudent = students[studentIndex + 1]
-  return nextStudent && targets[0]
-    ? { student: nextStudent, ...targets[0], label: 'Alumne següent' }
+  return nextStudent && competency.criteria[0]
+    ? { student: nextStudent, competency, criterion: competency.criteria[0], label: 'Alumne següent' }
     : null
 }
