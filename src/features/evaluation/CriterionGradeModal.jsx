@@ -102,7 +102,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
     <section className="criterion-actions-preview">
       <h3>Accions que s’avaluen en aquesta UT</h3>
       {actions.length ? <>
-        <p>Qualifica cada acció. La nota del criteri serà la més baixa: A &gt; B &gt; C &gt; D &gt; NA.</p>
+        <p>Qualifica cada acció. La nota del criteri serà la més baixa.</p>
         {value && !mark?.actionGrades && <p className="action-legacy-notice">Nota anterior del criteri: <strong>{value}</strong>. Les accions no hereten aquesta nota; es conservarà fins que desis les qualificacions de les accions.</p>}
         <div className="action-grade-fields">{actions.map(action => {
           const note = savedNotes[action.id]
