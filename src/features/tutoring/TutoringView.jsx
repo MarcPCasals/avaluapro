@@ -67,6 +67,7 @@ import {
   createFamilyInterviewDraft,
   FAMILY_INTERVIEW_TOPICS,
 } from '../../lib/familyInterview'
+import { addStudentInterviewTemplate } from '../../lib/studentInterviewTemplate'
 import {
   ensureSociometricSurveyPublicForm,
   listSociometricSurveyResponses,
@@ -8082,8 +8083,15 @@ export function TutoringView() {
 
                 {!familyInterviewActive && <label className="full">
                   Resum
+                  {recordForm.type === 'student-interview' && (
+                    <button
+                      className="student-interview-template-button"
+                      onClick={() => setRecordForm((current) => ({ ...current, note: addStudentInterviewTemplate(current.note) }))}
+                      type="button"
+                    >Usar plantilla</button>
+                  )}
                   <textarea
-                    maxLength={TUTORING_TEXT_LIMIT}
+                    maxLength={recordForm.type === 'student-interview' ? FAMILY_INTERVIEW_FIELD_LIMIT : TUTORING_TEXT_LIMIT}
                     onChange={(event) => setRecordForm((current) => ({ ...current, note: event.target.value }))}
                     placeholder={
                       isTutorialRegistryRecord(recordForm)

@@ -15,6 +15,7 @@ import { buildStudentProfiles } from '../../lib/analytics'
 import { getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { getStudentClassroomNotes } from '../../lib/studentClassroomNotes.js'
+import { addStudentInterviewTemplate } from '../../lib/studentInterviewTemplate.js'
 import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { StudentAnnotationsModal } from './StudentAnnotationsModal'
@@ -122,9 +123,16 @@ function RegistryModal({ onClose, student }) {
           </label>
           <label className="full">
             Informació
+            {form.type === 'student-interview' && (
+              <button
+                className="student-interview-template-button"
+                onClick={() => setForm((current) => ({ ...current, note: addStudentInterviewTemplate(current.note) }))}
+                type="button"
+              >Usar plantilla</button>
+            )}
             <textarea
               autoFocus
-              maxLength={700}
+              maxLength={form.type === 'student-interview' ? 1400 : 700}
               onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
               placeholder="Què cal recordar o quina actuació s’ha acordat?"
               value={form.note}

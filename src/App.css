@@ -3272,6 +3272,29 @@ button.tutorial-record-pill {
   line-height: 1.4;
 }
 
+.student-interview-template-button {
+  justify-self: start;
+  min-height: auto;
+  width: auto;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.tutorial-record-form .student-interview-template-button {
+  grid-column: auto;
+}
+
+.student-interview-template-button:hover {
+  background: #dbeafe;
+}
+
 .tutorial-record-type-select.amber {
   border-color: #fed7aa;
   background: #fff7ed;
