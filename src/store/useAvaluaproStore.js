@@ -4412,6 +4412,7 @@ export const useAvaluaproStore = create((set, get) => ({
     isImportant = false,
     note,
     studentId,
+    studentInterview = null,
     type,
   }) => {
     if (!classId || !studentId || !type) return
@@ -4428,6 +4429,7 @@ export const useAvaluaproStore = create((set, get) => ({
         type,
         date: cleanDate,
         note: cleanNote,
+        ...(type === 'student-interview' && studentInterview ? { studentInterview } : {}),
         createdAt: now,
         updatedAt: now,
         authorEmail: state.cloud.user?.email || '',

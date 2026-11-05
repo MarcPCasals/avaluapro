@@ -67,7 +67,8 @@ import {
   createFamilyInterviewDraft,
   FAMILY_INTERVIEW_TOPICS,
 } from '../../lib/familyInterview'
-import { addStudentInterviewTemplate } from '../../lib/studentInterviewTemplate'
+import { createStudentInterviewDraft, prepareStudentInterview } from '../../lib/studentInterviewTemplate'
+import { StudentInterviewAnswers, StudentInterviewForm } from './StudentInterviewForm'
 import {
   ensureSociometricSurveyPublicForm,
   listSociometricSurveyResponses,
@@ -4330,7 +4331,7 @@ function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
             {importantRecords.map((record) => (
               <article key={record.id}>
                 <strong>{getRecordTypeMeta(record.type).label}</strong>
-                <p>{record.note}</p>
+                {record.studentInterview ? <StudentInterviewAnswers interview={record.studentInterview} /> : <p>{record.note}</p>}
               </article>
             ))}
           </section>
@@ -4357,7 +4358,7 @@ function TutorialRecordStudentModal({ onClose, onDelete, onUpdate, row }) {
                         {record.contactPerson ? ` · ${record.contactPerson}` : ''}
                         {outcome ? ` · ${outcome}` : ''}
                       </span>
-                      <p>{record.note || 'Sense comentari afegit.'}</p>
+                      {record.studentInterview ? <StudentInterviewAnswers interview={record.studentInterview} /> : <p>{record.note || 'Sense comentari afegit.'}</p>}
                       {record.followUpDate && (
                         <span className={`tutorial-follow-up ${record.followUpStatus === 'done' ? 'done' : ''}`}>
                           {record.followUpStatus === 'done' ? 'Seguiment completat' : `Seguiment: ${formatShortDate(record.followUpDate)}`}
@@ -4548,6 +4549,8 @@ export function TutoringView() {
     followUpDate: '',
     familyInterview: createFamilyInterviewDraft(),
     familyInterviewEnabled: false,
+    studentInterviewEnabled: false,
+    studentInterviewQuestions: createStudentInterviewDraft(),
     isImportant: false,
     studentId: '',
     type: 'family-contact',
@@ -6059,9 +6062,13 @@ export function TutoringView() {
   })
   const selectedRecordType = getRecordTypeMeta(recordForm.type)
   const familyInterviewActive = recordForm.type === 'family-contact' && recordForm.familyInterviewEnabled
+  const studentInterviewActive = recordForm.type === 'student-interview' && recordForm.studentInterviewEnabled
+  const preparedStudentInterview = studentInterviewActive
+    ? prepareStudentInterview(recordForm.studentInterviewQuestions, recordForm.note)
+    : null
   const preparedRecordNote = familyInterviewActive
     ? buildFamilyInterviewNote(recordForm.familyInterview)
-    : recordForm.note
+    : preparedStudentInterview?.note || recordForm.note
 
   const handleSubmitTutorialRecord = async (event) => {
     event.preventDefault()
@@ -6074,6 +6081,7 @@ export function TutoringView() {
       type: recordForm.type,
       date: recordForm.date,
       note: preparedRecordNote,
+      studentInterview: preparedStudentInterview?.studentInterview,
       agendaKind: recordForm.agendaKind,
       contactChannel: recordForm.contactChannel,
       contactOutcome: recordForm.contactOutcome,
@@ -6087,6 +6095,8 @@ export function TutoringView() {
       date: getTodayDateInput(),
       contactPerson: '',
       familyInterview: createFamilyInterviewDraft(),
+      studentInterviewEnabled: false,
+      studentInterviewQuestions: createStudentInterviewDraft(),
       followUpDate: '',
       isImportant: false,
       note: '',
@@ -8081,17 +8091,25 @@ export function TutoringView() {
                   />
                 </label>
 
-                {!familyInterviewActive && <label className="full">
+                {recordForm.type === 'student-interview' && (
+                  <button
+                    className="student-interview-template-button"
+                    onClick={() => setRecordForm((current) => ({ ...current, studentInterviewEnabled: !current.studentInterviewEnabled }))}
+                    type="button"
+                  >{studentInterviewActive ? 'Anotació lliure' : 'Usar plantilla'}</button>
+                )}
+                {studentInterviewActive && (
+                  <StudentInterviewForm
+                    additionalNote={recordForm.note}
+                    onAdditionalNoteChange={(note) => setRecordForm((current) => ({ ...current, note }))}
+                    onChange={(studentInterviewQuestions) => setRecordForm((current) => ({ ...current, studentInterviewQuestions }))}
+                    questions={recordForm.studentInterviewQuestions}
+                  />
+                )}
+                {!familyInterviewActive && !studentInterviewActive && <label className="full">
                   Resum
-                  {recordForm.type === 'student-interview' && (
-                    <button
-                      className="student-interview-template-button"
-                      onClick={() => setRecordForm((current) => ({ ...current, note: addStudentInterviewTemplate(current.note) }))}
-                      type="button"
-                    >Usar plantilla</button>
-                  )}
                   <textarea
-                    maxLength={recordForm.type === 'student-interview' ? FAMILY_INTERVIEW_FIELD_LIMIT : TUTORING_TEXT_LIMIT}
+                    maxLength={TUTORING_TEXT_LIMIT}
                     onChange={(event) => setRecordForm((current) => ({ ...current, note: event.target.value }))}
                     placeholder={
                       isTutorialRegistryRecord(recordForm)
@@ -8343,7 +8361,7 @@ export function TutoringView() {
                         <span>
                           {record.typeMeta.label} · {formatShortDate(record.date)}
                         </span>
-                        <p>{record.note || 'Sense comentari afegit.'}</p>
+                        {record.studentInterview ? <StudentInterviewAnswers interview={record.studentInterview} /> : <p>{record.note || 'Sense comentari afegit.'}</p>}
                       </div>
                       <button
                         className="icon-button danger subtle"

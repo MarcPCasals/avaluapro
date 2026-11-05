@@ -3295,6 +3295,168 @@ button.tutorial-record-pill {
   background: #dbeafe;
 }
 
+.student-interview-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 13px;
+  padding: 16px;
+  background: linear-gradient(145deg, #f8fbff, #eff6ff);
+}
+
+.student-interview-form-heading strong {
+  color: #1e3a8a;
+  font-size: 16px;
+}
+
+.student-interview-form-heading p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.student-interview-questions {
+  display: grid;
+  gap: 12px;
+}
+
+.student-interview-question {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 11px;
+  padding: 13px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgb(30 64 175 / 5%);
+}
+
+.student-interview-question-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.student-interview-question-heading strong {
+  color: #1e40af;
+  font-size: 13px;
+}
+
+.student-interview-number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.student-interview-form label,
+.tutorial-record-form .student-interview-form label,
+.student-overview-registry-modal .student-interview-form label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: none;
+}
+
+.student-interview-form textarea,
+.tutorial-record-form .student-interview-form textarea,
+.student-overview-registry-modal .student-interview-form textarea {
+  width: 100%;
+  min-height: 75px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #0f172a;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.student-interview-form textarea.student-interview-prompt {
+  min-height: 63px;
+  color: #1e293b;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.student-interview-form textarea:focus-visible {
+  border-color: #3b82f6;
+  outline: 2px solid #bfdbfe;
+}
+
+.student-interview-form .student-interview-add,
+.student-interview-form .student-interview-remove,
+.tutorial-record-form .student-interview-form button {
+  grid-column: auto;
+  width: fit-content;
+  min-height: auto;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: #1d4ed8;
+  background: white;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.student-interview-form .student-interview-remove {
+  margin-left: auto;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.student-interview-additional {
+  padding-top: 12px;
+  border-top: 1px solid #bfdbfe;
+}
+
+.student-interview-answers {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.student-interview-answer {
+  display: grid;
+  gap: 4px;
+  border-left: 3px solid #93c5fd;
+  border-radius: 0 8px 8px 0;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.student-interview-answer strong {
+  color: #1d4ed8;
+  font-size: 11px;
+}
+
+.student-interview-answer span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.student-interview-answer p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .tutorial-record-type-select.amber {
   border-color: #fed7aa;
   background: #fff7ed;
@@ -31181,6 +31343,35 @@ button.profile-followup-card:focus-visible {
 .student-overview-registry-history article span.done {
   color: #166534;
   background: #dcfce7;
+}
+
+.tutorial-record-entry .student-interview-answer span,
+.student-overview-registry-history .student-interview-answer span {
+  display: block;
+  justify-self: stretch;
+  margin: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #334155;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.tutorial-record-entry .student-interview-answer strong,
+.student-overview-registry-history .student-interview-answer strong {
+  color: #1d4ed8;
+  font-size: 11px;
+}
+
+.tutorial-record-entry .student-interview-answer p,
+.student-overview-registry-history .student-interview-answer p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .student-overview-registry-history article > div:last-child {

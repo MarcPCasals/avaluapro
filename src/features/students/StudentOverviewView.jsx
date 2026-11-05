@@ -15,7 +15,7 @@ import { buildStudentProfiles } from '../../lib/analytics'
 import { getStudentAbsenceHours, getStudentAbsenceRecords } from '../../lib/attendance'
 import { downloadBlob, getTodaySlug } from '../../lib/downloads'
 import { getStudentClassroomNotes } from '../../lib/studentClassroomNotes.js'
-import { addStudentInterviewTemplate } from '../../lib/studentInterviewTemplate.js'
+import { createStudentInterviewDraft, prepareStudentInterview } from '../../lib/studentInterviewTemplate.js'
 import { buildStudentOverviewExcel } from '../../lib/studentOverviewExcel'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 import { StudentAnnotationsModal } from './StudentAnnotationsModal'
@@ -24,6 +24,7 @@ import * as studentOverviewSharingService from '../../data/cloud/studentOverview
 import { StudentOverviewSharingDialog } from './StudentOverviewSharingDialog'
 import { StudentOverviewTable } from './StudentOverviewTable'
 import { StudentProfileModal } from './StudentProfileModal'
+import { StudentInterviewAnswers, StudentInterviewForm } from '../tutoring/StudentInterviewForm'
 
 const REGISTRY_TYPES = [
   { id: 'family-contact', label: 'Contacte amb la família' },
@@ -79,22 +80,32 @@ function RegistryModal({ onClose, student }) {
     date: todayInputValue(),
     followUpDate: '',
     isImportant: false,
+    interviewEnabled: false,
+    interviewQuestions: createStudentInterviewDraft(),
     note: '',
     type: 'tutorial-observation',
   })
   const [saving, setSaving] = useState(false)
+  const preparedInterview = form.type === 'student-interview' && form.interviewEnabled
+    ? prepareStudentInterview(form.interviewQuestions, form.note)
+    : null
+  const preparedNote = preparedInterview?.note || form.note.trim()
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!form.note.trim()) return
+    if (!preparedNote) return
     setSaving(true)
     await addTutorialRecord({
-      ...form,
       classId: student.classId,
-      note: form.note.trim(),
+      date: form.date,
+      followUpDate: form.followUpDate,
+      isImportant: form.isImportant,
+      note: preparedNote,
       studentId: student.id,
+      studentInterview: preparedInterview?.studentInterview,
+      type: form.type,
     })
-    setForm((current) => ({ ...current, followUpDate: '', isImportant: false, note: '' }))
+    setForm((current) => ({ ...current, followUpDate: '', isImportant: false, interviewEnabled: false, interviewQuestions: createStudentInterviewDraft(), note: '' }))
     setSaving(false)
   }
 
@@ -121,23 +132,32 @@ function RegistryModal({ onClose, student }) {
               value={form.date}
             />
           </label>
-          <label className="full">
-            Informació
-            {form.type === 'student-interview' && (
-              <button
-                className="student-interview-template-button"
-                onClick={() => setForm((current) => ({ ...current, note: addStudentInterviewTemplate(current.note) }))}
-                type="button"
-              >Usar plantilla</button>
-            )}
-            <textarea
-              autoFocus
-              maxLength={form.type === 'student-interview' ? 1400 : 700}
-              onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
-              placeholder="Què cal recordar o quina actuació s’ha acordat?"
-              value={form.note}
+          {form.type === 'student-interview' && (
+            <button
+              className="student-interview-template-button"
+              onClick={() => setForm((current) => ({ ...current, interviewEnabled: !current.interviewEnabled }))}
+              type="button"
+            >{form.interviewEnabled ? 'Anotació lliure' : 'Usar plantilla'}</button>
+          )}
+          {form.type === 'student-interview' && form.interviewEnabled ? (
+            <StudentInterviewForm
+              additionalNote={form.note}
+              onAdditionalNoteChange={(note) => setForm((current) => ({ ...current, note }))}
+              onChange={(interviewQuestions) => setForm((current) => ({ ...current, interviewQuestions }))}
+              questions={form.interviewQuestions}
             />
-          </label>
+          ) : (
+            <label className="full">
+              Informació
+              <textarea
+                autoFocus
+                maxLength={700}
+                onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
+                placeholder="Què cal recordar o quina actuació s’ha acordat?"
+                value={form.note}
+              />
+            </label>
+          )}
           <label>
             Data de seguiment · opcional
             <input
@@ -155,7 +175,7 @@ function RegistryModal({ onClose, student }) {
             />
             Destacar a «A tenir en compte»
           </label>
-          <button className="primary-action" disabled={saving || !form.note.trim()} type="submit">
+          <button className="primary-action" disabled={saving || !preparedNote} type="submit">
             {saving ? 'Desant…' : 'Afegir al registre tutorial'}
           </button>
         </form>
@@ -175,7 +195,7 @@ function RegistryModal({ onClose, student }) {
                     <div>
                       <strong>{type?.label || 'Registre tutorial'}</strong>
                       <small>{formatShortDate(record.date)}</small>
-                      <p>{record.note}</p>
+                      {record.studentInterview ? <StudentInterviewAnswers interview={record.studentInterview} /> : <p>{record.note}</p>}
                       {record.followUpDate && (
                         <span className={overdue ? 'overdue' : record.followUpStatus === 'done' ? 'done' : ''}>
                           {record.followUpStatus === 'done'
