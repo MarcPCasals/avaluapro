@@ -13739,30 +13739,6 @@ button.tutorial-record-pill {
   background: white;
 }
 
-.tracking-student-search {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  padding: 5px 10px;
-  color: #64748b;
-  background: #ffffff;
-}
-
-.tracking-student-search input {
-  width: 170px;
-  min-height: 24px;
-  border: 0;
-  padding: 0;
-  color: #1f2937;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 850;
-  outline: none;
-}
-
 .tracking-empty-task-header {
   min-width: 230px;
   text-align: center;
@@ -32062,6 +32038,7 @@ button.profile-followup-card:focus-visible {
 /* Inline name filter in the evaluation student header. */
 .student-header-tools { display: flex; align-items: center; gap: 10px; }
 .header-student .student-header-tools > span { flex: 0 0 auto; gap: 8px; font-size: 18px; }
+.tracking-student-header .student-header-tools > span { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 8px; font-size: 18px; }
 .student-header-tools .student-name-search { width: 100%; min-width: 75px; flex: 1 1 100px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b; font: inherit; font-size: 13px; font-weight: 400; }
 .student-name-search:focus { outline: 2px solid #f97316; outline-offset: 2px; }
 .student-header-tools .note-signal { flex: 0 0 32px; width: 32px; height: 32px; padding: 6px; }

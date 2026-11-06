@@ -4,7 +4,6 @@ import {
   Bell,
   Clock3,
   Clipboard,
-  Search,
   Skull,
   Target,
   Trash2,
@@ -1163,26 +1162,6 @@ export function TrackingView() {
             {filter.label}
           </button>
         ))}
-        <label className="tracking-student-search">
-          <Search size={15} />
-          <input
-            aria-keyshortcuts="Meta+J"
-            aria-label="Cercar alumnes pel nom"
-            onChange={(event) => setStudentSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                event.stopPropagation()
-                setStudentSearch('')
-              }
-            }}
-            placeholder="Cerca… ⌘ J"
-            ref={studentSearchRef}
-            title="Cercar alumnes (⌘ + J)"
-            type="search"
-            value={studentSearch}
-          />
-        </label>
         <span>
           {filteredStudents.length} de {students.length} alumnes visibles
         </span>
@@ -1205,9 +1184,11 @@ export function TrackingView() {
         onOpenTaskNote={(task) => setTaskNoteDraft({ task })}
         onOpenTaskReminder={(task) => setReminderDraft({ task })}
         onSetTaskStatus={handleTaskStatus}
+        onStudentSearchChange={setStudentSearch}
         onCreateTask={() => setShowTaskModal(true)}
         rows={trackingRows}
         searchQuery={studentSearch}
+        studentSearchRef={studentSearchRef}
         taskRecords={taskRecords}
         tasks={visibleTasks}
       />

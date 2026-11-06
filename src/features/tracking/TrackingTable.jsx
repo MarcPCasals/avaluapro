@@ -11,6 +11,7 @@ import {
   Skull,
   Trash2,
   Triangle,
+  Users,
   XCircle,
 } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
@@ -156,9 +157,11 @@ export function TrackingTable({
   onOpenTaskNote = () => {},
   onOpenTaskReminder = () => {},
   onSetTaskStatus = () => {},
+  onStudentSearchChange = null,
   renderAbsenceControl = () => null,
   rows = [],
   searchQuery = '',
+  studentSearchRef = null,
   tableWrapRef = null,
   taskRecords = [],
   tasks = [],
@@ -169,10 +172,30 @@ export function TrackingTable({
         <thead>
           <tr>
             <th className="sticky-student tracking-student-header">
-              <span>Alumne</span>
-              <button className="note-signal" onClick={onOpenReminders} title="Recordatoris del grup" type="button">
-                <Bell size={19} />
-              </button>
+              <div className="student-header-tools">
+                <span><Users size={22} />Alumnes</span>
+                {onStudentSearchChange && <input
+                  aria-keyshortcuts="Meta+J"
+                  aria-label="Cercar alumnes pel nom"
+                  className="student-name-search"
+                  onChange={(event) => onStudentSearchChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onStudentSearchChange('')
+                    }
+                  }}
+                  placeholder="Cerca… ⌘ J"
+                  ref={studentSearchRef}
+                  title="Cercar alumnes (⌘ + J)"
+                  type="search"
+                  value={searchQuery}
+                />}
+                <button className="note-signal" onClick={onOpenReminders} title="Recordatoris del grup" type="button">
+                  <Bell size={19} />
+                </button>
+              </div>
             </th>
             {tasks.map((task, taskIndex) => (
               <th className="task-header" key={task.id}>
