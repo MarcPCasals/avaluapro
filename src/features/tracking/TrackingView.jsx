@@ -14,7 +14,6 @@ import {
 import { buildTrackingInterventions, getStudentTrackingStats } from '../../lib/analytics'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
-import { AbsenceToggle } from '../attendance/AbsenceToggle'
 import { ManageStudentsModal } from '../students/ManageStudentsModal'
 import { RemindersModal } from '../data/RemindersModal'
 import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
@@ -623,12 +622,24 @@ export function TrackingView() {
   const [reminderDraft, setReminderDraft] = useState(null)
   const [incompleteWarning, setIncompleteWarning] = useState(null)
   const [deleteTaskDraft, setDeleteTaskDraft] = useState(null)
-  const [showPastTasks, setShowPastTasks] = useState(false)
+  const [showPastTasks, setShowPastTasks] = useState(true)
   const [behaviorDraft, setBehaviorDraft] = useState(null)
   const [agendaWarningStudentId, setAgendaWarningStudentId] = useState(null)
   const [agendaDetailStudentId, setAgendaDetailStudentId] = useState(null)
   const [redDetailStudentId, setRedDetailStudentId] = useState(null)
   const [studentSearch, setStudentSearch] = useState('')
+  const studentSearchRef = useRef(null)
+  useEffect(() => {
+    const focusSearch = (event) => {
+      if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.code !== 'KeyJ') return
+      if (document.querySelector('[role="dialog"], dialog[open]')) return
+      event.preventDefault()
+      studentSearchRef.current?.focus()
+      studentSearchRef.current?.select()
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
   useSearchNavigation('tracking', (target) => {
     setHalfGroupFilter('all')
     setInterventionFilter('all')
@@ -646,7 +657,6 @@ export function TrackingView() {
   const [loadedClassSessions, setLoadedClassSessions] = useState({ classId: '', sessions: [] })
   const classSessionChoices = loadedClassSessions.classId === activeClassId ? loadedClassSessions.sessions : []
   const nextClassSession = classSessionChoices.find((session) => new Date(session.startsAt) > new Date()) || null
-  const tableWrapRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -672,11 +682,16 @@ export function TrackingView() {
       ),
     [interventionInsights],
   )
+  const searchWords = studentSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca').trim().split(/\s+/).filter(Boolean)
   const filteredStudents =
     (interventionFilter === 'all'
       ? students
       : students.filter((student) => insightByStudentId.get(student.id)?.level === interventionFilter))
       .filter((student) => halfGroupFilter === 'all' || student.halfGroup === halfGroupFilter)
+      .filter((student) => {
+        const name = student.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca')
+        return searchWords.every((word) => name.includes(word))
+      })
   const trackingRows = filteredStudents.map((student) => {
     const incidentsCount = behaviorEvents.filter(
       (event) => event.studentId === student.id && event.type === 'incident',
@@ -703,30 +718,6 @@ export function TrackingView() {
       trackingAgendaNotesCount: trackingAgendaNotes.length,
     }
   })
-  const trackingOverview = useMemo(() => {
-    const rows = students.map((student) => {
-      const stats = getStudentTrackingStats(student.id, taskRecords, tasks)
-      const trackingAgendaNotes = getTrackingAgendaNotes(student.id, agendaNotes, activeClassId)
-      const missingTasks = getMissingTasksForStudent(student.id, taskRecords, tasks)
-      return {
-        redPointCount: getRedPointCount(student, missingTasks, trackingAgendaNotes),
-        stats,
-        student,
-      }
-    })
-    const evaluatedRows = rows.filter((row) => row.stats.total > 0)
-    const averageConsistency =
-      evaluatedRows.length > 0
-        ? Math.round(evaluatedRows.reduce((sum, row) => sum + row.stats.consistency, 0) / evaluatedRows.length)
-        : null
-    return {
-      agendaSoon: rows.filter((row) => row.redPointCount >= 2).sort((a, b) => b.redPointCount - a.redPointCount),
-      averageConsistency,
-      lowConsistency: evaluatedRows
-        .filter((row) => row.stats.consistency < 70)
-        .sort((a, b) => a.stats.consistency - b.stats.consistency),
-    }
-  }, [activeClassId, agendaNotes, students, taskRecords, tasks])
   const halfGroups = Array.from(new Set(students.map((student) => student.halfGroup).filter(Boolean))).sort()
   const focusInsights = interventionInsights.filter((insight) => insight.level !== 'stable').slice(0, 4)
   const today = new Date().toISOString().slice(0, 10)
@@ -837,17 +828,6 @@ export function TrackingView() {
     for (const student of filteredStudents) {
       await updateTaskRecord(student.id, taskId, 'DONE')
     }
-  }
-  const handleStudentSearch = (value) => {
-    setStudentSearch(value)
-    const query = value.trim().toLocaleLowerCase('ca')
-    if (!query) return
-    const match = filteredStudents.find((student) => student.name.toLocaleLowerCase('ca').includes(query))
-    if (!match) return
-    window.requestAnimationFrame(() => {
-      const target = tableWrapRef.current?.querySelector(`[data-student-row="${match.id}"]`)
-      target?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
-    })
   }
   const saveTaskNote = async ({ taskId, studentId, text, reminderDate, reminderTime, reminderText }) => {
     const patch = {}
@@ -1186,80 +1166,27 @@ export function TrackingView() {
         <label className="tracking-student-search">
           <Search size={15} />
           <input
-            list="tracking-student-search-list"
-            onChange={(event) => handleStudentSearch(event.target.value)}
-            placeholder="Busca alumne..."
+            aria-keyshortcuts="Meta+J"
+            aria-label="Cercar alumnes pel nom"
+            onChange={(event) => setStudentSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                setStudentSearch('')
+              }
+            }}
+            placeholder="Cerca… ⌘ J"
+            ref={studentSearchRef}
+            title="Cercar alumnes (⌘ + J)"
+            type="search"
             value={studentSearch}
           />
-          <datalist id="tracking-student-search-list">
-            {filteredStudents.map((student) => (
-              <option key={student.id} value={student.name} />
-            ))}
-          </datalist>
         </label>
         <span>
           {filteredStudents.length} de {students.length} alumnes visibles
         </span>
       </div>
-      {visibleTasks.length === 0 ? (
-        <section className="tracking-standby-panel" data-tour="tracking-table">
-          <article className="tracking-standby-summary">
-            <Clipboard size={24} />
-            <div>
-              <strong>No hi ha tasques visibles ara mateix.</strong>
-              <p>
-                {tasks.length === 0
-                  ? 'Crea una primera tasca per començar el seguiment de la UT.'
-                  : `Hi ha ${pastTaskCount} tasca/ques passades amagades. Mostra-les per revisar-les o continuar marcant estats.`}
-              </p>
-            </div>
-            {tasks.length === 0 ? (
-              <button className="primary-action compact" onClick={() => setShowTaskModal(true)} type="button">
-                Nova tasca
-              </button>
-            ) : (
-              <button className="secondary-action compact" onClick={() => setShowPastTasks(true)} type="button">
-                Mostra passades: {pastTaskCount}
-              </button>
-            )}
-          </article>
-          <article>
-            <span>Constància mitjana</span>
-            <strong>{trackingOverview.averageConsistency === null ? '-' : `${trackingOverview.averageConsistency}%`}</strong>
-            <small>
-              {trackingOverview.averageConsistency === null
-                ? 'Encara no hi ha dades de tasques.'
-                : 'Calculada amb totes les tasques de la UT.'}
-            </small>
-          </article>
-          <article className="warning">
-            <span>Constància baixa</span>
-            <strong>{trackingOverview.lowConsistency.length}</strong>
-            <div>
-              {trackingOverview.lowConsistency.slice(0, 4).map((row) => (
-                <button key={row.student.id} onClick={() => setProfileStudentId(row.student.id)} type="button">
-                  {row.student.name}
-                  <b>{row.stats.consistency}%</b>
-                </button>
-              ))}
-              {trackingOverview.lowConsistency.length === 0 && <small>Cap alumne per sota del 70%.</small>}
-            </div>
-          </article>
-          <article className="agenda">
-            <span>A prop de nota a l’agenda</span>
-            <strong>{trackingOverview.agendaSoon.length}</strong>
-            <div>
-              {trackingOverview.agendaSoon.slice(0, 4).map((row) => (
-                <button key={row.student.id} onClick={() => setAgendaDetailStudentId(row.student.id)} type="button">
-                  {row.student.name}
-                  <b>{row.redPointCount} vermells</b>
-                </button>
-              ))}
-              {trackingOverview.agendaSoon.length === 0 && <small>Cap alumne amb 2 o més punts vermells actius.</small>}
-            </div>
-          </article>
-        </section>
-      ) : (
       <TrackingTable
         classSessionChoices={classSessionChoices}
         nextClassSession={nextClassSession}
@@ -1278,15 +1205,12 @@ export function TrackingView() {
         onOpenTaskNote={(task) => setTaskNoteDraft({ task })}
         onOpenTaskReminder={(task) => setReminderDraft({ task })}
         onSetTaskStatus={handleTaskStatus}
-        renderAbsenceControl={(student) => (
-          <AbsenceToggle classId={activeClassId} studentId={student.id} />
-        )}
+        onCreateTask={() => setShowTaskModal(true)}
         rows={trackingRows}
-        tableWrapRef={tableWrapRef}
+        searchQuery={studentSearch}
         taskRecords={taskRecords}
         tasks={visibleTasks}
       />
-      )}
     </section>
   )
 }

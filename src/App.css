@@ -13763,6 +13763,22 @@ button.tutorial-record-pill {
   outline: none;
 }
 
+.tracking-empty-task-header {
+  min-width: 230px;
+  text-align: center;
+}
+
+.tracking-empty-task-header span {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.tracking-empty-task-cell {
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
 .tracking-standby-panel {
   display: grid;
   grid-template-columns: minmax(260px, 1.35fr) repeat(3, minmax(190px, 1fr));

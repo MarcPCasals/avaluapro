@@ -143,6 +143,7 @@ export function TrackingTable({
   onAddBehavior = () => {},
   onChangeTaskDate = () => {},
   onChangeTaskTitle = () => {},
+  onCreateTask = () => {},
   onDeleteTask = () => {},
   onMarkVisibleStudentsDone = () => {},
   onOpenAgendaDetail = () => {},
@@ -157,6 +158,7 @@ export function TrackingTable({
   onSetTaskStatus = () => {},
   renderAbsenceControl = () => null,
   rows = [],
+  searchQuery = '',
   tableWrapRef = null,
   taskRecords = [],
   tasks = [],
@@ -209,10 +211,17 @@ export function TrackingTable({
                 </button>
               </th>
             ))}
+            {tasks.length === 0 && <th className="task-header tracking-empty-task-header">
+              <span>Encara no hi ha tasques en aquesta UT</span>
+              <button className="primary-action compact" onClick={onCreateTask} type="button">Nova tasca</button>
+            </th>}
             <th className="summary-header">Constància</th>
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 && <tr><td className="student-search-empty" colSpan={tasks.length + 2 + (tasks.length === 0 ? 1 : 0)} role="status">
+            {searchQuery.trim() ? 'Cap alumne coincideix amb la cerca.' : 'No hi ha alumnes amb els filtres actuals.'}
+          </td></tr>}
           {rows.map((row, studentIndex) => {
             const {
               incidentsCount = 0,
@@ -341,13 +350,14 @@ export function TrackingTable({
                     </td>
                   )
                 })}
+                {tasks.length === 0 && <td className="task-cell tracking-empty-task-cell">—</td>}
                 <td className="tracking-summary">
                   {interventionInsight && (
                     <span className={`intervention-badge ${interventionInsight.level}`}>{interventionInsight.label}</span>
                   )}
-                  <div className="progress-line"><span style={{ width: `${stats.consistency}%` }} /></div>
-                  <strong>{stats.consistency}%</strong>
-                  <small>{stats.done} fetes · {stats.missing} no fetes</small>
+                  <div className="progress-line"><span style={{ width: `${tasks.length > 0 ? stats.consistency : 0}%` }} /></div>
+                  <strong>{tasks.length > 0 ? `${stats.consistency}%` : '–'}</strong>
+                  <small>{tasks.length > 0 ? `${stats.done} fetes · ${stats.missing} no fetes` : 'Sense tasques'}</small>
                 </td>
               </tr>
             )
