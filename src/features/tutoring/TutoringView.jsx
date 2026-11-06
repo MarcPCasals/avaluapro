@@ -4584,7 +4584,7 @@ export function TutoringView() {
   const [sociogramDraftPositions, setSociogramDraftPositions] = useState({})
   const [cooperativeGroupSize, setCooperativeGroupSize] = useState('4')
   const [cooperativeStrategy, setCooperativeStrategy] = useState('balanced')
-  const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(true)
+  const [prioritizeHalfGroups, setPrioritizeHalfGroups] = useState(false)
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [cooperativeGroupSetObservation, setCooperativeGroupSetObservation] = useState('')
   const [cooperativeSourceGroupSetId, setCooperativeSourceGroupSetId] = useState('')
@@ -10383,7 +10383,22 @@ export function TutoringView() {
                   {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.label ||
                     'Equilibrat'}
                 </span>
-                <small>{prioritizeHalfGroups ? 'Mig grup prioritzat' : 'Mig grup barrejat'}</small>
+                <small>{prioritizeHalfGroups ? 'Mitjos grups separats' : 'Grup classe sencer'}</small>
+              </button>
+              <button
+                aria-pressed={prioritizeHalfGroups}
+                className={prioritizeHalfGroups ? 'active' : ''}
+                onClick={() => {
+                  setPrioritizeHalfGroups((current) => !current)
+                  resetCooperativeManualEditing()
+                  setSelectedCooperativeGroupSetId('')
+                }}
+                type="button"
+              >
+                <Layers3 aria-hidden="true" size={22} />
+                <strong>Separar per mig grup</strong>
+                <span>{prioritizeHalfGroups ? 'Activat' : 'Desactivat'}</span>
+                <small>Els alumnes de mitjos grups diferents no es barrejaran.</small>
               </button>
               <button
                 onClick={() => {
@@ -10461,22 +10476,6 @@ export function TutoringView() {
                     {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.description}
                   </small>
                 </label>
-                <button
-                  aria-pressed={prioritizeHalfGroups}
-                  className={`cooperative-inspector-toggle ${prioritizeHalfGroups ? 'active' : ''}`}
-                  onClick={() => {
-                    setPrioritizeHalfGroups((current) => !current)
-                    resetCooperativeManualEditing()
-                    setSelectedCooperativeGroupSetId('')
-                  }}
-                  type="button"
-                >
-                  <Layers3 aria-hidden="true" size={19} />
-                  <span>
-                    <strong>Prioritzar mig grup</strong>
-                    <small>Evita barrejar els dos subgrups sempre que sigui possible.</small>
-                  </span>
-                </button>
                 {manualCooperativeGroups.length > 0 && (
                   <button className="secondary-action compact" onClick={resetCooperativeManualEditing} type="button">
                     <RotateCcw size={16} />

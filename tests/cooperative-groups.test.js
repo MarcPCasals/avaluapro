@@ -51,6 +51,31 @@ function createMember({
 }
 
 describe('anàlisi explicable de grups cooperatius', () => {
+  it('separa estrictament els mitjos grups, fins i tot quan un només té un alumne', () => {
+    const profiles = [
+      ...Array.from({ length: 9 }, (_, index) => ({
+        ...createProfile({ id: `a-${index}`, name: `Alumne A ${index}` }),
+        student: { halfGroup: 'A', id: `a-${index}`, name: `Alumne A ${index}` },
+      })),
+      { ...createProfile({ id: 'b-1', name: 'Alumne B' }), student: { halfGroup: 'B', id: 'b-1', name: 'Alumne B' } },
+    ]
+    const groups = helpers.buildCooperativeGroups({
+      groupSize: 4,
+      prioritizeHalfGroups: true,
+      profiles,
+      recordRowsByStudent: new Map(),
+      relationRowsByStudent: new Map(),
+      relations: [],
+      roleRowsByStudent: new Map(),
+      sociometricRowsByStudentId: new Map(),
+      strategy: 'balanced',
+    })
+
+    assert.equal(groups.flatMap((group) => group.members).length, profiles.length)
+    assert.ok(groups.every((group) => new Set(group.members.map((member) => member.halfGroup)).size === 1))
+    assert.equal(groups.find((group) => group.halfGroupName === 'B')?.members.length, 1)
+  })
+
   it('redistribueix el grup sobrant perquè mai quedi un alumne sol', () => {
     const profiles = Array.from({ length: 9 }, (_, index) =>
       createProfile({
@@ -254,7 +279,7 @@ describe('anàlisi explicable de grups cooperatius', () => {
 
     assert.equal(analysis.methodology.strategyLabel, 'Equilibri general')
     assert.equal(analysis.methodology.groupSize, 4)
-    assert.equal(analysis.methodology.halfGroups, 'Prioritzats')
+    assert.equal(analysis.methodology.halfGroups, 'Separats')
     assert.ok(analysis.limitations.some((limitation) => limitation.includes('mig grup')))
   })
 

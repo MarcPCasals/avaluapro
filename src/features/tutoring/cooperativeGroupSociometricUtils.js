@@ -442,7 +442,7 @@ export function createCooperativeSociometricHelpers({
     })
   }
 
-  function redistributeSingletonCooperativeGroups(groups, relations, strategy, groupSize) {
+  function redistributeSingletonCooperativeGroups(groups, relations, strategy, groupSize, keepHalfGroupsSeparate = false) {
     const nextGroups = groups.map((group) => ({ ...group, members: [...group.members] }))
     const singletonGroups = nextGroups.filter((group) => group.members.length === 1)
 
@@ -451,7 +451,8 @@ export function createCooperativeSociometricHelpers({
 
       const candidate = singletonGroup.members[0]
       const targetGroup = nextGroups
-        .filter((group) => group !== singletonGroup && group.members.length > 0)
+        .filter((group) => group !== singletonGroup && group.members.length > 0 &&
+          (!keepHalfGroupsSeparate || group.halfGroupName === singletonGroup.halfGroupName))
         .map((group) => ({
           group,
           sameHalfGroup: group.members.some((member) => member.halfGroup === candidate.halfGroup),
@@ -599,7 +600,7 @@ export function createCooperativeSociometricHelpers({
       methodology: {
         dataSources: ['rendiment acadèmic', 'seguiment tutorial', 'relacions de treball', 'relacions socials', 'incompatibilitats'],
         groupSize: Number(options.groupSize) || null,
-        halfGroups: options.prioritizeHalfGroups ? 'Prioritzats' : 'Es permet barrejar-los',
+        halfGroups: options.prioritizeHalfGroups ? 'Separats' : 'Es permet barrejar-los',
         strategy: options.strategy || 'balanced',
         strategyLabel: strategyMeta.label,
         strategySummary: strategyMeta.summary,
@@ -727,6 +728,7 @@ export function createCooperativeSociometricHelpers({
           relations,
           strategy,
           cleanGroupSize,
+          true,
         ), relations),
         relations,
       )
