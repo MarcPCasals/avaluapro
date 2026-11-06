@@ -20507,6 +20507,94 @@ button.profile-followup-card:focus-visible {
   box-shadow: 0 0 0 3px #ffedd5;
 }
 
+.effective-measures-section {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.effective-measures-intro,
+.effective-measure-card p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.effective-measures-heading,
+.effective-measure-card,
+.effective-measure-form-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.effective-measures-heading {
+  flex-wrap: wrap;
+}
+
+.effective-measures-list,
+.effective-measure-form,
+.effective-measure-card > div:first-child {
+  display: grid;
+  gap: 10px;
+}
+
+.effective-measure-card {
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.effective-measure-card > div:first-child {
+  gap: 4px;
+}
+
+.effective-measure-card strong {
+  color: #1e3a8a;
+}
+
+.effective-measure-card small {
+  color: #64748b;
+}
+
+.effective-measure-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.effective-measure-actions button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #334155;
+  background: #fff;
+  cursor: pointer;
+}
+
+.effective-measure-form label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+}
+
+.effective-measure-form input,
+.effective-measure-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #fff;
+  font: inherit;
+}
+
+.effective-measure-form-actions {
+  justify-content: flex-end;
+}
+
 .student-note-history-modal {
   display: grid;
   gap: 14px;

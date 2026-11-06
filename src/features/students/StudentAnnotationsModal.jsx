@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { DIAGNOSIS_OPTIONS, resolveProgressReason } from '../../data/studentAnnotations'
 import { buildStudentProfiles, getStudentTrackingStats } from '../../lib/analytics'
+import { formatMeasureReviewDate, getEffectiveMeasures } from '../../lib/effectiveMeasures'
 import { calculateGrade, getNumericFromGrade, gradeClassName } from '../../lib/grades'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
@@ -470,6 +471,7 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
   if (!student) return null
 
   const diagnoses = student.diagnoses || []
+  const effectiveMeasures = getEffectiveMeasures(student)
   const progressReason = resolveProgressReason(student.progressReason)
   const activeDiagnoses = DIAGNOSIS_OPTIONS.filter((diagnosis) => diagnoses.includes(diagnosis.id)).map((diagnosis) =>
     diagnosis.id === 'progress' && progressReason
@@ -609,6 +611,20 @@ export function StudentAnnotationsModal({ studentId, onClose, onOpenProfile }) {
         </section>
 
         <StudentActionNotes notes={actionNotes} />
+
+        {effectiveMeasures.length > 0 && <section className="annotation-section effective-measures-section">
+          <div className="effective-measures-heading">
+            <h3>Mesures que funcionen</h3>
+            {onOpenProfile && <button className="secondary-action compact" onClick={() => onOpenProfile(studentId)} type="button">Obrir perfil per editar</button>}
+          </div>
+          <div className="effective-measures-list">
+            {effectiveMeasures.map((entry) => <article className="effective-measure-card" key={entry.id}>
+              <strong>{entry.measure}</strong>
+              <p>{entry.context}</p>
+              {entry.reviewedOn && <small>Revisat el {formatMeasureReviewDate(entry.reviewedOn)}</small>}
+            </article>)}
+          </div>
+        </section>}
 
         <section className="annotation-tools-row">
           <div>

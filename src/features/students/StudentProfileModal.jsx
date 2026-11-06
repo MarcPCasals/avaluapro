@@ -1,5 +1,6 @@
 import { ActionProgressStats } from '../analytics/ActionProgressStats'
 import { StudentGenderField } from './StudentGenderField'
+import { StudentEffectiveMeasures } from './StudentEffectiveMeasures'
 import { antecedentCompetencyKey, normalizeAntecedentCompetencies } from '../../lib/antecedentCompetencies'
 import {
   Camera,
@@ -819,6 +820,10 @@ export function StudentProfileModal({ studentId, mode = 'evaluation', onClose, o
             value={student.diagnosisNotes || ''}
           />
         </section>
+        <StudentEffectiveMeasures
+          onChange={(effectiveMeasures) => updateStudent(studentId, { effectiveMeasures })}
+          student={student}
+        />
         {diagnosisInfoIds.length > 0 && (
           <Modal
             onClose={() => setDiagnosisInfoIds([])}
