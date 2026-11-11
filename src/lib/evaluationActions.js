@@ -1,5 +1,5 @@
 import { canonicalizeSubjectName } from '../data/subjects.js'
-import { selectEvaluationCompetencies } from './transversalEvaluation.js'
+import { getTransversalNames, selectEvaluationCompetencies } from './transversalEvaluation.js'
 
 const CFN_SUBJECT = 'Ciències Físiques i de la Natura'
 const actions = (prefix, descriptions) => descriptions.map((description, index) => ({
@@ -104,6 +104,14 @@ export function buildEvaluationActionsPatch(state, { classId, utId, scope = 'spe
   }
   const competencies = new Map(selectEvaluationCompetencies(state, classItem, utId, scope)
     .filter(item => item.classId === classId).map(item => [item.id, item]))
+  const previousCatalog = getEvaluationActionCatalog(classItem, scope)
+  const transversalNames = new Set(getTransversalNames(classItem))
+  const removedByKey = new Map(Object.entries(previousCatalog).map(([key, actions]) => [key,
+    new Set(actions.map(action => action.id).filter(id => !(catalog[key] || []).some(action => action.id === id))),
+  ]))
+  const classCompetencies = new Map(state.competencies
+    .filter(item => item.classId === classId && (scope === 'transversal' ? transversalNames.has(item.name) : item.kind !== 'transversal'))
+    .map(item => [item.id, item]))
   return {
     classes: state.classes.map(item => item.id === classId ? {
       ...item,
@@ -113,8 +121,14 @@ export function buildEvaluationActionsPatch(state, { classId, utId, scope = 'spe
       },
     } : item),
     criteria: state.criteria.map(criterion => {
+      const classCompetency = classCompetencies.get(criterion.competencyId)
+      if (!classCompetency) return criterion
+      const removed = removedByKey.get(getCriterionActionKey(classCompetency, criterion))
+      const remaining = (criterion.selectedActionIds || []).filter(id => !removed?.has(id))
       const competency = competencies.get(criterion.competencyId)
-      if (!competency || !Object.hasOwn(selections, criterion.id)) return criterion
+      if (!competency || !Object.hasOwn(selections, criterion.id)) {
+        return remaining.length === (criterion.selectedActionIds || []).length ? criterion : { ...criterion, selectedActionIds: remaining }
+      }
       const available = new Set((catalog[getCriterionActionKey(competency, criterion)] || []).map(action => action.id))
       return { ...criterion, selectedActionIds: [...new Set(selections[criterion.id])].filter(id => available.has(id)) }
     }),

@@ -58,6 +58,25 @@ test('desmarcar totes és persistent i el catàleg manual es reutilitza en altre
   assert.throws(() => buildEvaluationActionsPatch(state, { classId: 'language', utId: 'ut1', catalog, selections: {} }), /classe o la UT/)
 })
 
+test('modificar el text conserva el codi i eliminar una acció la desmarca a totes les UT de la classe', () => {
+  const state = fixture()
+  state.criteria[0] = { ...state.criteria[0], selectedActionIds: ['C1R1', 'C1R2'] }
+  state.criteria[1].selectedActionIds = ['C1R1', 'C1R2']
+  state.criteria[2].selectedActionIds = ['C1R1']
+  const catalog = { ...CFN_ACTION_CATALOG, 'C1/CA1': [
+    { id: 'C1R1', description: 'Lèxic científic revisat.' },
+    ...CFN_ACTION_CATALOG['C1/CA1'].slice(2),
+  ] }
+  const patch = buildEvaluationActionsPatch(state, { classId: 'science', utId: 'ut1', catalog,
+    selections: { [ca1.id]: ['C1R1', 'C1R2'] },
+  })
+  assert.deepEqual(patch.criteria[0].selectedActionIds, ['C1R1'])
+  assert.deepEqual(patch.criteria[1].selectedActionIds, ['C1R1'])
+  assert.equal(patch.criteria[2], state.criteria[2])
+  assert.equal(getEvaluationActionCatalog(patch.classes[0])['C1/CA1'][0].description, 'Lèxic científic revisat.')
+  assert.equal(patch.marks, undefined)
+})
+
 test('una mateixa etiqueta de criteri pertany al catàleg de la seva competència', () => {
   assert.notEqual(getCriterionActionKey({ name: 'C1: Modelització' }, { name: 'CA1: Rigor' }), getCriterionActionKey({ name: 'C2: Indagació' }, { name: 'CA1: Pertinència' }))
   assert.equal(getCriterionActionKey({ name: 'C2 — Investigar' }, { name: 'CA2 — Rigor' }), 'C2/CA2')

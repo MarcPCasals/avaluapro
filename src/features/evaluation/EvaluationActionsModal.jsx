@@ -1,6 +1,7 @@
 import { useDialogSave } from '../../lib/useDialogSave'
 import './ActionDialogs.css'
 import { useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { getCriterionActionKey, parseActionLines } from '../../lib/evaluationActions'
 
@@ -38,6 +39,44 @@ function ActionImporter({ onImport }) {
     {error && <p role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
   </details>
+}
+
+function ActionOption({ action, selected, onSelect, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [description, setDescription] = useState(action.description)
+  const trimmed = description.trim()
+  const saveEdit = () => {
+    if (!trimmed) return
+    onUpdate(trimmed)
+    setEditing(false)
+  }
+  return <div className="evaluation-action-option">
+    {editing ? <div className="evaluation-action-edit">
+      <label className="field-label">{action.id.startsWith('text:') ? 'Text de l’acció' : `Text de l’acció ${action.id}`}
+        <input autoFocus maxLength={500} value={description} onChange={event => setDescription(event.target.value)} onKeyDown={event => {
+          if (event.key === 'Enter') saveEdit()
+          if (event.key === 'Escape') { setDescription(action.description); setEditing(false) }
+        }} />
+      </label>
+      <button className="primary-action compact" type="button" disabled={!trimmed} onClick={saveEdit}>Desar text</button>
+      <button className="secondary-action compact" type="button" onClick={() => { setDescription(action.description); setEditing(false) }}>Cancel·lar</button>
+    </div> : <>
+      <label className="evaluation-action-choice">
+        <input type="checkbox" checked={selected} onChange={event => onSelect(event.target.checked)} />
+        <span>{!action.id.startsWith('text:') && <strong>{action.id}: </strong>}{action.description}</span>
+      </label>
+      <div className="evaluation-action-controls">
+        <button className="secondary-action compact" type="button" aria-label={`Modificar ${action.id}`} onClick={() => { setDescription(action.description); setConfirmDelete(false); setEditing(true) }}><Pencil size={15} /> Modificar</button>
+        <button className="danger-soft" type="button" aria-label={`Eliminar ${action.id}`} onClick={() => setConfirmDelete(true)}><Trash2 size={15} /> Eliminar</button>
+      </div>
+    </>}
+    {confirmDelete && <div className="evaluation-action-delete-confirm" role="group" aria-label={`Confirmar eliminació de ${action.id}`}>
+      <span>Eliminar aquesta acció del catàleg i de les seleccions de totes les UT d’aquesta classe?</span>
+      <button className="danger-soft" type="button" onClick={onDelete}>Sí, eliminar</button>
+      <button className="secondary-action compact" type="button" onClick={() => setConfirmDelete(false)}>Cancel·lar</button>
+    </div>}
+  </div>
 }
 
 function ActionCopyControls({ destinations, busy, onCopy }) {
@@ -95,10 +134,14 @@ export function EvaluationActionsModal({ competencies, catalog: initialCatalog, 
                 <button className="secondary-action compact" type="button" onClick={() => select(criterion.id, available.map(action => action.id))}>Seleccionar totes</button>
                 <button className="secondary-action compact" type="button" onClick={() => select(criterion.id, [])}>Desmarcar totes</button>
               </div>
-              <div className="evaluation-action-options">{available.map(action => <label key={action.id}>
-                <input type="checkbox" checked={selected.includes(action.id)} onChange={event => select(criterion.id, event.target.checked ? [...selected, action.id] : selected.filter(id => id !== action.id))} />
-                <span>{!action.id.startsWith('text:') && <strong>{action.id}: </strong>}{action.description}</span>
-              </label>)}</div>
+              <div className="evaluation-action-options">{available.map(action => <ActionOption key={action.id} action={action}
+                selected={selected.includes(action.id)}
+                onSelect={checked => select(criterion.id, checked ? [...selected, action.id] : selected.filter(id => id !== action.id))}
+                onUpdate={description => setCatalog(current => ({ ...current, [key]: current[key].map(item => item.id === action.id ? { ...item, description } : item) }))}
+                onDelete={() => {
+                  setCatalog(current => ({ ...current, [key]: current[key].filter(item => item.id !== action.id) }))
+                  select(criterion.id, selected.filter(id => id !== action.id))
+                }} />)}</div>
             </> : <p>Encara no hi ha accions carregades per a aquest criteri.</p>}
             <ActionImporter onImport={imported => setCatalog(current => ({ ...current, [key]: [...new Map([...(current[key] || []), ...imported].map(action => [action.id, action])).values()] }))} />
           </section>
