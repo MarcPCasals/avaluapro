@@ -68,12 +68,12 @@ function ActionOption({ action, selected, onSelect, onUpdate, onDelete }) {
       </label>
       <div className="evaluation-action-controls">
         <button className="secondary-action compact" type="button" aria-label={`Modificar ${action.id}`} onClick={() => { setDescription(action.description); setConfirmDelete(false); setEditing(true) }}><Pencil size={15} /> Modificar</button>
-        <button className="danger-soft" type="button" aria-label={`Eliminar ${action.id}`} onClick={() => setConfirmDelete(true)}><Trash2 size={15} /> Eliminar</button>
+        <button className="danger-soft evaluation-action-delete-icon" type="button" aria-label={`Eliminar ${action.id}`} title={`Eliminar ${action.id}`} onClick={() => setConfirmDelete(true)}><Trash2 size={18} aria-hidden="true" /></button>
       </div>
     </>}
     {confirmDelete && <div className="evaluation-action-delete-confirm" role="group" aria-label={`Confirmar eliminació de ${action.id}`}>
       <span>Eliminar aquesta acció del catàleg i de les seleccions de totes les UT d’aquesta classe?</span>
-      <button className="danger-soft" type="button" onClick={onDelete}>Sí, eliminar</button>
+      <button className="danger-action compact" type="button" onClick={onDelete}>Sí, eliminar</button>
       <button className="secondary-action compact" type="button" onClick={() => setConfirmDelete(false)}>Cancel·lar</button>
     </div>}
   </div>
