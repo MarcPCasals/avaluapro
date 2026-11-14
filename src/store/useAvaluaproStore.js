@@ -462,6 +462,18 @@ function normalizeDataset(dataset) {
   const marks = []
 
   normalizedDataset.marks.forEach((mark) => {
+    if (mark.type === 'competency-note' && mark.classId && mark.studentId && mark.competencyName && typeof mark.text === 'string') {
+      marks.push({
+        id: mark.id || createId('note'),
+        type: 'competency-note',
+        classId: mark.classId,
+        studentId: mark.studentId,
+        competencyName: mark.competencyName,
+        competencyKind: mark.competencyKind || 'specific',
+        text: mark.text,
+      })
+      return
+    }
     if (mark.type === 'competency-modification' && mark.studentId && mark.competencyId) {
       marks.push({
         id: mark.id || createId('mod'),
@@ -3136,6 +3148,28 @@ export const useAvaluaproStore = create((set, get) => ({
       return { marks }
     })
     await persistCollections(set, get, ['marks'])
+  },
+
+  updateCompetencyNote: async ({ classId, studentId, competencyName, competencyKind = 'specific', text }) => {
+    if (!classId || !studentId || !competencyName) return
+    const trimmedText = String(text || '').trim()
+    setWithEditHistory(set, get, (state) => {
+      const existing = state.marks.find((mark) =>
+        mark.type === 'competency-note' && mark.classId === classId &&
+        mark.studentId === studentId && mark.competencyName === competencyName &&
+        mark.competencyKind === competencyKind,
+      )
+      if (existing?.text === trimmedText || (!existing && !trimmedText)) return {}
+      return {
+        marks: trimmedText
+          ? existing
+            ? state.marks.map((mark) => mark.id === existing.id ? { ...mark, text: trimmedText } : mark)
+            : [...state.marks, { id: createId('note'), type: 'competency-note', classId,
+              studentId, competencyName, competencyKind, text: trimmedText }]
+          : state.marks.filter((mark) => mark.id !== existing?.id),
+      }
+    })
+    await persistCollections(set, get, ['marks'], { throwOnError: true })
   },
 
   updateMarksBulk: async (updates) => {

@@ -5,7 +5,7 @@ import { CriterionGradeModal } from './CriterionGradeModal'
 import { getCriterionActionKey, getSelectedCriterionActions } from '../../lib/evaluationActions'
 import { getActionGradeSummary, isActionGradedMark } from '../../lib/actionGrades'
 import { getNextGradingTarget } from '../../lib/evaluationNavigation'
-import { Bell, BookOpen, MessageCircle, Users } from 'lucide-react'
+import { Bell, BookOpen, MessageCircle, NotebookPen, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
 import { calculateGrade, gradeClassName, gradeTextClassName } from '../../lib/grades.js'
 
@@ -47,6 +47,7 @@ export function EvaluationTable({
   onOpenProfile = () => {},
   onOpenReminders = () => {},
   onOpenRubric = () => {},
+  onOpenCompetencyNote = () => {},
   onToggleCompetencyModification = () => {},
   onUpdateMark = () => {},
   onUpdateActionGrades,
@@ -263,6 +264,24 @@ export function EvaluationTable({
                     }`}
                     key={`${student.id}_${competency.id}_grade`}
                   >
+                    {(() => {
+                      const note = marks.find((mark) =>
+                        mark.type === 'competency-note' && mark.classId === activeClassId &&
+                        mark.studentId === student.id && mark.competencyName === competency.name &&
+                        mark.competencyKind === (competency.kind || 'specific'),
+                      )
+                      return (
+                        <button
+                          aria-label={`${note ? 'Llegir o editar' : 'Afegir'} nota de ${student.name} a ${competency.name}`}
+                          className={`competency-note-button ${note ? 'has-note' : ''}`}
+                          onClick={() => onOpenCompetencyNote(student.id, competency)}
+                          title={note ? 'Hi ha una nota de competència. Clica per llegir-la o editar-la.' : 'Afegir nota de competència'}
+                          type="button"
+                        >
+                          <NotebookPen size={14} />
+                        </button>
+                      )
+                    })()}
                     {hasStudentModifiedCompetencies(marks, student.id) && (
                       <button
                         className={`modified-competency-toggle ${

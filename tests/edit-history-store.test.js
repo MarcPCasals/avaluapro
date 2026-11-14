@@ -97,6 +97,22 @@ test('una qualificació es desfà i refà al magatzem real i a IndexedDB fictici
   assert.equal(store.getState().marks[0].value, 'B')
   assert.equal((await db.loadDataset()).marks[0].value, 'B')
 })
+
+test('la nota de competència es conserva sense qualificació i es pot esborrar', async () => {
+  store.setState({ marks: [] }); history.clear()
+  const key = { classId: 'synthetic-class', studentId: 'synthetic-student', competencyName: '1AD' }
+  await store.getState().updateCompetencyNote({ ...key, text: 'Cal revisar l’explicació oral.' })
+  const note = store.getState().marks[0]
+  assert.equal(note.type, 'competency-note')
+  assert.equal(note.criterionId, undefined)
+  assert.equal((await db.loadDataset()).marks[0].text, note.text)
+  await store.getState().updateCompetencyNote({ ...key, text: 'Va millorar amb una altra evidència.' })
+  assert.equal(store.getState().marks.length, 1)
+  assert.equal(store.getState().marks[0].id, note.id)
+  await store.getState().updateCompetencyNote({ ...key, text: '  ' })
+  assert.equal(store.getState().marks.length, 0)
+  assert.equal((await db.loadDataset()).marks.length, 0)
+})
 test('crear un grup i la seva estructura es recupera com un sol bloc', async () => {
   history.clear()
   await store.getState().addClass({ name: 'Grup fictici', subject: 'Ciències' })

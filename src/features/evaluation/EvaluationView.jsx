@@ -18,6 +18,7 @@ import { StudentAnnotationsModal } from '../students/StudentAnnotationsModal'
 import { StudentProfileModal } from '../students/StudentProfileModal'
 import { EditStructureModal } from './EditStructureModal'
 import { EvaluationTable } from './EvaluationTable'
+import { CompetencyNoteModal } from './CompetencyNoteModal'
 import { ImportExcelModal } from './ImportExcelModal'
 import { RubricModal } from './RubricModal'
 import { TutorialSeatingMirrorModal } from './TutorialSeatingMirrorModal'
@@ -106,6 +107,7 @@ export function EvaluationView() {
   const updateMark = useAvaluaproStore((state) => state.updateMark)
   const updateMarksBulk = useAvaluaproStore((state) => state.updateMarksBulk)
   const toggleCompetencyModification = useAvaluaproStore((state) => state.toggleCompetencyModification)
+  const updateCompetencyNote = useAvaluaproStore((state) => state.updateCompetencyNote)
   const saveEvaluationActions = useAvaluaproStore((state) => state.saveEvaluationActions)
   const copyEvaluationActions = useAvaluaproStore((state) => state.copyEvaluationActions)
   const allClasses = useAvaluaproStore((state) => state.classes)
@@ -120,6 +122,7 @@ export function EvaluationView() {
   const [rubricCriterionId, setRubricCriterionId] = useState(null)
   const [profileStudentId, setProfileStudentId] = useState(null)
   const [annotationsStudentId, setAnnotationsStudentId] = useState(null)
+  const [competencyNoteTarget, setCompetencyNoteTarget] = useState(null)
   const [halfGroupFilter, setHalfGroupFilter] = useState('all')
   const scope = useAvaluaproStore((state) => state.ui.evaluationScope)
   const isTransversal = scope === 'transversal'
@@ -363,6 +366,25 @@ export function EvaluationView() {
           }}
         />
       )}
+      {competencyNoteTarget && (() => {
+        const student = students.find((item) => item.id === competencyNoteTarget.studentId)
+        const competency = competencyNoteTarget.competency
+        if (!student) return null
+        const existingNote = marks.find((mark) =>
+          mark.type === 'competency-note' && mark.classId === activeClassId &&
+          mark.studentId === student.id && mark.competencyName === competency.name &&
+          mark.competencyKind === (competency.kind || 'specific'),
+        )
+        return <CompetencyNoteModal
+          key={`${student.id}_${competency.id}`}
+          student={student}
+          competency={competency}
+          initialText={existingNote?.text || ''}
+          onClose={() => setCompetencyNoteTarget(null)}
+          onSave={(text) => updateCompetencyNote({ classId: activeClassId, studentId: student.id,
+            competencyName: competency.name, competencyKind: competency.kind || 'specific', text })}
+        />
+      })()}
       {competencies.length === 0 ? (
         <section className="empty-state">
           <h2>{emptyStateCopy.title}</h2>
@@ -390,6 +412,7 @@ export function EvaluationView() {
         onOpenProfile={setProfileStudentId}
         onOpenReminders={() => setShowRemindersModal(true)}
         onOpenRubric={setRubricCriterionId}
+        onOpenCompetencyNote={(studentId, competency) => setCompetencyNoteTarget({ studentId, competency })}
         onToggleCompetencyModification={toggleCompetencyModification}
         onUpdateMark={updateMark}
         actionNoteContext={actionNoteContext}
