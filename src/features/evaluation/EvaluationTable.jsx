@@ -8,6 +8,7 @@ import { getNextGradingTarget } from '../../lib/evaluationNavigation'
 import { Bell, BookOpen, MessageCircle, NotebookPen, Users } from 'lucide-react'
 import { getDominantDiagnosis } from '../../data/studentAnnotations.js'
 import { calculateGrade, gradeClassName, gradeTextClassName } from '../../lib/grades.js'
+import { shouldShowCompetencyNote } from '../../lib/competencyNotes.js'
 
 function getCriterionMark(marks, studentId, criterionId) {
   return marks.find((mark) => mark.studentId === studentId && mark.criterionId === criterionId)?.value || ''
@@ -270,6 +271,7 @@ export function EvaluationTable({
                         mark.studentId === student.id && mark.competencyName === competency.name &&
                         mark.competencyKind === (competency.kind || 'specific'),
                       )
+                      if (!shouldShowCompetencyNote(getCompetencyGrade(marks, student.id, competency), Boolean(note))) return null
                       return (
                         <button
                           aria-label={`${note ? 'Llegir o editar' : 'Afegir'} nota de ${student.name} a ${competency.name}`}
