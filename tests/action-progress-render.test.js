@@ -105,30 +105,32 @@ test('la còpia ofereix el catàleg per a totes les UT i només demana classes d
 
 test('el diàleg mostra comentari, orientacions i resultat anterior sense qualificar la UT actual', () => {
   const html = renderToStaticMarkup(createElement(GradeModal, {
-    student: { name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
+    student: { id: 'student-1', name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
     criterion: { name: 'CA1: Pertinència', selectedActionIds: ['C2P5'] },
     actions: [{ id: 'C2P5', description: 'Expressar les dades amb pertinència.' }],
     mark: { value: '', actionNotes: { C2P5: { text: 'Justificació fictícia.', orientation: false } } },
     onClose() {}, onSaveActions() {}, onSaveActionNote() {},
     previousOrientations: [{ actionId: 'C2P5', criterionId: 'old', utName: 'UT1', text: 'Practicar les unitats.' }],
-    previousClassResults: { C2P5: { utName: 'UT1', score: 1, evaluated: 3, total: 4, distribution: { A: 0, B: 0, C: 0, D: 3, NA: 0 } } },
+    previousClassResults: { C2P5: { utName: 'UT1', averageGrade: 'D', studentResults: { 'student-1': { grade: 'C', utName: 'UT1' } } } },
   }))
   assert.match(html, /has-note/)
   assert.match(html, /Justificació fictícia/)
   assert.match(html, /Practicar les unitats/)
-  assert.match(html, /3 de 4 amb nota/)
-  assert.match(html, /Convé reforçar aquesta acció/)
+  assert.match(html, /Nota de l’alumne: <strong>C<\/strong>/)
+  assert.match(html, /Mitjana de la classe: <strong>D<\/strong>/)
+  assert.doesNotMatch(html, /3 de 4 amb nota|Convé reforçar|A: 0|\/4/)
   assert.match(html, /class="secondary-action compact action-note-trigger has-note"[^>]*tabindex="-1"/)
   assert.match(html, /0\/1 accions qualificades/)
   const sparse = renderToStaticMarkup(createElement(GradeModal, {
-    student: { name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
+    student: { id: 'student-1', name: 'Alumne fictici' }, competency: { name: 'C2: Indagació' },
     criterion: { name: 'CA1: Pertinència', selectedActionIds: ['C2P5'] },
     actions: [{ id: 'C2P5', description: 'Expressar les dades amb pertinència.' }],
     onClose() {}, onSaveActions() {},
-    previousClassResults: { C2P5: { utName: 'UT1', score: 1, evaluated: 1, total: 4, distribution: { A: 0, B: 0, C: 0, D: 1, NA: 0 } } },
+    previousClassResults: { C2P5: { utName: 'UT2', averageGrade: 'D', studentResults: { 'student-1': { grade: 'B', utName: 'UT1' } } } },
   }))
-  assert.match(sparse, /1 de 4 amb nota/)
-  assert.doesNotMatch(sparse, /Convé reforçar aquesta acció/)
+  assert.match(sparse, /Nota de l’alumne: <strong>B<\/strong> · UT1/)
+  assert.match(sparse, /Mitjana de la classe: <strong>D<\/strong>/)
+  assert.doesNotMatch(sparse, /1 de 4 amb nota|Convé reforçar/)
 })
 
 test('el recull individual separa orientacions i justificacions amb la UT d’origen', () => {

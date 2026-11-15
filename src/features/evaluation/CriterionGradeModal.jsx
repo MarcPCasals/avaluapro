@@ -108,8 +108,7 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
           const note = savedNotes[action.id]
           const orientations = previousOrientations.filter(item => item.actionId === action.id)
           const classResult = previousClassResults[action.id]
-          const needsReinforcement = classResult && classResult.evaluated >= Math.max(2, Math.ceil(classResult.total * 2 / 3))
-            && (classResult.distribution.D + classResult.distribution.NA) > classResult.evaluated / 2
+          const studentResult = classResult?.studentResults?.[student.id]
           const editing = noteDraft?.action.id === action.id
           return <div className="action-note-item" key={action.id}>
           <div className="action-note-row"><label>
@@ -127,11 +126,10 @@ export function CriterionGradeModal({ student, competency, criterion, actions, v
           </button>}
           </div>
           {note && !editing && <p className="action-note-preview"><strong>{note.orientation ? 'Orientació' : 'Justificació'}:</strong> {note.text}</p>}
-          {classResult && <div className={`action-class-history${needsReinforcement ? ' needs-reinforcement' : ''}`}>
+          {classResult && <div className="action-class-history">
             <strong>Última avaluació de la classe · {classResult.utName}</strong>
-            <span title="A=4, B=3, C=2, D=1 i NA=1. Els pendents no compten.">Mitjana: {classResult.score.toLocaleString('ca-AD', { maximumFractionDigits: 2 })}/4 · {classResult.evaluated} de {classResult.total} amb nota</span>
-            <span>{GRADE_OPTIONS.filter(grade => classResult.distribution[grade] > 0).map(grade => `${grade}: ${classResult.distribution[grade]}`).join(' · ')}</span>
-            {needsReinforcement && <strong>Majoria de D o NA entre els avaluats · Convé reforçar aquesta acció</strong>}
+            <span>Nota de l’alumne: <strong>{studentResult?.grade || 'Sense nota'}</strong>{studentResult && studentResult.utName !== classResult.utName ? ` · ${studentResult.utName}` : ''}</span>
+            <span>Mitjana de la classe: <strong>{classResult.averageGrade}</strong></span>
           </div>}
           {orientations.length > 0 && <details open className="action-note-history">
             <summary tabIndex={-1}>Orientacions de les UT anteriors ({orientations.length})</summary>

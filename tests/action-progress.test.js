@@ -125,9 +125,15 @@ test('l’últim resultat anterior ignora la UT actual, les futures i els alumne
   assert.equal(previous.evaluated, 1)
   assert.equal(previous.total, 2)
   assert.deepEqual(previous.distribution, { A: 0, B: 1, C: 0, D: 0, NA: 0 })
+  assert.equal(previous.averageGrade, 'B')
+  assert.deepEqual(previous.studentResults, {
+    s1: { grade: 'B', utName: 'UT2' },
+    s2: { grade: 'D', utName: 'UT1' },
+  })
   state.marks.push(...actionMarks([{ studentId: 's2', criterionId: 'ca-ut3', value: 'A' }]))
   assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut3', 'specific', 'C1/CA1').C1R1, previous)
   assert.equal(getPreviousClassActionResults(state, 'science', 'ut2', 'specific', 'C1/CA1').C1R1.utName, 'UT1')
+  assert.equal(getPreviousClassActionResults(state, 'science', 'ut2', 'specific', 'C1/CA1').C1R1.averageGrade, 'B')
   assert.deepEqual(getPreviousClassActionResults(state, 'science', 'ut1', 'specific', 'C1/CA1'), {})
   assert.deepEqual(getPreviousClassActionResults(state, 'science', 'absent', 'specific', 'C1/CA1'), {})
 })

@@ -1,7 +1,7 @@
 import { getActionGrade } from './actionGrades.js'
 import { getCriterionActionKey, getEvaluationActionCatalog } from './evaluationActions.js'
 import { getNumericFromGrade } from './grades.js'
-import { getClassUts } from './studentEvaluation.js'
+import { getClassUts, getGradeFromAverage } from './studentEvaluation.js'
 import { selectEvaluationCompetencies } from './transversalEvaluation.js'
 import { isStudentExemptFromSubject } from './tutorialExemptions.js'
 
@@ -78,6 +78,10 @@ export function getPreviousClassActionResults(state, classId, utId, scope, crite
   const report = buildActionProgress({ ...state, uts: ordered.slice(0, index) }, classId, { scope })
   return Object.fromEntries(report.rows.filter(row => row.key === criterionKey && row.latest).map(row => {
     const { ut, score, evaluated, distribution } = row.latest
-    return [row.action.id, { utName: ut.name, score, evaluated, distribution, total: report.students.length }]
+    const studentResults = Object.fromEntries(row.cells.flatMap(cell => cell.grades.map(item => [
+      item.studentId, { grade: item.grade, utName: cell.ut.name },
+    ])))
+    return [row.action.id, { utName: ut.name, score, averageGrade: getGradeFromAverage(score),
+      evaluated, distribution, total: report.students.length, studentResults }]
   }))
 }

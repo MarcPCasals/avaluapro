@@ -65,7 +65,8 @@
   .action-note-row .action-note-trigger { justify-self: start; }
 }
 
-.action-class-history { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 6px 0 12px; padding: 8px 12px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: .85rem; }
-.action-class-history.needs-reinforcement { background: #fff7ed; color: #9a3412; }
+.action-class-history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; margin: 6px 0 12px; padding: 8px 12px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: .85rem; }
+.action-class-history > strong { grid-column: 1 / -1; }
+@media (max-width: 540px) { .action-class-history { grid-template-columns: 1fr; } }
 
 .action-class-history span { overflow-wrap: anywhere; }
