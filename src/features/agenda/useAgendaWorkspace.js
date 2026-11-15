@@ -27,6 +27,7 @@ import {
 } from '../../data/local/planningIndexedDb'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
+import { selectPriorTemporalUnitCleanup } from './temporalUnitCleanup.js'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 import {
   buildSchedulingPersistenceEntries,
@@ -616,11 +617,12 @@ export function useAgendaWorkspace(user, classes = []) {
     from,
     includeDetails = true,
     mergeWithExisting = false,
+    store = true,
     to,
   }) => {
     if (!repository || !from || !to) return []
-    const requestId = ++sessionRangeRequest.current
-    setSessionsLoading(true)
+    const requestId = store ? ++sessionRangeRequest.current : null
+    if (store) setSessionsLoading(true)
     try {
       const applications = await loadAccessiblePlanningApplications({ classId })
       const sessionResults = await Promise.all(applications.map(({ application, planningUnit }) =>
@@ -665,7 +667,7 @@ export function useAgendaWorkspace(user, classes = []) {
             .filter((entity) => entity.entityType === 'activityResult'),
         })).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
         const bundles = reconcileSessionOccurrences(rawBundles).bundles
-        if (requestId === sessionRangeRequest.current) {
+        if (store && requestId === sessionRangeRequest.current) {
           setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
         }
         return bundles
@@ -764,14 +766,46 @@ export function useAgendaWorkspace(user, classes = []) {
         }, Object.values(slotsByTimetableId).flat().find((slot) => slot.id === record.session.timetableSlotId))
       }).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt))
       const bundles = reconcileSessionOccurrences(rawBundles).bundles
-      if (requestId === sessionRangeRequest.current) {
+      if (store && requestId === sessionRangeRequest.current) {
         setSessionBundles((current) => mergeWithExisting ? mergeSessionBundles(current, bundles) : bundles)
       }
       return bundles
     } finally {
-      if (requestId === sessionRangeRequest.current) setSessionsLoading(false)
+      if (store && requestId === sessionRangeRequest.current) setSessionsLoading(false)
     }
   }, [allPlanningUnits, loadAccessiblePlanningApplications, refreshRevision, repository, slotsByTimetableId, user?.uid])
+
+  const loadPriorTemporalUnitCleanup = useCallback(async ({ classId, currentUnit }) => {
+    if (!activeAcademicYear || !currentUnit) return []
+    if (!temporalUnits.some((unit) => unit.id !== currentUnit.id && unit.endsOn < currentUnit.startsOn)) return []
+    const bundles = await loadSessionRange({
+      classId, from: currentUnit.startsOn, to: activeAcademicYear.endsOn,
+      includeDetails: true, store: false,
+    })
+    return selectPriorTemporalUnitCleanup(bundles, temporalUnits, currentUnit)
+  }, [activeAcademicYear, loadSessionRange, temporalUnits])
+
+  const clearPriorTemporalUnitSchedule = useCallback(async ({ classId, currentUnit }) => {
+    if (!repository) throw new Error('Cal iniciar sessió abans de netejar la cronologia.')
+    const candidates = await loadPriorTemporalUnitCleanup({ classId, currentUnit })
+    let removedCount = 0
+    for (const { bundle, items } of candidates) {
+      const context = { applicationId: bundle.application.id,
+        planningUnitId: bundle.planningUnit.id, sessionId: bundle.session.id }
+      for (const item of items) {
+        const state = getAgendaSessionItemRemovalState(bundle, item)
+        if (!state.canRemove || !state.isFutureSession || bundle.session.classroomOpenedAt) continue
+        for (const result of state.linkedResults) await repository.remove(result, context)
+        await repository.remove(item, context)
+        removedCount += 1
+      }
+    }
+    if (removedCount) {
+      await refreshSync()
+      await synchronize()
+    }
+    return removedCount
+  }, [loadPriorTemporalUnitCleanup, refreshSync, repository, synchronize])
 
   const refreshTimelineContent = useCallback(async ({ classId, subject = '' }) => {
     if (!repository || !classId) throw new Error('Selecciona un grup abans d’actualitzar el contingut.')
@@ -2381,6 +2415,8 @@ export function useAgendaWorkspace(user, classes = []) {
     sessionPrivateNotes,
     loadSessionDetails,
     loadSessionRange,
+    loadPriorTemporalUnitCleanup,
+    clearPriorTemporalUnitSchedule: useCallback((...args) => editHistory.run('Agenda i cronologia', () => clearPriorTemporalUnitSchedule(...args)), [clearPriorTemporalUnitSchedule]),
     loadUnscheduledPlanningActivities,
     loadTodaySessions,
     ownedPlanningUnits: planningUnits,

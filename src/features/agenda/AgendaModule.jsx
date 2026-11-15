@@ -449,6 +449,7 @@ export default function AgendaModule() {
     .catch((error) => setWorkspaceError(error.message || 'No s’han pogut carregar les notes.')),
   [loadTimelinePrivateNotes, setWorkspaceError])
   const loadSessionRange = workspace.loadSessionRange
+  const loadPriorTemporalUnitCleanup = workspace.loadPriorTemporalUnitCleanup
   const loadTodaySessions = workspace.loadTodaySessions
   const loadUnscheduledPlanningActivities = workspace.loadUnscheduledPlanningActivities
   const academicYearStartsOn = workspace.activeAcademicYear?.startsOn
@@ -547,6 +548,8 @@ export default function AgendaModule() {
   const [classroomRevision, setClassroomRevision] = useState(0)
   const [timelineRange, setTimelineRange] = useState(null)
   const [timelinePlanningRevision, setTimelinePlanningRevision] = useState(0)
+  const [timelineCleanup, setTimelineCleanup] = useState({ key: '', count: 0, busy: false, error: '' })
+  const [dismissedCleanupKey, setDismissedCleanupKey] = useState('')
   const [timelineUnscheduled, setTimelineUnscheduled] = useState({
     activities: [],
     hasApplications: false,
@@ -608,11 +611,25 @@ export default function AgendaModule() {
         temporalUnitId: activeTemporalUnit?.id || '',
       }),
     ])
-      .then(([, unscheduled]) => {
+      .then(async ([, unscheduled]) => {
         if (!cancelled) {
           setTimelineRange(initialRange)
           setTimelineUnscheduled({ ...unscheduled, loading: false })
         }
+        const nextUnit = workspace.temporalUnits.find((unit) =>
+          unit.startsOn > agendaToday && unit.startsOn <= addDateDays(agendaToday, 7))
+        for (const unit of [activeTemporalUnit, nextUnit].filter((value, index, values) =>
+          value && values.findIndex((candidate) => candidate?.id === value.id) === index)) {
+          const candidates = await loadPriorTemporalUnitCleanup({ classId: activeClassId, currentUnit: unit })
+          if (cancelled) return
+          const count = candidates.reduce((sum, candidate) => sum + candidate.items.length, 0)
+          if (count > 0) {
+            setTimelineCleanup({ key: `${activeClassId}:${unit.id}`, classId: activeClassId,
+              unit, count, busy: false, error: '' })
+            return
+          }
+        }
+        if (!cancelled) setTimelineCleanup({ key: '', count: 0, busy: false, error: '' })
       })
       .catch((error) => {
         if (!cancelled) {
@@ -621,7 +638,7 @@ export default function AgendaModule() {
         }
       })
     return () => { cancelled = true }
-  }, [activeClassId, activeTemporalUnit?.id, academicYearEndsOn, academicYearStartsOn, agendaToday, loadSessionRange, loadUnscheduledPlanningActivities, setWorkspaceError, timelinePlanningRevision, view])
+  }, [activeClassId, activeTemporalUnit, academicYearEndsOn, academicYearStartsOn, agendaToday, loadSessionRange, loadPriorTemporalUnitCleanup, loadUnscheduledPlanningActivities, setWorkspaceError, timelinePlanningRevision, view, workspace.temporalUnits])
 
   if (!user) {
     return <section className="agenda-auth-required"><CalendarDays size={32} /><h1>Agenda</h1><p>Inicia sessió amb Google des de «Dades i Compte» per protegir l’horari i tenir-lo disponible als teus dispositius.</p></section>
@@ -728,6 +745,18 @@ export default function AgendaModule() {
   }
   const openTimeline = () => {
     setView('timeline')
+  }
+  const cleanTimelineForTemporalUnit = async () => {
+    const { key, unit } = timelineCleanup
+    setTimelineCleanup((current) => ({ ...current, busy: true, error: '' }))
+    try {
+      const count = await workspace.clearPriorTemporalUnitSchedule({ classId: activeClassId, currentUnit: unit })
+      setTimelineCleanup({ key, count: 0, busy: false, error: '' })
+      setScheduleNotice(`${count} ${count === 1 ? 'activitat anterior retirada' : 'activitats anteriors retirades'} de la cronologia futura. Les sessions fetes i la Programació es conserven.`)
+      setTimelinePlanningRevision((revision) => revision + 1)
+    } catch (error) {
+      setTimelineCleanup((current) => ({ ...current, busy: false, error: error.message || 'No s’ha pogut netejar la cronologia.' }))
+    }
   }
   const openTimelineScheduling = (subject = '') => {
     setSchedulingSubject(subject)
@@ -1097,7 +1126,7 @@ export default function AgendaModule() {
           {view === 'today' && <AgendaTodayView bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} loading={workspace.sessionsLoading} onAdjust={adjustSession} onOpenCalendar={openCalendar} onOpenClassroom={openClassroom} onOpenCoordination={openCoordinationReminder} onOpenScheduling={hasOwnCalendar ? () => setDialog('scheduling') : null} onOpenTimetable={hasOwnCalendar ? () => setView('timetable') : null} onOpenTimetableClassroom={openTimetableClassroom} reminders={upcomingReminders} selectedClassId={activeClassId} slots={workspace.slots} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'week' && calendarMode === 'week' && <AgendaWeekView activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenReminders={openReminders} onOpenSession={openSession} onOpenTimetableClassroom={openTimetableClassroom} onReload={reloadCurrentWeek} onShowMonth={openMonth} personalReminders={personalCalendarReminders} slots={workspace.slots} temporalUnitProgress={temporalUnitProgress} temporalUnits={workspace.temporalUnits} timetable={workspace.activeTimetable} weekStart={weekStart} />}
           {view === 'week' && calendarMode === 'month' && <AgendaMonthView academicYear={workspace.activeAcademicYear} activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} coordinationReminders={tutoringCalendarReminders} monthKey={monthKey} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onDeleteEvent={removeEvent} onEditEvent={openCalendarEvent} onMoveMonth={moveMonth} onOpenReminders={openReminders} onSelectWeek={selectCalendarWeek} onShowWeek={() => selectCalendarWeek(startOfWeek(monthKey))} personalReminders={personalCalendarReminders} slots={workspace.slots} temporalUnitProgress={temporalUnitProgress} temporalUnits={workspace.temporalUnits} timetable={workspace.activeTimetable} today={workspace.today} />}
-          {view === 'timeline' && <AgendaTimelineView onRefreshContent={workspace.refreshTimelineContent} sessionPrivateNotes={workspace.sessionPrivateNotes} onLoadNotes={loadTimelineNotes} onOpenNotes={openSessionNotes} notesLoadingId={notesLoadingId} timetable={workspace.activeTimetable} timetables={workspace.timetables} range={timelineRange} onOpenTimetableClassroom={openTimetableClassroom} activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} hasEarlier={Boolean(timelineRange && timelineRange.from > (academicYearStartsOn || addDateDays(agendaToday, -180)))} hasLater={Boolean(timelineRange && timelineRange.to < (academicYearEndsOn || addDateDays(agendaToday, 365)))} loading={workspace.sessionsLoading} onLoadEarlier={loadEarlierTimeline} onLoadLater={loadLaterTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? openTimelineScheduling : null} selectedClassId={activeClassId} slots={workspace.slots} slotsByTimetableId={workspace.slotsByTimetableId} today={workspace.today} unscheduledActivities={timelineUnscheduled.activities} unscheduledHasApplications={timelineUnscheduled.hasApplications} unscheduledLoading={timelineUnscheduled.loading} />}
+          {view === 'timeline' && <AgendaTimelineView cleanup={timelineCleanup.classId === activeClassId && dismissedCleanupKey !== timelineCleanup.key ? timelineCleanup : null} onCleanTimeline={cleanTimelineForTemporalUnit} onDismissCleanup={() => setDismissedCleanupKey(timelineCleanup.key)} onRefreshContent={workspace.refreshTimelineContent} sessionPrivateNotes={workspace.sessionPrivateNotes} onLoadNotes={loadTimelineNotes} onOpenNotes={openSessionNotes} notesLoadingId={notesLoadingId} timetable={workspace.activeTimetable} timetables={workspace.timetables} range={timelineRange} onOpenTimetableClassroom={openTimetableClassroom} activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} hasEarlier={Boolean(timelineRange && timelineRange.from > (academicYearStartsOn || addDateDays(agendaToday, -180)))} hasLater={Boolean(timelineRange && timelineRange.to < (academicYearEndsOn || addDateDays(agendaToday, 365)))} loading={workspace.sessionsLoading} onLoadEarlier={loadEarlierTimeline} onLoadLater={loadLaterTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? openTimelineScheduling : null} selectedClassId={activeClassId} slots={workspace.slots} slotsByTimetableId={workspace.slotsByTimetableId} today={workspace.today} unscheduledActivities={timelineUnscheduled.activities} unscheduledHasApplications={timelineUnscheduled.hasApplications} unscheduledLoading={timelineUnscheduled.loading} />}
           {view === 'timetable' && !hasOwnCalendar && <section className="agenda-large-empty"><span><LayoutGrid size={29} /></span><h2>Configura el curs abans de crear l’horari</h2><p>Només cal indicar les dates del curs actual. En acabar, crearàs la primera versió de l’horari aquí mateix.</p><button className="primary-action" onClick={() => setDialog('academic-year')} type="button"><CalendarPlus size={17} />Configurar curs</button></section>}
           {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditTemporalUnit={(unit) => { setEditingTemporalUnit(unit); setDialog('temporal-unit') }} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} temporalUnit={activeTemporalUnit} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
         </main>
