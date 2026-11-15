@@ -414,8 +414,6 @@
 .agenda-ut-countdown span { font-size: 8px; font-weight: 850; white-space: nowrap; }
 .agenda-ut-countdown span strong { font-size: 11px; }
 .agenda-ut-countdown small { color: #9a3412; font-size: 6px; font-weight: 750; white-space: nowrap; }
-.agenda-ut-countdown.sessions { border-color: #ddd6fe; color: #6d28d9; background: #f5f3ff; }
-.agenda-ut-countdown.sessions small { color: #7c3aed; }
 .agenda-calendar-view-switch { display: inline-flex; gap: 2px; border-radius: 9px; padding: 3px; background: #f1f5f9; }
 .agenda-calendar-view-switch button { border: 0; border-radius: 7px; padding: 6px 11px; color: #64748b; background: transparent; font-size: 9px; font-weight: 900; }
 .agenda-calendar-view-switch button.active { color: #c2410c; background: white; box-shadow: 0 2px 7px rgb(15 23 42 / 8%); }

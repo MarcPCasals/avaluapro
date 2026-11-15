@@ -157,3 +157,47 @@ test('les sessions reals de la UT respecten versions d horari, festius i el comp
   assert.equal(progress.totalSessions, 1)
   assert.equal(progress.remainingSessions, 0)
 })
+
+test('les sessions marcades com no realitzades no compten per a la matèria de la cronologia', () => {
+  const base = {
+    classId: 'class-1',
+    slotsByTimetableId: {
+      timetable: [
+        { id: 'science-monday', classId: 'class-1', subject: 'Ciències', weekday: 1 },
+        { id: 'science-wednesday', classId: 'class-1', subject: 'Ciències', weekday: 3 },
+        { id: 'tutorial-tuesday', classId: 'class-1', subject: 'Tutoria', weekday: 2 },
+      ],
+    },
+    temporalUnit: { startsOn: '2026-09-21', endsOn: '2026-09-27' },
+    timetables: [{ id: 'timetable', effectiveFrom: '2026-09-01' }],
+    today: '2026-09-21',
+  }
+  const calendarEvents = [{
+    id: 'vacances', type: 'nonTeaching', startsOn: '2026-09-23',
+    endsOn: '2026-09-23', classIds: [],
+  }]
+  const sessionBundles = [{ session: {
+    classId: 'class-1', startsAt: '2026-09-21T09:00:00',
+    timetableSlotId: 'science-monday', status: 'notHeld',
+  } }]
+
+  assert.equal(getTemporalUnitProgress({ ...base, subject: 'Ciències', calendarEvents }).remainingSessions, 1)
+  assert.equal(getTemporalUnitProgress({ ...base, subject: 'Ciències', calendarEvents, sessionBundles }).remainingSessions, 0)
+  assert.equal(getTemporalUnitProgress({ ...base, subject: 'Tutoria', calendarEvents, sessionBundles }).remainingSessions, 1)
+})
+
+test('una classe extraordinària que avança la calendarització compta només per a la seva matèria', () => {
+  const progress = getTemporalUnitProgress({
+    calendarEvents: [{
+      id: 'extra', type: 'extraordinarySession', subject: 'Ciències',
+      startsOn: '2026-09-24', endsOn: '2026-09-24', startsAt: '10:00',
+      durationMinutes: 60, consumesPlannedSession: true, classIds: ['class-1'],
+    }],
+    classId: 'class-1',
+    subject: 'Ciències',
+    temporalUnit: { startsOn: '2026-09-21', endsOn: '2026-09-27' },
+    today: '2026-09-21',
+  })
+
+  assert.equal(progress.remainingSessions, 1)
+})

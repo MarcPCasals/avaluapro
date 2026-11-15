@@ -51,6 +51,7 @@ function sharedProgrammingRootId(slot, slotsById) {
 export function getTemporalUnitProgress({
   calendarEvents = [],
   classId = '',
+  sessionBundles = [],
   slotsByTimetableId = {},
   subject = '',
   temporalUnit,
@@ -63,6 +64,17 @@ export function getTemporalUnitProgress({
   let remainingWorkingDays = 0
   let totalSessions = 0
   let remainingSessions = 0
+  const unavailableSessions = new Set(sessionBundles
+    .filter((bundle) => bundle?.session?.classId === classId
+      && ['cancelled', 'notHeld'].includes(bundle.session.status)
+      && bundle.session.timetableSlotId)
+    .map((bundle) => `${String(bundle.session.startsAt).slice(0, 10)}:${bundle.session.timetableSlotId}`))
+  const unavailableExtraEvents = new Set(sessionBundles
+    .filter((bundle) => bundle?.session?.classId === classId
+      && ['cancelled', 'notHeld'].includes(bundle.session.status)
+      && bundle.session.calendarEventId)
+    .map((bundle) => bundle.session.calendarEventId))
+  const subjectKey = normalizedSubject(subject)
 
   for (let dateKey = temporalUnit.startsOn; dateKey <= temporalUnit.endsOn; dateKey = addDays(dateKey, 1)) {
     const weekday = weekdayFromDate(dateKey)
@@ -77,14 +89,24 @@ export function getTemporalUnitProgress({
     const timetable = selectTimetableForDate(timetables, dateKey)
     const timetableSlots = slotsByTimetableId[timetable?.id] || []
     const slotsById = new Map(timetableSlots.map((slot) => [slot.id, slot]))
-    const subjectKey = normalizedSubject(subject)
     const slots = timetableSlots
       .filter((slot) => slot.classId === classId && Number(slot.weekday) === weekday)
       .filter((slot) => !subjectKey || normalizedSubject(slot.subject) === subjectKey)
-      .filter((slot) => !getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id }))
+      .filter((slot) => !unavailableSessions.has(`${dateKey}:${slot.id}`)
+        && !getNoClassCalendarEvent(calendarEvents, dateKey, classId, { timetableSlotId: slot.id }))
     const logicalSessionIds = new Set(slots.map((slot) => sharedProgrammingRootId(slot, slotsById)))
     for (const sessionId of logicalSessionIds) {
       if (!sessionId) continue
+      totalSessions += 1
+      if (dateKey >= firstRemainingDate) remainingSessions += 1
+    }
+    for (const event of calendarEvents) {
+      if (event.type !== 'extraordinarySession' || !event.consumesPlannedSession
+        || !event.startsAt || Number(event.durationMinutes) <= 0
+        || !calendarEventCoversDate(event, dateKey)
+        || !calendarEventAppliesToClass(event, classId)
+        || (subjectKey && normalizedSubject(event.subject) !== subjectKey)
+        || unavailableExtraEvents.has(event.id)) continue
       totalSessions += 1
       if (dateKey >= firstRemainingDate) remainingSessions += 1
     }
