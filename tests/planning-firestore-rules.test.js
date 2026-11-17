@@ -41,6 +41,7 @@ import {
   createTimetableVersion,
 } from '../src/domain/planning/index.js'
 import { applyPlanningCloudOperationToDatabase } from '../src/data/cloud/planningCloudSync.js'
+import { PEDAGOGICAL_TYPES } from '../src/domain/planning/documents.js'
 import { getPlanningEntityLocation } from '../src/data/planningEntityLocation.js'
 import {
   buildSchedulingPersistenceEntries,
@@ -974,12 +975,23 @@ describe('Planificació compartida', () => {
     ))
     await assertFails(updateDoc(
       doc(upRef(ownerDb), 'activities', 'plan-activity-one'),
-      { pedagogicalType: 'diagnosis', updatedAt: NOW },
+      { pedagogicalType: 'invalid-pedagogical-type', updatedAt: NOW },
     ))
     await assertFails(updateDoc(upRef(ownerDb), {
       resourceSections: { specific: [], transversal: [] },
       updatedAt: NOW,
     }))
+  })
+
+  test('les regles accepten tots els moments pedagògics que pot importar el Word', async () => {
+    const db = authDb(OWNER)
+    for (const pedagogicalType of PEDAGOGICAL_TYPES) {
+      const id = `plan-activity-type-${pedagogicalType}`
+      await assertSucceeds(setDoc(
+        doc(upRef(db), 'activities', id),
+        activityData({ id, pedagogicalType }),
+      ))
+    }
   })
 
   test('només s’accepten els tres tipus d’element previstos a la cronologia', async () => {

@@ -1501,7 +1501,9 @@ service cloud.firestore {
         && request.resource.data.pedagogicalType in [
           'explanation', 'priorKnowledge', 'motivation', 'situation', 'hypothesis',
           'workPlan', 'acquisition', 'metacognition', 'regulation', 'mobilization',
-          'response', 'theorization', 'competencyTest', 'custom'
+          'response', 'theorization', 'competencyTest', 'exploration', 'diagnosis',
+          'guidedPractice', 'modeling', 'argumentation', 'application',
+          'editorialProduct', 'margin', 'custom'
         ]
         && request.resource.data.indicatorIds is list
         && request.resource.data.curriculumSelections is list
