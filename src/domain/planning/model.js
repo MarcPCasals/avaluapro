@@ -129,6 +129,8 @@ function normalizeCurriculum(input = {}, options = {}) {
     id: embeddedId(item?.id, 'plan-curriculum', options.idFactory),
     label: requiredText(item?.label, 'contingut curricular'),
     sourceId: optionalText(item?.sourceId),
+    ...(key === 'assessmentCriteria' && item?.actions ? { actions: optionalText(item.actions) } : {}),
+    ...(key === 'assessmentCriteria' && item?.competencyLabel ? { competencyLabel: optionalText(item.competencyLabel) } : {}),
   }))]))
 }
 

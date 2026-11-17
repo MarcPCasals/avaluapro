@@ -123,9 +123,12 @@ function curriculumTable(curriculum = {}) {
     ['Criteri d’avaluació', curriculum.assessmentCriteria],
     ['Indicador d’avaluació', curriculum.indicators],
   ]
+  if (curriculum.assessmentCriteria?.some((item) => item.actions)) {
+    fields.push(['Accions del criteri treballades', curriculum.assessmentCriteria.map((item) => ({ label: item.actions || '' }))])
+  }
   const maxRows = Math.max(1, ...fields.map(([, items]) => items?.length || 0))
   return new Table({
-    columnWidths: [2500, 2500, 2500, 2500],
+    columnWidths: fields.map(() => Math.floor(10000 / fields.length)),
     rows: [
       new TableRow({
         children: fields.map(([label]) => cell(paragraph(label, {

@@ -17,12 +17,28 @@ export const PEDAGOGICAL_TYPES = Object.freeze([
   'response',
   'theorization',
   'competencyTest',
+  'exploration',
+  'diagnosis',
+  'guidedPractice',
+  'modeling',
+  'argumentation',
+  'application',
+  'editorialProduct',
+  'margin',
   'custom',
 ])
 
 export const PEDAGOGICAL_TYPE_LABELS = Object.freeze({
   acquisition: 'Adquisició',
   competencyTest: 'Prova competencial',
+  exploration: 'Exploració',
+  diagnosis: 'Diagnosi',
+  guidedPractice: 'Pràctica guiada',
+  modeling: 'Modelització',
+  argumentation: 'Argumentació',
+  application: 'Aplicació',
+  editorialProduct: 'Producte editorial',
+  margin: 'Marge',
   custom: 'Altres',
   explanation: 'Explicació',
   hypothesis: 'Hipòtesi',
@@ -95,6 +111,14 @@ export function normalizeResourceSections(input = {}, legacy = {}) {
 export function inferPedagogicalType(value) {
   const normalized = text(value).toLocaleLowerCase('ca')
   if (!normalized) return 'custom'
+  if (/^exploraci[oó]/.test(normalized)) return 'exploration'
+  if (/^diagnosi/.test(normalized)) return 'diagnosis'
+  if (/^pr[aà]ctica guiada/.test(normalized)) return 'guidedPractice'
+  if (/^modelitzaci[oó]/.test(normalized)) return 'modeling'
+  if (/^argumentaci[oó]/.test(normalized)) return 'argumentation'
+  if (/^aplicaci[oó]/.test(normalized)) return 'application'
+  if (/^producte editorial/.test(normalized)) return 'editorialProduct'
+  if (/^marge/.test(normalized)) return 'margin'
   if (/metacogn/.test(normalized)) return 'metacognition'
   if (/coneixement|previ/.test(normalized)) return 'priorKnowledge'
   if (/motiv/.test(normalized)) return 'motivation'
@@ -291,7 +315,7 @@ function parseCurriculum(tables) {
     return labels.some((label) => label === 'competencia')
       && labels.some((label) => label.includes('aprenentatge esperat'))
       && labels.some((label) => label.includes('criteri d avaluacio'))
-      && labels.some((label) => label.includes('indicador d avaluacio'))
+      && labels.some((label) => label.includes('indicador d avaluacio') || label.includes('accions del criteri treballades'))
   }))
   const empty = { assessmentCriteria: [], competencies: [], expectedLearnings: [], indicators: [] }
   if (!table) return empty
@@ -304,9 +328,23 @@ function parseCurriculum(tables) {
     expectedLearnings: columnIndex(/^aprenentatge esperat$/),
     indicators: columnIndex(/^indicador d avaluacio$/),
   }
-  return Object.fromEntries(Object.entries(columns).map(([key, index]) => [key, textList(
+  const curriculum = Object.fromEntries(Object.entries(columns).map(([key, index]) => [key, textList(
     table.slice(headerIndex + 1).map((row) => row[index]?.lines?.join('\n') || '').filter(Boolean),
   ).map((label) => ({ label }))]))
+  const actionsIndex = columnIndex(/^accions del criteri treballades$/)
+  if (actionsIndex >= 0) {
+    const competencyIndex = columns.competencies
+    const criterionIndex = columns.assessmentCriteria
+    const details = new Map(table.slice(headerIndex + 1).map((row) => [
+      normalizedHeader(row[criterionIndex]?.text),
+      { actions: cellText(row, actionsIndex), competencyLabel: cellText(row, competencyIndex) },
+    ]))
+    curriculum.assessmentCriteria = curriculum.assessmentCriteria.map((item) => ({
+      ...item,
+      ...details.get(normalizedHeader(item.label)),
+    }))
+  }
+  return curriculum
 }
 
 function parseResourceSection(tables, titlePattern) {
@@ -327,12 +365,13 @@ function parseResourceSection(tables, titlePattern) {
 function parseActivityContent(lines) {
   const cleaned = lines.map(text).filter(Boolean)
   const diversityIndex = cleaned.findIndex((line) => /^atenci[oó] a la diversitat\s*:?$/i.test(line))
+  const flexibilityIndex = cleaned.findIndex((line) => /^flexibilitzaci[oó]\s*[·:]/i.test(line))
   const commentIndexes = cleaned
     .map((line, index) => /^comentaris? per a l['’]aplicaci[oó](?:, si s['’]escau)?\s*:?$/i.test(line) ? index : -1)
     .filter((index) => index >= 0)
   const firstCommentIndex = commentIndexes[0] ?? -1
   const lastCommentIndex = commentIndexes.at(-1) ?? -1
-  const activityEnd = [diversityIndex, firstCommentIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? cleaned.length
+  const activityEnd = [diversityIndex, flexibilityIndex, firstCommentIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? cleaned.length
   const activityLines = cleaned.slice(0, activityEnd)
   const firstLine = activityLines[0] || ''
   const inlineTitle = /^activitat\s*:\s*(.+)$/i.exec(firstLine)?.[1] || ''
@@ -343,7 +382,9 @@ function parseActivityContent(lines) {
   const description = withoutLabel.slice(inlineTitle ? 0 : 1).join('\n')
   const diversityStart = diversityIndex >= 0 ? diversityIndex + 1 : -1
   const diversityEnd = commentIndexes.find((index) => index > diversityIndex) ?? cleaned.length
-  const diversityText = diversityStart >= 0 ? cleaned.slice(diversityStart, diversityEnd).join('\n') : ''
+  const diversityText = diversityStart >= 0
+    ? cleaned.slice(diversityStart, diversityEnd).join('\n')
+    : flexibilityIndex >= 0 ? cleaned[flexibilityIndex].replace(/^flexibilitzaci[oó]\s*[·:]\s*/i, '') : ''
   const applicationComment = lastCommentIndex >= 0 ? cleaned.slice(lastCommentIndex + 1).join('\n') : ''
   return { applicationComment, description, diversityText, title }
 }
@@ -362,8 +403,8 @@ function phaseKindFromLabel(value) {
 }
 
 function phaseTitleFromLabel(value) {
-  const matched = text(value).match(/fase\s+(?:de|d['’])\s*(.+?)(?:\n|$)/i)
-  const title = text(matched?.[1]).replace(/[.:;]+$/, '')
+  const matched = text(value).match(/^fase\s+(?:de|d['’])\s*(.+?)(?:\n|$)/i)
+  const title = text(matched?.[1]).replace(/\s*[·–-]\s*sessi[oó]\s*\d+.*$/i, '').replace(/[.:;]+$/, '')
   if (!title) return ''
   return title.charAt(0).toLocaleUpperCase('ca') + title.slice(1).toLocaleLowerCase('ca')
 }
@@ -372,7 +413,9 @@ function sequenceColumnIndexes(row) {
   const headers = row.map((cell) => normalizedHeader(cell?.text))
   const find = (...patterns) => headers.findIndex((header) => patterns.some((pattern) => pattern.test(header)))
   return {
-    activity: find(/^descriptiu activitat$/, /^activitat$/, /^descripcio/),
+    activity: find(/^descriptiu (?:de l )?activitat$/, /^activitat$/, /^descripcio/),
+    activityType: find(/^tipologia d activitat$/),
+    criteriaCodes: find(/^ca$/),
     curriculum: find(/^competencies criteris/, /^competencia criteri/),
     grouping: find(/^agrup/, /^agrupament/),
     indicators: find(/^ia$/, /^indicador/),
@@ -393,6 +436,8 @@ function isSequenceHeader(row) {
 function legacySequenceColumns() {
   return {
     activity: 2,
+    activityType: -1,
+    criteriaCodes: -1,
     curriculum: -1,
     grouping: 5,
     indicators: 6,
@@ -467,6 +512,39 @@ function parseActivityCurriculum(lines, curriculum) {
   return selections
 }
 
+function parseActivityCurriculumCodes(lines, curriculum) {
+  const selections = []
+  const byCompetency = new Map()
+  ;(lines || []).forEach((line) => {
+    const match = text(line).match(/^C\s*(\d+)\s+CA\s*(\d+)$/i)
+    if (!match) return
+    const competencyCode = `C${match[1]}`
+    const criterionCode = `CA${match[2]}`
+    const competency = (curriculum.competencies || []).find((item) =>
+      new RegExp(`^${competencyCode}(?:\\b|$)`, 'i').test(item.label))
+    const criterion = (curriculum.assessmentCriteria || []).find((item) =>
+      normalizedHeader(item.competencyLabel) === normalizedHeader(competency?.label)
+      && new RegExp(`^${criterionCode}(?:\\b|$)`, 'i').test(item.label))
+    if (!competency || !criterion) return
+    let selection = byCompetency.get(competencyCode)
+    if (!selection) {
+      selection = {
+        competencyKey: importedCurriculumKey('competency', competency.label),
+        label: competency.label,
+        assessmentCriteria: [],
+      }
+      byCompetency.set(competencyCode, selection)
+      selections.push(selection)
+    }
+    if (selection.assessmentCriteria.some((item) => item.label === criterion.label)) return
+    selection.assessmentCriteria.push({
+      criterionKey: importedCurriculumKey('criterion', criterion.label, selection.competencyKey),
+      label: criterion.label,
+    })
+  })
+  return selections
+}
+
 function materialFromText(label) {
   return {
     id: null,
@@ -506,6 +584,7 @@ export function parsePlanningWordHtml(html) {
   let currentRootKey = null
   let currentSubphaseKey = null
   let currentSubphaseLabel = ''
+  let currentSessionLabel = ''
   const ensureRootPhase = (kind, title = PHASE_LABELS[kind]) => {
     const safeTitle = text(title) || PHASE_LABELS[kind] || 'Fase importada'
     const signature = `${kind}:${comparableImportedLabel(safeTitle)}`
@@ -521,6 +600,9 @@ export function parsePlanningWordHtml(html) {
     sequenceTable.forEach((row) => {
       const phaseTitle = row.map((cell) => phaseTitleFromLabel(cell?.text)).find(Boolean) || ''
       if (phaseTitle) {
+        const phaseText = row.map((cell) => cell?.text || '').find((value) => phaseTitleFromLabel(value)) || ''
+        const sessionNumber = /^fase\s+(?:de|d['’]).*?\bsessi[oó]\s*0*(\d+)/i.exec(phaseText)?.[1]
+        currentSessionLabel = sessionNumber ? `Sessió ${Number(sessionNumber)}` : ''
         currentKind = phaseKindFromLabel(phaseTitle)
         currentRootKey = ensureRootPhase(currentKind, phaseTitle)
         currentSubphaseKey = null
@@ -534,8 +616,10 @@ export function parsePlanningWordHtml(html) {
       }
       if (!columns) return
       const numberText = cellText(row, columns.number)
-      if (!/^\d+\s*[.)-]?$/.test(numberText)) return
-      const subphase = cellText(row, columns.subphase)
+      const hasActivityCode = /^\d+\s*[.)-]?$/.test(numberText)
+        || (columns.activityType >= 0 && /^(?:A\d+|[—–-]$)/i.test(numberText))
+      if (!hasActivityCode) return
+      const subphase = currentSessionLabel || cellText(row, columns.subphase)
       const rootKey = currentRootKey || ensureRootPhase(currentKind, PHASE_LABELS[currentKind])
       const parsedContent = parseActivityContent(cellLines(row, columns.activity))
       if (subphase) {
@@ -561,32 +645,44 @@ export function parsePlanningWordHtml(html) {
       // Les plantilles oficials deixen sovint la subfase en blanc per indicar que
       // l'activitat continua el mateix tram. En aquest cas l'heretem.
       const phaseKey = currentSubphaseKey || rootKey
-      if (parsedContent.title.length > 120 && subphase && !/^[a-z]\d+$/i.test(subphase)) {
+      if (parsedContent.title.length > 120 && subphase && columns.activityType < 0 && !/^[a-z]\d+$/i.test(subphase)) {
         parsedContent.description = [parsedContent.title, parsedContent.description].filter(Boolean).join('\n')
         parsedContent.title = subphase
       }
       parsedContent.description = withImportedResources(parsedContent.description, cellText(row, columns.resources))
       const curriculumLines = cellLines(row, columns.curriculum)
+      const criteriaCodeLines = cellLines(row, columns.criteriaCodes)
       const indicatorLines = cellLines(row, columns.indicators)
       const hasActivityCurriculum = columns.curriculum >= 0
       const indicatorLabels = hasActivityCurriculum
         ? []
         : textList(indicatorLines.flatMap((line) => line.split(/[;,]/)))
-      activityNumbers.push(Number(numberText.match(/\d+/)?.[0]))
+      if (/^\d+\s*[.)-]?$/.test(numberText)) activityNumbers.push(Number(numberText.match(/\d+/)?.[0]))
+      const activityTypeLabel = cellText(row, columns.activityType)
+      const groupingLines = cellLines(row, columns.grouping)
+      const activityDescription = [
+        activityTypeLabel ? `Tipologia original: ${activityTypeLabel}` : '',
+        columns.activityType >= 0 && !/^[—–-]$/.test(numberText) ? `Codi al Word: ${numberText}` : '',
+        parsedContent.description,
+        columns.activityType >= 0 && groupingLines.length > 1 ? `Finalitat de l’agrupament: ${groupingLines.slice(1).join('\n')}` : '',
+      ].filter(Boolean).join('\n')
       activities.push({
         ...parsedContent,
-        curriculumSelections: hasActivityCurriculum ? parseActivityCurriculum(curriculumLines, parsedCurriculum) : [],
+        curriculumSelections: hasActivityCurriculum
+          ? parseActivityCurriculum(curriculumLines, parsedCurriculum)
+          : parseActivityCurriculumCodes(criteriaCodeLines, parsedCurriculum),
+        description: activityDescription,
         diversityMeasures: parsedContent.diversityText ? [{ label: parsedContent.diversityText, studentNames: [] }] : [],
         evidenceMode: 'none',
-        grouping: cellText(row, columns.grouping),
+        grouping: columns.activityType >= 0 ? text(groupingLines[0]) : cellText(row, columns.grouping),
         indicatorLabels,
         order: activities.filter((activity) => activity.phaseKey === phaseKey).length,
-        pedagogicalType: inferPedagogicalType(`${subphase} ${parsedContent.title}`),
+        pedagogicalType: inferPedagogicalType(activityTypeLabel || `${subphase} ${parsedContent.title}`),
         phaseKey,
         plannedMinutes: parseMinutes(cellText(row, columns.minutes)),
         space: cellText(row, columns.space),
         studentMaterials: [],
-        teacherMaterials: textList(cellLines(row, columns.materials)).map(materialFromText),
+        teacherMaterials: textList(cellLines(row, columns.materials)).filter((label) => !/^[—–-]$/.test(label)).map(materialFromText),
         type: 'activity',
       })
     })
@@ -631,7 +727,7 @@ export function parsePlanningWordHtml(html) {
       code,
       complexSituation: field(/^situaci[oó] o pregunta complexa(?: \(i descriptiu si escau\))?\s*:?/i),
       curriculum,
-      expectedProduct: field(/^proposta de producci[oó]\/producte(?:, si escau)?\s*:?/i),
+      expectedProduct: field(/^proposta de producci[oó](?:\/producte(?:, si escau)?| o resposta si escau)\s*:?/i),
       level,
       resourceSections,
       title,

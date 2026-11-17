@@ -34,6 +34,7 @@ function CurriculumBlock({ curriculum = {} }) {
     ['Competències', curriculum.competencies],
     ['Aprenentatges esperats', curriculum.expectedLearnings],
     ['Criteris d’avaluació', curriculum.assessmentCriteria],
+    ['Accions dels criteris treballades', (curriculum.assessmentCriteria || []).filter((item) => item.actions).map((item) => ({ id: item.id, label: `${item.label}: ${item.actions}` }))],
     ['Indicadors', curriculum.indicators],
   ].filter(([, items]) => items?.length)
 

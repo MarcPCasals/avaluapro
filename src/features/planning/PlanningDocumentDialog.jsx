@@ -23,6 +23,8 @@ function ImportPreview({ bundle }) {
         <div><dt>Activitats</dt><dd>{bundle.activities.length}</dd></div>
         <div><dt>Temps detectat</dt><dd>{totalMinutes} min</dd></div>
         <div><dt>Materials</dt><dd>{bundle.importSummary?.materialCount ?? 0}</dd></div>
+        <div><dt>Activitats amb CA</dt><dd>{bundle.activities.filter((activity) => activity.curriculumSelections?.length).length}</dd></div>
+        <div><dt>Mesures de diversitat</dt><dd>{bundle.activities.filter((activity) => activity.diversityMeasures?.length).length}</dd></div>
       </dl>
       {warnings.length > 0 && <ul className="planning-import-warnings">{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       <details>
@@ -155,12 +157,13 @@ export function PlanningDocumentDialog({ activities, onClose, onImportBundle, on
           <details className="planning-import-guide" open>
             <summary><CircleHelp size={16} />Com preparar el Word</summary>
             <div>
-              <p>La plantilla és recomanada, però el lector també accepta versions antigues amb una columna de Recursos.</p>
+              <p>El lector reconeix el format de les UP amb sessions, tipologia, descriptiu, minuts, materials, agrupament i CA. També accepta la plantilla d’AvaluaPro i versions antigues amb una columna de Recursos.</p>
               <ul>
-                <li>Posa cada activitat en una fila i identifica-la amb un número únic.</li>
-                <li>Conserva les capçaleres Núm., Subfase, Descriptiu activitat, Temps, Material i Agrupament.</li>
+                <li>Posa cada activitat en una fila. S’accepten codis com A01, A17–A18 i les files de marge marcades amb —.</li>
+                <li>Conserva les capçaleres Núm., Tipologia d’activitat, Descriptiu de l’activitat, Min., Material, Agrupament i finalitat i CA.</li>
                 <li>Escriu la durada com 20, 20 min o 20’. Evita indicar-hi el nombre de sessions.</li>
-                <li>Pots afegir, canviar o eliminar fases i subfases. Escriu el nom de cada fase damunt de la seva taula.</li>
+                <li>Escriu FASE DE PREPARACIÓ · SESSIÓ 01 damunt de la taula de cada sessió; també es reconeixen Resolució i Tancament.</li>
+                <li>Les accions del criteri es conserven com a accions; la columna CA vincula les activitats als criteris. Els indicadors només es creen si el Word els declara com a indicadors.</li>
                 <li>Abans d’importar, revisa el recompte d’activitats, els minuts i els avisos de la previsualització.</li>
               </ul>
             </div>

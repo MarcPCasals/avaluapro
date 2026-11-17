@@ -24,6 +24,9 @@ function CurriculumDocument({ curriculum = {} }) {
     ['Criteri d’avaluació', curriculum.assessmentCriteria],
     ['Indicador d’avaluació', curriculum.indicators],
   ]
+  if (curriculum.assessmentCriteria?.some((item) => item.actions)) {
+    rows.push(['Accions del criteri treballades', curriculum.assessmentCriteria.map((item) => ({ label: item.actions }))])
+  }
   const count = Math.max(1, ...rows.map(([, items]) => items?.length || 0))
   return (
     <div className="planning-document-table-wrap">

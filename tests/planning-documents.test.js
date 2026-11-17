@@ -8,6 +8,7 @@ import {
   parsePlanningTableText,
   parsePlanningWordHtml,
 } from '../src/domain/planning/documents.js'
+import { createPlanningUnit } from '../src/domain/planning/model.js'
 
 test('the versioned JSON preserves the UP but excludes identities and sharing', () => {
   const exported = buildPlanningDocumentExport({
@@ -180,6 +181,51 @@ test('the new Word activity column restores competencies and optional assessment
   assert.equal(parsed.activities[0].curriculumSelections[0].label, 'C1: Modelització')
   assert.equal(parsed.activities[0].curriculumSelections[0].assessmentCriteria[0].label, 'CA1: Rigor')
   assert.deepEqual(parsed.activities[0].indicatorLabels, [])
+})
+
+test('the 2026 UP layout keeps sessions, criterion actions and activity links distinct from indicators', () => {
+  const html = `
+    <table><tr><td><p>UP 1.2</p><p>1r curs 1r cicle</p></td><td>Seqüència</td></tr></table>
+    <table><tr><td>INFORMACIÓ GENERAL</td></tr><tr><td>Títol: L’Univers a la revista</td></tr><tr><td>Proposta de producció o resposta si escau: Quatre peces revisades</td></tr></table>
+    <table>
+      <tr><td>COMPETÈNCIA</td><td>APRENENTATGE ESPERAT</td><td>CRITERI D’AVALUACIÓ</td><td>ACCIONS DEL CRITERI TREBALLADES</td></tr>
+      <tr><td>C1</td><td>Representar relacions</td><td>CA1 Rigor</td><td><p>Treballades</p><p>C1R1 lèxic</p></td></tr>
+      <tr><td>C3</td><td>Construir una justificació</td><td>CA1 Sentit crític</td><td>C3S1 judici científic</td></tr>
+    </table>
+    <table><tr><td>Recursos de competències específiques:</td></tr><tr><td>Fets i conceptes: Univers</td></tr></table>
+    <table>
+      <tr><td colspan="7">FASE DE PREPARACIÓ · SESSIÓ 01</td></tr>
+      <tr><td>Núm.</td><td>Tipologia d’activitat</td><td>Descriptiu de l’activitat</td><td>Min.</td><td>Material</td><td>Agrupament i finalitat</td><td>CA</td></tr>
+      <tr><td>A01</td><td>Exploració</td><td><p>Vídeo i pregunta</p><p>Objectiu · Formular una pregunta</p><p>Flexibilització · Suport visual</p></td><td>40</td><td>Vídeo</td><td><p>Individual</p><p>Pregunta personal</p></td><td>—</td></tr>
+      <tr><td>—</td><td>Marge</td><td>Marge i recollida</td><td>15</td><td>—</td><td>Grup classe</td><td>—</td></tr>
+    </table>
+    <table>
+      <tr><td colspan="7">FASE DE RESOLUCIÓ · SESSIÓ 02</td></tr>
+      <tr><td>Núm.</td><td>Tipologia d’activitat</td><td>Descriptiu de l’activitat</td><td>Min.</td><td>Material</td><td>Agrupament i finalitat</td><td>CA</td></tr>
+      <tr><td>A02</td><td>Modelització C1</td><td>Construir un model</td><td>55</td><td>Quadern</td><td>Individual</td><td><p>C1 CA1</p><p>C3 CA1</p></td></tr>
+    </table>`
+  const parsed = parsePlanningWordHtml(html)
+  assert.equal(parsed.unit.expectedProduct, 'Quatre peces revisades')
+  assert.equal(parsed.unit.curriculum.assessmentCriteria[0].actions, 'Treballades\nC1R1 lèxic')
+  const savedUnit = createPlanningUnit({
+    ...parsed.unit,
+    academicYearId: 'synthetic-year',
+    ownerUid: 'synthetic-owner',
+    temporalUnitId: 'synthetic-ut',
+  })
+  assert.equal(savedUnit.curriculum.assessmentCriteria[0].actions, 'Treballades\nC1R1 lèxic')
+  assert.deepEqual(parsed.unit.curriculum.indicators, [])
+  assert.deepEqual(parsed.phases.filter((phase) => phase.parentKey).map((phase) => phase.title), ['Sessió 1', 'Sessió 2'])
+  assert.deepEqual(parsed.activities.map((activity) => activity.plannedMinutes), [40, 15, 55])
+  assert.equal(parsed.activities[0].pedagogicalType, 'exploration')
+  assert.equal(parsed.activities[0].diversityMeasures[0].label, 'Suport visual')
+  assert.equal(parsed.activities[0].grouping, 'Individual')
+  assert.match(parsed.activities[0].description, /Codi al Word: A01.*Finalitat de l’agrupament: Pregunta personal/s)
+  assert.equal(parsed.activities[1].teacherMaterials.length, 0)
+  assert.deepEqual(parsed.activities[2].curriculumSelections.map((selection) => [
+    selection.label,
+    selection.assessmentCriteria[0].label,
+  ]), [['C1', 'CA1 Rigor'], ['C3', 'CA1 Sentit crític']])
 })
 
 test('older SG Word variants keep merged curriculum cells and every phase table', () => {
