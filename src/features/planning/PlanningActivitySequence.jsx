@@ -8,6 +8,7 @@ import {
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
 import { activityTypePresentation } from '../../domain/planning/documents'
+import { reconcileActivityCurriculumSelections } from '../../domain/planning/activityCurriculum'
 import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
 import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
@@ -22,7 +23,7 @@ const TYPE_DETAILS = {
   transition: { icon: ArrowRight, label: 'Pausa o transició' },
 }
 
-function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
+function ActivityRow({ activity, availableCompetencies, progress, completionBusy, dragId, isCompleted, isManuallyCompleted, onDelete, onDragEnd, onDragStart, onDrop, onEdit, onKeyboardMove, onSetManualCompletion, onTouchDrop, planningUnit, programmableMinutes, sequenceNumber, sessionDuration }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [blockedLinks, setBlockedLinks] = useState([])
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
@@ -32,9 +33,14 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
     + (activity.studentMaterials?.length || 0)
     + (planningUnit?.transversalMaterials?.length || 0)
   const resources = normalizeActivityResourceSelections(activity.resourceSelections)
-  const competencyCount = activity.curriculumSelections?.length || 0
-  const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)
-  const curriculumCodes = (activity.curriculumSelections || []).flatMap((selection) => (selection.assessmentCriteria || []).map((criterion) => ({
+  const selectedCurriculum = reconcileActivityCurriculumSelections(activity.curriculumSelections, availableCompetencies)
+    .flatMap((selection) => {
+      const option = availableCompetencies.find((candidate) => candidate.key === selection.competencyKey)
+      return option ? [{ ...selection, assessmentCriteria: selection.assessmentCriteria.filter((criterion) => option.criteria.some((candidate) => candidate.key === criterion.criterionKey)) }] : []
+    })
+  const competencyCount = selectedCurriculum.length
+  const criterionCount = selectedCurriculum.reduce((total, selection) => total + selection.assessmentCriteria.length, 0)
+  const curriculumCodes = selectedCurriculum.flatMap((selection) => selection.assessmentCriteria.map((criterion) => ({
     label: `${/^C\d+\b/i.exec(selection.label)?.[0] || selection.label} ${/^CA\d+\b/i.exec(criterion.label)?.[0] || criterion.label}`,
     title: `${selection.label} · ${criterion.label}`,
   })))
@@ -171,7 +177,7 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
   )
 }
 
-export function PlanningActivitySequence({ activities, activityProgress = {}, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onMovePhase, onSetManualCompletion, phases, planningUnit }) {
+export function PlanningActivitySequence({ activities, availableCompetencies = [], activityProgress = {}, completedActivityIds = new Set(), completedActivitiesLoading = false, completionBusyId = '', manuallyCompletedActivityIds = new Set(), onAdd, onAddChildPhase, onAddPhase, onDelete, onDeletePhase, onEdit, onEditPhase, onMove, onMovePhase, onSetManualCompletion, phases, planningUnit }) {
   const [dragId, setDragId] = useState('')
   const [phaseDragId, setPhaseDragId] = useState('')
   const [phaseDropId, setPhaseDropId] = useState('')
@@ -406,6 +412,7 @@ export function PlanningActivitySequence({ activities, activityProgress = {}, co
                 {phaseActivities.length === 0 ? <p>Arrossega un element aquí o crea’n un de nou.</p> : phaseActivities.map((activity) => (
                   <ActivityRow
                     activity={activity}
+                    availableCompetencies={availableCompetencies}
                     progress={activityProgress[activity.id]}
                     completionBusy={completionBusyId === activity.id}
                     dragId={dragId}

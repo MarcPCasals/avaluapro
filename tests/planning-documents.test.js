@@ -224,7 +224,8 @@ test('the 2026 UP layout keeps sessions, criterion actions and activity links di
   assert.doesNotMatch(parsed.activities[0].description, /Tipologia original/)
   assert.equal(parsed.activities[0].diversityMeasures[0].label, 'Suport visual')
   assert.equal(parsed.activities[0].grouping, 'Individual')
-  assert.match(parsed.activities[0].description, /Codi al Word: A01.*Finalitat de l’agrupament: Pregunta personal/s)
+  assert.match(parsed.activities[0].description, /Finalitat de l’agrupament: Pregunta personal/)
+  assert.doesNotMatch(parsed.activities[0].description, /Codi al Word/)
   assert.equal(parsed.activities[1].teacherMaterials.length, 0)
   assert.deepEqual(parsed.activities[2].curriculumSelections.map((selection) => [
     selection.label,
@@ -236,7 +237,7 @@ test('the 2026 UP layout keeps sessions, criterion actions and activity links di
   ])
   assert.equal(parsed.activities[3].curriculumSelections[0].assessmentCriteria[0].label, 'CA1 Rigor')
   assert.equal(activityTypePresentation({ description: 'Tipologia original: Teorització docent\nCodi al Word: A4', pedagogicalType: 'theorization' }).label, 'Teorització docent')
-  assert.equal(activityTypePresentation({ description: 'Tipologia original: Teorització docent\nCodi al Word: A4', pedagogicalType: 'theorization' }).description, 'Codi al Word: A4')
+  assert.equal(activityTypePresentation({ description: 'Tipologia original: Teorització docent\nCodi al Word: A4\nObjectiu', pedagogicalType: 'theorization' }).description, 'Objectiu')
 })
 
 test('older SG Word variants keep merged curriculum cells and every phase table', () => {

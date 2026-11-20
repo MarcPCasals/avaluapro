@@ -40,6 +40,41 @@ export function normalizeActivityCurriculumSelections(selections = []) {
   })).filter((selection) => selection.competencyKey && selection.label)
 }
 
+function comparableCurriculumLabel(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('ca').replace(/[^a-z0-9]/g, '')
+}
+
+function leadingCurriculumCode(value, prefix) {
+  return new RegExp(`^${prefix}\\s*(\\d+)\\b`, 'i').exec(String(value || ''))?.[1] || ''
+}
+
+/** Relaciona els codis de la UP importada amb les opcions reals del formulari. */
+export function reconcileActivityCurriculumSelections(selections = [], options = []) {
+  const normalized = normalizeActivityCurriculumSelections(selections)
+  if (!options.length) return normalized
+  return normalized.map((selection) => {
+    const competency = options.find((option) => option.key === selection.competencyKey)
+      || options.find((option) => comparableCurriculumLabel(option.label) === comparableCurriculumLabel(selection.label))
+      || (selection.label.match(/^C\s*\d+$/i)
+        ? options.find((option) => leadingCurriculumCode(option.label, 'C') === leadingCurriculumCode(selection.label, 'C'))
+        : null)
+    if (!competency) return selection
+    return {
+      competencyKey: competency.key,
+      label: competency.label,
+      assessmentCriteria: selection.assessmentCriteria.map((criterion) => {
+        const matched = competency.criteria.find((option) => option.key === criterion.criterionKey)
+          || competency.criteria.find((option) => comparableCurriculumLabel(option.label) === comparableCurriculumLabel(criterion.label))
+          || (criterion.label.match(/^CA\s*\d+$/i)
+            ? competency.criteria.find((option) => leadingCurriculumCode(option.label, 'CA') === leadingCurriculumCode(criterion.label, 'CA'))
+            : null)
+        return matched ? { criterionKey: matched.key, label: matched.label } : criterion
+      }),
+    }
+  })
+}
+
 /**
  * Les competències d'avaluació es creen una vegada per UT. Per al selector
  * d'activitats les agrupem pel nom perquè el docent vegi el currículum real de

@@ -56,9 +56,10 @@ export const PEDAGOGICAL_TYPE_LABELS = Object.freeze({
 export function activityTypePresentation(activity = {}) {
   const description = String(activity.description || '')
   const legacy = /^Tipologia original:\s*([^\n]+)\n?/i.exec(description)
+  const withoutType = legacy ? description.slice(legacy[0].length).trimStart() : description
   return {
     label: text(activity.activityTypeLabel) || text(legacy?.[1]) || PEDAGOGICAL_TYPE_LABELS[activity.pedagogicalType] || 'Altres',
-    description: legacy ? description.slice(legacy[0].length).trimStart() : description,
+    description: withoutType.replace(/^Codi al Word:\s*[^\n]+\n?/i, '').trimStart(),
   }
 }
 
@@ -686,7 +687,6 @@ export function parsePlanningWordHtml(html) {
       const activityTypeLabel = cellText(row, columns.activityType)
       const groupingLines = cellLines(row, columns.grouping)
       const activityDescription = [
-        columns.activityType >= 0 && !/^[—–-]$/.test(numberText) ? `Codi al Word: ${numberText}` : '',
         parsedContent.description,
         columns.activityType >= 0 && groupingLines.length > 1 ? `Finalitat de l’agrupament: ${groupingLines.slice(1).join('\n')}` : '',
       ].filter(Boolean).join('\n')

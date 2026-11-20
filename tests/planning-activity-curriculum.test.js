@@ -4,6 +4,7 @@ import {
   activityCurriculumText,
   buildActivityCurriculumOptions,
   criterionActionVerbs,
+  reconcileActivityCurriculumSelections,
 } from '../src/domain/planning/activityCurriculum.js'
 
 test('agrupa les competències i els criteris repetits de les diferents UT', () => {
@@ -68,4 +69,28 @@ test('genera una còpia llegible de les competències i criteris seleccionats', 
   })
 
   assert.equal(text, 'C1: Modelització\nCA1: Rigor')
+})
+
+test('relaciona els codis de CA importats amb les caselles reals de la classe', () => {
+  const options = buildActivityCurriculumOptions({ classId: 'class-cfn', subjectName: 'Ciències Físiques i de la Natura' })
+  const imported = [{
+    competencyKey: 'competency:c1',
+    label: 'C1',
+    assessmentCriteria: [
+      { criterionKey: 'competency:c1:criterion:ca1-rigor', label: 'CA1 Rigor' },
+      { criterionKey: 'competency:c1:criterion:ca2-precisio', label: 'CA2 Precisió' },
+    ],
+  }]
+  const resolved = reconcileActivityCurriculumSelections(imported, options)
+  assert.equal(resolved[0].competencyKey, options[0].key)
+  assert.deepEqual(resolved[0].assessmentCriteria.map((criterion) => criterion.criterionKey), options[0].criteria.map((criterion) => criterion.key))
+  assert.deepEqual(reconcileActivityCurriculumSelections(resolved, options), resolved)
+})
+
+test('no associa un criteri diferent només perquè comparteixi el número CA', () => {
+  const options = buildActivityCurriculumOptions({ classId: 'class-cfn', subjectName: 'Ciències Físiques i de la Natura' })
+  const imported = [{ competencyKey: 'old', label: 'C1', assessmentCriteria: [{ criterionKey: 'old-ca', label: 'CA1: Un altre criteri' }] }]
+  const resolved = reconcileActivityCurriculumSelections(imported, options)
+  assert.equal(resolved[0].competencyKey, options[0].key)
+  assert.equal(resolved[0].assessmentCriteria[0].criterionKey, 'old-ca')
 })

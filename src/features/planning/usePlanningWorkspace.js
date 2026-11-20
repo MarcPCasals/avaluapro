@@ -41,6 +41,7 @@ import {
 } from '../../domain/planning/classPlanning'
 import { applyImprovementProposals, movePlanningActivityInSequence, movePlanningPhaseInSequence } from '../../domain/planning/rules'
 import { getPlanningActivityProgress } from '../../domain/planning/activityProgress'
+import { reconcileActivityCurriculumSelections } from '../../domain/planning/activityCurriculum'
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 
@@ -616,6 +617,7 @@ export function usePlanningWorkspace(currentUser, activeClassId = '', options = 
       .map((indicator) => [comparableLabel(indicator.label), indicator.id]))
     const importedActivities = bundle.activities.map((source, index) => createPlanningActivity({
       ...source,
+      curriculumSelections: reconcileActivityCurriculumSelections(source.curriculumSelections, classContext.curriculumOptions),
       diversityMeasures: (source.diversityMeasures || []).map((measure) => ({ ...measure, id: null })),
       id: null,
       indicatorIds: (source.indicatorLabels || []).map((label) => indicatorByLabel.get(comparableLabel(label))).filter(Boolean),

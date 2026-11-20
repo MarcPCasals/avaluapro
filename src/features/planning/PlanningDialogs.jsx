@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Clock3, Copy, History, Italic, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { activityTypePresentation, PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
+import { reconcileActivityCurriculumSelections } from '../../domain/planning/activityCurriculum'
 import { inlineFormattingToHtml, stripInlineFormatting } from '../../lib/formattedText'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
@@ -363,7 +364,7 @@ export function ActivityDialog({ activities = [], availableCompetencies = [], cl
   }))
   const [materials, setMaterials] = useState(() => materialDrafts(initialValue))
   const [resourceSelections, setResourceSelections] = useState(() => normalizeActivityResourceSelections(initialValue?.resourceSelections))
-  const [curriculumSelections, setCurriculumSelections] = useState(() => initialValue?.curriculumSelections || [])
+  const [curriculumSelections, setCurriculumSelections] = useState(() => reconcileActivityCurriculumSelections(initialValue?.curriculumSelections, availableCompetencies))
   const [diversityMeasures, setDiversityMeasures] = useState(() => initialValue?.diversityMeasures || [])
   const updateMaterial = (index, field, value) => setMaterials((items) => items.map((item, itemIndex) => (
     itemIndex === index ? { ...item, [field]: value } : item

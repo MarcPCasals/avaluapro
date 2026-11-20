@@ -297,7 +297,7 @@ function TransversalMaterialsDialog({ onClose, onError, onSave, unit }) {
   )
 }
 
-function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange, onSaveResources, resourcesPending }) {
+function UnitEditor({ activities, activityCurriculumOptions = [], canManageUnit = false, curriculumCatalog, loadCompletedActivityIds, manuallyCompletedActivityIds = new Set(), onAcceptImprovements, onAddActivity, onAddChildPhase, onAddPhase, onArchive, onDeleteActivity, onDeletePhase, onDuplicate, onEditActivity, onEditPhase, onError, onMoveActivity, onMovePhase, onOpenDocuments, onOpenHistory, onOpenPreview, onOpenSharing, onReactivate, onSave, onSetActivityManualCompletion, phases, sourceYearLabel, temporalUnit, unit, values, onChange, onSaveResources, resourcesPending }) {
   const [busy, setBusy] = useState(false)
   const [activityProgress, setActivityProgress] = useState({})
   const completedActivityIds = useMemo(() => new Set(Object.entries(activityProgress).filter(([, progress]) => progress.completed).map(([id]) => id)), [activityProgress])
@@ -423,6 +423,7 @@ function UnitEditor({ activities, canManageUnit = false, curriculumCatalog, load
       </details>
       <PlanningActivitySequence
         activities={activities}
+        availableCompetencies={activityCurriculumOptions}
         activityProgress={activityProgress}
         completedActivityIds={allCompletedActivityIds}
         completedActivitiesLoading={completedActivitiesLoading}
@@ -834,6 +835,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
                 )}
                 <UnitEditor
                   activities={workspace.activities}
+                  activityCurriculumOptions={activityCurriculumOptions}
                   loadCompletedActivityIds={workspace.loadCompletedActivityIds}
                   manuallyCompletedActivityIds={workspace.manuallyCompletedActivityIds}
                   curriculumCatalog={curriculumCatalog}
@@ -915,7 +917,7 @@ export default function PlanningModule({ embedded = false, tutorialContext: forc
       {dialog === 'annualCopy' && <AnnualCopyDialog academicYears={workspace.academicYears} loadTemporalUnits={workspace.loadTemporalUnitsForYear} onClose={() => setDialog(null)} onSave={(values) => workspace.duplicateUnitToAcademicYear(values, { classId: activeClassId, classLabel: activeClass?.name })} sourceYearId={workspace.activeAcademicYearId} />}
       {dialog === 'history' && <ActivityHistoryDialog loadStructure={workspace.loadHistoricalUnitStructure} loadUnits={workspace.loadHistoricalUnits} onClose={() => setDialog(null)} onSave={(values) => withConnectedConfirmation(() => workspace.copyHistoricalActivity(values))} phases={workspace.phases} />}
       {dialog === 'sharing' && workspace.activePlanningUnit && <PlanningSharingDialog applications={workspace.applications.filter((application) => application.planningUnitId === workspace.activePlanningUnit.id && application.status !== 'archived')} classes={classes} grants={workspace.accessGrants} onClose={() => setDialog(null)} onRevoke={workspace.revokeAccessGrant} onSave={workspace.saveAccessGrant} unit={workspace.activePlanningUnit} />}
-      {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
+      {dialog === 'documents' && <PlanningDocumentDialog activities={workspace.activities} onClose={() => setDialog(null)} onImportBundle={(bundle, temporalUnitId) => workspace.importPlanningBundle(bundle, temporalUnitId, { classId: activeClassId, classLabel: activeClass?.name, curriculumOptions: activityCurriculumOptions })} onImportTable={workspace.activePlanningUnit ? (rows, phaseId) => withConnectedConfirmation(() => workspace.importPlanningTable(rows, phaseId)) : null} phases={workspace.phases} temporalUnits={workspace.temporalUnits} unit={workspace.activePlanningUnit} />}
       {dialog === 'preview' && workspace.activePlanningUnit && <PlanningPreviewDialog currentApplication={workspace.activeApplication} currentOverrides={workspace.activityOverrides} initialApplicationId={workspace.activeApplication?.id} onShare={workspace.activeRole === 'owner' ? () => setDialog('sharing') : undefined} activities={workspace.baseActivities} loadApplications={workspace.loadApplicationOverview} onClose={() => setDialog(null)} phases={workspace.phases} unit={workspace.activePlanningUnit} />}
       {dialog === 'reminders' && workspace.activePlanningUnit && <PlanningRemindersDialog agendaNotes={agendaNotes} classes={classes} onClose={() => setDialog(null)} onUpdate={updateAgendaNote} unit={workspace.activePlanningUnit} />}
       {connectedDecision && <ConnectedChangeDialog activeClassName={activeClass?.name || 'aquesta classe'} onChoose={resolveConnectedDecision} otherClassNames={otherConnectedClassLabels} supportsCurrentClass={connectedDecision.supportsCurrentClass} />}
