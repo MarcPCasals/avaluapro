@@ -5,7 +5,7 @@ import { planningSubjectsMatch } from '../../domain/planning/subjects.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays, CalendarPlus, Check, Clock3, Cloud, CloudOff,
-  Copy, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw,
+  Copy, LayoutGrid, ListChecks, Loader2, Menu, Pencil, Plus, RotateCcw, CalendarClock,
   Palette, Trash2,
 } from 'lucide-react'
 import {
@@ -40,6 +40,7 @@ import {
 } from './AgendaDialogs'
 import { useAgendaWorkspace } from './useAgendaWorkspace'
 import { AgendaSessionNotesDialog } from './AgendaSessionNotesDialog'
+import { PlannedAbsencesView } from './PlannedAbsencesView'
 import { AgendaSchedulingDialog } from './AgendaSchedulingDialog'
 import {
   AgendaMonthView,
@@ -66,6 +67,7 @@ const AGENDA_VIEW_HELP = {
   week: 'Reuneix en una graella les classes de l’horari, les sessions programades, els recordatoris i les excepcions del calendari.',
   timeline: 'Ordena cronològicament totes les sessions del grup i permet consultar o reajustar què s’ha fet i què queda previst.',
   timetable: 'Defineix les franges habituals de cada grup i conserva versions de l’horari perquè els canvis no reescriguin el passat.',
+  absences: 'Apunta absències futures dels alumnes del grup seleccionat, consulta les sessions que es perdran i prepara un correu editable amb les activitats i els materials.',
 }
 
 const GRID_START = 7 * 60 + 30
@@ -407,6 +409,7 @@ export default function AgendaModule() {
   const user = useAvaluaproStore((state) => state.cloud.user)
   const classes = useAvaluaproStore((state) => state.classes)
   const students = useAvaluaproStore((state) => state.students)
+  const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const semesters = useAvaluaproStore((state) => state.semesters)
   const uts = useAvaluaproStore((state) => state.uts)
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
@@ -506,7 +509,12 @@ export default function AgendaModule() {
       ...tutoringCalendarReminders,
     ], workspace.today, 3)
   }, [reminderSummary.items, tutoringCalendarReminders, workspace.today])
-  const [view, setView] = useState('today')
+  const [view, setView] = useState(() => {
+    const key = 'avaluapro:open-planned-absences'
+    const requested = globalThis.sessionStorage?.getItem(key) === '1'
+    if (requested) globalThis.sessionStorage.removeItem(key)
+    return requested ? 'absences' : 'today'
+  })
   const [weekStart, setWeekStart] = useState(() => getAgendaDefaultWeekStart(workspace.today))
   const [calendarMode, setCalendarMode] = useState('week')
   const [monthKey, setMonthKey] = useState(() => firstDayOfMonth(workspace.today))
@@ -1094,6 +1102,7 @@ export default function AgendaModule() {
         <ContextualTab className={view === 'today' ? 'active' : ''} help={AGENDA_VIEW_HELP.today} helpTitle="Avui" onClick={openToday} type="button"><CalendarDays size={17} />Avui</ContextualTab>
         <ContextualTab className={view === 'week' ? 'active' : ''} help={AGENDA_VIEW_HELP.week} helpTitle="Calendari" onClick={openCalendar} type="button"><Clock3 size={17} />Calendari</ContextualTab>
         <ContextualTab className={view === 'timeline' ? 'active' : ''} help={AGENDA_VIEW_HELP.timeline} helpTitle="Cronologia" onClick={openTimeline} type="button"><ListChecks size={17} />Cronologia</ContextualTab>
+        <ContextualTab className={view === 'absences' ? 'active' : ''} help={AGENDA_VIEW_HELP.absences} helpTitle="Absències previstes" onClick={() => setView('absences')} type="button"><CalendarClock size={17} />Absències previstes</ContextualTab>
         <ContextualTab className={view === 'timetable' ? 'active' : ''} help={AGENDA_VIEW_HELP.timetable} helpTitle="Horari" onClick={() => { setView('timetable'); if (!hasOwnCalendar) setDialog('academic-year') }} type="button"><LayoutGrid size={17} />Horari</ContextualTab>
       </nav>
 
@@ -1127,6 +1136,7 @@ export default function AgendaModule() {
           {view === 'week' && calendarMode === 'week' && <AgendaWeekView activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} coordinationReminders={tutoringCalendarReminders} loading={workspace.sessionsLoading} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onMoveWeek={moveWeek} onOpenCoordination={openCoordinationReminder} onOpenReminders={openReminders} onOpenSession={openSession} onOpenTimetableClassroom={openTimetableClassroom} onReload={reloadCurrentWeek} onShowMonth={openMonth} personalReminders={personalCalendarReminders} slots={workspace.slots} temporalUnitProgress={temporalUnitProgress} temporalUnits={workspace.temporalUnits} timetable={workspace.activeTimetable} weekStart={weekStart} />}
           {view === 'week' && calendarMode === 'month' && <AgendaMonthView academicYear={workspace.activeAcademicYear} activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} coordinationReminders={tutoringCalendarReminders} monthKey={monthKey} onAddEvent={hasOwnCalendar ? openCalendarEvent : null} onDeleteEvent={removeEvent} onEditEvent={openCalendarEvent} onMoveMonth={moveMonth} onOpenReminders={openReminders} onSelectWeek={selectCalendarWeek} onShowWeek={() => selectCalendarWeek(startOfWeek(monthKey))} personalReminders={personalCalendarReminders} slots={workspace.slots} temporalUnitProgress={temporalUnitProgress} temporalUnits={workspace.temporalUnits} timetable={workspace.activeTimetable} today={workspace.today} />}
           {view === 'timeline' && <AgendaTimelineView cleanup={timelineCleanup.classId === activeClassId && dismissedCleanupKey !== timelineCleanup.key ? timelineCleanup : null} onCleanTimeline={cleanTimelineForTemporalUnit} onDismissCleanup={() => setDismissedCleanupKey(timelineCleanup.key)} onRefreshContent={workspace.refreshTimelineContent} sessionPrivateNotes={workspace.sessionPrivateNotes} onLoadNotes={loadTimelineNotes} onOpenNotes={openSessionNotes} notesLoadingId={notesLoadingId} timetable={workspace.activeTimetable} timetables={workspace.timetables} range={timelineRange} onOpenTimetableClassroom={openTimetableClassroom} activeTemporalUnit={activeTemporalUnit} bundles={workspace.sessionBundles} calendarEvents={workspace.calendarEvents} classes={agendaClasses} hasEarlier={Boolean(timelineRange && timelineRange.from > (academicYearStartsOn || addDateDays(agendaToday, -180)))} hasLater={Boolean(timelineRange && timelineRange.to < (academicYearEndsOn || addDateDays(agendaToday, 365)))} loading={workspace.sessionsLoading} onLoadEarlier={loadEarlierTimeline} onLoadLater={loadLaterTimeline} onOpenSession={openSession} onSchedule={hasOwnCalendar ? openTimelineScheduling : null} selectedClassId={activeClassId} slots={workspace.slots} slotsByTimetableId={workspace.slotsByTimetableId} today={workspace.today} unscheduledActivities={timelineUnscheduled.activities} unscheduledHasApplications={timelineUnscheduled.hasApplications} unscheduledLoading={timelineUnscheduled.loading} />}
+          {view === 'absences' && <PlannedAbsencesView key={activeClassId} classItem={classes.find((item) => item.id === activeClassId)} students={students} calendarEvents={workspace.calendarEvents} loadSessionRange={loadSessionRange} slotsByTimetableId={workspace.slotsByTimetableId} timetables={workspace.timetables} updateStudent={updateStudent} today={agendaToday} />}
           {view === 'timetable' && !hasOwnCalendar && <section className="agenda-large-empty"><span><LayoutGrid size={29} /></span><h2>Configura el curs abans de crear l’horari</h2><p>Només cal indicar les dates del curs actual. En acabar, crearàs la primera versió de l’horari aquí mateix.</p><button className="primary-action" onClick={() => setDialog('academic-year')} type="button"><CalendarPlus size={17} />Configurar curs</button></section>}
           {view === 'timetable' && hasOwnCalendar && <TimetableView classes={classes} onAdd={(position) => openSlot(null, position)} onAddClass={addClass} onCreateVersion={() => { setEditingTimetable(null); setDialog('timetable') }} onDelete={removeSlot} onEdit={(slot) => openSlot(slot)} onEditTemporalUnit={(unit) => { setEditingTemporalUnit(unit); setDialog('temporal-unit') }} onEditVersion={() => { setEditingTimetable(workspace.activeTimetable); setDialog('timetable') }} onError={(error) => workspace.setError(error.message || 'No s’ha pogut actualitzar l’horari.')} onMove={workspace.moveSlot} onQuickAdd={(values) => workspace.saveSlot(values)} onResize={(slot, durationMinutes) => workspace.saveSlot({ durationMinutes }, slot)} onSelectVersion={workspace.setActiveTimetableId} onUpdateClass={updateClass} slots={workspace.slots} temporalUnit={activeTemporalUnit} timetable={workspace.activeTimetable} timetables={workspace.timetables} today={workspace.today} />}
         </main>

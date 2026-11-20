@@ -3,6 +3,7 @@ import { EditHistoryFixture } from './src/EditHistoryFixture.jsx'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PlanningDirectionFixture } from './src/PlanningDirectionFixture.jsx'
+import { PlannedAbsencesFixture } from './src/PlannedAbsencesFixture.jsx'
 import AssistanceApp from './src/AssistanceApp.jsx'
 import './src/assistance.css'
 import { installAssistanceRuntimeBoundary } from './src/secureRuntime.js'
@@ -11,6 +12,6 @@ installAssistanceRuntimeBoundary()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {new URLSearchParams(window.location.search).has('agenda-content-refresh-demo') ? <AgendaContentRefreshFixture /> : new URLSearchParams(window.location.search).has('edit-history-demo') ? <EditHistoryFixture /> : new URLSearchParams(window.location.search).has('planning-direction-demo') ? <PlanningDirectionFixture /> : <AssistanceApp />}
+    {new URLSearchParams(window.location.search).has('planned-absences-demo') ? <PlannedAbsencesFixture /> : new URLSearchParams(window.location.search).has('agenda-content-refresh-demo') ? <AgendaContentRefreshFixture /> : new URLSearchParams(window.location.search).has('edit-history-demo') ? <EditHistoryFixture /> : new URLSearchParams(window.location.search).has('planning-direction-demo') ? <PlanningDirectionFixture /> : <AssistanceApp />}
   </StrictMode>,
 )

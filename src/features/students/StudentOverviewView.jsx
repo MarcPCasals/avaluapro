@@ -1,6 +1,7 @@
 import { useSearchNavigation } from '../search/useSearchNavigation'
 import {
   CheckCircle2,
+  CalendarClock,
   ClipboardList,
   FileSpreadsheet,
   Filter,
@@ -285,6 +286,7 @@ export function StudentOverviewView() {
   const agendaNotes = useAvaluaproStore((state) => state.agendaNotes)
   const tutorialRecords = useAvaluaproStore((state) => state.tutorialRecords)
   const updateStudent = useAvaluaproStore((state) => state.updateStudent)
+  const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const [sharing, setSharing] = useState(false)
   const [search, setSearch] = useState('')
   const [onlyAttention, setOnlyAttention] = useState(false)
@@ -431,6 +433,7 @@ export function StudentOverviewView() {
           />
         </label>
         <div className="student-overview-toolbar-actions">
+          <button type="button" disabled={!activeClass} onClick={() => { globalThis.sessionStorage?.setItem('avaluapro:open-planned-absences', '1'); setActiveMode('agenda') }}><CalendarClock size={17} /> Absències previstes</button>
           <button type="button" disabled={!activeClass || allRows.length === 0} onClick={() => setSharing(true)}><Share2 size={17} /> Compartir consulta amb direcció</button>
           <button
             className="student-overview-excel-button"

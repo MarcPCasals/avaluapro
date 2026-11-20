@@ -46,6 +46,30 @@
 .agenda-view-tabs > .contextual-tab > button:first-child.active { border-bottom-color: #f97316; color: #c2410c; }
 .agenda-view-tabs > .contextual-tab > button:first-child:disabled { opacity: .42; }
 .agenda-main { padding: 18px 22px 28px; }
+.planned-absences-view { display: grid; gap: 18px; }
+.planned-absences-view > header span { display: inline-flex; align-items: center; gap: 6px; color: #c2410c; font-size: 12px; font-weight: 850; }
+.planned-absences-view h2 { margin: 4px 0; color: #172033; font-size: 22px; }
+.planned-absences-view h3 { margin: 0 0 12px; color: #243044; font-size: 15px; }
+.planned-absences-view p { margin: 4px 0; color: #64748b; font-size: 12px; line-height: 1.5; }
+.planned-absence-form { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; }
+.planned-absence-form label, .planned-absence-draft { display: grid; gap: 5px; color: #334155; font-size: 11px; font-weight: 800; }
+.planned-absence-form select, .planned-absence-form input, .planned-absence-draft textarea { min-height: 36px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; color: #172033; background: #fff; font: inherit; }
+.planned-absence-form select { min-width: 190px; }
+.planned-absence-layout { display: grid; grid-template-columns: minmax(220px, .34fr) minmax(0, .66fr); gap: 14px; }
+.planned-absence-list, .planned-absence-detail { min-width: 0; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
+.planned-absence-list article { display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 9px; margin: 8px 0; }
+.planned-absence-list article.selected { border-color: #fb923c; background: #fff7ed; }
+.planned-absence-list article > button:first-child { flex: 1; display: grid; gap: 3px; border: 0; padding: 10px; text-align: left; background: transparent; cursor: pointer; }
+.planned-absence-list article span, .planned-absence-list article small { color: #64748b; font-size: 11px; }
+.planned-absence-delete { border: 0; padding: 10px; color: #b91c1c; background: transparent; cursor: pointer; }
+.planned-absence-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.planned-absence-detail ul { padding-left: 20px; color: #334155; font-size: 12px; line-height: 1.6; }
+.planned-absence-draft { margin: 12px 0; }
+.planned-absence-draft textarea { width: 100%; min-height: 260px; resize: vertical; font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.5; }
+.planned-absence-error, .planned-absence-notice { border-radius: 8px; padding: 9px 12px; }
+.planned-absence-error { background: #fef2f2; color: #991b1b !important; }
+.planned-absence-notice { background: #f0fdf4; color: #166534 !important; }
+@media (max-width: 760px) { .planned-absence-layout { grid-template-columns: 1fr; } }
 .agenda-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 22px 0; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; color: #991b1b; background: #fff1f2; font-size: 12px; font-weight: 800; }
 .agenda-error button { border: 0; color: inherit; background: transparent; font-weight: 900; }
 .agenda-sync-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 22px 0; border: 1px solid #fed7aa; border-radius: 10px; padding: 10px 12px; color: #9a3412; background: #fff7ed; font-size: 12px; font-weight: 800; }
