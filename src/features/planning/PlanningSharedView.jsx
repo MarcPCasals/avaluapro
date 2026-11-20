@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FormattedText } from '../../components/FormattedText'
+import { activityTypePresentation } from '../../domain/planning/documents'
 import { orderPlanningPhases } from '../../domain/planning/phaseSequence'
 import { buildDirectionActivityReports, selectDirectionApplication } from '../../domain/planning/directionView'
 import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
@@ -88,11 +89,12 @@ function OccurrenceList({ occurrences }) {
 }
 
 function SharedActivity({ activity, report, unit, sequenceNumber, sessionDuration = 60 }) {
+  const typePresentation = activityTypePresentation(activity)
   return <article className="planning-direction-activity">
     <div className="planning-direction-activity-content">
-      <div className="planning-direction-activity-heading"><span>{activityKindLabel(activity.type)}</span>{report?.modified && <span className="planning-direction-modified">Activitat modificada</span>}</div>
+      <div className="planning-direction-activity-heading"><span>{activityKindLabel(activity.type)}</span><span>{typePresentation.label}</span>{report?.modified && <span className="planning-direction-modified">Activitat modificada</span>}</div>
       <strong>{sequenceNumber && <span className="planning-sequence-code">A{sequenceNumber}</span>}{activity.title}</strong>
-      {activity.description && <FormattedText as="p" text={activity.description} />}
+      {typePresentation.description && <FormattedText as="p" text={typePresentation.description} />}
       <MaterialLinks activity={activity} unit={unit} />
     </div>
     <aside className="planning-direction-meta">

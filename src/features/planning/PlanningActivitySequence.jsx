@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { ContextualHelp } from '../../components/ContextualHelp'
 import { FormattedText } from '../../components/FormattedText'
+import { activityTypePresentation } from '../../domain/planning/documents'
 import { getEffectiveActivityMaterialLinks } from '../../domain/planning/materials'
 import { openExternalLinks } from '../../lib/openExternalLinks'
 import {
@@ -25,6 +26,7 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [blockedLinks, setBlockedLinks] = useState([])
   const TypeIcon = TYPE_DETAILS[activity.type]?.icon || BookOpenText
+  const typePresentation = activityTypePresentation(activity)
   const links = getEffectiveActivityMaterialLinks(activity, planningUnit)
   const materialCount = (activity.teacherMaterials?.length || 0)
     + (activity.studentMaterials?.length || 0)
@@ -32,6 +34,10 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
   const resources = normalizeActivityResourceSelections(activity.resourceSelections)
   const competencyCount = activity.curriculumSelections?.length || 0
   const criterionCount = (activity.curriculumSelections || []).reduce((total, selection) => total + (selection.assessmentCriteria?.length || 0), 0)
+  const curriculumCodes = (activity.curriculumSelections || []).flatMap((selection) => (selection.assessmentCriteria || []).map((criterion) => ({
+    label: `${/^C\d+\b/i.exec(selection.label)?.[0] || selection.label} ${/^CA\d+\b/i.exec(criterion.label)?.[0] || criterion.label}`,
+    title: `${selection.label} · ${criterion.label}`,
+  })))
   const load = activity.plannedMinutes ? getSessionLoad([activity], sessionDuration) : null
   return (
     <article
@@ -79,8 +85,8 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
       <span className={`planning-activity-type ${activity.type || 'activity'}`} title={TYPE_DETAILS[activity.type]?.label || 'Activitat'}><TypeIcon size={16} /></span>
       <div className="planning-activity-text">
         <button className="planning-activity-content" onClick={() => onEdit(activity)} type="button">
-          <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}</strong>
-          {activity.description && <FormattedText as="span" text={activity.description} />}
+          <strong><span className="planning-sequence-code">A{sequenceNumber}</span>{activity.title}<span className="planning-pedagogical-label">{typePresentation.label}</span></strong>
+          {typePresentation.description && <FormattedText as="span" text={typePresentation.description} />}
           <small>
             {activity.grouping && <span>{activity.grouping}</span>}
             {activity.space && <span>{activity.space}</span>}
@@ -93,8 +99,9 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
             {activity.groupOverride && <span className="planning-group-override-mark">Adaptada a aquest grup</span>}
             {activity.copiedFrom && <span className="planning-source-mark" title="Activitat recuperada d’una programació anterior"><History size={11} />Recuperada</span>}
           </small>
+          {curriculumCodes.length > 0 && <span className="planning-activity-ca-list">{curriculumCodes.map((code, index) => <span className="planning-activity-ca" key={`${code.label}-${index}`} title={code.title}>{code.label}</span>)}</span>}
         </button>
-        {activity.description && (
+        {typePresentation.description && (
           <button
             aria-controls={`planning-description-${activity.id}`}
             aria-expanded={descriptionExpanded}
@@ -145,12 +152,12 @@ function ActivityRow({ activity, progress, completionBusy, dragId, isCompleted, 
         <button aria-label={`Eliminar ${activity.title}`} className="icon-action danger" onClick={() => onDelete(activity)} type="button"><Trash2 size={15} /></button>
       </div>
       {resources.length > 0 && <details className="planning-activity-resources"><summary>Recursos vinculats ({resources.length})</summary><ul>{resources.map((resource, index) => <li key={index}>{resource.text}</li>)}</ul></details>}
-      {descriptionExpanded && (
+      {descriptionExpanded && typePresentation.description && (
         <FormattedText
           as="div"
           className="planning-activity-description-expanded"
           id={`planning-description-${activity.id}`}
-          text={activity.description}
+          text={typePresentation.description}
         />
       )}
       {blockedLinks.length > 0 && (

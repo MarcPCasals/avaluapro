@@ -53,6 +53,15 @@ export const PEDAGOGICAL_TYPE_LABELS = Object.freeze({
   workPlan: 'Pla de treball',
 })
 
+export function activityTypePresentation(activity = {}) {
+  const description = String(activity.description || '')
+  const legacy = /^Tipologia original:\s*([^\n]+)\n?/i.exec(description)
+  return {
+    label: text(activity.activityTypeLabel) || text(legacy?.[1]) || PEDAGOGICAL_TYPE_LABELS[activity.pedagogicalType] || 'Altres',
+    description: legacy ? description.slice(legacy[0].length).trimStart() : description,
+  }
+}
+
 const PHASE_LABELS = Object.freeze({
   closing: 'Tancament',
   custom: 'Altres',
@@ -185,6 +194,7 @@ export function buildPlanningDocumentExport({ activities = [], phases = [], unit
     })),
     activities: activities.map((activity, index) => ({
       applicationComment: text(activity.applicationComment),
+      activityTypeLabel: text(activity.activityTypeLabel),
       curriculumSelections: clone(activity.curriculumSelections || []),
       resourceSelections: clone(activity.resourceSelections || []),
       description: text(activity.description),
@@ -545,15 +555,30 @@ function parseActivityCurriculumCodes(lines, curriculum) {
   return selections
 }
 
-function materialFromText(label) {
+function materialFromText(label, url = null) {
   return {
     id: null,
-    kind: 'physical',
+    kind: url ? 'link' : 'physical',
     label,
     preparationKind: 'reference',
     reminderDaysBefore: 0,
-    url: null,
+    url,
   }
+}
+
+function materialsFromHtmlCell(cell) {
+  if (!cell) return []
+  return cell.html
+    .split(/\s+·\s+|<\/p>|<br\s*\/?\s*>/i)
+    .map((part) => {
+      const label = htmlToLines(part).join(' ')
+      const href = /<a\b[^>]*\bhref=["']([^"']+)["']/i.exec(part)?.[1]
+      const url = href ? decodeHtml(href) : null
+      return label && !/^[—–-]$/.test(label)
+        ? materialFromText(label, /^https?:\/\//i.test(url || '') ? url : null)
+        : null
+    })
+    .filter(Boolean)
 }
 
 /**
@@ -617,7 +642,7 @@ export function parsePlanningWordHtml(html) {
       if (!columns) return
       const numberText = cellText(row, columns.number)
       const hasActivityCode = /^\d+\s*[.)-]?$/.test(numberText)
-        || (columns.activityType >= 0 && /^(?:A\d+|[—–-]$)/i.test(numberText))
+        || (columns.activityType >= 0 && Boolean(numberText) && Boolean(cellText(row, columns.activity)))
       if (!hasActivityCode) return
       const subphase = currentSessionLabel || cellText(row, columns.subphase)
       const rootKey = currentRootKey || ensureRootPhase(currentKind, PHASE_LABELS[currentKind])
@@ -661,13 +686,13 @@ export function parsePlanningWordHtml(html) {
       const activityTypeLabel = cellText(row, columns.activityType)
       const groupingLines = cellLines(row, columns.grouping)
       const activityDescription = [
-        activityTypeLabel ? `Tipologia original: ${activityTypeLabel}` : '',
         columns.activityType >= 0 && !/^[—–-]$/.test(numberText) ? `Codi al Word: ${numberText}` : '',
         parsedContent.description,
         columns.activityType >= 0 && groupingLines.length > 1 ? `Finalitat de l’agrupament: ${groupingLines.slice(1).join('\n')}` : '',
       ].filter(Boolean).join('\n')
       activities.push({
         ...parsedContent,
+        activityTypeLabel,
         curriculumSelections: hasActivityCurriculum
           ? parseActivityCurriculum(curriculumLines, parsedCurriculum)
           : parseActivityCurriculumCodes(criteriaCodeLines, parsedCurriculum),
@@ -682,7 +707,7 @@ export function parsePlanningWordHtml(html) {
         plannedMinutes: parseMinutes(cellText(row, columns.minutes)),
         space: cellText(row, columns.space),
         studentMaterials: [],
-        teacherMaterials: textList(cellLines(row, columns.materials)).filter((label) => !/^[—–-]$/.test(label)).map(materialFromText),
+        teacherMaterials: materialsFromHtmlCell(row[columns.materials]),
         type: 'activity',
       })
     })

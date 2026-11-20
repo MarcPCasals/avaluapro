@@ -344,6 +344,7 @@ export function createPlanningActivity(input, options = {}) {
     phaseId: requiredText(input.phaseId, 'fase'),
     type: enumValue(input.type || 'activity', SESSION_ITEM_TYPES, "tipus d'element"),
     title: requiredText(input.title, "títol de l'activitat"),
+    ...(input.activityTypeLabel ? { activityTypeLabel: optionalText(input.activityTypeLabel) } : {}),
     description: optionalText(input.description),
     order: normalizedOrder(input.order),
     plannedMinutes: optionalMinutes(input.plannedMinutes, 'temps previst'),

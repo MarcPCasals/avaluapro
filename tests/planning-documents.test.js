@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  activityTypePresentation,
   buildPlanningDocumentExport,
   inferPedagogicalType,
   normalizeResourceSections,
@@ -202,7 +203,8 @@ test('the 2026 UP layout keeps sessions, criterion actions and activity links di
     <table>
       <tr><td colspan="7">FASE DE RESOLUCIÓ · SESSIÓ 02</td></tr>
       <tr><td>Núm.</td><td>Tipologia d’activitat</td><td>Descriptiu de l’activitat</td><td>Min.</td><td>Material</td><td>Agrupament i finalitat</td><td>CA</td></tr>
-      <tr><td>A02</td><td>Modelització C1</td><td>Construir un model</td><td>55</td><td>Quadern</td><td>Individual</td><td><p>C1 CA1</p><p>C3 CA1</p></td></tr>
+      <tr><td>A02</td><td>Modelització C1</td><td>Construir un model</td><td>55</td><td><p><a href="https://example.org/model?part=1&amp;view=2">Model</a> · Quadern</p></td><td>Individual</td><td><p>C1 CA1</p><p>C3 CA1</p></td></tr>
+      <tr><td>B01</td><td>Pràctica guiada</td><td>Practicar el model</td><td>10</td><td>—</td><td>Parelles</td><td>C1 CA1</td></tr>
     </table>`
   const parsed = parsePlanningWordHtml(html)
   assert.equal(parsed.unit.expectedProduct, 'Quatre peces revisades')
@@ -216,8 +218,10 @@ test('the 2026 UP layout keeps sessions, criterion actions and activity links di
   assert.equal(savedUnit.curriculum.assessmentCriteria[0].actions, 'Treballades\nC1R1 lèxic')
   assert.deepEqual(parsed.unit.curriculum.indicators, [])
   assert.deepEqual(parsed.phases.filter((phase) => phase.parentKey).map((phase) => phase.title), ['Sessió 1', 'Sessió 2'])
-  assert.deepEqual(parsed.activities.map((activity) => activity.plannedMinutes), [40, 15, 55])
+  assert.deepEqual(parsed.activities.map((activity) => activity.plannedMinutes), [40, 15, 55, 10])
   assert.equal(parsed.activities[0].pedagogicalType, 'exploration')
+  assert.equal(parsed.activities[0].activityTypeLabel, 'Exploració')
+  assert.doesNotMatch(parsed.activities[0].description, /Tipologia original/)
   assert.equal(parsed.activities[0].diversityMeasures[0].label, 'Suport visual')
   assert.equal(parsed.activities[0].grouping, 'Individual')
   assert.match(parsed.activities[0].description, /Codi al Word: A01.*Finalitat de l’agrupament: Pregunta personal/s)
@@ -226,6 +230,13 @@ test('the 2026 UP layout keeps sessions, criterion actions and activity links di
     selection.label,
     selection.assessmentCriteria[0].label,
   ]), [['C1', 'CA1 Rigor'], ['C3', 'CA1 Sentit crític']])
+  assert.deepEqual(parsed.activities[2].teacherMaterials.map((material) => [material.label, material.kind, material.url]), [
+    ['Model', 'link', 'https://example.org/model?part=1&view=2'],
+    ['Quadern', 'physical', null],
+  ])
+  assert.equal(parsed.activities[3].curriculumSelections[0].assessmentCriteria[0].label, 'CA1 Rigor')
+  assert.equal(activityTypePresentation({ description: 'Tipologia original: Teorització docent\nCodi al Word: A4', pedagogicalType: 'theorization' }).label, 'Teorització docent')
+  assert.equal(activityTypePresentation({ description: 'Tipologia original: Teorització docent\nCodi al Word: A4', pedagogicalType: 'theorization' }).description, 'Codi al Word: A4')
 })
 
 test('older SG Word variants keep merged curriculum cells and every phase table', () => {

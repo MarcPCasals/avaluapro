@@ -4,7 +4,7 @@ import {
   buildPlanningDocumentExport,
   getPlanningDocumentFilename,
   normalizeResourceSections,
-  PEDAGOGICAL_TYPE_LABELS,
+  activityTypePresentation,
 } from '../../domain/planning/documents'
 import { downloadBlob, downloadJson } from '../../lib/downloads'
 import { FormattedText } from '../../components/FormattedText'
@@ -105,11 +105,11 @@ function SequenceDocument({ activities, phases, unit }) {
                   <td>
                     <div className="planning-document-icon-slot" title="Espai reservat per a la imatge pedagògica original"><Image size={14} /><span>Imatge pendent</span></div>
                     <strong>{phase?.parentPhaseId ? phase.title : '—'}</strong>
-                    <small>{PEDAGOGICAL_TYPE_LABELS[activity.pedagogicalType] || 'Altres'}</small>
+                    <small>{activityTypePresentation(activity).label}</small>
                   </td>
                   <td className="activity-copy">
                     <strong>{activity.title}</strong>
-                    {activity.description && <FormattedText as="p" text={activity.description} />}
+                    {activityTypePresentation(activity).description && <FormattedText as="p" text={activityTypePresentation(activity).description} />}
                     <div><b>Atenció a la diversitat</b><span>{diversityText(activity) || '—'}</span></div>
                     <div><b>Comentaris per a l’aplicació</b><span>{activity.applicationComment || '—'}</span></div>
                   </td>

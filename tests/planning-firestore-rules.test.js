@@ -963,6 +963,20 @@ describe('Planificació compartida', () => {
     await assertSucceeds(updateDoc(doc(upRef(authDb(EDITOR)), 'activities', 'plan-activity-one'), { resourceSelections, updatedAt: NOW }))
   })
 
+  test('la tipologia original i els materials enllaçats del Word es poden sincronitzar', async () => {
+    const reference = doc(upRef(authDb(OWNER)), 'activities', 'plan-activity-one')
+    const imported = activityData({
+      activityTypeLabel: 'Teorització docent',
+      curriculumSelections: [{ competencyKey: 'competency-c1', label: 'C1', assessmentCriteria: [{ criterionKey: 'criterion-ca1', label: 'CA1 Rigor' }] }],
+      teacherMaterials: [{ id: null, kind: 'link', label: 'Carnet', preparationKind: 'reference', reminderDaysBefore: 0, teacherUrl: '', url: 'https://example.org/carnet' }],
+    })
+    await assertSucceeds(setDoc(reference, imported))
+    const saved = (await getDoc(reference)).data()
+    assert.equal(saved.activityTypeLabel, 'Teorització docent')
+    assert.equal(saved.teacherMaterials[0].url, 'https://example.org/carnet')
+    assert.equal(saved.curriculumSelections[0].assessmentCriteria[0].label, 'CA1 Rigor')
+  })
+
   test('els camps inesperats i els canvis d’identitat es rebutgen', async () => {
     const ownerDb = authDb(OWNER)
     await assertFails(setDoc(

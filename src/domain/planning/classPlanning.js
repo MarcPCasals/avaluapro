@@ -37,6 +37,7 @@ export function getConnectablePlanningUnits(planningUnits = [], applications = [
 
 const ACTIVITY_OVERRIDE_FIELDS = Object.freeze([
   'applicationComment',
+  'activityTypeLabel',
   'description',
   'curriculumSelections',
   'resourceSelections',

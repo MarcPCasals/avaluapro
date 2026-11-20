@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { CircleHelp, ClipboardPaste, Download, FileJson, FileText, Import, Loader2, Upload } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { ContextualTab } from '../../components/ContextualHelp'
-import { parsePlanningDocumentExport, parsePlanningTableText } from '../../domain/planning/documents'
+import { activityTypePresentation, parsePlanningDocumentExport, parsePlanningTableText } from '../../domain/planning/documents'
 import { downloadBlob } from '../../lib/downloads'
 import { moveHorizontalTabFocus } from '../../lib/tabs'
 import { PlanningDocumentView } from './PlanningDocumentView'
@@ -23,6 +23,7 @@ function ImportPreview({ bundle }) {
         <div><dt>Activitats</dt><dd>{bundle.activities.length}</dd></div>
         <div><dt>Temps detectat</dt><dd>{totalMinutes} min</dd></div>
         <div><dt>Materials</dt><dd>{bundle.importSummary?.materialCount ?? 0}</dd></div>
+        <div><dt>Enllaços de materials</dt><dd>{bundle.activities.flatMap((activity) => [...(activity.teacherMaterials || []), ...(activity.studentMaterials || [])]).filter((material) => material.kind === 'link' && material.url).length}</dd></div>
         <div><dt>Activitats amb CA</dt><dd>{bundle.activities.filter((activity) => activity.curriculumSelections?.length).length}</dd></div>
         <div><dt>Mesures de diversitat</dt><dd>{bundle.activities.filter((activity) => activity.diversityMeasures?.length).length}</dd></div>
       </dl>
@@ -33,7 +34,7 @@ function ImportPreview({ bundle }) {
           {bundle.activities.map((activity, index) => (
             <li key={`${activity.phaseKey}:${activity.order}:${index}`}>
               <span>{index + 1}</span>
-              <div><strong>{activity.title}</strong><small>{[phaseByKey.get(activity.phaseKey)?.title, activity.plannedMinutes != null ? `${activity.plannedMinutes} min` : 'Sense temps', `${(activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)} materials`].filter(Boolean).join(' · ')}</small></div>
+              <div><strong>{activity.title}</strong><small>{[phaseByKey.get(activity.phaseKey)?.title, activityTypePresentation(activity).label, activity.plannedMinutes != null ? `${activity.plannedMinutes} min` : 'Sense temps', `${(activity.teacherMaterials?.length || 0) + (activity.studentMaterials?.length || 0)} materials`, `${(activity.curriculumSelections || []).reduce((count, selection) => count + (selection.assessmentCriteria?.length || 0), 0)} CA`].filter(Boolean).join(' · ')}</small></div>
             </li>
           ))}
         </ol>

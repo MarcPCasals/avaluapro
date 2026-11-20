@@ -3,7 +3,7 @@ import { normalizeActivityResourceSelections } from '../../domain/planning/resou
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Clock3, Copy, History, Italic, Link2, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { Modal } from '../../components/Modal'
-import { PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
+import { activityTypePresentation, PEDAGOGICAL_TYPE_LABELS } from '../../domain/planning/documents'
 import { inlineFormattingToHtml, stripInlineFormatting } from '../../lib/formattedText'
 import { PlanningDiversityEditor } from './PlanningDiversityEditor'
 
@@ -349,7 +349,8 @@ function ActivityCurriculumPicker({ competencies, onChange, selections }) {
 
 export function ActivityDialog({ activities = [], availableCompetencies = [], classes = [], initialPhaseId = '', initialValue, onClose, onSave, phases, planningUnit, students = [] }) {
   const [values, setValues] = useState(() => ({
-    description: initialValue?.description || '',
+    activityTypeLabel: initialValue?.activityTypeLabel || (/^Tipologia original:\s*([^\n]+)/i.exec(initialValue?.description || '')?.[1] || ''),
+    description: activityTypePresentation(initialValue).description,
     evidenceMode: initialValue?.evidenceMode || 'none',
     grouping: initialValue?.grouping || '',
     hasTiming: initialValue?.plannedMinutes !== null && initialValue?.plannedMinutes !== undefined,
@@ -433,6 +434,7 @@ export function ActivityDialog({ activities = [], availableCompetencies = [], cl
           {Object.entries(PEDAGOGICAL_TYPE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select><small className="planning-field-help">Aquest tipus reservarà la icona oficial corresponent quan ens facilitis les imatges originals.</small></label>
       )}
+      {values.type === 'activity' && <label>Etiqueta de tipologia<input maxLength="160" placeholder="Ex.: Teorització docent" value={values.activityTypeLabel} onChange={(event) => setValues({ ...values, activityTypeLabel: event.target.value })} /></label>}
       <label>Títol<input autoFocus required value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></label>
       <label>Descripció<FormattedTextarea value={values.description} onChange={(description) => setValues({ ...values, description })} /></label>
       <div className="planning-timing-fields">

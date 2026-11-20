@@ -16,9 +16,9 @@ import {
   WidthType,
 } from 'docx'
 import {
+  activityTypePresentation,
   normalizeResourceSections,
   parsePlanningWordHtml,
-  PEDAGOGICAL_TYPE_LABELS,
 } from '../../domain/planning/documents'
 import { stripInlineFormatting } from '../../lib/formattedText'
 import { activityCurriculumText } from '../../domain/planning/activityCurriculum'
@@ -184,8 +184,9 @@ function diversityText(measures = []) {
 }
 
 function activityDescription(activity) {
+  const description = activityTypePresentation(activity).description
   return [
-    activity.description ? `Activitat\n${stripInlineFormatting(activity.description)}` : `Activitat\n${activity.title}`,
+    description ? `Activitat\n${stripInlineFormatting(description)}` : `Activitat\n${activity.title}`,
     `Atenció a la diversitat\n${diversityText(activity.diversityMeasures) || '—'}`,
     `Comentaris per a l’aplicació\n${activity.applicationComment || '—'}`,
   ].join('\n\n')
@@ -219,7 +220,7 @@ function activityTable({ activities, blankActivityRow = false, phase, unit }) {
           cell([
             paragraph('Imatge pedagògica pendent', { run: { color: '8B5CF6', italics: true, size: 12 } }),
             paragraph(activity.subphaseLabel || '—', { run: { bold: true, size: 15 } }),
-            paragraph(PEDAGOGICAL_TYPE_LABELS[activity.pedagogicalType] || 'Altres', { run: { color: MUTED, italics: true, size: 13 } }),
+            paragraph(activityTypePresentation(activity).label, { run: { color: MUTED, italics: true, size: 13 } }),
           ]),
           cell([paragraph(activity.title, { run: { bold: true, color: PURPLE_DARK, size: 16 } }), paragraph(activityDescription(activity), { run: { size: 15 } })]),
           cell(paragraph(activity.plannedMinutes == null ? '—' : activity.plannedMinutes, { alignment: AlignmentType.CENTER, run: { size: 15 } })),
