@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { buildPlannedAbsenceEmail, getPlannedAbsenceSessions } from '../../lib/plannedAbsences.js'
+import { buildPlannedAbsenceEmail, getPlannedAbsenceSessions, nextPlannedAbsenceDate } from '../../lib/plannedAbsences.js'
 import { buildTimetableSessionCandidates } from '../../domain/planning/scheduler.js'
 
 function formatDate(date) {
@@ -13,17 +13,17 @@ export function PlannedAbsencesView({ classItem, students, calendarEvents, loadS
     .sort((a, b) => a.name.localeCompare(b.name, 'ca')), [classItem?.id, students])
   const [studentId, setStudentId] = useState('')
   const [startsOn, setStartsOn] = useState(today)
-  const [endsOn, setEndsOn] = useState(today)
+  const [endsOn, setEndsOn] = useState(() => nextPlannedAbsenceDate(today))
   const [selectedId, setSelectedId] = useState('')
   const [bundles, setBundles] = useState([])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const records = useMemo(() => classStudents.flatMap((student) => (student.plannedAbsences || [])
+  const records = useMemo(() => classStudents.flatMap((student) => (student.plannedAbsences || []).filter((period) => period.endsOn >= today)
     .map((period) => ({ ...period, student })))
     .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.student.name.localeCompare(b.student.name, 'ca')),
-  [classStudents])
+  [classStudents, today])
   const selected = records.find((record) => record.id === selectedId)
   const candidates = useMemo(() => selected ? buildTimetableSessionCandidates({
     calendarEvents, classId: selected.student.classId, from: selected.startsOn, to: selected.endsOn,
@@ -105,10 +105,10 @@ export function PlannedAbsencesView({ classItem, students, calendarEvents, loadS
 
   return <section className="planned-absences-view">
     <header><div><span><CalendarClock size={18} /> Seguiment</span><h2>Absències previstes · {classItem?.name || 'Classe'}</h2>
-      <p>Apunta els dies que faltarà un alumne. Això no modifica el registre d’assistència.</p></div></header>
+      <p>Apunta els dies que faltarà un alumne. El període desapareixerà l’endemà de la data final i no modificarà el registre d’assistència.</p></div></header>
     <form className="planned-absence-form" onSubmit={save}>
       <label>Alumne<select required value={studentId} onChange={(event) => setStudentId(event.target.value)}><option value="">Tria un alumne</option>{classStudents.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label>
-      <label>Des de<input required type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} /></label>
+      <label>Des de<input required type="date" value={startsOn} onChange={(event) => { const nextStart = event.target.value; setStartsOn(nextStart); setEndsOn(nextPlannedAbsenceDate(nextStart)) }} /></label>
       <label>Fins a<input required min={startsOn} type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} /></label>
       <button className="primary-action compact" disabled={!classStudents.length} type="submit">Apuntar absència</button>
     </form>

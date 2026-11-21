@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildPlannedAbsenceEmail, getPlannedAbsenceSessions } from '../src/lib/plannedAbsences.js'
+import { buildPlannedAbsenceEmail, getPlannedAbsenceGivenName, getPlannedAbsenceSessions, nextPlannedAbsenceDate, pruneExpiredPlannedAbsences } from '../src/lib/plannedAbsences.js'
 
 const student = { id: 'student-1', classId: 'class-1', name: 'Aina Prova', halfGroup: 'Grup A' }
 const period = { startsOn: '2026-11-23', endsOn: '2026-11-27' }
@@ -37,4 +37,29 @@ test('email includes descriptions and student materials but no teacher links', (
   assert.match(email, /https:\/\/example\.test\/text/)
   assert.match(email, /https:\/\/example\.test\/dossier/)
   assert.doesNotMatch(email, /teacher|Solucionari/)
+})
+
+test('the greeting uses the given name after the comma', () => {
+  const recipient = { ...student, name: 'Prova Casals, Aina Maria' }
+  assert.equal(getPlannedAbsenceGivenName(recipient.name), 'Aina Maria')
+  assert.match(buildPlannedAbsenceEmail({ student: recipient, period }), /Hola Aina Maria,/)
+  assert.doesNotMatch(buildPlannedAbsenceEmail({ student: recipient, period }), /Hola Prova/)
+})
+
+test('the suggested end date is the following calendar day', () => {
+  assert.equal(nextPlannedAbsenceDate('2026-11-23'), '2026-11-24')
+  assert.equal(nextPlannedAbsenceDate('2026-12-31'), '2027-01-01')
+  assert.equal(nextPlannedAbsenceDate(''), '')
+})
+
+test('expired periods are removed after their final day, preserving attendance', () => {
+  const studentWithPeriods = { ...student, plannedAbsences: [
+    { id: 'past', startsOn: '2026-11-19', endsOn: '2026-11-20' },
+    { id: 'today', startsOn: '2026-11-20', endsOn: '2026-11-21' },
+    { id: 'future', startsOn: '2026-11-23', endsOn: '2026-11-24' },
+  ], absenceHours: 3 }
+  const result = pruneExpiredPlannedAbsences([studentWithPeriods], '2026-11-21')
+  assert.deepEqual(result[0].plannedAbsences.map((period) => period.id), ['today', 'future'])
+  assert.equal(result[0].absenceHours, 3)
+  assert.strictEqual(pruneExpiredPlannedAbsences(result, '2026-11-21')[0], result[0])
 })

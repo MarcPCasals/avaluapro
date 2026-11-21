@@ -223,6 +223,7 @@ function App() {
   const sociometricAccessToken = publicParams.get('token')
   const studentProfileSurveyId = publicParams.get('student-profile')
   const initialize = useAvaluaproStore((state) => state.initialize)
+  const cleanupExpiredPlannedAbsences = useAvaluaproStore((state) => state.cleanupExpiredPlannedAbsences)
   const refreshCloudWorkspace = useAvaluaproStore((state) => state.refreshCloudWorkspace)
   const status = useAvaluaproStore((state) => state.status)
   const error = useAvaluaproStore((state) => state.error)
@@ -268,6 +269,18 @@ function App() {
     if (sociometricSurveyId || studentProfileSurveyId) return
     initialize()
   }, [initialize, sociometricSurveyId, studentProfileSurveyId])
+
+  useEffect(() => {
+    if (sociometricSurveyId || studentProfileSurveyId || status !== 'ready' || !cloud.startupComplete) return undefined
+    const cleanup = () => { cleanupExpiredPlannedAbsences().catch(() => {}) }
+    cleanup()
+    const timer = globalThis.setInterval(cleanup, 60_000)
+    globalThis.addEventListener?.('focus', cleanup)
+    return () => {
+      globalThis.clearInterval(timer)
+      globalThis.removeEventListener?.('focus', cleanup)
+    }
+  }, [cleanupExpiredPlannedAbsences, cloud.startupComplete, sociometricSurveyId, status, studentProfileSurveyId])
 
   useEffect(() => {
     if (sociometricSurveyId || studentProfileSurveyId || !cloud.user?.uid) return undefined

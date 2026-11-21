@@ -1,6 +1,30 @@
 import { getNoClassCalendarEvent } from './agendaCalendar.js'
 import { getEffectiveActivityMaterialLinks } from '../domain/planning/materials.js'
 
+export function nextPlannedAbsenceDate(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return ''
+  const date = new Date(`${dateKey}T12:00:00Z`)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+export function getPlannedAbsenceGivenName(name) {
+  const value = String(name || '').trim()
+  if (value.includes(',')) return value.slice(value.indexOf(',') + 1).trim() || value.split(',')[0].trim()
+  return value.split(/\s+/)[0] || ''
+}
+
+export function pruneExpiredPlannedAbsences(students = [], today = '') {
+  return students.map((student) => {
+    if (!Array.isArray(student.plannedAbsences)) return student
+    const active = student.plannedAbsences.filter((period) => period?.endsOn >= today)
+    return active.length === student.plannedAbsences.length
+      ? student
+      : { ...student, plannedAbsences: active }
+  })
+}
+
 export function getPlannedAbsenceSessions({ bundles = [], calendarEvents = [], candidates = [], period, student }) {
   if (!period || !student) return []
   const scheduled = bundles.filter(({ session }) => {
@@ -32,7 +56,7 @@ export function buildPlannedAbsenceEmail({ student, period, bundles = [] }) {
   const lines = [
     `Assumpte: Activitats de classe del ${period.startsOn} al ${period.endsOn}`,
     '',
-    `Hola ${String(student.name || '').split(' ')[0]},`,
+    `Hola ${getPlannedAbsenceGivenName(student.name)},`,
     '',
     'Durant els dies que no podràs venir a classe, tenim previstes aquestes sessions:',
     '',

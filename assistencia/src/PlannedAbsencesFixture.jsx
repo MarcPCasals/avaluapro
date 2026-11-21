@@ -3,7 +3,7 @@ import { PlannedAbsencesView } from '../../src/features/agenda/PlannedAbsencesVi
 import '../../src/features/agenda/agenda.css'
 
 const classItem = { id: 'class-01', name: 'Grup 01' }
-const initialStudents = [{ id: 'student-01', classId: 'class-01', name: 'Alumna de prova', halfGroup: 'Grup A' }]
+const initialStudents = [{ id: 'student-01', classId: 'class-01', name: 'Prova, Alumna', halfGroup: 'Grup A' }]
 const session = {
   session: { id: 'session-01', classId: 'class-01', startsAt: '2026-11-24T09:00:00', status: 'planned', timetableSlotId: 'slot-01' },
   planningUnit: { transversalMaterials: [] },

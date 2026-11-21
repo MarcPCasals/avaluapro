@@ -47,6 +47,7 @@ import {
   previewTeacherGradePackage,
 } from '../lib/teacherGradePackages'
 import { normalizeTutorialExemptSubjects } from '../lib/tutorialExemptions'
+import { pruneExpiredPlannedAbsences } from '../lib/plannedAbsences.js'
 import {
   SHARED_TUTORING_COLLECTIONS,
   acknowledgeTutoringInvitationUpdate,
@@ -5991,6 +5992,24 @@ export const useAvaluaproStore = create((set, get) => ({
       ),
     }))
     await persistCollections(set, get, ['students'])
+  },
+
+  cleanupExpiredPlannedAbsences: async () => {
+    const state = get()
+    if (state.status !== 'ready' || !state.cloud.startupComplete
+      || (state.cloud.user && (['syncing', 'review', 'error'].includes(state.cloud.status)
+        || state.cloud.pendingOperationCount > 0))) return 0
+    const now = new Date()
+    const today = getLocalDateKey(now)
+    const pruned = pruneExpiredPlannedAbsences(state.students, today)
+    const expiredCount = pruned.reduce((total, student, index) => total
+      + (student === state.students[index] ? 0 : (state.students[index].plannedAbsences?.length || 0) - student.plannedAbsences.length), 0)
+    if (!expiredCount) return 0
+    const updatedAt = now.toISOString()
+    set((current) => ({ students: current.students.map((student, index) =>
+      pruned[index] === state.students[index] ? student : { ...student, plannedAbsences: pruned[index].plannedAbsences, updatedAt }) }))
+    await persistCollections(set, get, ['students'], { throwOnError: true })
+    return expiredCount
   },
 
   upsertStudentAntecedent: async (studentId, patch) => {
