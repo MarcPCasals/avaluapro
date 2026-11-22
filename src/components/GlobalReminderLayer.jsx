@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertOctagon, Bell, BellRing, CheckCircle2, Clock3, Mail, MessageCircle, Skull } from 'lucide-react'
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
+import { getPlannedAbsenceReminders } from '../lib/plannedAbsences'
+import { getLocalToday } from '../lib/reminders'
 import {
   getPendingTutoringReminderAlerts,
   getUnreadTutoringCoordinationItems,
@@ -94,6 +96,7 @@ export function GlobalReminderLayer() {
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
+  const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const setActiveClass = useAvaluaproStore((state) => state.setActiveClass)
   const setActiveMode = useAvaluaproStore((state) => state.setActiveMode)
   const setActiveTutoringPanel = useAvaluaproStore((state) => state.setActiveTutoringPanel)
@@ -118,6 +121,9 @@ export function GlobalReminderLayer() {
     }
 
     return [
+      ...getPlannedAbsenceReminders(students, getLocalToday())
+        .filter((item) => isDue(item.reminder))
+        .map((item) => ({ ...item, text: item.reminder.text })),
       ...agendaNotes
         .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type) && isDue(note.reminder))
         .map((note) => ({
@@ -200,6 +206,13 @@ export function GlobalReminderLayer() {
   const snoozeReminder = async (reminder) => {
     const snoozeUntil = getSnoozeUntilIso(55)
     const nextReminder = { ...reminder.reminder, snoozeUntil }
+    if (reminder.kind === 'plannedAbsence') {
+      await updateStudent(reminder.student.id, { plannedAbsences: (reminder.student.plannedAbsences || [])
+        .map((period) => period.id === reminder.period.id ? { ...period, reminderStates: {
+          ...period.reminderStates, [reminder.stage]: { ...period.reminderStates?.[reminder.stage], snoozeUntil },
+        } } : period) })
+      return
+    }
     if (reminder.kind === 'agenda' || reminder.kind === 'general') {
       await updateAgendaNote(reminder.note.id, { reminder: nextReminder })
       return
@@ -214,6 +227,13 @@ export function GlobalReminderLayer() {
   const dismissReminder = async (reminder) => {
     const dismissedAt = new Date().toISOString()
     const nextReminder = { ...reminder.reminder, dismissedAt }
+    if (reminder.kind === 'plannedAbsence') {
+      await updateStudent(reminder.student.id, { plannedAbsences: (reminder.student.plannedAbsences || [])
+        .map((period) => period.id === reminder.period.id ? { ...period, reminderStates: {
+          ...period.reminderStates, [reminder.stage]: { ...period.reminderStates?.[reminder.stage], dismissedAt },
+        } } : period) })
+      return
+    }
     if (reminder.kind === 'agenda' || reminder.kind === 'general') {
       await updateAgendaNote(reminder.note.id, { reminder: nextReminder })
       return

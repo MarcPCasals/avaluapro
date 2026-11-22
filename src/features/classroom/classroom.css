@@ -117,6 +117,8 @@
 .classroom-student-select > span { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 8px; color: #64748b; background: #f1f5f9; }
 .selected .classroom-student-select > span { color: #7c3aed; background: #ede9fe; }
 .classroom-student-select strong { overflow: hidden; color: #334155; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.classroom-student-select strong em { display: block; color: #b45309; font-size: 8px; font-style: normal; font-weight: 800; }
+.classroom-planned-absences { display: flex; align-items: flex-start; gap: 6px; border: 1px solid #fdba74; border-radius: 8px; padding: 8px; color: #9a3412; background: #fff7ed; font-weight: 750; }
 .classroom-student-select small { color: #7c3aed; font-size: 7px; font-weight: 900; }
 .classroom-absence-toggle { min-height: 32px; display: flex; align-items: center; justify-content: center; gap: 3px; border: 0; border-radius: 7px; padding: 3px 5px; color: #15803d; background: #f0fdf4; }
 .classroom-absence-toggle small { font-size: 7px; font-weight: 900; }

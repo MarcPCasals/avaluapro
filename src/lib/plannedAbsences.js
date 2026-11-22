@@ -2,11 +2,40 @@ import { getNoClassCalendarEvent } from './agendaCalendar.js'
 import { getEffectiveActivityMaterialLinks } from '../domain/planning/materials.js'
 
 export function nextPlannedAbsenceDate(dateKey) {
+  return shiftPlannedAbsenceDate(dateKey, 1)
+}
+
+export function shiftPlannedAbsenceDate(dateKey, days) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return ''
   const date = new Date(`${dateKey}T12:00:00Z`)
   if (Number.isNaN(date.getTime())) return ''
-  date.setUTCDate(date.getUTCDate() + 1)
+  date.setUTCDate(date.getUTCDate() + days)
   return date.toISOString().slice(0, 10)
+}
+
+export function getPlannedAbsenceForDate(student, dateKey) {
+  return (student?.plannedAbsences || []).find((period) =>
+    period.startsOn <= dateKey && period.endsOn >= dateKey) || null
+}
+
+export function getPlannedAbsenceReminders(students = [], today = '') {
+  return students.flatMap((student) => (student.plannedAbsences || []).flatMap((period) => {
+    if (period.sentAt || !period.startsOn || period.endsOn < today) return []
+    return [
+      { stage: 'week', days: 7, label: 'Una setmana abans' },
+      { stage: 'day', days: 1, label: 'Un dia abans' },
+    ].filter(({ stage }) => !period.reminderStates?.[stage]?.dismissedAt)
+      .map(({ stage, days, label }) => ({
+      id: `planned_absence_${student.id}_${period.id}_${stage}`,
+      kind: 'plannedAbsence',
+      student,
+      period,
+      stage,
+      reminder: { date: shiftPlannedAbsenceDate(period.startsOn, -days), time: '09:00', text: `Enviar la feina a ${student.name} abans de l’absència del ${period.startsOn}`, ...period.reminderStates?.[stage] },
+      title: 'Feina d’absència pendent d’enviar',
+      detail: `Alumne: ${student.name} · ${label} de l’absència`,
+    }))
+  }))
 }
 
 export function getPlannedAbsenceGivenName(name) {

@@ -55,12 +55,19 @@
 .planned-absence-form label, .planned-absence-draft { display: grid; gap: 5px; color: #334155; font-size: 11px; font-weight: 800; }
 .planned-absence-form select, .planned-absence-form input, .planned-absence-draft textarea { min-height: 36px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; color: #172033; background: #fff; font: inherit; }
 .planned-absence-form select { min-width: 190px; }
+.planned-absence-student-picker { position: relative; display: grid; gap: 5px; min-width: 210px; color: #334155; font-size: 11px; font-weight: 800; }
+.planned-absence-student-picker input { width: 100%; }
+.planned-absence-suggestions { position: absolute; z-index: 12; top: 100%; left: 0; right: 0; max-height: 230px; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; background: white; box-shadow: 0 8px 22px #0f172a20; }
+.planned-absence-suggestions button { display: block; width: 100%; border: 0; padding: 9px; color: #172033; background: white; text-align: left; cursor: pointer; }
+.planned-absence-suggestions button:hover, .planned-absence-suggestions button:focus-visible { background: #fff7ed; }
 .planned-absence-layout { display: grid; grid-template-columns: minmax(220px, .34fr) minmax(0, .66fr); gap: 14px; }
 .planned-absence-list, .planned-absence-detail { min-width: 0; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
 .planned-absence-list article { display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 9px; margin: 8px 0; }
 .planned-absence-list article.selected { border-color: #fb923c; background: #fff7ed; }
 .planned-absence-list article > button:first-child { flex: 1; display: grid; gap: 3px; border: 0; padding: 10px; text-align: left; background: transparent; cursor: pointer; }
 .planned-absence-list article span, .planned-absence-list article small { color: #64748b; font-size: 11px; }
+.planned-absence-list article small svg { vertical-align: middle; }
+.planned-absence-list .planned-absence-sent-toggle { border: 0; border-left: 1px solid #e2e8f0; padding: 8px; color: #166534; background: transparent; font-size: 10px; font-weight: 800; cursor: pointer; }
 .planned-absence-delete { border: 0; padding: 10px; color: #b91c1c; background: transparent; cursor: pointer; }
 .planned-absence-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .planned-absence-detail ul { padding-left: 20px; color: #334155; font-size: 12px; line-height: 1.6; }

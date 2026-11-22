@@ -54,6 +54,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const setCoordinationReminderCompleted = useAvaluaproStore((state) => state.setTutoringCoordinationReminderCompleted)
   const editCoordinationItem = useAvaluaproStore((state) => state.editTutoringCoordinationItem)
   const updateAgendaNote = useAvaluaproStore((state) => state.updateAgendaNote)
+  const updateStudent = useAvaluaproStore((state) => state.updateStudent)
   const updateTask = useAvaluaproStore((state) => state.updateTask)
   const updateTaskRecordMeta = useAvaluaproStore((state) => state.updateTaskRecordMeta)
   const [draft, setDraft] = useState({
@@ -115,6 +116,11 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const markDone = async (item) => {
     const dismissedAt = new Date().toISOString()
     const reminder = { ...item.reminder, dismissedAt }
+    if (item.kind === 'plannedAbsence') {
+      await updateStudent(item.student.id, { plannedAbsences: (item.student.plannedAbsences || [])
+        .map((period) => period.id === item.period.id ? { ...period, sentAt: dismissedAt } : period) })
+      return
+    }
     if (item.kind === 'recovery') {
       for (const note of item.recoveryNotes || [item.note]) await completeClassroomRecovery(note.id)
       return
@@ -445,10 +451,10 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                   <div className="reminder-row-actions">
                   {item.kind === 'recovery'
                     ? <button className="secondary-action compact" onClick={() => previewRecoveryEmail(item)} type="button"><Mail size={15} />Previsualitzar el correu</button>
-                    : <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>}
+                    : item.kind !== 'plannedAbsence' && <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>}
                   <button className="secondary-action compact" disabled={savingDate || Boolean(completingId)} onClick={() => completeVisibleReminder(item)} type="button">
                     <CheckCircle2 size={15} />
-                    {showingRecoveries ? 'Recuperació feta' : 'Fet'}
+                    {showingRecoveries ? 'Recuperació feta' : item.kind === 'plannedAbsence' ? 'Feina enviada' : 'Fet'}
                   </button>
                   </div>
                 </article>

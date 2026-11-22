@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ClipboardCheck, Clock3,
+  AlertTriangle, ArrowLeft, ArrowRight, Bell, CalendarClock, Check, CheckCircle2, ClipboardCheck, Clock3,
   Copy, DoorOpen, ExternalLink, Loader2, Mail, MessageSquarePlus,
   Pause, PencilLine, Play, Projector, Save, ShieldCheck, ThumbsUp, TimerReset, UserCheck,
   Users, UserX, X,
@@ -16,6 +16,7 @@ import {
   getEffectiveActivityMaterialLinks,
 } from '../../domain/planning'
 import { findAbsenceForSession } from '../../lib/attendance'
+import { getPlannedAbsenceForDate } from '../../lib/plannedAbsences'
 import { SessionNotesNotice } from './SessionNotesNotice'
 import { FormattedText } from '../../components/FormattedText'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
@@ -357,6 +358,8 @@ export function ClassroomMode({
       .filter((student) => !isStudentExemptFromSubject(student, classItem?.subject)),
     [classItem?.subject, currentBundle.session.classId, currentBundle.session.subgroupId, students],
   )
+  const sessionDate = String(currentBundle.session.startsAt).slice(0, 10)
+  const plannedAbsentStudents = visibleStudents.filter((student) => getPlannedAbsenceForDate(student, sessionDate))
   const absentStudents = visibleStudents.filter((student) => findAbsenceForSession(
     absenceRecords,
     student.id,
@@ -735,6 +738,7 @@ export function ClassroomMode({
       <main className={`classroom-workspace ${sidePanel ? 'attendance-visible' : ''}`}>
         <section className="classroom-chronology" aria-label="Cronologia de la classe">
           <SessionNotesNotice privateNotes={currentBundle.privateNotes} applicationNotes={currentBundle.session.applicationNotes} />
+          {plannedAbsentStudents.length > 0 && <p className="classroom-planned-absences"><CalendarClock size={15} /> Absència prevista: {plannedAbsentStudents.map((student) => student.name).join(' · ')}. Comprova l’assistència real.</p>}
           {sessionPersonalReminders.length > 0 && <section className="classroom-session-reminders" aria-label="Recordatoris d’aquesta sessió">
             <Bell size={19} />
             <div>
@@ -800,8 +804,9 @@ export function ClassroomMode({
             const selected = selectedStudentIds.includes(student.id)
             const departed = departedStudents.some((item) => item.id === student.id)
             const behaviorCount = behaviorEvents.filter((event) => event.studentId === student.id && event.sessionId === currentBundle.session.id).length
+            const plannedAbsence = getPlannedAbsenceForDate(student, sessionDate)
             return <div className={`${absence ? 'absent' : ''} ${selected ? 'selected' : ''}`} key={student.id}>
-              <button aria-pressed={selected} className="classroom-student-select" onClick={() => toggleStudentSelection(student.id)} type="button"><span>{selected ? <Check size={15} /> : <Users size={15} />}</span><strong>{student.name}</strong>{behaviorCount > 0 && <small>{behaviorCount} registre{behaviorCount === 1 ? '' : 's'}</small>}</button>
+              <button aria-pressed={selected} className="classroom-student-select" onClick={() => toggleStudentSelection(student.id)} type="button"><span>{selected ? <Check size={15} /> : <Users size={15} />}</span><strong>{student.name}{plannedAbsence && <em>Absència prevista · {plannedAbsence.sentAt ? 'feina enviada' : 'feina pendent'}</em>}</strong>{behaviorCount > 0 && <small>{behaviorCount} registre{behaviorCount === 1 ? '' : 's'}</small>}</button>
               <div className="classroom-presence-actions"><button aria-label={`${absence ? 'Marcar present' : 'Marcar absent'} ${student.name}`} aria-pressed={Boolean(absence)} className="classroom-absence-toggle" disabled={loading || busy === `recovery:${student.id}`} onClick={() => absence ? toggleAbsence(student.id) : openRecovery(student, 'absence')} type="button">{loading || busy === `recovery:${student.id}` ? <Loader2 className="spin" size={14} /> : absence ? <UserX size={16} /> : <UserCheck size={16} />}<small>{absence ? 'Absent' : 'Present'}</small></button><button aria-label={`Registrar sortida de ${student.name}`} aria-pressed={departed} className={`classroom-departure-toggle ${departed ? 'active' : ''}`} disabled={busy === `recovery:${student.id}`} onClick={() => openRecovery(student, 'earlyDeparture')} type="button"><DoorOpen size={15} /><small>Surt</small></button></div>
             </div>
           })}</div>

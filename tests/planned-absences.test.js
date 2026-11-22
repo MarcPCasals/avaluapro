@@ -1,9 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildPlannedAbsenceEmail, getPlannedAbsenceGivenName, getPlannedAbsenceSessions, nextPlannedAbsenceDate, pruneExpiredPlannedAbsences } from '../src/lib/plannedAbsences.js'
+import { buildPlannedAbsenceEmail, getPlannedAbsenceForDate, getPlannedAbsenceGivenName, getPlannedAbsenceReminders, getPlannedAbsenceSessions, nextPlannedAbsenceDate, pruneExpiredPlannedAbsences } from '../src/lib/plannedAbsences.js'
 
 const student = { id: 'student-1', classId: 'class-1', name: 'Aina Prova', halfGroup: 'Grup A' }
 const period = { startsOn: '2026-11-23', endsOn: '2026-11-27' }
+
+test('planned absences appear on classroom dates and create two student reminders until sent', () => {
+  const plannedStudent = { ...student, plannedAbsences: [{ id: 'absence-1', startsOn: '2026-12-01', endsOn: '2026-12-04', sentAt: null }] }
+  assert.equal(getPlannedAbsenceForDate(plannedStudent, '2026-11-30'), null)
+  assert.equal(getPlannedAbsenceForDate(plannedStudent, '2026-12-02')?.id, 'absence-1')
+  const reminders = getPlannedAbsenceReminders([plannedStudent], '2026-11-22')
+  assert.deepEqual(reminders.map((item) => [item.stage, item.reminder.date]), [['week', '2026-11-24'], ['day', '2026-11-30']])
+  assert.ok(reminders.every((item) => item.student.id === student.id))
+  assert.equal(getPlannedAbsenceReminders([{ ...plannedStudent, plannedAbsences: [{ ...plannedStudent.plannedAbsences[0], sentAt: '2026-11-22T09:00:00Z' }] }], '2026-11-22').length, 0)
+  assert.equal(getPlannedAbsenceReminders([plannedStudent], '2026-12-05').length, 0)
+})
 const bundle = (id, date, options = {}) => ({
   session: { id, classId: 'class-1', startsAt: `${date}T09:00:00`, status: 'planned', ...options },
   planningUnit: { transversalMaterials: [{ kind: 'link', label: 'Dossier', url: 'https://example.test/dossier' }] },

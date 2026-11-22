@@ -1,3 +1,5 @@
+import { getPlannedAbsenceReminders } from './plannedAbsences.js'
+
 export function reminderDateTime(reminder = {}) {
   // Les recuperacions sense activitats conserven `reminder: null`. És un
   // registre vàlid: no ha de generar cap avís ni impedir que l'app s'obri.
@@ -24,6 +26,10 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
   const taskById = new Map(tasks.map((task) => [task.id, task]))
 
   return [
+    ...getPlannedAbsenceReminders(students, getLocalToday()).map((item) => ({
+      ...item,
+      classItem: classById.get(item.student.classId),
+    })),
     ...agendaNotes
       .filter((note) => ['agendaReminder', 'generalReminder'].includes(note.type)
         && isPendingReminder(note.reminder))

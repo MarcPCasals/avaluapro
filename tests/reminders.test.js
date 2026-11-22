@@ -120,3 +120,15 @@ test('completar el correu no amaga una recuperació pendent; completar la recupe
   assert.equal(getPendingRecoverySummary({ agendaNotes: [{ ...note, recovery: { status: 'completed' } }] }).count, 0)
   assert.equal(getPendingRecoverySummary({ agendaNotes: [{ ...note, recovery: { status: 'none' } }] }).count, 0)
 })
+
+test('els avisos d absència prevista queden assignats a l alumne i desapareixen en enviar la feina', () => {
+  const student = { id: 'synthetic-1', classId: 'class-1', name: 'Prova, Alumna', plannedAbsences: [{
+    id: 'period-1', startsOn: '2099-12-10', endsOn: '2099-12-12', sentAt: null,
+    reminderStates: { week: { dismissedAt: '2099-12-02T09:00:00Z' } },
+  }] }
+  const summary = getPendingReminderSummary({ students: [student], classes: [{ id: 'class-1', name: 'Grup 1' }] })
+  assert.deepEqual(summary.items.map((item) => item.id), ['planned_absence_synthetic-1_period-1_day'])
+  assert.equal(summary.items[0].student.name, 'Prova, Alumna')
+  assert.equal(summary.items[0].classItem.name, 'Grup 1')
+  assert.equal(getPendingReminderSummary({ students: [{ ...student, plannedAbsences: [{ ...student.plannedAbsences[0], sentAt: '2099-12-03T09:00:00Z' }] }] }).count, 0)
+})
