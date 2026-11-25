@@ -85,7 +85,7 @@ import {
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
   summarizeCompletedActivityIds,
-  summarizeUnscheduledPlanningActivities,
+  summarizeUnscheduledActivitiesThroughTemporalUnit,
 } from '../../domain/planning'
 
 const EMPTY_SYNC = {
@@ -1385,7 +1385,7 @@ export function useAgendaWorkspace(user, classes = []) {
         classId,
         planningUnitId: planningUnit.id,
       })))
-    const activities = setups.flatMap((setup) => summarizeUnscheduledPlanningActivities(setup).map((activity) => ({
+    const activities = setups.flatMap((setup) => summarizeUnscheduledActivitiesThroughTemporalUnit(setup).map((activity) => ({
       ...activity,
       planningUnitCode: setup.planningUnit.code,
       planningUnitId: setup.planningUnit.id,

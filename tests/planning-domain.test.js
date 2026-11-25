@@ -62,6 +62,7 @@ import {
   resolveSchedulingStartDate,
   selectEffectiveTimetable,
   summarizeAssignedActivityProgress,
+  summarizeUnscheduledActivitiesThroughTemporalUnit,
   summarizeUnscheduledPlanningActivities,
   updatePlanningActivity,
 } from '../src/domain/planning/index.js'
@@ -142,6 +143,35 @@ test('la cronologia resumeix només les activitats pendents sense data', () => {
       { id: 'untimed', remainingMinutes: null },
     ],
   )
+})
+
+test('una activitat situada després del final de la UT queda fora de la calendarització', () => {
+  const setup = {
+    activities: [
+      { id: 'inside', plannedMinutes: 30, title: 'Dins la UT' },
+      { id: 'late', plannedMinutes: 40, title: 'Després de la UT' },
+      { id: 'split', plannedMinutes: 50, title: 'Dividida' },
+    ],
+    activityOverrides: [],
+    calendarEvents: [],
+    existingSessionBundles: [
+      { session: { id: 'jan-29', startsAt: '2027-01-29T09:00:00', status: 'planned', durationMinutes: 55 }, items: [
+        { id: 'item-1', sourceActivityId: 'inside', plannedMinutes: 30 },
+        { id: 'item-2', sourceActivityId: 'split', plannedMinutes: 20 },
+      ] },
+      { session: { id: 'feb-01', startsAt: '2027-02-01T09:00:00', status: 'planned', durationMinutes: 55 }, items: [
+        { id: 'item-3', sourceActivityId: 'late', plannedMinutes: 40 },
+        { id: 'item-4', sourceActivityId: 'split', plannedMinutes: 30 },
+      ] },
+    ],
+    temporalUnit: { endsOn: '2027-01-29' },
+  }
+
+  assert.deepEqual(summarizeUnscheduledActivitiesThroughTemporalUnit(setup)
+    .map(({ id, remainingMinutes }) => ({ id, remainingMinutes })), [
+    { id: 'late', remainingMinutes: 40 },
+    { id: 'split', remainingMinutes: 30 },
+  ])
 })
 
 test('els enllaços sempre són de consulta, encara que arribin amb una altra funció', () => {

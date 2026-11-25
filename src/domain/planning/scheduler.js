@@ -8,6 +8,7 @@ import {
 import { getProgrammableMinutes, selectEffectiveTimetable } from './rules.js'
 import { BABELIUM_MINUTES, createBabeliumItem, isBabeliumItem } from './babelium.js'
 import { getSessionOccurrenceKey, reconcileSessionOccurrences } from './sessionOccurrences.js'
+import { getManuallyCompletedActivityIds } from './classPlanning.js'
 
 const BLOCKING_EVENT_TYPES = new Set(['holiday', 'nonTeaching', 'specialDay', 'cancellation'])
 
@@ -226,6 +227,33 @@ export function summarizeUnscheduledPlanningActivities({
         ? remainingMinutesByActivityId[activity.id]
         : (Number(activity.plannedMinutes) > 0 ? Number(activity.plannedMinutes) : null),
     }))
+}
+
+/** La cronologia d'una UT només considera calendaritzats els minuts fins al seu últim dia. */
+export function summarizeUnscheduledActivitiesThroughTemporalUnit(setup) {
+  const unitEnd = setup.temporalUnit?.endsOn
+  if (!unitEnd) return summarizeUnscheduledPlanningActivities(setup)
+  const inUnitBundles = reconcileSessionOccurrences(setup.existingSessionBundles || []).bundles
+    .filter((bundle) => String(bundle.session.startsAt).slice(0, 10) <= unitEnd)
+    .filter((bundle) => !isUnperformedNoClassBundle(bundle, setup.calendarEvents))
+  const progress = summarizeAssignedActivityProgress(inUnitBundles)
+  const completed = summarizeCompletedActivityIds(inUnitBundles)
+  const manuallyCompleted = getManuallyCompletedActivityIds(setup.activityOverrides)
+  const remainingMinutesByActivityId = Object.fromEntries(setup.activities.map((activity) => {
+    const minutes = Number(activity.plannedMinutes)
+    return [activity.id, Number.isFinite(minutes) && minutes > 0
+      ? Math.max(0, minutes - (progress.assignedMinutesByActivityId[activity.id] || 0))
+      : progress.assignedSourceActivityIds.has(activity.id) ? 0 : null]
+  }))
+  const unavailableSourceActivityIds = setup.activities
+    .filter((activity) => remainingMinutesByActivityId[activity.id] === 0
+      || manuallyCompleted.has(activity.id) || completed.has(activity.id))
+    .map((activity) => activity.id)
+  return summarizeUnscheduledPlanningActivities({
+    activities: setup.activities,
+    remainingMinutesByActivityId,
+    unavailableSourceActivityIds,
+  })
 }
 
 /**

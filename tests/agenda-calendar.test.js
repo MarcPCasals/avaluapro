@@ -44,6 +44,20 @@ test('la cronologia respecta el final de curs encara que avui sigui posterior', 
   assert.equal(range.hasLater, false)
 })
 
+test('la cronologia s’atura al final de la UT, inclòs el darrer dia', () => {
+  const initial = getAgendaTimelineInitialRange({
+    endsOn: '2027-01-29', startsOn: '2026-09-09', today: '2026-11-25',
+  })
+  const next = getAdjacentAgendaTimelineRange(initial, 'later', {
+    endsOn: '2027-01-29', startsOn: '2026-09-09',
+  })
+
+  assert.deepEqual({ from: next.from, to: next.to }, { from: '2027-01-20', to: '2027-01-29' })
+  assert.equal(getAdjacentAgendaTimelineRange({ ...initial, ...next }, 'later', {
+    endsOn: '2027-01-29', startsOn: '2026-09-09',
+  }), null)
+})
+
 test('el calendari obre la setmana entrant durant el cap de setmana', () => {
   assert.equal(getAgendaDefaultWeekStart('2026-09-18'), '2026-09-14')
   assert.equal(getAgendaDefaultWeekStart('2026-09-19'), '2026-09-21')

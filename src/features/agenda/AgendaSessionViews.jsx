@@ -685,7 +685,8 @@ export function AgendaTimelineView({
   }, [])
   const [contentRefresh, setContentRefresh] = useState({ busy: false, classId: '', subject: '', notice: '', error: '' })
   const [subjectFilter, setSubjectFilter] = useState({ classId: '', subject: '' })
-  const groupBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId)
+  const groupBundles = bundles.filter((bundle) => bundle.session.classId === selectedClassId
+    && (!activeTemporalUnit?.endsOn || sessionDate(bundle) <= activeTemporalUnit.endsOn))
   const timetableSubjects = getClassPlanningSubjects(slots, selectedClassId)
   const subjectForBundle = (bundle) => resolvePlanningSubject({ application: bundle.application,
     planningUnit: bundle.planningUnit, classItem: classes.find((item) => item.id === selectedClassId), subjects: timetableSubjects })
@@ -710,6 +711,7 @@ export function AgendaTimelineView({
   })
   const timetableCandidates = [...timetableAvailability.candidates, ...timetableAvailability.blockedCandidates]
     .filter((candidate) => candidate.timetableSlotId
+    && (!activeTemporalUnit?.endsOn || candidate.date <= activeTemporalUnit.endsOn)
     && (candidate.blockingEvent || candidate.date >= today)
     && (candidate.blockingEvent || activeSubject || !planningSubjectsMatch(candidate.subject, selectedClassSubject))
     && !groupBundles.some((bundle) => bundle.session.startsAt === candidate.startsAt
@@ -767,6 +769,7 @@ export function AgendaTimelineView({
       {refreshMatchesSelection && (contentRefresh.busy || contentRefresh.notice) && <p className="agenda-session-edit-notice" role="status">{contentRefresh.busy ? 'Actualitzant descripcions i materials… Es conservaran l’ordre i la temporització.' : contentRefresh.notice}</p>}
       {refreshMatchesSelection && contentRefresh.error && <p className="agenda-inline-error" role="alert">{contentRefresh.error}</p>}
       {selectedClassId && subjects.length > 0 && <label className="agenda-timeline-subject">Calendarització<select disabled={contentRefresh.busy} value={activeSubject} onChange={(event) => setSubjectFilter({ classId: selectedClassId, subject: event.target.value })}><option value="">Totes les matèries</option>{subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}</select></label>}
+      {selectedClassId && activeTemporalUnit?.endsOn && <p className="agenda-session-edit-notice">La cronologia d’aquesta UT acaba el {formatDate(activeTemporalUnit.endsOn)}. Les activitats que no hi caben apareixen a «Activitats fora de la calendarització».</p>}
       {!selectedClassId ? <div className="agenda-timeline-empty"><Layers3 size={28} /><strong>Selecciona un grup a la barra superior</strong><p>La cronologia seguirà automàticament la classe activa.</p></div> : <div className="agenda-timeline-sections">
         {classBundles.length === 0 ? <div className="agenda-timeline-empty"><CalendarDays size={28} /><strong>No hi ha sessions en aquest tram</strong><p>Pots ampliar la cronologia o calendaritzar una UP nova.</p><div className="agenda-timeline-empty-actions">{hasEarlier && <button disabled={loading || contentRefresh.busy} onClick={onLoadEarlier} type="button"><ArrowLeft size={14} />8 setmanes anteriors</button>}{hasLater && <button disabled={loading || contentRefresh.busy} onClick={onLoadLater} type="button">8 setmanes següents<ArrowRight size={14} /></button>}</div></div> : <>
           {upcomingGroups.length > 0 ? <TimelineRows onOpenNotes={onOpenNotes} notesLoadingId={notesLoadingId} onOpenTimetableClassroom={onOpenTimetableClassroom} classes={classes} slots={slots} calendarEvents={calendarEvents} groups={upcomingGroups} onOpenSession={onOpenSession} /> : <div className="agenda-timeline-empty compact"><CalendarDays size={24} /><strong>No queden sessions programades</strong><p>Pots consultar les sessions anteriors a l’històric.</p></div>}

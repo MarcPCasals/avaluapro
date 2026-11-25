@@ -43,7 +43,7 @@ test('les peticions antigues continuen obrint la UP en mode progressiu', () => {
 test('la Cronologia obre les activitats pendents en mode intel·ligent', () => {
   const source = fs.readFileSync(new URL('../src/features/agenda/AgendaModule.jsx', import.meta.url), 'utf8')
 
-  assert.match(source, /const openTimelineScheduling = \(\) => \{/)
+  assert.match(source, /const openTimelineScheduling = \(subject = ''\) => \{/)
   assert.match(source, /setSchedulingMode\('smart'\)/)
   assert.match(source, /onSchedule=\{hasOwnCalendar \? openTimelineScheduling : null\}/)
 })
