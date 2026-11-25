@@ -1,4 +1,5 @@
 import { getPlannedAbsenceReminders } from './plannedAbsences.js'
+import { getTaskDeliveryAlerts } from './taskDeliveryAlerts.js'
 
 export function reminderDateTime(reminder = {}) {
   // Les recuperacions sense activitats conserven `reminder: null`. És un
@@ -62,6 +63,11 @@ function getReminderItems({ agendaNotes, classes, students, taskRecords, tasks }
         task,
         title: task.reminder?.text || task.title,
       })),
+    ...getTaskDeliveryAlerts(tasks, getLocalToday()).map((item) => ({
+      ...item,
+      classItem: classById.get(item.task.classId),
+      detail: `Lliurament de la tasca: ${item.task.title}`,
+    })),
     ...taskRecords
       .filter((record) => isPendingReminder(record.reminder) && !(record.recoveryPending && record.recoveryNoteId))
       .map((record) => {

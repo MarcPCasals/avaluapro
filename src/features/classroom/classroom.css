@@ -76,6 +76,12 @@
 .classroom-session-reminders > div { min-width: 0; display: grid; gap: 5px; }
 .classroom-session-reminders strong { color: #92400e; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
 .classroom-session-reminders p { margin: 0; color: #1e293b; font-size: 13px; font-weight: 850; line-height: 1.4; }
+.classroom-delivery-alert { max-width: 760px; display: flex; align-items: flex-start; gap: 11px; border: 1px solid #fca5a5; border-left: 5px solid #dc2626; border-radius: 0 12px 12px 0; padding: 13px 14px; color: #b91c1c; background: #fef2f2; box-shadow: 0 5px 16px rgba(185, 28, 28, .12); }
+.classroom-delivery-alert > div { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.classroom-delivery-alert strong { color: #991b1b; font-size: 13px; font-weight: 950; }
+.classroom-delivery-alert p { margin: 0; color: #7f1d1d; font-size: 14px; font-weight: 800; line-height: 1.35; }
+.classroom-delivery-alert button { flex-shrink: 0; }
+@media (max-width: 640px) { .classroom-delivery-alert { flex-wrap: wrap; } .classroom-delivery-alert button { margin-left: 31px; } }
 
 .classroom-timer { max-width: 640px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 18px; align-items: center; border-top: 1px solid #eceff3; border-bottom: 1px solid #eceff3; padding: 15px 0; }
 .classroom-timer > span { color: #94a3b8; font-size: 9px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }

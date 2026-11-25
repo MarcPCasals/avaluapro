@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getPendingRecoverySummary, getPendingReminderSummary, getSessionPersonalReminders, reminderMatchesFocus } from '../src/lib/reminders.js'
+import { getLocalToday, getPendingRecoverySummary, getPendingReminderSummary, getSessionPersonalReminders, reminderMatchesFocus } from '../src/lib/reminders.js'
+import { getTaskDeliveryAlerts } from '../src/lib/taskDeliveryAlerts.js'
 
 test('un acces contextual mostra nomes els recordatoris seleccionats', () => {
   assert.equal(reminderMatchesFocus('agenda_1', []), true)
@@ -131,4 +132,27 @@ test('els avisos d absència prevista queden assignats a l alumne i desapareixen
   assert.equal(summary.items[0].student.name, 'Prova, Alumna')
   assert.equal(summary.items[0].classItem.name, 'Grup 1')
   assert.equal(getPendingReminderSummary({ students: [{ ...student, plannedAbsences: [{ ...student.plannedAbsences[0], sentAt: '2099-12-03T09:00:00Z' }] }] }).count, 0)
+})
+
+test('la tasca lliure genera un avís de lliurament només el dia assignat', () => {
+  const date = '2026-11-25'
+  const freeTask = { id: 'free', classId: 'class-1', title: 'Dossier de prova', date }
+  const tasks = [
+    freeTask,
+    { ...freeTask, id: 'classroom', source: 'classroom' },
+    { ...freeTask, id: 'explicit', reminder: { date, text: 'Avisar' } },
+    { ...freeTask, id: 'dismissed', deliveryAlert: { date, dismissedAt: '2026-11-25T09:00:00Z' } },
+  ]
+  assert.deepEqual(getTaskDeliveryAlerts(tasks, date).map((item) => item.id), ['delivery_free'])
+  assert.equal(getTaskDeliveryAlerts(tasks, '2026-11-26').length, 0)
+  const summary = getPendingReminderSummary({ tasks: [{ ...freeTask, date: getLocalToday() }] })
+  assert.equal(summary.items[0]?.kind, 'delivery')
+  assert.equal(summary.dueCount, 1)
+})
+
+test('canviar la data de la tasca reactiva el seu avís de lliurament', () => {
+  const task = { id: 'free', title: 'Dossier', date: '2026-11-26', deliveryAlert: {
+    date: '2026-11-25', dismissedAt: '2026-11-25T09:00:00Z', snoozeUntil: '',
+  } }
+  assert.equal(getTaskDeliveryAlerts([task], '2026-11-26').length, 1)
 })

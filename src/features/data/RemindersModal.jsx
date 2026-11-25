@@ -145,6 +145,10 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
       await updateTaskRecordMeta(item.student.id, item.task.id, { reminder })
       return
     }
+    if (item.kind === 'delivery') {
+      await updateTask(item.task.id, { deliveryAlert: { date: item.task.date, dismissedAt, snoozeUntil: '' } })
+      return
+    }
     await updateTask(item.task.id, { reminder })
   }
 
@@ -180,6 +184,8 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
       if (!date || Number.isNaN(dueAt.getTime())) throw new Error('Revisa la data i l’hora del recordatori.')
       if (shared) {
         await editCoordinationItem(item.id, { text: item.text, studentId: item.studentId, dueAt: dueAt.toISOString() })
+      } else if (item.kind === 'delivery') {
+        await updateTask(item.task.id, { date, deliveryAlert: null })
       } else {
         const reminder = { ...item.reminder, date, time, dismissedAt: '', snoozeUntil: '' }
         if (item.note) {
@@ -334,14 +340,15 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
 
   if (rescheduling) {
     return (
-      <Modal key="reschedule" onClose={() => { if (!savingDate) setRescheduling(null) }} title="Reprogramar recordatori">
+      <Modal key="reschedule" onClose={() => { if (!savingDate) setRescheduling(null) }} title={rescheduling.item.kind === 'delivery' ? 'Canviar data de lliurament' : 'Reprogramar recordatori'}>
         <form className="reminders-modal" onSubmit={saveRescheduling}>
           <strong>{rescheduling.shared ? rescheduling.item.text : rescheduling.item.title}</strong>
           {rescheduling.shared && <p className="reminder-kind-help">La nova data es compartirà amb la cotutora i tornarà a activar els avisos.</p>}
+          {rescheduling.item.kind === 'delivery' && <p className="reminder-kind-help">La nova data també canviarà la data de la tasca a Seguiment.</p>}
           <ReminderDateCalendar key={rescheduling.date.slice(0, 7)} disabled={savingDate} onChange={(date) => setRescheduling(current => ({ ...current, date }))} value={rescheduling.date} />
           <div className="reminder-form-grid">
             <label>Data<input required type="date" value={rescheduling.date} disabled={savingDate} onChange={(event) => setRescheduling(current => ({ ...current, date: event.target.value }))} /></label>
-            <label>Hora<input type="time" value={rescheduling.time} disabled={savingDate} onChange={(event) => setRescheduling(current => ({ ...current, time: event.target.value }))} /></label>
+            {rescheduling.item.kind !== 'delivery' && <label>Hora<input type="time" value={rescheduling.time} disabled={savingDate} onChange={(event) => setRescheduling(current => ({ ...current, time: event.target.value }))} /></label>}
           </div>
           {error && <p className="reminder-form-error" role="alert">{error}</p>}
           <div className="reminder-row-actions">
@@ -465,7 +472,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             <>
               {visibleSummaryItems.map((item) => (
                 <article className={`reminder-row ${item.kind}`} key={item.id}>
-                  {item.kind === 'agenda' ? <Skull size={18} /> : <Clock3 size={18} />}
+                  {item.kind === 'agenda' || item.kind === 'delivery' ? <Skull size={18} /> : <Clock3 size={18} />}
                   <div>
                     <strong>{item.title}</strong>
                     <span>{formatReminderDate(item.reminder)}</span>
@@ -478,7 +485,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
                     : item.kind !== 'plannedAbsence' && <button className="secondary-action compact" disabled={savingDate} onClick={() => startRescheduling(item)} type="button"><Clock3 size={15} />Reprogramar</button>}
                   <button className="secondary-action compact" disabled={savingDate || Boolean(completingId)} onClick={() => completeVisibleReminder(item)} type="button">
                     <CheckCircle2 size={15} />
-                    {showingRecoveries ? 'Recuperació feta' : item.kind === 'plannedAbsence' ? 'Feina enviada' : 'Fet'}
+                    {showingRecoveries ? 'Recuperació feta' : item.kind === 'plannedAbsence' ? 'Feina enviada' : item.kind === 'delivery' ? 'Vist' : 'Fet'}
                   </button>
                   </div>
                 </article>

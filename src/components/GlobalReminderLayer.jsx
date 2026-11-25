@@ -3,6 +3,7 @@ import { AlertOctagon, Bell, BellRing, CheckCircle2, Clock3, Mail, MessageCircle
 import { useAvaluaproStore } from '../store/useAvaluaproStore'
 import { getPlannedAbsenceReminders } from '../lib/plannedAbsences'
 import { getLocalToday } from '../lib/reminders'
+import { getTaskDeliveryAlerts } from '../lib/taskDeliveryAlerts'
 import {
   getPendingTutoringReminderAlerts,
   getUnreadTutoringCoordinationItems,
@@ -145,6 +146,8 @@ export function GlobalReminderLayer() {
           text: task.reminder?.text,
           title: task.title,
         })),
+      ...getTaskDeliveryAlerts(tasks, getLocalToday())
+        .filter((item) => isDue(item.reminder)),
       ...taskRecords
         .filter((record) => isDue(record.reminder))
         .map((record) => {
@@ -205,6 +208,10 @@ export function GlobalReminderLayer() {
 
   const snoozeReminder = async (reminder) => {
     const snoozeUntil = getSnoozeUntilIso(55)
+    if (reminder.kind === 'delivery') {
+      await updateTask(reminder.task.id, { deliveryAlert: { date: reminder.task.date, dismissedAt: '', snoozeUntil } })
+      return
+    }
     const nextReminder = { ...reminder.reminder, snoozeUntil }
     if (reminder.kind === 'plannedAbsence') {
       await updateStudent(reminder.student.id, { plannedAbsences: (reminder.student.plannedAbsences || [])
@@ -226,6 +233,10 @@ export function GlobalReminderLayer() {
 
   const dismissReminder = async (reminder) => {
     const dismissedAt = new Date().toISOString()
+    if (reminder.kind === 'delivery') {
+      await updateTask(reminder.task.id, { deliveryAlert: { date: reminder.task.date, dismissedAt, snoozeUntil: '' } })
+      return
+    }
     const nextReminder = { ...reminder.reminder, dismissedAt }
     if (reminder.kind === 'plannedAbsence') {
       await updateStudent(reminder.student.id, { plannedAbsences: (reminder.student.plannedAbsences || [])
@@ -312,11 +323,12 @@ export function GlobalReminderLayer() {
       })}
       {dueReminders.slice(0, 3).map((reminder) => (
         <article className={`global-reminder-card ${reminder.kind}`} key={reminder.id}>
-          {reminder.kind === 'agenda' ? <Skull size={19} /> : <Clock3 size={19} />}
+          {reminder.kind === 'agenda' || reminder.kind === 'delivery' ? <Skull size={19} /> : <Clock3 size={19} />}
           <div>
             <strong>{reminder.title}</strong>
             {reminder.student && <span>{reminder.student.name}</span>}
             {reminder.kind === 'task' && <span>Recordatori de tota la classe</span>}
+            {reminder.kind === 'delivery' && <span>{classes.find((item) => item.id === reminder.task.classId)?.name || 'Classe'} · Entrega d’avui</span>}
             {reminder.kind === 'general' && <span>Recordatori general</span>}
             {reminder.kind === 'agenda' && <span>Recorda registrar la nota a l’agenda.</span>}
             <small>{formatDue(reminder.reminder)}</small>

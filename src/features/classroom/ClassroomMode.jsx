@@ -20,7 +20,8 @@ import { getPlannedAbsenceForDate } from '../../lib/plannedAbsences'
 import { SessionNotesNotice } from './SessionNotesNotice'
 import { FormattedText } from '../../components/FormattedText'
 import { getClassroomSessionTasks } from '../../lib/classroomTracking'
-import { getSessionPersonalReminders } from '../../lib/reminders'
+import { getLocalToday, getSessionPersonalReminders } from '../../lib/reminders'
+import { getTaskDeliveryAlerts } from '../../lib/taskDeliveryAlerts'
 import { isStudentExemptFromSubject } from '../../lib/tutorialExemptions'
 import { useDialogAccessibility } from '../../lib/useDialogAccessibility'
 import { openExternalLinks } from '../../lib/openExternalLinks'
@@ -374,6 +375,10 @@ export function ClassroomMode({
     evidenceKeys,
     tasks,
   })
+  const deliveryAlerts = sessionDate === getLocalToday()
+    ? getTaskDeliveryAlerts(sessionTasks, sessionDate)
+      .filter((item) => !item.reminder.snoozeUntil || new Date(item.reminder.snoozeUntil) <= new Date())
+    : []
   const selectedTask = sessionTasks.find((task) => task.id === selectedTaskId) || sessionTasks[0] || null
   const sessionTaskRecords = taskRecords.filter((record) => sessionTasks.some((task) => task.id === record.taskId))
   const pendingTaskRecords = sessionTaskRecords.filter((record) => record.recoveryPending || ['LATE', 'MISSING'].includes(record.status))
@@ -739,6 +744,14 @@ export function ClassroomMode({
         <section className="classroom-chronology" aria-label="Cronologia de la classe">
           <SessionNotesNotice privateNotes={currentBundle.privateNotes} applicationNotes={currentBundle.session.applicationNotes} />
           {plannedAbsentStudents.length > 0 && <p className="classroom-planned-absences"><CalendarClock size={15} /> Absència prevista: {plannedAbsentStudents.map((student) => student.name).join(' · ')}. Comprova l’assistència real.</p>}
+          {deliveryAlerts.length > 0 && <section className="classroom-delivery-alert" aria-label="Tasques per recollir avui">
+            <AlertTriangle size={21} />
+            <div>
+              <strong>{deliveryAlerts.length === 1 ? 'Avui has de demanar aquesta tasca' : 'Avui has de demanar aquestes tasques'}</strong>
+              {deliveryAlerts.map((item) => <p key={item.id}>{item.task.title}</p>)}
+            </div>
+            <button className="secondary-action compact" onClick={() => { setSelectedTaskId(deliveryAlerts[0].task.id); setSidePanel('tasks') }} type="button">Revisar entregues</button>
+          </section>}
           {sessionPersonalReminders.length > 0 && <section className="classroom-session-reminders" aria-label="Recordatoris d’aquesta sessió">
             <Bell size={19} />
             <div>
