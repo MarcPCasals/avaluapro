@@ -520,7 +520,7 @@ const tutoringTourSteps = [
   {
     target: 'tutoring-tool-groups',
     title: '14. Grups cooperatius',
-    text: 'La vista general només mostra els grups, els alumnes i si cal revisar-los. Entra a “Detall i modificació” per consultar els motius, moure o intercanviar alumnes, bloquejar elements i guardar versions.',
+    text: 'Per moure un alumne, toca el seu nom, tria “Posar aquí” en un altre grup i confirma el canvi. Entra a “Detall i modificació” per consultar els motius, intercanviar alumnes o bloquejar elements.',
     mode: 'tutoring',
   },
   {

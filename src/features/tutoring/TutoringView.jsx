@@ -7161,6 +7161,27 @@ export function TutoringView() {
     })
   }
 
+  const handleStartCooperativeQuickMove = (studentId, sourceGroupId) => {
+    const sourceGroup = visibleCooperativeGroups.find((group) => group.id === sourceGroupId)
+    if (
+      selectedCooperativeGroupSet ||
+      sourceGroup?.members.length <= 2 ||
+      !canModifyCooperativeMember({
+        group: sourceGroup,
+        lockedStudentIds: cooperativeLockedStudentIds,
+        studentId,
+      })
+    ) return
+
+    setSelectedCooperativeGroupId('')
+    setCooperativeWorkspacePanel('')
+    setCooperativeEditDraft((current) =>
+      current.studentId === studentId && !selectedCooperativeGroupId
+        ? EMPTY_COOPERATIVE_EDIT_DRAFT
+        : { studentId, targetGroupId: '', targetStudentId: '', type: 'move' },
+    )
+  }
+
   const handleApplyCooperativeEdit = () => {
     if (!cooperativeEditPreview) return
     const currentSnapshot = {
@@ -7174,10 +7195,12 @@ export function TutoringView() {
     }))
     setSelectedCooperativeGroupSetId('')
     setManualCooperativeGroups(cooperativeEditPreview.nextGroups)
-    setSelectedCooperativeGroupId(
-      cooperativeEditDraft.type === 'move'
-        ? cooperativeEditPreview.targetGroup.id
-        : cooperativeEditPreview.sourceGroup.id,
+    setSelectedCooperativeGroupId((current) =>
+      current
+        ? cooperativeEditDraft.type === 'move'
+          ? cooperativeEditPreview.targetGroup.id
+          : cooperativeEditPreview.sourceGroup.id
+        : '',
     )
     setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
   }
@@ -10974,6 +10997,48 @@ export function TutoringView() {
                   </section>
                 )}
 
+                {!selectedCooperativeGroupSet && !cooperativeEditDraft.studentId &&
+                  visibleCooperativeGroups.some((group) => !group.locked && group.members.length > 2) && (
+                    <p className="cooperative-quick-hint">Per moure un alumne, toca el seu nom i tria el grup de destinació.</p>
+                  )}
+
+                {!selectedCooperativeGroup && !selectedCooperativeGroupSet &&
+                  cooperativeEditSourceMember && cooperativeEditDraft.type === 'move' && (
+                    <section className="cooperative-quick-move" aria-label="Moure alumne entre grups">
+                      <div>
+                        <strong>
+                          {formatCooperativeStudentName(cooperativeEditSourceMember?.student.name)}
+                          {' · '}
+                          {cooperativeEditPreview
+                            ? `${cooperativeEditPreview.sourceGroup.name} → ${cooperativeEditPreview.targetGroup.name}`
+                            : 'Tria un altre grup'}
+                        </strong>
+                        <span>
+                          {cooperativeEditPreview
+                            ? `Quedaran ${cooperativeEditPreview.nextSourceGroup.members.length} i ${cooperativeEditPreview.nextTargetGroup.members.length} alumnes. Qualitat global: ${cooperativeGroupSetAnalysis.score}/100 → ${cooperativeEditPreview.nextAnalysis.score}/100.`
+                            : 'Toca «Posar aquí» a la targeta del grup de destinació.'}
+                        </span>
+                        {cooperativeEditPreview?.sizeWarning && (
+                          <em>El canvi deixa algun grup lluny de la mida objectiu.</em>
+                        )}
+                      </div>
+                      <div className="cooperative-quick-move-actions">
+                        <button
+                          className="secondary-action compact"
+                          onClick={() => setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)}
+                          type="button"
+                        >
+                          Cancel·lar
+                        </button>
+                        {cooperativeEditPreview && (
+                          <button className="primary-action compact" onClick={handleApplyCooperativeEdit} type="button">
+                            Confirmar canvi
+                          </button>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
                 <div className="cooperative-group-grid">
                   {visibleCooperativeGroups.map((group) => (
                     <article
@@ -11010,9 +11075,22 @@ export function TutoringView() {
 
                       <div className="cooperative-group-members">
                         {group.members.map((member) => (
-                          <div
-                            className={`cooperative-member compact ${member.performanceLevel}`}
+                          <button
+                            aria-label={`Seleccionar ${formatCooperativeStudentName(member.student.name)} per moure a un altre grup`}
+                            aria-pressed={cooperativeEditDraft.studentId === member.student.id}
+                            className={`cooperative-member compact cooperative-member-quick-select ${member.performanceLevel} ${cooperativeEditDraft.studentId === member.student.id ? 'quick-selected' : ''}`}
+                            disabled={
+                              Boolean(selectedCooperativeGroupSet) ||
+                              group.members.length <= 2 ||
+                              !canModifyCooperativeMember({
+                                group,
+                                lockedStudentIds: cooperativeLockedStudentIds,
+                                studentId: member.student.id,
+                              })
+                            }
                             key={member.student.id}
+                            onClick={() => handleStartCooperativeQuickMove(member.student.id, group.id)}
+                            type="button"
                           >
                             <strong>{formatCooperativeStudentName(member.student.name)}</strong>
                             {member.isStar && (
@@ -11023,9 +11101,22 @@ export function TutoringView() {
                                 size={15}
                               />
                             )}
-                          </div>
+                          </button>
                         ))}
                       </div>
+
+                      {cooperativeEditSourceMember && cooperativeEditDraft.type === 'move' &&
+                        !selectedCooperativeGroup && !selectedCooperativeGroupSet &&
+                        cooperativeEditSourceGroup?.id !== group.id && !group.locked && (
+                          <button
+                            aria-label={`Posar ${formatCooperativeStudentName(cooperativeEditSourceMember?.student.name)} a ${group.name}`}
+                            className={`cooperative-quick-target ${cooperativeEditDraft.targetGroupId === group.id ? 'active' : ''}`}
+                            onClick={() => setCooperativeEditDraft((current) => ({ ...current, targetGroupId: group.id }))}
+                            type="button"
+                          >
+                            {cooperativeEditDraft.targetGroupId === group.id ? 'Destinació triada' : 'Posar aquí'}
+                          </button>
+                        )}
 
                       <button
                         aria-expanded={selectedCooperativeGroupId === group.id}

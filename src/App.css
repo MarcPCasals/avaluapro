@@ -8566,6 +8566,67 @@ button.tutorial-record-pill {
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.18);
 }
 
+.cooperative-quick-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f5f3ff;
+}
+
+.cooperative-quick-hint {
+  margin-block: 0;
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.cooperative-quick-move > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cooperative-quick-move strong { color: #5b21b6; }
+.cooperative-quick-move span { color: #475569; font-size: 12px; }
+.cooperative-quick-move em { color: #9a3412; font-size: 11px; font-style: normal; }
+.cooperative-quick-move-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.cooperative-member.compact.cooperative-member-quick-select {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cooperative-member-quick-select:not(:disabled):hover,
+.cooperative-member-quick-select.quick-selected {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 1px;
+}
+
+.cooperative-member-quick-select:disabled { cursor: default; opacity: 0.7; }
+
+.cooperative-quick-target {
+  min-height: 38px;
+  border: 1px dashed #8b5cf6;
+  border-radius: 8px;
+  color: #5b21b6;
+  background: #f5f3ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cooperative-quick-target.active {
+  border-style: solid;
+  color: #fff;
+  background: #7c3aed;
+}
+
 .cooperative-canvas .cooperative-group-detail-button {
   margin-top: auto;
 }

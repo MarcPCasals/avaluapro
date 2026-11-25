@@ -324,6 +324,33 @@ describe('anàlisi explicable de grups cooperatius', () => {
     )
   })
 
+  it('mou un alumne sense intercanvi i conserva la resta dels grups', () => {
+    const groups = helpers.enrichCooperativeGroups(
+      [
+        {
+          id: 'group-1',
+          members: [1, 2, 3, 4].map((id) => createMember({ id: `student-${id}`, name: `Alumne ${id}` })),
+          name: 'Grup 1',
+          targetGroupSize: 4,
+        },
+        {
+          id: 'group-2',
+          members: [5, 6, 7, 8].map((id) => createMember({ id: `student-${id}`, name: `Alumne ${id}` })),
+          name: 'Grup 2',
+          targetGroupSize: 4,
+        },
+      ],
+      [],
+    )
+
+    const moved = helpers.moveCooperativeMemberToGroup(groups, 'student-1', 'group-2', [])
+
+    assert.deepEqual(moved.map((group) => group.members.length), [3, 5])
+    assert.equal(moved[0].members.some((member) => member.student.id === 'student-1'), false)
+    assert.equal(moved[1].members.at(-1).student.id, 'student-1')
+    assert.deepEqual(groups.map((group) => group.members.length), [4, 4])
+  })
+
   it('aplica el format de nom compacte als conflictes de disposició', () => {
     const seatingHelpers = createCooperativeSociometricHelpers({
       formatSeatingStudentName: (name) => `Curt:${name.split(' ')[0]}`,
