@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { getRecoveryEmailPreview, groupDailyRecoveryReminders } from '../../lib/classroomRecovery'
 import { Modal } from '../../components/Modal'
 import { getLocalToday, getPendingRecoverySummary, getPendingReminderSummary, reminderDateTime, reminderMatchesFocus } from '../../lib/reminders'
+import { nextReminderSession } from '../../lib/reminderScheduling'
 import { useAvaluaproStore } from '../../store/useAvaluaproStore'
 
 function formatReminderDate(reminder = {}) {
@@ -73,6 +74,10 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   const [emailPreview, setEmailPreview] = useState(null)
   const [emailCopied, setEmailCopied] = useState(false)
   const [activeTray, setActiveTray] = useState(null)
+  const [dateTimeEdited, setDateTimeEdited] = useState(false)
+  const suggestedSession = !dateTimeEdited && nextReminderSession(sessionOptions, draft.classId)
+  const effectiveDate = suggestedSession?.date || draft.date
+  const effectiveTime = suggestedSession?.time || draft.time
 
   const tutoringClasses = useMemo(
     () => classes.filter((classItem) => classItem.sharedTutoringSpaceId),
@@ -236,17 +241,35 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
 
   const changeKind = (kind) => {
     const currentClassIsShared = tutoringClasses.some((classItem) => classItem.id === draft.classId)
+    const classId = kind === 'tutoring' && !currentClassIsShared ? tutoringClasses[0]?.id || '' : draft.classId
+    const nextSession = nextReminderSession(sessionOptions, classId)
     setError('')
+    setDateTimeEdited(false)
     setDraft((current) => ({
       ...current,
-      classId: kind === 'tutoring' && !currentClassIsShared ? tutoringClasses[0]?.id || '' : current.classId,
+      classId,
+      date: nextSession?.date || getLocalToday(),
       kind,
       sessionKey: '',
+      time: nextSession?.time || '',
+    }))
+  }
+
+  const selectClass = (classId) => {
+    const nextSession = nextReminderSession(sessionOptions, classId)
+    setDateTimeEdited(false)
+    setDraft((current) => ({
+      ...current,
+      classId,
+      date: nextSession?.date || getLocalToday(),
+      sessionKey: '',
+      time: nextSession?.time || '',
     }))
   }
 
   const selectSession = (sessionKey) => {
     const session = availableSessions.find((option) => option.id === sessionKey)
+    setDateTimeEdited(true)
     setDraft((current) => ({
       ...current,
       date: session?.date || current.date,
@@ -256,12 +279,12 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
   }
 
   const addReminder = async () => {
-    if (!draft.text.trim() || !draft.date || (draft.kind === 'tutoring' && !draft.classId)) return
+    if (!draft.text.trim() || !effectiveDate || (draft.kind === 'tutoring' && !draft.classId)) return
     setBusy(true)
     setError('')
     try {
       if (draft.kind === 'tutoring') {
-        const dueAt = new Date(`${draft.date}T${draft.time || '09:00'}:00`)
+        const dueAt = new Date(`${effectiveDate}T${effectiveTime || '09:00'}:00`)
         if (Number.isNaN(dueAt.getTime())) throw new Error('Revisa la data i l’hora del recordatori.')
         await addTutoringCoordinationItem({
           assigneeUid: 'all',
@@ -279,16 +302,17 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             timetableSlotId: selectedSession.timetableSlotId,
           } : {}),
           reminder: {
-            date: draft.date,
+            date: effectiveDate,
             dismissedAt: '',
             snoozeUntil: '',
             text: draft.text.trim(),
-            time: draft.time || '',
+            time: effectiveTime || '',
           },
           source: selectedSession ? 'manual-session-reminder' : 'manual-general-reminder',
         })
       }
-      setDraft((current) => ({ ...current, sessionKey: '', text: '', time: '' }))
+      setDateTimeEdited(false)
+      setDraft((current) => ({ ...current, sessionKey: '', text: '' }))
     } catch (operationError) {
       setError(operationError.message || 'No s’ha pogut desar el recordatori.')
     } finally {
@@ -374,7 +398,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             <label>
               Classe
               <select
-                onChange={(event) => setDraft((current) => ({ ...current, classId: event.target.value, sessionKey: '' }))}
+                onChange={(event) => selectClass(event.target.value)}
                 value={draft.classId}
               >
                 {draft.kind === 'personal' && <option value="">General (sense classe)</option>}
@@ -388,17 +412,17 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             <label>
               Data
               <input
-                onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value, sessionKey: '' }))}
+                onChange={(event) => { setDateTimeEdited(true); setDraft((current) => ({ ...current, date: event.target.value, sessionKey: '', time: effectiveTime })) }}
                 type="date"
-                value={draft.date}
+                value={effectiveDate}
               />
             </label>
             <label>
               Hora
               <input
-                onChange={(event) => setDraft((current) => ({ ...current, sessionKey: '', time: event.target.value }))}
+                onChange={(event) => { setDateTimeEdited(true); setDraft((current) => ({ ...current, date: effectiveDate, sessionKey: '', time: event.target.value })) }}
                 type="time"
-                value={draft.time}
+                value={effectiveTime}
               />
             </label>
           </div>
@@ -423,7 +447,7 @@ export function RemindersModal({ focusedReminderIds = [], onClose, sessionOption
             placeholder={draft.kind === 'tutoring' ? 'Ex: reunió amb la família de…' : 'Ex: recordar que portin gots de plàstic…'}
             value={draft.text}
           />
-          <button className="primary-action compact" disabled={busy || !draft.text.trim() || !draft.date || (draft.kind === 'tutoring' && !draft.classId)} onClick={addReminder} type="button">
+          <button className="primary-action compact" disabled={busy || !draft.text.trim() || !effectiveDate || (draft.kind === 'tutoring' && !draft.classId)} onClick={addReminder} type="button">
             <Plus size={15} />
             {busy ? 'Desant…' : draft.kind === 'tutoring' ? 'Afegir recordatori de cotutoria' : 'Afegir recordatori'}
           </button>
