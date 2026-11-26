@@ -28,6 +28,7 @@ import {
 import { PLANNING_SYNC_LABELS, PLANNING_SYNC_STATES } from '../../data/sync/planningSync'
 import { getAgendaSessionItemRemovalState } from '../../lib/agendaToday'
 import { selectPriorTemporalUnitCleanup } from './temporalUnitCleanup.js'
+import { getManuallyCompletedRecoveryOptions } from './agendaRecoveryOptions.js'
 import { CROSS_DEVICE_REFRESH_EVENT } from '../../lib/crossDeviceRefresh'
 import {
   buildSchedulingPersistenceEntries,
@@ -1641,6 +1642,24 @@ export function useAgendaWorkspace(user, classes = []) {
       const activities = structureResult.entities
         .filter((entity) => entity.entityType === 'planningActivity')
       const activityById = new Map(activities.map((activity) => [activity.id, activity]))
+      const currentApplication = [...applications]
+        .sort((left, right) => {
+          if (unit.id === bundle.planningUnit.id) {
+            if (left.id === bundle.application.id) return -1
+            if (right.id === bundle.application.id) return 1
+          }
+          return String(right.updatedAt || '').localeCompare(String(left.updatedAt || ''))
+        })[0]
+      const completedOverrides = currentApplication
+        ? (await repository.loadScope(
+            `application:${currentApplication.id}:overrides`,
+            async () => withPlanningRemoteContext(
+              await loadPlanningActivityOverrides(unit.id, currentApplication.id),
+              { applicationId: currentApplication.id, planningUnitId: unit.id },
+            ),
+            { completeSnapshot: true },
+          )).entities
+        : []
       const sessionResults = await Promise.all(applications.map((application) => repository.loadScope(
         `application:${application.id}:sessions`,
         async () => withPlanningRemoteContext(
@@ -1677,13 +1696,14 @@ export function useAgendaWorkspace(user, classes = []) {
         )))
       return {
         activityById,
+        completedOverrides,
         detailResults,
         orderedActivities: orderActivitiesForScheduling(phases, activities),
         previousSessions,
         unit,
       }
     }))
-    histories.forEach(({ activityById, detailResults, orderedActivities, previousSessions, unit }) => {
+    histories.forEach(({ activityById, completedOverrides, detailResults, orderedActivities, previousSessions, unit }) => {
       previousSessions.forEach(({ session }, index) => {
         if (['cancelled', 'notHeld'].includes(session.status)) return
         detailResults[index].entities
@@ -1702,6 +1722,18 @@ export function useAgendaWorkspace(user, classes = []) {
             })
           })
       })
+      for (const option of getManuallyCompletedRecoveryOptions({
+        activities: orderedActivities,
+        overrides: completedOverrides,
+        session: bundle.session,
+        unit,
+      })) {
+        const key = `${unit.id}:${option.sourceActivityId}`
+        const existing = latestByActivityId.get(key)
+        latestByActivityId.set(key, existing
+          ? { ...existing, isManuallyCompleted: true }
+          : option)
+      }
       // Si una replanificació antiga ja va retirar les sessions de la
       // cronologia, l'activitat mestra continua existint a la UP. Oferim les
       // activitats anteriors a la que consta avui, començant per la més
@@ -1744,6 +1776,9 @@ export function useAgendaWorkspace(user, classes = []) {
     })
     return [...latestByActivityId.values()]
       .sort((left, right) => {
+        if (left.isManuallyCompleted !== right.isManuallyCompleted) {
+          return left.isManuallyCompleted ? -1 : 1
+        }
         if (left.lastStartsAt && right.lastStartsAt) {
           return right.lastStartsAt.localeCompare(left.lastStartsAt)
         }
