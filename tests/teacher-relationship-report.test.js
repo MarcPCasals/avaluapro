@@ -20,6 +20,8 @@ test('teacher report excludes questionnaire by default and preserves directions'
   assert.equal(report.relationCount, 3)
   assert.equal(report.questionnaireCount, 0)
   assert.equal(report.rows[0].social.length, 0)
+  assert.equal(report.rows[0].work[0].direction, '↔')
+  assert.equal(report.rows[1].avoid[0].direction, '←')
   assert.deepEqual(report.pairs.work.map((pair) => pair.label), ['Alba ↔ Biel'])
   assert.deepEqual(report.pairs.avoid.map((pair) => pair.label), ['Clara → Biel'])
   assert.equal(JSON.stringify(report).includes('nota privada'), false)

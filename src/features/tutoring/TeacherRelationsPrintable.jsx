@@ -11,7 +11,7 @@ export function TeacherRelationshipReport({ students, relations, includeQuestion
   return <section className="teacher-relationship-report" aria-label="Informe de relacions per a l’equip docent">
     <div className="teacher-relationship-intro">
       <strong>Ús intern de l’equip docent</strong>
-      <p>{report.relationCount} relacions registrades: {report.teacherCount} de criteri docent{includeQuestionnaire ? ` i ${report.questionnaireCount} del qüestionari de l’alumnat` : ''}. La llista de cada alumne mostra les relacions registrades des d’aquell alumne. A les parelles, → indica la direcció registrada i ↔ indica tots dos sentits.</p>
+      <p>{report.relationCount} relacions registrades: {report.teacherCount} de criteri docent{includeQuestionnaire ? ` i ${report.questionnaireCount} del qüestionari de l’alumnat` : ''}. A cada fitxa, → surt de l’alumne, ← arriba a l’alumne i ↔ està registrada en tots dos sentits. El resum de parelles conserva la mateixa direcció.</p>
       <p>Registre orientatiu per preparar parelles, grups i llocs a l’aula. «Evitar de moment» indica una precaució pedagògica temporal.</p>
     </div>
     {report.relationCount === 0 ? <p className="teacher-relationship-empty">Encara no hi ha relacions dels orígens seleccionats per a aquest grup.</p> : <>
@@ -19,13 +19,13 @@ export function TeacherRelationshipReport({ students, relations, includeQuestion
         <h3>Relacions per alumne</h3>
         {report.rows.map(({ student, work, social, avoid }) => <article key={student.id}>
           <h4>{student.name}</h4>
-          {work.length + social.length + avoid.length === 0 ? <span className="teacher-relationship-no-rows">Sense relacions registrades des d’aquest alumne.</span> :
+          {work.length + social.length + avoid.length === 0 ? <span className="teacher-relationship-no-rows">Sense relacions registrades per a aquest alumne.</span> :
           <div className="teacher-relationship-student-grid">
             {SECTIONS.map(({ key, title }) => {
               const items = { work, social, avoid }[key]
               return <div key={key} className={`teacher-relationship-${key}`}>
                 <strong>{title}</strong>
-                {items.length ? <ul>{items.map((item) => <li key={item.id || `${student.id}-${key}-${item.name}`}>{item.name}{includeQuestionnaire && <small> · {item.source}</small>}</li>)}</ul> : <span>Sense registres</span>}
+                {items.length ? <ul>{items.map((item) => <li key={item.id}>{item.direction} {item.name}{includeQuestionnaire && <small> · {item.source}</small>}</li>)}</ul> : <span>Sense registres</span>}
               </div>
             })}
           </div>}

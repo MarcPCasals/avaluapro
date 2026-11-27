@@ -13,12 +13,31 @@ export function buildTeacherRelationshipReport({ students = [], relations = [], 
   })
   const order = (a, b) => a.name.localeCompare(b.name, 'ca')
   const rows = [...students].sort(order).map((student) => {
-    const outgoing = selected.filter((relation) => relation.sourceStudentId === student.id)
-    const group = (type) => outgoing.filter((relation) => relation.type === type).map((relation) => ({
-      id: relation.id,
-      name: studentsById.get(relation.targetStudentId).name,
-      source: QUESTIONNAIRE_SOURCES.has(relation.source) ? 'Qüestionari' : 'Criteri docent',
-    })).sort(order)
+    const connected = selected.filter((relation) =>
+      relation.sourceStudentId === student.id || relation.targetStudentId === student.id,
+    )
+    const group = (type) => {
+      const counterparts = new Map()
+      connected.filter((relation) => relation.type === type).forEach((relation) => {
+        const outgoing = relation.sourceStudentId === student.id
+        const counterpartId = outgoing ? relation.targetStudentId : relation.sourceStudentId
+        const current = counterparts.get(counterpartId) || {
+          id: counterpartId,
+          name: studentsById.get(counterpartId).name,
+          directions: new Set(),
+          sources: new Set(),
+        }
+        current.directions.add(outgoing ? 'outgoing' : 'incoming')
+        current.sources.add(QUESTIONNAIRE_SOURCES.has(relation.source) ? 'Qüestionari' : 'Criteri docent')
+        counterparts.set(counterpartId, current)
+      })
+      return [...counterparts.values()].map((item) => ({
+        id: item.id,
+        name: item.name,
+        direction: item.directions.size === 2 ? '↔' : item.directions.has('outgoing') ? '→' : '←',
+        source: [...item.sources].join(' + '),
+      })).sort(order)
+    }
     return { student, work: group('positive'), social: group('friendship'), avoid: group('avoid') }
   })
 

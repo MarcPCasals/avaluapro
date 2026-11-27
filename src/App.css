@@ -12256,9 +12256,10 @@ button.tutorial-record-pill {
 
   body.sociometric-report-printing .app-shell > :not(.content-area),
   body.sociometric-report-printing .tutoring-view > :not(.tutorial-relationships-panel),
+  body.sociometric-report-printing .tutorial-relationships-panel > :not(.sociometric-reports-panel),
   body.sociometric-report-printing .tutorial-tool-launch-grid,
   body.sociometric-report-printing .relationship-tool-panel:not(.sociometric-reports-panel),
-  body.sociometric-report-printing .sociometric-reports-panel > header,
+  body.sociometric-report-printing .sociometric-reports-panel > header:not(.sociometric-report-print-header),
   body.sociometric-report-printing .sociometric-reports-overview,
   body.sociometric-report-printing .sociometric-report-type-grid,
   body.sociometric-report-printing .sociometric-report-workspace,
@@ -12354,7 +12355,7 @@ button.tutorial-record-pill {
   body.sociometric-report-printing .teacher-relationship-pairs h3 { font-size: 14px; }
   body.sociometric-report-printing .teacher-relationship-students h4,
   body.sociometric-report-printing .teacher-relationship-pairs h4 { font-size: 11px; }
-  body.sociometric-report-printing .teacher-relationship-pairs { break-before: auto; }
+  body.sociometric-report-printing .teacher-relationship-pairs { break-before: page; }
 
   body.sociometric-report-printing .sociometric-quick-report,
   body.sociometric-report-printing .sociometric-complete-report,
