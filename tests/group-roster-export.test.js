@@ -26,6 +26,13 @@ test('names and titles are escaped, unsafe image sources cannot inject markup', 
   assert.equal(html.includes('javascript:'), false)
 })
 
+test('cooperative roles appear beside names in the printable roster', () => {
+  const html = buildGroupRosterHtml([{ name: 'Grup 1', students: [
+    { name: 'Alumna fictícia', cooperativeRole: 'Comunicador' },
+  ] }])
+  assert.match(html, /Alumna fictícia<small> · Comunicador<\/small>/)
+})
+
 test('blocked popup gives actionable feedback', () => {
   globalThis.window = { open: () => null }
   try { assert.throws(() => openGroupRosterExport([]), /Permet obrir/) } finally { delete globalThis.window }

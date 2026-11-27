@@ -8606,6 +8606,44 @@ button.tutorial-record-pill {
 .cooperative-manual-assignment button.active { color: white; background: #6d28d9; }
 .cooperative-manual-group-actions { margin-top: 10px; }
 
+.cooperative-manual-search { width: 100%; }
+.cooperative-manual-search input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.cooperative-manual-suggestions {
+  margin-top: 3px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 24px #312e8130;
+}
+.cooperative-manual-suggestions button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+}
+.cooperative-manual-suggestions button:hover,
+.cooperative-manual-suggestions button:focus-visible { background: #f5f3ff; }
+.cooperative-member-with-role { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.cooperative-member-with-role > button { min-width: 0; }
+.cooperative-member-with-role select {
+  max-width: 125px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 5px;
+  font-size: 11px;
+  background: #fff;
+}
+
 .cooperative-canvas-toolbar button > svg {
   color: #7c3aed;
 }

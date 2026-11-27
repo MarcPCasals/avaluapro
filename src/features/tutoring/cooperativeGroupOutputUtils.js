@@ -7,10 +7,36 @@ export function formatCooperativeStudentName(name) {
   return [givenName, surnames.trim()].filter(Boolean).join(' ')
 }
 
+export const COOPERATIVE_ROLES = ['Coordinador', 'Comunicador', 'Material', 'Revisor']
+
+const normalizeSearch = (value) => String(value || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca')
+  .replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
+export function findCooperativeStudentMatches(students, query) {
+  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  return (students || [])
+    .filter((student) => {
+      const name = normalizeSearch(formatCooperativeStudentName(student.name))
+      return words.every((word) => name.includes(word))
+    })
+    .sort((a, b) => {
+      const aName = normalizeSearch(formatCooperativeStudentName(a.name))
+      const bName = normalizeSearch(formatCooperativeStudentName(b.name))
+      return Number(bName.startsWith(words[0])) - Number(aName.startsWith(words[0])) ||
+        aName.localeCompare(bName, 'ca')
+    })
+    .slice(0, 6)
+}
+
 function getGroupMemberNames(group) {
   return (group?.members || [])
-    .map((member) => member?.student?.name || member?.name || '')
-    .map(formatCooperativeStudentName)
+    .map((member) => {
+      const name = formatCooperativeStudentName(member?.student?.name || member?.name || '')
+      const role = group?.memberRoles?.[member?.student?.id || member?.id]
+      return role && COOPERATIVE_ROLES.includes(role) ? `${name} · ${role}` : name
+    })
     .filter(Boolean)
 }
 

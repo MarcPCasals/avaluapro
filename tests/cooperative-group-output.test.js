@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   buildStudentCooperativeGroupText,
   buildTeacherCooperativeGroupText,
+  findCooperativeStudentMatches,
   formatCooperativeStudentName,
 } from '../src/features/tutoring/cooperativeGroupOutputUtils.js'
 
@@ -29,6 +30,17 @@ describe('sortides de grups cooperatius', () => {
     )
   })
 
+  it('proposa alumnes a partir del nom o cognom sense exigir accents', () => {
+    const students = [
+      { id: '1', name: 'García, Júlia' },
+      { id: '2', name: 'Garcia, Joan' },
+      { id: '3', name: 'Pérez, Anna' },
+    ]
+    assert.deepEqual(findCooperativeStudentMatches(students, 'julia garcia').map((item) => item.id), ['1'])
+    assert.deepEqual(findCooperativeStudentMatches(students, 'garcia').map((item) => item.id), ['2', '1'])
+    assert.deepEqual(findCooperativeStudentMatches(students, ''), [])
+  })
+
   it('la còpia per alumnat només inclou noms i grups', () => {
     const text = buildStudentCooperativeGroupText(groups, { title: 'Laboratori' })
 
@@ -52,5 +64,21 @@ describe('sortides de grups cooperatius', () => {
     assert.match(text, /Observació docent/)
     assert.match(text, /Fortaleses/)
     assert.match(text, /Punts a revisar/)
+  })
+
+  it('inclou els rols triats en les dues llistes i ignora valors desconeguts', () => {
+    const withRoles = [{
+      name: 'Grup 1',
+      memberRoles: { 'student-1': 'Coordinador', 'student-2': 'Inventat' },
+      members: [
+        { student: { id: 'student-1', name: 'Alumna A' } },
+        { student: { id: 'student-2', name: 'Alumne B' } },
+      ],
+    }]
+    const studentText = buildStudentCooperativeGroupText(withRoles)
+    const teacherText = buildTeacherCooperativeGroupText(withRoles)
+    assert.match(studentText, /Alumna A · Coordinador/)
+    assert.match(teacherText, /Alumna A · Coordinador/)
+    assert.doesNotMatch(studentText, /Inventat/)
   })
 })

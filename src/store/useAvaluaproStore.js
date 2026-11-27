@@ -126,6 +126,7 @@ import {
   normalizeCooperativeGenerationMeta,
   normalizeCooperativeQualitySnapshot,
 } from '../features/tutoring/cooperativeGroupHistoryUtils'
+import { COOPERATIVE_ROLES } from '../features/tutoring/cooperativeGroupOutputUtils'
 import { findAbsenceForSession, findAbsenceInSlot, getAbsenceTimeParts } from '../lib/attendance'
 import {
   clearRecoveryTaskLinks,
@@ -5053,6 +5054,9 @@ export const useAvaluaproStore = create((set, get) => ({
         locked: Boolean(group.locked),
         lockedMemberIds: memberIds.filter((memberId) => (lockedStudentIds || []).includes(memberId)),
         memberIds,
+        memberRoles: Object.fromEntries(memberIds
+          .map((memberId) => [memberId, group.memberRoles?.[memberId]])
+          .filter(([, role]) => COOPERATIVE_ROLES.includes(role))),
         name: group.name || `Grup ${index + 1}`,
       }
     })
@@ -6161,9 +6165,12 @@ export const useAvaluaproStore = create((set, get) => ({
       tutorialStudentRoles: (current.tutorialStudentRoles || []).filter((role) => role.studentId !== studentId),
       tutorialGroupSets: (current.tutorialGroupSets || []).map((groupSet) => ({
         ...groupSet,
+        excludedStudentIds: (groupSet.excludedStudentIds || []).filter((id) => id !== studentId),
         groups: (groupSet.groups || []).map((group) => ({
           ...group,
           memberIds: (group.memberIds || []).filter((memberId) => memberId !== studentId),
+          memberRoles: Object.fromEntries(Object.entries(group.memberRoles || {})
+            .filter(([memberId]) => memberId !== studentId)),
         })),
         updatedAt: now,
       })),
