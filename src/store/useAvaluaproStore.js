@@ -5025,6 +5025,7 @@ export const useAvaluaproStore = create((set, get) => ({
 
   saveTutorialGroupSet: async ({
     classId,
+    excludedStudentIds,
     generationMeta,
     groups,
     groupSize,
@@ -5047,6 +5048,7 @@ export const useAvaluaproStore = create((set, get) => ({
         .map((member) => member.student?.id || member.studentId || member.id)
         .filter(Boolean)
       return {
+        halfGroupName: String(group.halfGroupName || '').trim(),
         id: group.id || `group_${index + 1}`,
         locked: Boolean(group.locked),
         lockedMemberIds: memberIds.filter((memberId) => (lockedStudentIds || []).includes(memberId)),
@@ -5061,6 +5063,7 @@ export const useAvaluaproStore = create((set, get) => ({
           id: createId('tgroups'),
           classId,
           createdAt: now,
+          excludedStudentIds: [...new Set((excludedStudentIds || []).filter(Boolean))],
           generationMeta: normalizeCooperativeGenerationMeta(generationMeta),
           groupSize: Number(groupSize) || 4,
           groups: cleanGroups,

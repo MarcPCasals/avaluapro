@@ -8563,6 +8563,49 @@ button.tutorial-record-pill {
   background: #faf5ff;
 }
 
+.cooperative-exclusion-list {
+  display: grid;
+  gap: 8px;
+  max-height: 290px;
+  overflow: auto;
+  margin: 10px 0;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.cooperative-exclusion-list legend { font-weight: 800; }
+.cooperative-exclusion-list label { display: flex; align-items: center; gap: 8px; }
+.cooperative-exclusion-list input { width: auto; }
+
+.cooperative-excluded-summary,
+.cooperative-manual-assignment {
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #faf5ff;
+}
+
+.cooperative-manual-assignment > div,
+.cooperative-manual-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cooperative-manual-assignment button,
+.cooperative-manual-group-actions button {
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #5b21b6;
+  background: white;
+  cursor: pointer;
+}
+
+.cooperative-manual-assignment button.active { color: white; background: #6d28d9; }
+.cooperative-manual-group-actions { margin-top: 10px; }
+
 .cooperative-canvas-toolbar button > svg {
   color: #7c3aed;
 }

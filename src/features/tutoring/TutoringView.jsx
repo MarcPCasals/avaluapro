@@ -208,6 +208,8 @@ const EMPTY_COOPERATIVE_EDIT_DRAFT = {
   targetStudentId: '',
   type: 'move',
 }
+const EMPTY_COOPERATIVE_GROUPS = []
+const EMPTY_COOPERATIVE_STUDENT_IDS = []
 const SEATING_ITERATION_OBJECTIVES = [
   { id: 'balanced', label: 'Equilibri general', description: 'Compensa tots els criteris pedagògics.' },
   { id: 'calm', label: 'Més calma', description: 'Separa tensions, conflictes i influències difícils.' },
@@ -2930,6 +2932,8 @@ function materializeSavedCooperativeGroups({ profilesByStudentId, relations, sav
   if (!savedGroupSet) return []
 
   const groups = (savedGroupSet.groups || []).map((group, index) => ({
+    halfGroupName: group.halfGroupName ||
+      profilesByStudentId.get(group.memberIds?.[0])?.halfGroup || '',
     id: group.id || `saved_group_${index + 1}`,
     locked: Boolean(group.locked),
     members: (group.memberIds || []).map((studentId) => profilesByStudentId.get(studentId)).filter(Boolean),
@@ -4598,7 +4602,10 @@ export function TutoringView() {
   const [cooperativeGroupSetName, setCooperativeGroupSetName] = useState('')
   const [cooperativeGroupSetObservation, setCooperativeGroupSetObservation] = useState('')
   const [cooperativeSourceGroupSetId, setCooperativeSourceGroupSetId] = useState('')
-  const [manualCooperativeGroups, setManualCooperativeGroups] = useState([])
+  const [manualCooperativeGroupState, setManualCooperativeGroupState] = useState({ classId: '', groups: [] })
+  const [manualCooperativeBuildState, setManualCooperativeBuildState] = useState({ classId: '', active: false })
+  const [excludedCooperativeStudentState, setExcludedCooperativeStudentState] = useState({ classId: '', ids: [] })
+  const [pendingCooperativeStudentId, setPendingCooperativeStudentId] = useState('')
   const [selectedCooperativeGroupSetId, setSelectedCooperativeGroupSetId] = useState('')
   const [selectedCooperativeGroupId, setSelectedCooperativeGroupId] = useState('')
   const [cooperativeEditDraft, setCooperativeEditDraft] = useState(EMPTY_COOPERATIVE_EDIT_DRAFT)
@@ -4654,6 +4661,23 @@ export function TutoringView() {
   const [tutoringChangeSignalsSpaceId, setTutoringChangeSignalsSpaceId] = useState('')
   const [tutoringChangeSignalError, setTutoringChangeSignalError] = useState({ message: '', spaceId: '' })
   const activeClassId = useAvaluaproStore((state) => state.ui.activeClassId)
+  const manualCooperativeGroups = manualCooperativeGroupState.classId === activeClassId
+    ? manualCooperativeGroupState.groups : EMPTY_COOPERATIVE_GROUPS
+  const manualCooperativeBuild = manualCooperativeBuildState.classId === activeClassId &&
+    manualCooperativeBuildState.active
+  const excludedCooperativeStudentIds = excludedCooperativeStudentState.classId === activeClassId
+    ? excludedCooperativeStudentState.ids : EMPTY_COOPERATIVE_STUDENT_IDS
+  const setManualCooperativeGroups = (next) => setManualCooperativeGroupState((current) => ({
+    classId: activeClassId,
+    groups: typeof next === 'function'
+      ? next(current.classId === activeClassId ? current.groups : []) : next,
+  }))
+  const setManualCooperativeBuild = (active) => setManualCooperativeBuildState({ classId: activeClassId, active })
+  const setExcludedCooperativeStudentIds = (next) => setExcludedCooperativeStudentState((current) => ({
+    classId: activeClassId,
+    ids: typeof next === 'function'
+      ? next(current.classId === activeClassId ? current.ids : []) : next,
+  }))
   const classes = useAvaluaproStore((state) => state.classes)
   const cloud = useAvaluaproStore((state) => state.cloud)
   const students = useAvaluaproStore((state) => state.students)
@@ -5710,7 +5734,9 @@ export function TutoringView() {
       buildCooperativeGroups({
         groupSize: cooperativeGroupSize,
         prioritizeHalfGroups,
-        profiles: tutorialSummary.studentProfiles,
+        profiles: tutorialSummary.studentProfiles.filter(
+          (profile) => !excludedCooperativeStudentIds.includes(profile.student.id),
+        ),
         recordRowsByStudent: tutorialRecordRowsByStudent,
         relationRowsByStudent: tutorialRelationRowsByStudent,
         relations: effectiveTutorialRelations,
@@ -5721,6 +5747,7 @@ export function TutoringView() {
     [
       cooperativeGroupSize,
       cooperativeStrategy,
+      excludedCooperativeStudentIds,
       effectiveTutorialRelations,
       prioritizeHalfGroups,
       sociometricRowsByStudentId,
@@ -5750,16 +5777,33 @@ export function TutoringView() {
             savedGroupSet: selectedCooperativeGroupSet,
           })
         : manualCooperativeGroups.length > 0
-          ? enrichCooperativeGroups(manualCooperativeGroups, effectiveTutorialRelations)
+          ? enrichCooperativeGroups(manualCooperativeGroups.map((group) => ({
+              ...group,
+              members: group.members.filter(
+                (member) => !excludedCooperativeStudentIds.includes(member.student.id),
+              ),
+            })), effectiveTutorialRelations)
         : cooperativeGroups,
     [
       cooperativeGroups,
       cooperativeProfilesByStudentId,
       effectiveTutorialRelations,
+      excludedCooperativeStudentIds,
       manualCooperativeGroups,
       selectedCooperativeGroupSet,
     ],
   )
+  const visibleExcludedCooperativeStudentIds = selectedCooperativeGroupSet
+    ? selectedCooperativeGroupSet.excludedStudentIds || []
+    : excludedCooperativeStudentIds
+  const unassignedCooperativeStudents = manualCooperativeBuild && !selectedCooperativeGroupSet
+    ? classStudents.filter((student) =>
+        !excludedCooperativeStudentIds.includes(student.id) &&
+        !visibleCooperativeGroups.some((group) =>
+          group.members.some((member) => member.student.id === student.id),
+        ),
+      )
+    : []
   const cooperativeGroupSetAnalysis = useMemo(
     () =>
       analyzeCooperativeGroupSet(visibleCooperativeGroups, {
@@ -7054,11 +7098,13 @@ export function TutoringView() {
   }
 
   const handleSaveCooperativeGroupSet = async () => {
-    if (visibleCooperativeGroups.length === 0) return
+    if (visibleCooperativeGroups.length === 0 || cooperativeGroupSetAnalysis.totalStudents === 0 ||
+      unassignedCooperativeStudents.length > 0) return
 
     const fallbackName = `Grups cooperatius ${formatShortDate(getTodayDateInput())}`
     await saveTutorialGroupSet({
       classId: activeClassId,
+      excludedStudentIds: excludedCooperativeStudentIds,
       generationMeta: cooperativeGroupSetAnalysis.methodology,
       groupSize: cooperativeGroupSize,
       groups: visibleCooperativeGroups,
@@ -7096,6 +7142,8 @@ export function TutoringView() {
     setCooperativeStrategy(groupSet.strategy || 'balanced')
     setPrioritizeHalfGroups(groupSet.prioritizeHalfGroups !== false)
     setManualCooperativeGroups(reusableGroups)
+    setManualCooperativeBuild((groupSet.excludedStudentIds || []).length > 0)
+    setExcludedCooperativeStudentIds(groupSet.excludedStudentIds || [])
     setCooperativeLockedStudentIds(
       [...new Set((groupSet.groups || []).flatMap((group) => group.lockedMemberIds || []))],
     )
@@ -7142,6 +7190,7 @@ export function TutoringView() {
 
   const resetCooperativeManualEditing = () => {
     setManualCooperativeGroups([])
+    setManualCooperativeBuild(false)
     setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
     setCooperativeEditHistory({ future: [], past: [] })
     setCooperativeLockedStudentIds([])
@@ -7273,6 +7322,45 @@ export function TutoringView() {
     commitCooperativeStructureChange(nextGroups)
     setSelectedCooperativeGroupId(nextGroups.at(-1)?.id || '')
     setCooperativeRenameDraft(nextGroups.at(-1)?.name || '')
+  }
+
+  const handleStartManualCooperativeBuild = () => {
+    if (cooperativeGroupSetAnalysis.totalStudents === 0) return
+    if (manualCooperativeGroups.length > 0 && !window.confirm(
+      'Vols començar uns grups manuals nous? Es perdran els canvis d’aquesta proposta que encara no hagis guardat.',
+    )) return
+    const emptyGroups = cooperativeGroups.map((group) => ({ ...group, members: [] }))
+    setManualCooperativeGroups(emptyGroups)
+    setManualCooperativeBuild(true)
+    setPendingCooperativeStudentId('')
+    setSelectedCooperativeGroupSetId('')
+    setSelectedCooperativeGroupId('')
+    setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
+    setCooperativeEditHistory({ future: [], past: [] })
+  }
+
+  const handleAssignManualCooperativeStudent = (groupId) => {
+    const member = cooperativeProfilesByStudentId.get(pendingCooperativeStudentId)
+    const group = visibleCooperativeGroups.find((item) => item.id === groupId)
+    if (!member || excludedCooperativeStudentIds.includes(pendingCooperativeStudentId) || !group || group.locked ||
+      (prioritizeHalfGroups && group.halfGroupName && group.halfGroupName !==
+        (member.halfGroup || 'Sense mig grup'))) return
+    commitCooperativeStructureChange(visibleCooperativeGroups.map((item) =>
+      item.id === groupId ? {
+        ...item,
+        halfGroupName: item.halfGroupName || member.halfGroup || 'Sense mig grup',
+        members: [...item.members, member],
+      } : item,
+    ))
+    setPendingCooperativeStudentId('')
+  }
+
+  const handleRemoveManualCooperativeStudent = (studentId) => {
+    if (!manualCooperativeBuild) return
+    commitCooperativeStructureChange(visibleCooperativeGroups.map((group) => ({
+      ...group,
+      members: group.members.filter((member) => member.student.id !== studentId),
+    })))
   }
 
   const handleRenameCooperativeGroup = (groupId, name) => {
@@ -10241,6 +10329,7 @@ export function TutoringView() {
               onApply={async (assignments, lockedIds) => {
                 await applyClassHalfGroups(linkedClassId, assignments, lockedIds)
                 setManualCooperativeGroups([])
+                setManualCooperativeBuild(false)
                 setSelectedCooperativeGroupSetId('')
                 setSelectedCooperativeGroupId('')
                 setCooperativeEditDraft(EMPTY_COOPERATIVE_EDIT_DRAFT)
@@ -10268,7 +10357,9 @@ export function TutoringView() {
                 <div>
                   <h2>Grups cooperatius</h2>
                   <span>
-                    {cooperativeGroupSetAnalysis.reviewGroupCount + cooperativeGroupSetAnalysis.criticalGroupCount === 0
+                    {unassignedCooperativeStudents.length > 0
+                      ? `${unassignedCooperativeStudents.length} alumnes pendents de repartir`
+                      : cooperativeGroupSetAnalysis.reviewGroupCount + cooperativeGroupSetAnalysis.criticalGroupCount === 0
                       ? 'Proposta equilibrada'
                       : `${cooperativeGroupSetAnalysis.reviewGroupCount + cooperativeGroupSetAnalysis.criticalGroupCount} grup/s a revisar`}
                     {' · '}
@@ -10279,6 +10370,7 @@ export function TutoringView() {
               <div className="cooperative-canvas-actions">
                 <button
                   className="primary-action compact"
+                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     setSelectedCooperativeGroupId('')
                     setCooperativeWorkspacePanel('save')
@@ -10290,6 +10382,7 @@ export function TutoringView() {
                 </button>
                 <button
                   className={cooperativeWorkspacePanel === 'share' ? 'secondary-action compact active' : 'secondary-action compact'}
+                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     setSelectedCooperativeGroupId('')
                     setCooperativeWorkspacePanel((current) => (current === 'share' ? '' : 'share'))
@@ -10458,6 +10551,16 @@ export function TutoringView() {
                 <strong>Crear grup</strong>
               </button>
               <button
+                className={manualCooperativeBuild ? 'active' : ''}
+                disabled={classStudents.length === excludedCooperativeStudentIds.length}
+                onClick={handleStartManualCooperativeBuild}
+                type="button"
+              >
+                <Plus aria-hidden="true" size={24} />
+                <strong>Fer grups manualment</strong>
+                <small>Comença amb grups buits i valora la teva tria.</small>
+              </button>
+              <button
                 className={cooperativeWorkspacePanel === 'versions' ? 'active' : ''}
                 onClick={() => {
                   setSelectedCooperativeGroupId('')
@@ -10523,6 +10626,27 @@ export function TutoringView() {
                     {COOPERATIVE_GROUP_STRATEGIES.find((strategy) => strategy.id === cooperativeStrategy)?.description}
                   </small>
                 </label>
+                <fieldset className="cooperative-exclusion-list">
+                  <legend>Alumnes que no entren a classe</legend>
+                  <small>Marca qui ha de quedar fora de tots els grups d’aquesta proposta.</small>
+                  {classStudents.map((student) => (
+                    <label key={student.id}>
+                      <input
+                        checked={excludedCooperativeStudentIds.includes(student.id)}
+                        onChange={() => {
+                          setSelectedCooperativeGroupSetId('')
+                          setExcludedCooperativeStudentIds((current) =>
+                            current.includes(student.id)
+                              ? current.filter((id) => id !== student.id)
+                              : [...current, student.id],
+                          )
+                        }}
+                        type="checkbox"
+                      />
+                      {formatCooperativeStudentName(student.name)}
+                    </label>
+                  ))}
+                </fieldset>
                 {manualCooperativeGroups.length > 0 && (
                   <button className="secondary-action compact" onClick={resetCooperativeManualEditing} type="button">
                     <RotateCcw size={16} />
@@ -10562,6 +10686,7 @@ export function TutoringView() {
                 </label>
                 <button
                   className="primary-action"
+                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     handleSaveCooperativeGroupSet()
                     setCooperativeWorkspacePanel('')
@@ -10571,6 +10696,9 @@ export function TutoringView() {
                   <Save size={17} />
                   Guardar versió
                 </button>
+                {unassignedCooperativeStudents.length > 0 && (
+                  <small>Reparteix els {unassignedCooperativeStudents.length} alumnes pendents abans de guardar.</small>
+                )}
               </aside>
             )}
 
@@ -10649,6 +10777,32 @@ export function TutoringView() {
                   </span>
                   {manualCooperativeGroups.length > 0 && <em>Editada manualment</em>}
                 </section>
+                {visibleExcludedCooperativeStudentIds.length > 0 && (
+                  <p className="cooperative-excluded-summary">
+                    Fora dels grups: {visibleExcludedCooperativeStudentIds.map((id) =>
+                      formatCooperativeStudentName(classStudents.find((student) => student.id === id)?.name || ''),
+                    ).filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {manualCooperativeBuild && !selectedCooperativeGroupSet && (
+                  <section className="cooperative-manual-assignment">
+                    <strong>Repartiment manual · {unassignedCooperativeStudents.length} pendents</strong>
+                    <p>Tria un alumne pendent i posa’l al grup que vulguis. La valoració s’actualitza amb cada canvi.</p>
+                    <div>
+                      {unassignedCooperativeStudents.map((student) => (
+                        <button
+                          aria-pressed={pendingCooperativeStudentId === student.id}
+                          className={pendingCooperativeStudentId === student.id ? 'active' : ''}
+                          key={student.id}
+                          onClick={() => setPendingCooperativeStudentId(student.id)}
+                          type="button"
+                        >
+                          {formatCooperativeStudentName(student.name)}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {selectedCooperativeGroup && !cooperativeWorkspacePanel && (
                   <section
@@ -11128,6 +11282,31 @@ export function TutoringView() {
                           </button>
                         ))}
                       </div>
+                      {manualCooperativeBuild && !selectedCooperativeGroupSet && (
+                        <div className="cooperative-manual-group-actions">
+                          {group.members.map((member) => (
+                            <button
+                              disabled={group.locked}
+                              key={member.student.id}
+                              onClick={() => handleRemoveManualCooperativeStudent(member.student.id)}
+                              type="button"
+                            >
+                              Treure {formatCooperativeStudentName(member.student.name)}
+                            </button>
+                          ))}
+                          {pendingCooperativeStudentId && (
+                            <button
+                              className="primary-action compact"
+                              disabled={group.locked || (prioritizeHalfGroups && group.halfGroupName && group.halfGroupName !==
+                                (cooperativeProfilesByStudentId.get(pendingCooperativeStudentId)?.halfGroup || 'Sense mig grup'))}
+                              onClick={() => handleAssignManualCooperativeStudent(group.id)}
+                              type="button"
+                            >
+                              Posar aquí
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                       {cooperativeEditSourceMember && cooperativeEditDraft.type === 'move' &&
                         !selectedCooperativeGroup && !selectedCooperativeGroupSet &&
