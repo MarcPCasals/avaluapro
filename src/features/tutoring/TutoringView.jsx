@@ -105,6 +105,7 @@ import {
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricSummaryPanel } from './SociometricSummaryPanel'
 import { SociometricStudentInsightCard } from './SociometricStudentInsightCard'
+import { TeacherRelationshipReport } from './TeacherRelationsPrintable'
 import { StudentProfileSurveyPanel } from './StudentProfileSurveyPanel'
 import { TutoringCoordinationPanel } from './TutoringCoordinationPanel'
 import { TutorialProfileList } from './TutorialProfileList'
@@ -252,6 +253,14 @@ const SOCIOMETRIC_STAT_DRILLDOWN_META = {
   },
 }
 const SOCIOMETRIC_REPORT_TYPES = [
+  {
+    id: 'teachers',
+    title: 'Relacions per a l’equip docent',
+    description: 'Relacions concretes per alumne i parelles útils per preparar grups i llocs.',
+    icon: HeartHandshake,
+    estimate: 'Segons les relacions',
+    status: 'Disponible',
+  },
   {
     id: 'quick',
     title: 'Informe ràpid del grup',
@@ -4574,6 +4583,7 @@ export function TutoringView() {
   const [sociometricSurveyBusy, setSociometricSurveyBusy] = useState('')
   const [sociometricResponseCounts, setSociometricResponseCounts] = useState({})
   const [selectedSociometricReportType, setSelectedSociometricReportType] = useState('quick')
+  const [includeQuestionnaireInTeacherReport, setIncludeQuestionnaireInTeacherReport] = useState(false)
   const [selectedSociometricReportStudentId, setSelectedSociometricReportStudentId] = useState('')
   const [selectedSociometricComparisonEnd, setSelectedSociometricComparisonEnd] = useState('current')
   const [selectedSociometricComparisonStart, setSelectedSociometricComparisonStart] = useState('')
@@ -5615,12 +5625,14 @@ export function TutoringView() {
     (section) => sociometricReportSections[section.id],
   )
   const estimatedSociometricReportPages =
-    selectedSociometricReportType === 'individual'
-      ? Math.max(1, visibleSociometricIndividualReports.length)
-      : Math.max(
-          1,
-          activeSociometricReportSections.reduce((total, section) => total + section.pages, 0),
-        )
+    selectedSociometricReportType === 'teachers'
+      ? '—'
+      : selectedSociometricReportType === 'individual'
+        ? Math.max(1, visibleSociometricIndividualReports.length)
+        : Math.max(
+            1,
+            activeSociometricReportSections.reduce((total, section) => total + section.pages, 0),
+          )
   const handleSelectSociometricReportType = (reportTypeId) => {
     setSelectedSociometricReportType(reportTypeId)
     setSociometricReportSections(DEFAULT_SOCIOMETRIC_REPORT_SECTIONS[reportTypeId] || DEFAULT_SOCIOMETRIC_REPORT_SECTIONS.quick)
@@ -8828,7 +8840,7 @@ export function TutoringView() {
               <div className="sociometric-import-actions">
                 <button
                   className="primary-action compact"
-                  disabled={!['quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
+                  disabled={!['teachers', 'quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
                   onClick={printSociometricReport}
                   type="button"
                 >
@@ -8904,17 +8916,22 @@ export function TutoringView() {
                   <span>{selectedSociometricReportTypeMeta.estimate}</span>
                   <span>{selectedSociometricReportTypeMeta.status}</span>
                 </div>
-                <div className="sociometric-report-priority-list">
+                {selectedSociometricReportType !== 'teachers' && <div className="sociometric-report-priority-list">
                   <strong>Primera lectura del grup</strong>
                   {sociometricReportSnapshot.priorityNames.length > 0 ? (
                     <p>Alumnes a revisar primer: {sociometricReportSnapshot.priorityNames.join(', ')}.</p>
                   ) : (
                     <p>No hi ha alumnes classificats com a rebutjats o aïllats amb les dades actuals.</p>
                   )}
-                </div>
+                </div>}
               </article>
 
-              <article className="sociometric-report-sections">
+              {selectedSociometricReportType === 'teachers' ? <article className="teacher-relationship-options">
+                <h3>Origen de les relacions</h3>
+                <p>El PDF inclou les relacions marcades pel professor. Pots afegir-hi les del qüestionari de l’alumnat.</p>
+                <label><input checked={includeQuestionnaireInTeacherReport} onChange={(event) => setIncludeQuestionnaireInTeacherReport(event.target.checked)} type="checkbox" /> Incloure també el qüestionari de l’alumnat</label>
+                <small>Les notes lliures no s’inclouen al document.</small>
+              </article> : <article className="sociometric-report-sections">
                 <header>
                   <div>
                     <span className="section-kicker">
@@ -8941,10 +8958,10 @@ export function TutoringView() {
                     </button>
                   ))}
                 </div>
-              </article>
+              </article>}
             </div>
 
-            <section className="sociometric-report-config">
+            {selectedSociometricReportType !== 'teachers' && <section className="sociometric-report-config">
               <article>
                 <span>Seccions actives</span>
                 <strong>{activeSociometricReportSections.length}</strong>
@@ -8964,7 +8981,7 @@ export function TutoringView() {
                 </strong>
                 <small>{selectedSociometricReportType === 'individual' ? 'seleccionats per fitxa' : 'inclòs tot el grup'}</small>
               </article>
-            </section>
+            </section>}
 
             {selectedSociometricReportType === 'individual' && (
               <section className="sociometric-report-student-selector">
@@ -9055,7 +9072,9 @@ export function TutoringView() {
               </p>
             </header>
 
-            {selectedSociometricReportType === 'quick' ? (
+            {selectedSociometricReportType === 'teachers' ? (
+              <TeacherRelationshipReport students={classStudents} relations={classTutorialRelations} includeQuestionnaire={includeQuestionnaireInTeacherReport} />
+            ) : selectedSociometricReportType === 'quick' ? (
               <section className="sociometric-quick-report" aria-label="Informe ràpid del grup">
                 <header>
                   <div>
@@ -9771,36 +9790,41 @@ export function TutoringView() {
             )}
 
             <footer className="sociometric-report-print-footer">
-              Informe orientatiu generat amb AvaluaPro. Les dades sociomètriques s’han d’interpretar dins del context
-              educatiu del grup i contrastar-les amb l’observació docent.
+              {selectedSociometricReportType === 'teachers'
+                ? 'Ús intern de l’equip docent. Les relacions registrades s’han de contrastar amb l’observació actual del grup.'
+                : 'Informe orientatiu generat amb AvaluaPro. Les dades sociomètriques s’han d’interpretar dins del context educatiu del grup i contrastar-les amb l’observació docent.'}
             </footer>
 
             <footer className="sociometric-report-footer">
               <p>
-                {selectedSociometricReportType === 'quick'
-                  ? 'L’informe ràpid ja es calcula amb les dades actuals del sociograma i es pot imprimir o guardar com a PDF.'
-                  : selectedSociometricReportType === 'complete'
-                    ? 'L’informe docent complet respecta les seccions actives i es pot imprimir o guardar com a PDF.'
-                    : selectedSociometricReportType === 'comparative'
-                      ? 'L’informe comparatiu reconstrueix dos moments amb les relacions guardades i es pot imprimir o guardar com a PDF.'
-                      : selectedSociometricReportType === 'individual'
-                        ? 'Les fitxes individuals ja es calculen amb les dades actuals i es poden imprimir o guardar com a PDF.'
-                        : 'Aquesta opció queda preparada per a una fase posterior del generador d’informes.'}
+                {selectedSociometricReportType === 'teachers'
+                  ? 'Les relacions seleccionades es poden imprimir o guardar com a PDF per a l’equip docent.'
+                  : selectedSociometricReportType === 'quick'
+                    ? 'L’informe ràpid ja es calcula amb les dades actuals del sociograma i es pot imprimir o guardar com a PDF.'
+                    : selectedSociometricReportType === 'complete'
+                      ? 'L’informe docent complet respecta les seccions actives i es pot imprimir o guardar com a PDF.'
+                      : selectedSociometricReportType === 'comparative'
+                        ? 'L’informe comparatiu reconstrueix dos moments amb les relacions guardades i es pot imprimir o guardar com a PDF.'
+                        : selectedSociometricReportType === 'individual'
+                          ? 'Les fitxes individuals ja es calculen amb les dades actuals i es poden imprimir o guardar com a PDF.'
+                          : 'Aquesta opció queda preparada per a una fase posterior del generador d’informes.'}
               </p>
               <button
                 className="primary-action"
-                disabled={!['quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
+                disabled={!['teachers', 'quick', 'complete', 'individual', 'comparative'].includes(selectedSociometricReportType)}
                 onClick={printSociometricReport}
                 type="button"
               >
                 <FileDown size={17} />
-                {selectedSociometricReportType === 'individual'
-                  ? 'Imprimir fitxes'
-                  : selectedSociometricReportType === 'complete'
-                    ? 'Imprimir informe complet'
-                    : selectedSociometricReportType === 'comparative'
-                      ? 'Imprimir informe comparatiu'
-                      : 'Imprimir informe ràpid'}
+                {selectedSociometricReportType === 'teachers'
+                  ? 'Imprimir relacions'
+                  : selectedSociometricReportType === 'individual'
+                    ? 'Imprimir fitxes'
+                    : selectedSociometricReportType === 'complete'
+                      ? 'Imprimir informe complet'
+                      : selectedSociometricReportType === 'comparative'
+                        ? 'Imprimir informe comparatiu'
+                        : 'Imprimir informe ràpid'}
               </button>
             </footer>
           </section>
