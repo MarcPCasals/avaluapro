@@ -8633,13 +8633,15 @@ button.tutorial-record-pill {
 }
 .cooperative-manual-suggestions button:hover,
 .cooperative-manual-suggestions button:focus-visible { background: #f5f3ff; }
-.cooperative-member-with-role { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
-.cooperative-member-with-role > button { min-width: 0; }
+.cooperative-member-with-role { display: grid; gap: 2px; }
+.cooperative-member-with-role > button { min-width: 0; width: 100%; }
 .cooperative-member-with-role select {
-  max-width: 125px;
+  justify-self: end;
+  max-width: 118px;
+  min-height: 25px;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 4px 5px;
+  border-radius: 6px;
+  padding: 2px 4px;
   font-size: 11px;
   background: #fff;
 }
@@ -8676,6 +8678,19 @@ button.tutorial-record-pill {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 195px), 1fr));
   align-self: start;
   padding: 0 16px 20px 0;
+}
+
+.cooperative-canvas.read-only { grid-template-columns: minmax(0, 1fr); }
+.cooperative-canvas.read-only.has-inspector {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 330px);
+}
+.cooperative-canvas.read-only .cooperative-group-grid,
+.cooperative-canvas.read-only.has-inspector .cooperative-group-grid {
+  grid-column: 1;
+  padding: 0 16px 20px;
+}
+.cooperative-canvas.read-only.has-inspector .cooperative-canvas-inspector {
+  grid-column: 2;
 }
 
 .cooperative-canvas.has-inspector .cooperative-group-grid {
@@ -27927,6 +27942,9 @@ button.profile-followup-card:focus-visible {
   .cooperative-canvas.has-inspector {
     grid-template-columns: 88px minmax(0, 1fr);
   }
+
+  .cooperative-canvas.read-only,
+  .cooperative-canvas.read-only.has-inspector { grid-template-columns: minmax(0, 1fr); }
 
   .cooperative-canvas-header {
     align-items: flex-start;

@@ -5087,6 +5087,29 @@ export const useAvaluaproStore = create((set, get) => ({
     await persistCollections(set, get, ['tutorialGroupSets'])
   },
 
+  updateTutorialGroupMemberRole: async ({ groupSetId, studentId, role }) => {
+    if (!groupSetId || !studentId || (role && !COOPERATIVE_ROLES.includes(role))) return
+    const groupSet = (get().tutorialGroupSets || []).find((item) => item.id === groupSetId)
+    const group = groupSet?.groups?.find((item) => (item.memberIds || []).includes(studentId))
+    if (!group || (group.memberRoles?.[studentId] || '') === role) return
+
+    const updatedAt = new Date().toISOString()
+    setWithEditHistory(set, get, (current) => ({
+      tutorialGroupSets: (current.tutorialGroupSets || []).map((item) => item.id === groupSetId ? {
+        ...item,
+        groups: (item.groups || []).map((currentGroup) => currentGroup.id === group.id ? {
+          ...currentGroup,
+          memberRoles: Object.fromEntries(Object.entries({
+            ...(currentGroup.memberRoles || {}),
+            [studentId]: role,
+          }).filter(([, value]) => Boolean(value))),
+        } : currentGroup),
+        updatedAt,
+      } : item),
+    }))
+    await persistCollections(set, get, ['tutorialGroupSets'])
+  },
+
   deleteTutorialGroupSet: async (groupSetId) => {
     if (!groupSetId) return
     const state = get()
@@ -6448,7 +6471,7 @@ const reversibleActions = [
   'toggleCompetencyModification', 'setCompetencyModification', 'updateTutorialMark', 'importTutorialMarks',
   'addTutorialRecord', 'updateTutorialRecord', 'deleteTutorialRecord',
   'upsertTutorialRelation', 'importTutorialRelations', 'deleteTutorialRelation',
-  'saveTutorialGroupSet', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
+  'saveTutorialGroupSet', 'updateTutorialGroupMemberRole', 'deleteTutorialGroupSet', 'upsertTutorialSociogramLayout', 'resetTutorialSociogramLayout',
   'toggleTutorialStudentRole', 'saveTutorialSeatingPlan', 'updateTutorialSeatingPlan', 'deleteTutorialSeatingPlan',
   'addCompetency', 'updateCompetency', 'deleteCompetency', 'setUtCompetencyActive', 'setClassTransversalCompetencies',
   'saveEvaluationActions', 'copyEvaluationActions', 'addCriterion', 'updateCriterion', 'deleteCriterion', 'copyCompetenciesToUt', 'applySubjectCfnToUt',

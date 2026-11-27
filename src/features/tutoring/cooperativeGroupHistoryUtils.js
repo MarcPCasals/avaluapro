@@ -38,3 +38,10 @@ export function getCooperativeGroupSetOrigin(groupSet) {
   }
   return 'Proposta automàtica'
 }
+
+export function getVisibleCooperativeGroupSet(groupSets, selectedId = '', editing = false) {
+  if (editing) return null
+  const latest = [...(groupSets || [])]
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null
+  return (groupSets || []).find((groupSet) => groupSet.id === selectedId) || latest
+}
