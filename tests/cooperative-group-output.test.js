@@ -5,6 +5,8 @@ import {
   buildTeacherCooperativeGroupText,
   findCooperativeStudentMatches,
   formatCooperativeStudentName,
+  getExcludedCooperativeStudentIds,
+  sortCooperativeGroupMembers,
 } from '../src/features/tutoring/cooperativeGroupOutputUtils.js'
 
 const groups = [
@@ -80,5 +82,33 @@ describe('sortides de grups cooperatius', () => {
     assert.match(studentText, /Alumna A · Coordinador/)
     assert.match(teacherText, /Alumna A · Coordinador/)
     assert.doesNotMatch(studentText, /Inventat/)
+  })
+
+  it('ordena els membres i les còpies pel rol assignat, sense alterar els rols', () => {
+    const memberRoles = {
+      material: 'Material', comunicador: 'Comunicador',
+      revisor: 'Revisor', coordinador: 'Coordinador',
+    }
+    const members = ['material', 'sense-rol', 'comunicador', 'revisor', 'coordinador']
+      .map((id) => ({ student: { id, name: id } }))
+    assert.deepEqual(
+      sortCooperativeGroupMembers(members, memberRoles).map((member) => member.student.id),
+      ['coordinador', 'revisor', 'comunicador', 'material', 'sense-rol'],
+    )
+    assert.deepEqual(members.map((member) => member.student.id),
+      ['material', 'sense-rol', 'comunicador', 'revisor', 'coordinador'])
+    const text = buildStudentCooperativeGroupText([{ members, memberRoles }])
+    assert.ok(text.indexOf('coordinador · Coordinador') < text.indexOf('revisor · Revisor'))
+    assert.ok(text.indexOf('revisor · Revisor') < text.indexOf('comunicador · Comunicador'))
+    assert.ok(text.indexOf('comunicador · Comunicador') < text.indexOf('material · Material'))
+  })
+
+  it('deixa fora de la versió els alumnes explícitament exclosos i els pendents', () => {
+    assert.deepEqual(
+      getExcludedCooperativeStudentIds(['absent', 'repetit'], [
+        { id: 'pendent' }, { id: 'repetit' }, { id: '' },
+      ]),
+      ['absent', 'repetit', 'pendent'],
+    )
   })
 })

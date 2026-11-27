@@ -7,7 +7,25 @@ export function formatCooperativeStudentName(name) {
   return [givenName, surnames.trim()].filter(Boolean).join(' ')
 }
 
-export const COOPERATIVE_ROLES = ['Coordinador', 'Comunicador', 'Material', 'Revisor']
+export const COOPERATIVE_ROLES = ['Coordinador', 'Revisor', 'Comunicador', 'Material']
+
+export function sortCooperativeGroupMembers(members, memberRoles = {}) {
+  return [...(members || [])].sort((a, b) => {
+    const aRole = memberRoles[a?.student?.id || a?.id]
+    const bRole = memberRoles[b?.student?.id || b?.id]
+    const aRank = COOPERATIVE_ROLES.indexOf(aRole)
+    const bRank = COOPERATIVE_ROLES.indexOf(bRole)
+    return (aRank < 0 ? COOPERATIVE_ROLES.length : aRank) -
+      (bRank < 0 ? COOPERATIVE_ROLES.length : bRank)
+  })
+}
+
+export function getExcludedCooperativeStudentIds(excludedStudentIds, unassignedStudents) {
+  return [...new Set([
+    ...(excludedStudentIds || []),
+    ...(unassignedStudents || []).map((student) => student?.id),
+  ].filter(Boolean))]
+}
 
 const normalizeSearch = (value) => String(value || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ca')
@@ -31,7 +49,7 @@ export function findCooperativeStudentMatches(students, query) {
 }
 
 function getGroupMemberNames(group) {
-  return (group?.members || [])
+  return sortCooperativeGroupMembers(group?.members, group?.memberRoles)
     .map((member) => {
       const name = formatCooperativeStudentName(member?.student?.name || member?.name || '')
       const role = group?.memberRoles?.[member?.student?.id || member?.id]

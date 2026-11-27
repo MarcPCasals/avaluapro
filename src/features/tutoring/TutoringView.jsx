@@ -104,6 +104,8 @@ import {
   COOPERATIVE_ROLES,
   findCooperativeStudentMatches,
   formatCooperativeStudentName,
+  getExcludedCooperativeStudentIds,
+  sortCooperativeGroupMembers,
 } from './cooperativeGroupOutputUtils'
 import { SociometricComparisonSelector } from './SociometricComparisonSelector'
 import { SociometricSummaryPanel } from './SociometricSummaryPanel'
@@ -5803,12 +5805,18 @@ export function TutoringView() {
               ),
             })), effectiveTutorialRelations)
         : cooperativeGroups
-      return selectedCooperativeGroupSet ? groups : groups.map((group) => ({
-        ...group,
-        memberRoles: Object.fromEntries(group.members
-          .map((member) => [member.student.id, cooperativeMemberRoles[member.student.id]])
-          .filter(([, role]) => COOPERATIVE_ROLES.includes(role))),
-      }))
+      return groups.map((group) => {
+        const memberRoles = selectedCooperativeGroupSet
+          ? group.memberRoles
+          : Object.fromEntries(group.members
+            .map((member) => [member.student.id, cooperativeMemberRoles[member.student.id]])
+            .filter(([, role]) => COOPERATIVE_ROLES.includes(role)))
+        return {
+          ...group,
+          memberRoles,
+          members: sortCooperativeGroupMembers(group.members, memberRoles),
+        }
+      })
     },
     [
       cooperativeGroups,
@@ -7125,13 +7133,14 @@ export function TutoringView() {
   }
 
   const handleSaveCooperativeGroupSet = async () => {
-    if (visibleCooperativeGroups.length === 0 || cooperativeGroupSetAnalysis.totalStudents === 0 ||
-      unassignedCooperativeStudents.length > 0) return
+    if (visibleCooperativeGroups.length === 0 || cooperativeGroupSetAnalysis.totalStudents === 0) return
 
     const fallbackName = `Grups cooperatius ${formatShortDate(getTodayDateInput())}`
     await saveTutorialGroupSet({
       classId: activeClassId,
-      excludedStudentIds: excludedCooperativeStudentIds,
+      excludedStudentIds: getExcludedCooperativeStudentIds(
+        excludedCooperativeStudentIds, unassignedCooperativeStudents,
+      ),
       generationMeta: cooperativeGroupSetAnalysis.methodology,
       groupSize: cooperativeGroupSize,
       groups: visibleCooperativeGroups,
@@ -10502,7 +10511,7 @@ export function TutoringView() {
                 {isEditingCooperativeGroups && <>
                 <button
                   className="primary-action compact"
-                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
+                  disabled={cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     setSelectedCooperativeGroupId('')
                     setCooperativeWorkspacePanel('save')
@@ -10518,7 +10527,7 @@ export function TutoringView() {
                 </>}
                 <button
                   className={cooperativeWorkspacePanel === 'share' ? 'secondary-action compact active' : 'secondary-action compact'}
-                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
+                  disabled={cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     setSelectedCooperativeGroupId('')
                     setCooperativeWorkspacePanel((current) => (current === 'share' ? '' : 'share'))
@@ -10802,7 +10811,7 @@ export function TutoringView() {
                 </label>
                 <button
                   className="primary-action"
-                  disabled={unassignedCooperativeStudents.length > 0 || cooperativeGroupSetAnalysis.totalStudents === 0}
+                  disabled={cooperativeGroupSetAnalysis.totalStudents === 0}
                   onClick={() => {
                     handleSaveCooperativeGroupSet()
                     setCooperativeWorkspacePanel('')
@@ -10813,7 +10822,7 @@ export function TutoringView() {
                   Guardar versió
                 </button>
                 {unassignedCooperativeStudents.length > 0 && (
-                  <small>Reparteix els {unassignedCooperativeStudents.length} alumnes pendents abans de guardar.</small>
+                  <small>Els {unassignedCooperativeStudents.length} alumnes pendents quedaran fora dels grups d’aquesta versió.</small>
                 )}
               </aside>
             )}
